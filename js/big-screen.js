@@ -737,6 +737,8 @@ function showMyRewards() {
     } else {
       content.innerHTML = available.map(r => {
         const qty = r.quantity || 0;
+        const redemptions = cachedData?.redemptions || [];
+        const pendingR = r.redemptionId ? redemptions.find(rd => rd.id === r.redemptionId && rd.status === 'pending') : null;
         const metaStr = r.type === 'time'
           ? '时间类 · ' + (r.durationMinutes || 0) + '分钟'
           : '物品类';
@@ -751,6 +753,8 @@ function showMyRewards() {
             onclick="redeemFromRewardBox('${r.id}')">
             兑换
           </button>
+          ${pendingR ? `<button class="btn-cancel" style="padding:8px 16px;font-size:14px;border-radius:8px;border:1px solid var(--text-secondary);background:transparent;color:var(--text-secondary);cursor:pointer;"
+            onclick="cancelRedemption('${pendingR.id}','${r.id}')">撤回</button>` : ''}
         </div>
       `;
       }).join('');
@@ -798,6 +802,44 @@ async function redeemFromRewardBox(itemId) {
     cachedData = await API.getData();
     showMyRewards();
     showToast('已兑换：' + item.name);
+  } finally {
+    _redeemingRewardBox = false;
+  }
+}
+
+async function cancelRedemption(redemptionId, rewardBoxItemId) {
+  if (_redeemingRewardBox) return;
+  _redeemingRewardBox = true;
+  try {
+    const redemptions = cachedData?.redemptions || [];
+    const r = redemptions.find(r => r.id === redemptionId);
+    if (!r || r.status !== 'pending') {
+      showToast('无法撤回');
+      return;
+    }
+
+    r.status = 'cancelled';
+    await API.saveRedemptions(redemptions);
+
+    const shopItems = cachedData?.shopItems || [];
+    const shopItem = shopItems.find(si => si.name === r.itemName);
+    if (shopItem) {
+      shopItem.remainingQuantity = (shopItem.remainingQuantity ?? 0) + 1;
+      await API.saveShopItems(shopItems);
+    }
+
+    await API.updatePoints('earn', r.points, '撤回兑换：' + r.itemName);
+
+    const rewardBox = cachedData?.rewardBox || [];
+    const idx = rewardBox.findIndex(rb => rb.id === rewardBoxItemId);
+    if (idx !== -1) {
+      rewardBox.splice(idx, 1);
+      await API.saveRewardBox(rewardBox);
+    }
+
+    cachedData = await API.getData();
+    showMyRewards();
+    showToast('已撤回兑换，积分已退回');
   } finally {
     _redeemingRewardBox = false;
   }
@@ -873,8 +915,9 @@ async function redeemItem(itemId) {
     await API.saveShopItems(items);
 
     const redemptions = cachedData?.redemptions || [];
+    const redemptionId = Util.genId();
     redemptions.push({
-      id: Util.genId(),
+      id: redemptionId,
       itemName: item.name,
       itemType: item.type || 'item',
       durationMinutes: item.durationMinutes || 0,
@@ -893,6 +936,7 @@ async function redeemItem(itemId) {
       type: item.type || 'item',
       durationMinutes: item.durationMinutes || 0,
       quantity: 1,
+      redemptionId,
     });
     await API.saveRewardBox(rewardBox);
 
