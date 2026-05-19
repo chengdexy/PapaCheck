@@ -742,10 +742,12 @@ function renderStatsTab() {
       value: totalCount > 0 ? Math.round(doneCount / totalCount * 100) : 0,
     });
 
-    const effData = cachedData?.efficiencyHistory?.[date];
+    const challengeHw = hwList.filter(h => h.mode === 'challenge' && h.status === 'done' && h.actualDuration !== null && h.suggestedDuration > 0);
+    const ratios = challengeHw.map(h => h.actualDuration / h.suggestedDuration);
+    const avgRatio = ratios.length > 0 ? ratios.reduce((a, b) => a + b, 0) / ratios.length : 0;
     efficiencyRatios.push({
       date: date.slice(5),
-      value: effData?.averageRatio ? Math.round(effData.averageRatio * 100) : 0,
+      value: Math.round(avgRatio * 100),
     });
 
     const settlement = cachedData?.dailySettlement?.[date];
