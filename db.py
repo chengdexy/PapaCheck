@@ -93,6 +93,7 @@ def init_db():
 
 def get_full_data():
     """返回与旧 JSON 格式兼容的完整数据"""
+    _reset_daily_shop_quantity()
     conn = _connect()
     data = {
         'points': {

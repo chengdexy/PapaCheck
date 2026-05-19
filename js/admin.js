@@ -10,6 +10,9 @@ let adminRedemptions = [];
 let adminRewardBox = [];
 let adminCurrentTab = 'homework';
 let adminEditingId = null;
+let _submittingAdminRating = false;
+let _fulfillingRedemption = false;
+let _adjustingPoints = false;
 
 const ADMIN_SUBJECTS = [
   { id: '语文', icon: '📖' },
@@ -278,48 +281,54 @@ function openRatingModal(dateKey) {
 }
 
 async function submitRating(dateKey, rating) {
+  if (_submittingAdminRating) return;
   const settlement = cachedData?.dailySettlement?.[dateKey];
   if (!settlement) return;
 
-  const multipliers = {
-    'challenge': { '优': 2.0, '良': 1.5, '可': 1.2, '差': 0 },
-    'timer': { '优': 1.5, '良': 1.2, '可': 1.0, '差': 0 },
-  };
+  _submittingAdminRating = true;
+  try {
+    const multipliers = {
+      'challenge': { '优': 2.0, '良': 1.5, '可': 1.2, '差': 0 },
+      'timer': { '优': 1.5, '良': 1.2, '可': 1.0, '差': 0 },
+    };
 
-  const now = new Date();
-  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-  let multiplier = 1.0;
-  const hwList = cachedData?.homeworks?.[dateKey] || [];
-  const modes = [...new Set(hwList.filter(h => h.status === 'done').map(h => h.mode))];
-  if (modes.length === 1 && modes[0] === 'timer') {
-    multiplier = multipliers.timer[rating];
-  } else if (modes.length === 1 && modes[0] === 'challenge') {
-    multiplier = multipliers.challenge[rating];
-  } else {
-    const challengeMult = multipliers.challenge[rating];
-    const timerMult = multipliers.timer[rating];
-    multiplier = (challengeMult + timerMult) / 2;
+    let multiplier = 1.0;
+    const hwList = cachedData?.homeworks?.[dateKey] || [];
+    const modes = [...new Set(hwList.filter(h => h.status === 'done').map(h => h.mode))];
+    if (modes.length === 1 && modes[0] === 'timer') {
+      multiplier = multipliers.timer[rating];
+    } else if (modes.length === 1 && modes[0] === 'challenge') {
+      multiplier = multipliers.challenge[rating];
+    } else {
+      const challengeMult = multipliers.challenge[rating];
+      const timerMult = multipliers.timer[rating];
+      multiplier = (challengeMult + timerMult) / 2;
+    }
+
+    const finalPoints = rating === '差' ? 0
+      : Math.round((settlement.basePoints + settlement.efficiencyBonus) * multiplier);
+
+    settlement.rating = rating;
+    settlement.multiplier = multiplier;
+    settlement.finalPoints = finalPoints;
+    settlement.ratedAt = timeStr;
+
+    await API.saveSettlement(dateKey, settlement);
+
+    if (finalPoints > 0) {
+      await API.updatePoints('earn', finalPoints, `完成作业，评级${rating}`);
+    }
+
+    closeAdminModal();
+    await refreshAllData();
+    renderHomeworkTab();
+    showToast(`已评级: ${rating} · 最终积分: ${finalPoints}`);
+  } finally {
+    _submittingAdminRating = false;
   }
-
-  const finalPoints = rating === '差' ? 0
-    : Math.round((settlement.basePoints + settlement.efficiencyBonus) * multiplier);
-
-  settlement.rating = rating;
-  settlement.multiplier = multiplier;
-  settlement.finalPoints = finalPoints;
-  settlement.ratedAt = timeStr;
-
-  await API.saveSettlement(dateKey, settlement);
-
-  if (finalPoints > 0) {
-    await API.updatePoints('earn', finalPoints, `完成作业，评级${rating}`);
-  }
-
-  closeAdminModal();
-  await refreshAllData();
-  renderHomeworkTab();
-  showToast(`已评级: ${rating} · 最终积分: ${finalPoints}`);
 }
 
 // ========== Tab 2: Shop ==========
@@ -631,40 +640,47 @@ function renderRedeemTab() {
 }
 
 async function fulfillRedemption(id) {
+  if (_fulfillingRedemption) return;
   const r = adminRedemptions.find(r => r.id === id);
   if (!r) return;
-  r.status = 'fulfilled';
-  await API.saveRedemptions(adminRedemptions);
 
-  const itemType = r.itemType;
-  let durationMinutes = r.durationMinutes || 0;
+  _fulfillingRedemption = true;
+  try {
+    r.status = 'fulfilled';
+    await API.saveRedemptions(adminRedemptions);
 
-  if ((!itemType || !durationMinutes) && r.itemName) {
-    const shopItem = adminShopItems.find(i => i.name === r.itemName);
-    if (shopItem) {
-      if (!itemType) r.itemType = shopItem.type;
-      if (!durationMinutes) durationMinutes = shopItem.durationMinutes || 0;
+    const itemType = r.itemType;
+    let durationMinutes = r.durationMinutes || 0;
+
+    if ((!itemType || !durationMinutes) && r.itemName) {
+      const shopItem = adminShopItems.find(i => i.name === r.itemName);
+      if (shopItem) {
+        if (!itemType) r.itemType = shopItem.type;
+        if (!durationMinutes) durationMinutes = shopItem.durationMinutes || 0;
+      }
     }
-  }
 
-  if ((itemType || r.itemType) === 'time' && durationMinutes > 0) {
-    const dateKey = AdminUtil.dateKey(adminDate);
-    const freeTime = await API.getFreeTime(dateKey);
-    freeTime.push({
-      id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
-      name: r.itemName,
-      durationMinutes,
-      status: 'pending',
-      startedAt: null,
-      completedAt: null,
-      remainingSeconds: durationMinutes * 60,
-    });
-    await API.saveFreeTime(dateKey, freeTime);
-  }
+    if ((itemType || r.itemType) === 'time' && durationMinutes > 0) {
+      const dateKey = AdminUtil.dateKey(adminDate);
+      const freeTime = await API.getFreeTime(dateKey);
+      freeTime.push({
+        id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+        name: r.itemName,
+        durationMinutes,
+        status: 'pending',
+        startedAt: null,
+        completedAt: null,
+        remainingSeconds: durationMinutes * 60,
+      });
+      await API.saveFreeTime(dateKey, freeTime);
+    }
 
-  await refreshAllData();
-  renderRedeemTab();
-  showToast('已确认兑现');
+    await refreshAllData();
+    renderRedeemTab();
+    showToast('已确认兑现');
+  } finally {
+    _fulfillingRedemption = false;
+  }
 }
 
 // ========== Tab 5: Statistics ==========
@@ -839,22 +855,34 @@ function renderSettingsTab() {
 }
 
 async function adjustPoints(amount, label) {
-  const action = amount > 0 ? 'earn' : 'spend';
-  const absAmount = Math.abs(amount);
-  await API.updatePoints(action, absAmount, '爸爸' + label + ': ' + absAmount + '分');
-  await refreshAllData();
-  renderSettingsTab();
-  showToast((amount > 0 ? '奖励' : '惩罚') + absAmount + '分');
+  if (_adjustingPoints) return;
+  _adjustingPoints = true;
+  try {
+    const action = amount > 0 ? 'earn' : 'spend';
+    const absAmount = Math.abs(amount);
+    await API.updatePoints(action, absAmount, '爸爸' + label + ': ' + absAmount + '分');
+    await refreshAllData();
+    renderSettingsTab();
+    showToast((amount > 0 ? '奖励' : '惩罚') + absAmount + '分');
+  } finally {
+    _adjustingPoints = false;
+  }
 }
 
 async function clearAllPoints() {
-  const balance = cachedData?.points?.balance ?? cachedData?.points ?? 0;
-  if (balance > 0) {
-    await API.updatePoints('spend', balance, '清零积分');
+  if (_adjustingPoints) return;
+  _adjustingPoints = true;
+  try {
+    const balance = cachedData?.points?.balance ?? cachedData?.points ?? 0;
+    if (balance > 0) {
+      await API.updatePoints('spend', balance, '清零积分');
+    }
+    await refreshAllData();
+    renderSettingsTab();
+    showToast('积分已清零');
+  } finally {
+    _adjustingPoints = false;
   }
-  await refreshAllData();
-  renderSettingsTab();
-  showToast('积分已清零');
 }
 
 async function resetCurrentDate() {

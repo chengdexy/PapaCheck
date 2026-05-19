@@ -249,13 +249,19 @@ async function calculateSettlement() {
 
   const basePoints = homeworks.filter(h => h.status === 'done').length * 10;
   let efficiencyBonus = 0;
+  const ratios = [];
 
   challengeHw.forEach(hw => {
     if (hw.actualDuration !== null && hw.suggestedDuration > 0) {
       const ratio = hw.actualDuration / hw.suggestedDuration;
+      ratios.push(ratio);
       if (ratio <= 0.8) efficiencyBonus += 5;
     }
   });
+
+  const averageRatio = ratios.length > 0
+    ? ratios.reduce((a, b) => a + b, 0) / ratios.length
+    : 0;
 
   const settlementData = {
     basePoints,
@@ -277,38 +283,48 @@ async function calculateSettlement() {
     ratedAt: null,
   });
 
+  await API.saveEfficiency(dateKey, { averageRatio, ratios });
+
   needsFullRender = true;
   updateBigScreen();
 }
 
+let _submittingRating = false;
+
 async function submitForRating() {
+  if (_submittingRating) return;
   const settlement = window._settlement;
   if (!settlement) return;
 
-  const dateKey = Util.dateKey(currentDate);
-  const settlementData = {
-    basePoints: settlement.basePoints,
-    efficiencyBonus: settlement.efficiencyBonus,
-    rating: null,
-    multiplier: null,
-    finalPoints: null,
-    submittedAt: Util.nowTimeStr(),
-    ratedAt: null,
-  };
+  _submittingRating = true;
+  try {
+    const dateKey = Util.dateKey(currentDate);
+    const settlementData = {
+      basePoints: settlement.basePoints,
+      efficiencyBonus: settlement.efficiencyBonus,
+      rating: null,
+      multiplier: null,
+      finalPoints: null,
+      submittedAt: Util.nowTimeStr(),
+      ratedAt: null,
+    };
 
-  await API.saveSettlement(dateKey, settlementData);
+    await API.saveSettlement(dateKey, settlementData);
 
-  homeworks.forEach(hw => {
-    if (hw.status === 'done') {
-      delete lastReminderTrigger[hw.id];
-    }
-  });
+    homeworks.forEach(hw => {
+      if (hw.status === 'done') {
+        delete lastReminderTrigger[hw.id];
+      }
+    });
 
-  stopTickTimer();
-  needsFullRender = true;
-  updateBigScreen();
-  showToast('已提交等待爸爸评级');
-  Voice.speak('请爸爸检查作业');
+    stopTickTimer();
+    needsFullRender = true;
+    updateBigScreen();
+    showToast('已提交等待爸爸评级');
+    Voice.speak('请爸爸检查作业');
+  } finally {
+    _submittingRating = false;
+  }
 }
 
 // ========== Screen Saver ==========

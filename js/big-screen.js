@@ -15,6 +15,8 @@ const PAGE = { MAIN: 'main', SHOP: 'shop', SETTLEMENT: 'settlement', RATED: 'rat
 let currentPage = PAGE.MAIN;
 let needsFullRender = true;
 let forceMainPage = false;
+let _redeemingItem = false;
+let _redeemingRewardBox = false;
 
 // ---- Lightweight per-second tick: clock + active timers ----
 function tickFrame() {
@@ -729,26 +731,30 @@ function showMyRewards() {
   if (rewardBox.length === 0) {
     content.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:18px;">你还没有获得奖励，<br>快去获取积分兑换吧！</div>';
   } else {
-    content.innerHTML = rewardBox.map(r => {
-      const qty = r.quantity || 0;
-      const soldOut = qty <= 0;
-      const metaStr = r.type === 'time'
-        ? '时间类 · ' + (r.durationMinutes || 0) + '分钟'
-        : '物品类';
-      return `
+    const available = rewardBox.filter(r => (r.quantity || 0) > 0);
+    if (available.length === 0) {
+      content.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:18px;">你还没有获得奖励，<br>快去获取积分兑换吧！</div>';
+    } else {
+      content.innerHTML = available.map(r => {
+        const qty = r.quantity || 0;
+        const metaStr = r.type === 'time'
+          ? '时间类 · ' + (r.durationMinutes || 0) + '分钟'
+          : '物品类';
+        return `
         <div class="reward-item">
           <div class="reward-item-info">
             <div class="reward-item-name">${r.name}</div>
             <div class="reward-item-meta">${metaStr}</div>
           </div>
           <span class="reward-qty">× ${qty}</span>
-          <button class="btn-redeem-sm" ${soldOut ? 'disabled' : ''}
+          <button class="btn-redeem-sm"
             onclick="redeemFromRewardBox('${r.id}')">
-            ${soldOut ? '已用光' : '兑换'}
+            兑换
           </button>
         </div>
       `;
-    }).join('');
+      }).join('');
+    }
   }
 
   overlay.style.display = 'flex';
@@ -759,6 +765,7 @@ function hideMyRewards() {
 }
 
 async function redeemFromRewardBox(itemId) {
+  if (_redeemingRewardBox) return;
   const rewardBox = cachedData?.rewardBox || [];
   const item = rewardBox.find(i => i.id === itemId);
   if (!item || (item.quantity || 0) <= 0) {
@@ -766,27 +773,34 @@ async function redeemFromRewardBox(itemId) {
     return;
   }
 
-  item.quantity -= 1;
-  await API.saveRewardBox(rewardBox);
+  _redeemingRewardBox = true;
+  try {
+    item.quantity -= 1;
 
-  if (item.type === 'time' && item.durationMinutes > 0) {
-    const dateKey = Util.dateKey(currentDate);
-    const freeTime = await API.getFreeTime(dateKey);
-    freeTime.push({
-      id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
-      name: item.name,
-      durationMinutes: item.durationMinutes,
-      status: 'pending',
-      startedAt: null,
-      completedAt: null,
-      remainingSeconds: item.durationMinutes * 60,
-    });
-    await API.saveFreeTime(dateKey, freeTime);
+    const cleanedBox = rewardBox.filter(i => (i.quantity || 0) > 0);
+    await API.saveRewardBox(cleanedBox);
+
+    if (item.type === 'time' && item.durationMinutes > 0) {
+      const dateKey = Util.dateKey(currentDate);
+      const freeTime = await API.getFreeTime(dateKey);
+      freeTime.push({
+        id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+        name: item.name,
+        durationMinutes: item.durationMinutes,
+        status: 'pending',
+        startedAt: null,
+        completedAt: null,
+        remainingSeconds: item.durationMinutes * 60,
+      });
+      await API.saveFreeTime(dateKey, freeTime);
+    }
+
+    cachedData = await API.getData();
+    showMyRewards();
+    showToast('已兑换：' + item.name);
+  } finally {
+    _redeemingRewardBox = false;
   }
-
-  cachedData = await API.getData();
-  showMyRewards();
-  showToast('已兑换：' + item.name);
 }
 
 // ========== Shop Page ==========
@@ -836,6 +850,7 @@ async function updateShopPage() {
 }
 
 async function redeemItem(itemId) {
+  if (_redeemingItem) return;
   const items = cachedData?.shopItems || [];
   const item = items.find(i => i.id === itemId);
   if (!item) return;
@@ -852,37 +867,42 @@ async function redeemItem(itemId) {
     return;
   }
 
-  item.remainingQuantity = remaining - 1;
-  await API.saveShopItems(items);
+  _redeemingItem = true;
+  try {
+    item.remainingQuantity = remaining - 1;
+    await API.saveShopItems(items);
 
-  const redemptions = cachedData?.redemptions || [];
-  redemptions.push({
-    id: Util.genId(),
-    itemName: item.name,
-    itemType: item.type || 'item',
-    durationMinutes: item.durationMinutes || 0,
-    points: item.points,
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-  });
+    const redemptions = cachedData?.redemptions || [];
+    redemptions.push({
+      id: Util.genId(),
+      itemName: item.name,
+      itemType: item.type || 'item',
+      durationMinutes: item.durationMinutes || 0,
+      points: item.points,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
 
-  await API.saveRedemptions(redemptions);
-  await API.updatePoints('spend', item.points, '兑换：' + item.name);
+    await API.saveRedemptions(redemptions);
+    await API.updatePoints('spend', item.points, '兑换：' + item.name);
 
-  const rewardBox = cachedData?.rewardBox || [];
-  rewardBox.push({
-    id: Util.genId(),
-    name: item.name,
-    type: item.type || 'item',
-    durationMinutes: item.durationMinutes || 0,
-    quantity: 1,
-  });
-  await API.saveRewardBox(rewardBox);
+    const rewardBox = cachedData?.rewardBox || [];
+    rewardBox.push({
+      id: Util.genId(),
+      name: item.name,
+      type: item.type || 'item',
+      durationMinutes: item.durationMinutes || 0,
+      quantity: 1,
+    });
+    await API.saveRewardBox(rewardBox);
 
-  cachedData = await API.getData();
-  updateShopPage();
-  showToast('兑换成功！等待爸爸确认');
-  Voice.speak('兑换成功！');
+    cachedData = await API.getData();
+    updateShopPage();
+    showToast('兑换成功！等待爸爸确认');
+    Voice.speak('兑换成功！');
+  } finally {
+    _redeemingItem = false;
+  }
 }
 
 async function backToMain() {
