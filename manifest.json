@@ -1,0 +1,18 @@
+{
+  "name": "TinySchedule",
+  "short_name": "小日程",
+  "description": "我的小日程 - 每日学习计划管理",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUyIiByPSI0NCIgZmlsbD0iI2ZiYmYyNCIgc3Ryb2tlPSIjZjU5ZTBiIiBzdHJva2Utd2lkdGg9IjMiLz48Y2lyY2xlIGN4PSIzNSIgY3k9IjQ1IiByPSI3IiBmaWxsPSIjMWUyOTNiIi8+PGNpcmNsZSBjeD0iNjUiIGN5PSI0NSIgcj0iNyIgZmlsbD0iIzFlMjkzYiIvPjxlbGxpcHNlIGN4PSI1MCIgY3k9IjU1IiByeD0iNyIgcnk9IjUiIGZpbGw9IiNmODcxNzEiLz48cGF0aCBkPSJNMzIgNzIgUTUwIDg4IDY4IDcyIiBmaWxsPSJub25lIiBzdHJva2U9IiM0YWRlODAiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PC9zdmc+">
+  <title>TinySchedule - 孩子端</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+</head>
+
+<body>
+
+  <!-- Big Screen Mode -->
+  <div class="big-screen-mode active" id="bigMode">
+    <!-- Header -->
+    <div class="big-header" id="bigHeader">
+      <div class="big-date" id="bigDate">--</div>
+      <div class="big-time" id="bigTime">--:--</div>
+      <span class="conn-status" id="connStatus" title="数据同步状态">⚪</span>
+    </div>
+
+    <!-- Main Content -->
+    <div class="big-content" id="bigContent">
+      <!-- Left Column -->
+      <div class="big-column" id="leftColumn">
+        <!-- Current Task -->
+        <div class="big-card" id="currentTaskCard">
+          <div class="big-card-title">⏰ 当前任务</div>
+          <div class="current-task-display" id="currentTaskDisplay">
+            <div class="current-task-icon">🌟</div>
+            <div class="current-task-name">暂无进行中的任务</div>
+            <div class="current-task-time">休息一下，准备开始吧！</div>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="big-stats" id="bigStats">
+          <div class="stat-item">
+            <div class="stat-value" id="homeworkProgress">0/0</div>
+            <div class="stat-label">作业完成</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="totalPoints">0</div>
+            <div class="stat-label">积分</div>
+          </div>
+          <button class="btn-shop-nav" onclick="showShopPage()">🏪 积分商店</button>
+          <button class="btn-shop-nav" onclick="showMyRewards()">🎁 我的奖励</button>
+        </div>
+      </div>
+
+      <!-- Right Column -->
+      <div class="big-column" id="rightColumn">
+        <!-- Homework -->
+        <div class="big-card" id="homeworkCard">
+          <div class="big-card-title">📝 今日作业</div>
+          <div class="homework-grid" id="homeworkGrid"></div>
+        </div>
+        <!-- FreeTime -->
+        <div class="big-card" id="freeTimeCard" style="display:none;">
+          <div class="big-card-title">🎮 奖励时间</div>
+          <div class="homework-grid" id="freeTimeGrid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settlement -->
+    <div class="settlement-container" id="settlementContainer" style="display:none;"></div>
+    <div class="rated-container" id="ratedContainer" style="display:none;"></div>
+    <div class="shop-container" id="shopContainer" style="display:none;"></div>
+
+    <!-- My Rewards -->
+    <div class="my-rewards-overlay" id="myRewardsOverlay" style="display:none;">
+      <div class="my-rewards-card">
+        <div class="settlement-title" style="margin-bottom:16px;">🎁 我的奖励</div>
+        <div id="myRewardsContent"></div>
+        <button class="btn-cancel"
+          style="margin-top:16px;padding:14px 24px;border:none;border-radius:14px;font-size:20px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--text);width:100%;"
+          onclick="hideMyRewards()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen Saver -->
+  <div class="screen-saver" id="screenSaver" onclick="wakeUp()">
+    <div class="saver-time" id="saverTime">--:--</div>
+    <div class="saver-date" id="saverDate">--</div>
+    <div class="saver-message">点击屏幕唤醒</div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Start Mode Modal -->
+  <div class="modal-overlay" id="startModeModal">
+    <div class="modal-content" id="startModeModalContent"></div>
+  </div>
+
+  <!-- Scripts: api → big-screen → app -->
+  <script src="js/api.js"></script>
+  <script src="js/big-screen.js"></script>
+  <script src="js/app.js"></script>
+</body>
+
+</html>

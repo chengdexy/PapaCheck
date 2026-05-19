@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>TinySchedule 管理端</title>
+  <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjQ4IiByPSIzOCIgZmlsbD0iI2ZiYmYyNCIgc3Ryb2tlPSIjZjU5ZTBiIiBzdHJva2Utd2lkdGg9IjMiLz48Y2lyY2xlIGN4PSIzNSIgY3k9IjQyIiByPSI2IiBmaWxsPSIjMWUyOTNiIi8+PGNpcmNsZSBjeD0iNjUiIGN5PSI0MiIgcj0iNiIgZmlsbD0iIzFlMjkzYiIvPjxsaW5lIHgxPSI0MCIgeTE9IjU2IiB4Mj0iNjAiIHkyPSI1NiIgc3Ryb2tlPSIjY2JkNWUxIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxwYXRoIGQ9Ik0yOCA2OCBRNTAgOTAgNzIgNjgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2NiZDVlMSIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjE4IiByPSIyMCIgZmlsbD0iI2UyZThmMCIgb3BhY2l0eT0iMC44Ii8+PC9zdmc+">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+  <div class="admin-header">
+    <h1>TinySchedule 管理端</h1>
+    <span class="admin-date" id="adminDate">--</span>
+  </div>
+
+  <div class="admin-content" id="adminContent"></div>
+
+  <!-- Tab Navigation -->
+  <div class="admin-tabs">
+    <button class="tab-btn active" onclick="switchTab('homework')">📋 作业</button>
+    <button class="tab-btn" onclick="switchTab('shop')">🏪 商店</button>
+    <button class="tab-btn" onclick="switchTab('rewardBox')">🎁 奖励箱</button>
+    <button class="tab-btn" onclick="switchTab('redeem')">📋 兑换</button>
+    <button class="tab-btn" onclick="switchTab('stats')">📊 统计</button>
+    <button class="tab-btn" onclick="switchTab('settings')">⚙️ 设置</button>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="adminModal">
+    <div class="modal-content" id="adminModalContent"></div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>
