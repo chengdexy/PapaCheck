@@ -446,8 +446,9 @@ async function init() {
       }
 
       const hasActive = getActiveHomework() || getActiveFreeTime();
-      if (hasActive && !tickInterval) startTickTimer();
-      if (!hasActive && tickInterval) stopTickTimer();
+      const isPaused = isAnyTaskPaused();
+      if (hasActive && !isPaused && !tickInterval) startTickTimer();
+      if ((!hasActive || isPaused) && tickInterval) stopTickTimer();
 
       const newSettlement = cachedData.dailySettlement?.[key] || null;
       if (newSettlement) {

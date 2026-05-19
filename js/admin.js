@@ -282,7 +282,7 @@ function openRatingModal(dateKey) {
 async function submitRating(dateKey, rating) {
   if (_submittingAdminRating) return;
   const settlement = cachedData?.dailySettlement?.[dateKey];
-  if (!settlement) return;
+  if (!settlement || settlement.rating) return;
 
   _submittingAdminRating = true;
   try {
@@ -816,7 +816,7 @@ function renderStatsTab() {
         const s = cachedData?.dailySettlement?.[d];
         return `<div class="rating-history-item">
             <span>${d}</span>
-            <span>${s.finalPoints}分 (×${s.multiplier})</span>
+            <span>${s.basePoints + s.efficiencyBonus} × ${s.multiplier} = ${s.finalPoints}分</span>
             <span class="rating-grade ${s.rating}">${s.rating}</span>
           </div>`;
       }).join('')}
