@@ -785,8 +785,8 @@ function renderStatsTab() {
       value: totalCount > 0 ? Math.round(doneCount / totalCount * 100) : 0,
     });
 
-    const challengeHw = hwList.filter(h => h.mode === 'challenge' && h.status === 'done' && h.actualDuration !== null && h.suggestedDuration > 0);
-    const ratios = challengeHw.map(h => h.actualDuration / h.suggestedDuration);
+    const doneHw = hwList.filter(h => h.status === 'done' && h.actualDuration !== null && h.suggestedDuration > 0);
+    const ratios = doneHw.map(h => h.actualDuration / h.suggestedDuration);
     const avgRatio = ratios.length > 0 ? ratios.reduce((a, b) => a + b, 0) / ratios.length : 0;
     efficiencyRatios.push({
       date: date.slice(5),
@@ -912,8 +912,8 @@ function renderSettingsTab() {
           ${calHtml}
         </div>
         <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
-          <div style="font-size:16px;font-weight:600;">${AdminUtil.formatDate(adminDate)}</div>
-          <button onclick="resetCurrentDate()" style="padding:10px 16px;background:var(--danger);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;">🔄 重置这一天</button>
+          <div style="font-size:22px;font-weight:700;">${AdminUtil.formatDate(adminDate)}</div>
+          <button onclick="resetCurrentDate()" style="padding:10px 20px;background:var(--danger);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;align-self:flex-start;">🔄 重置这一天</button>
           <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">重置将清除该日所有作业、结算、自由时间</div>
         </div>
       </div>

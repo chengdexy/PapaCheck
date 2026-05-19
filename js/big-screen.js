@@ -981,9 +981,9 @@ function confirmStartTask(hwId) {
   const content = document.getElementById('startConfirmModalContent');
 
   content.innerHTML = `
-    <h3 style="text-align:center;margin-bottom:8px;">${subject.icon} ${hw.subject}</h3>
-    <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;">${hw.content}</p>
-    <p style="text-align:center;color:var(--accent);font-size:14px;margin-bottom:16px;">建议 ${hw.suggestedDuration} 分钟内完成</p>
+    <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon} ${hw.subject}</h3>
+    <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;font-size:20px;">${hw.content}</p>
+    <p style="text-align:center;color:var(--accent);font-size:20px;margin-bottom:16px;">建议 ${hw.suggestedDuration} 分钟内完成</p>
     <div class="modal-actions">
       <button onclick="closeStartConfirm()" style="padding:10px 24px;border:2px solid var(--text-secondary);border-radius:12px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;">取消</button>
       <button onclick="closeStartConfirm(); startHomework('${hwId}', 'challenge')" style="padding:10px 24px;background:var(--accent);color:var(--bg);border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">⚔️ 开始</button>
