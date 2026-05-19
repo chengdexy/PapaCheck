@@ -875,30 +875,30 @@ function renderSettingsTab() {
   container.innerHTML = `
     <div class="admin-card">
       <div class="admin-card-title">⚙️ 积分管理</div>
-      <div class="settings-row">
+      <div class="settings-row" style="display:flex;align-items:center;gap:12px;">
         <label>当前余额</label>
-        <span style="font-size:20px;font-weight:700;color:var(--accent);">${balance}</span>
-      </div>
-      <div class="settings-row" style="margin-top:12px;">
-        <label>调整积分</label>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <input type="number" id="pointsInput" value="" placeholder="输入正数奖励，负数惩罚"
-            style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:16px;background:var(--bg);color:var(--text);"
-            oninput="document.getElementById('btnPointsConfirm').style.display='inline-block';document.getElementById('btnPointsCancel').style.display='inline-block';">
-          <button id="btnPointsConfirm" class="btn-primary" style="display:none;padding:10px 16px;" onclick="confirmAdjustPoints()">确认</button>
-          <button id="btnPointsCancel" class="btn-cancel" style="display:none;padding:10px 16px;" onclick="cancelAdjustPoints()">取消</button>
-        </div>
+        <span id="balanceDisplay" style="font-size:20px;font-weight:700;color:var(--accent);cursor:pointer;border-bottom:2px dashed var(--accent);" onclick="startEditBalance()" title="点击修改积分">${balance}</span>
+        <span id="balanceEdit" style="display:none;gap:6px;align-items:center;">
+          <input type="number" id="pointsInput" value="" placeholder="+/- 数值"
+            style="width:100px;padding:6px 10px;border:1px solid var(--accent);border-radius:6px;font-size:14px;background:var(--bg);color:var(--text);">
+          <button id="btnPointsConfirm" onclick="confirmAdjustPoints()" style="padding:4px 8px;background:none;border:none;color:var(--success);font-size:20px;cursor:pointer;" title="确认">✓</button>
+          <button id="btnPointsCancel" onclick="cancelAdjustPoints()" style="padding:4px 8px;background:none;border:none;color:var(--danger);font-size:20px;cursor:pointer;" title="取消">✕</button>
+        </span>
       </div>
     </div>
 
     <div class="admin-card">
-      <div class="admin-card-title">📅 日期选择</div>
-      <div class="date-nav">
-        <button onclick="changeAdminDate(-1)">◀ 前一天</button>
-        <span>${AdminUtil.formatDate(adminDate)}</span>
-        <button onclick="changeAdminDate(1)">后一天 ▶</button>
+      <div class="admin-card-title">📅 日期管理</div>
+      <div style="display:flex;gap:16px;align-items:stretch;">
+        <div style="display:flex;align-items:center;gap:10px;flex:1;">
+          <button onclick="changeAdminDate(-1)" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);cursor:pointer;font-size:16px;">◀</button>
+          <span style="font-size:16px;font-weight:600;min-width:120px;text-align:center;">${AdminUtil.formatDate(adminDate)}</span>
+          <button onclick="changeAdminDate(1)" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);cursor:pointer;font-size:16px;">▶</button>
+          <button onclick="adminDate = new Date(); refreshAllData(); renderCurrentTab();" style="padding:8px 12px;border:1px solid var(--accent);border-radius:8px;background:transparent;color:var(--accent);cursor:pointer;font-size:13px;">今天</button>
+        </div>
+        <button onclick="resetCurrentDate()" style="padding:8px 16px;background:var(--danger);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">🔄 重置这一天</button>
       </div>
-      <button class="btn-add" style="background:var(--danger);margin-top:12px;" onclick="resetCurrentDate()">🔄 重置这一天</button>
+      <div style="font-size:12px;color:var(--text-secondary);margin-top:8px;">重置将清除该日所有作业、结算、自由时间，第二天商品库存会刷新</div>
     </div>
 
     <div class="admin-card">
@@ -912,11 +912,18 @@ function renderSettingsTab() {
     </div>`;
 }
 
+function startEditBalance() {
+  document.getElementById('balanceDisplay').style.display = 'none';
+  const edit = document.getElementById('balanceEdit');
+  edit.style.display = 'flex';
+  document.getElementById('pointsInput').focus();
+}
+
 function cancelAdjustPoints() {
   const input = document.getElementById('pointsInput');
   if (input) input.value = '';
-  document.getElementById('btnPointsConfirm').style.display = 'none';
-  document.getElementById('btnPointsCancel').style.display = 'none';
+  document.getElementById('balanceEdit').style.display = 'none';
+  document.getElementById('balanceDisplay').style.display = '';
 }
 
 async function confirmAdjustPoints() {
