@@ -888,6 +888,7 @@ function renderSettingsTab() {
 
     <div class="admin-card">
       <div class="admin-card-title">💾 数据管理</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">导出为JSON备份文件，可随时导入恢复。导出不包含 data.db 原始数据库。</div>
       <div class="settings-actions">
         <button class="btn-primary" onclick="exportData()">导出数据</button>
         <button class="btn-cancel" style="border:1px solid var(--text-secondary);" onclick="document.getElementById('importFileInput').click()">导入数据</button>

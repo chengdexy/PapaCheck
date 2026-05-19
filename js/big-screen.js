@@ -514,7 +514,7 @@ function updateHomeworkGrid() {
     const clickAction = isDone ? '' : isActive ? '' : `onclick="startHomework('${hw.id}', 'challenge')"`;
 
     return `
-      <div class="homework-card ${statusClass}" data-hw-id="${hw.id}" ${clickAction}>
+      <div class="homework-card ${statusClass} ${isDone && hw._animClass ? hw._animClass : ''}" data-hw-id="${hw.id}" ${clickAction}>
         <div class="homework-card-row">
           <span style="font-size:28px;flex-shrink:0;">${subject.icon}</span>
           <div class="homework-card-info">
@@ -530,6 +530,8 @@ function updateHomeworkGrid() {
       </div>
     `;
   }).join('');
+
+  homeworks.forEach(h => { if (h._animClass) delete h._animClass; });
 }
 
 function updateFreeTimeGrid() {

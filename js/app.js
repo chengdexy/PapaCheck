@@ -106,8 +106,14 @@ async function completeHomework(id) {
   hw.completedAt = completedAt.toISOString();
   hw.actualDuration = actualDuration;
 
+  let toastMsg;
   if (hw.mode === 'challenge' && hw.suggestedDuration > 0 && actualDuration > hw.suggestedDuration) {
     hw.mode = 'timer';
+    hw._animClass = 'task-complete';
+    toastMsg = '✅ ' + hw.subject + '完成';
+  } else {
+    hw._animClass = 'challenge-success';
+    toastMsg = '⚡ 挑战成功！' + hw.subject + '提前完成';
   }
 
   stopTickTimer();
@@ -117,6 +123,7 @@ async function completeHomework(id) {
   checkAllDone();
   needsFullRender = true;
   updateBigScreen();
+  showToast(toastMsg);
 }
 
 async function saveHomeworksSilent() {
