@@ -24,6 +24,8 @@ function tickFrame() {
   document.getElementById('bigDate').textContent = Util.formatDate(now);
   document.getElementById('bigTime').textContent = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 
+  if (isAnyTaskPaused()) return;
+
   const activeHw = getActiveHomework();
   if (activeHw) {
     checkReminders(activeHw);
@@ -729,6 +731,7 @@ function showMyRewards() {
   const overlay = document.getElementById('myRewardsOverlay');
   const content = document.getElementById('myRewardsContent');
   const rewardBox = cachedData?.rewardBox || [];
+  const redemptions = cachedData?.redemptions || [];
 
   if (rewardBox.length === 0) {
     content.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:18px;">你还没有获得奖励，<br>快去获取积分兑换吧！</div>';
@@ -739,8 +742,7 @@ function showMyRewards() {
     } else {
       content.innerHTML = available.map(r => {
         const qty = r.quantity || 0;
-        const redemptions = cachedData?.redemptions || [];
-        const pendingR = r.redemptionId ? redemptions.find(rd => rd.id === r.redemptionId && rd.status === 'pending') : null;
+        const pendingR = redemptions.find(rd => rd.rewardBoxItemId === r.id && rd.status === 'pending');
         const metaStr = r.type === 'time'
           ? '时间类 · ' + (r.durationMinutes || 0) + '分钟'
           : '物品类';
@@ -751,12 +753,11 @@ function showMyRewards() {
             <div class="reward-item-meta">${metaStr}</div>
           </div>
           <span class="reward-qty">× ${qty}</span>
-          <button class="btn-redeem-sm"
-            onclick="redeemFromRewardBox('${r.id}')">
-            兑换
-          </button>
-          ${pendingR ? `<button class="btn-cancel" style="padding:8px 16px;font-size:14px;border-radius:8px;border:1px solid var(--text-secondary);background:transparent;color:var(--text-secondary);cursor:pointer;"
-            onclick="cancelRedemption('${pendingR.id}','${r.id}')">撤回</button>` : ''}
+          ${pendingR
+            ? `<span style="font-size:12px;color:var(--warning);font-weight:600;">已提交</span>
+               <button onclick="cancelRedemption('${pendingR.id}')" style="padding:8px 16px;font-size:14px;border-radius:8px;border:1px solid var(--text-secondary);background:transparent;color:var(--text-secondary);cursor:pointer;">撤回</button>`
+            : `<button class="btn-redeem-sm" onclick="redeemFromRewardBox('${r.id}')">兑换</button>`
+          }
         </div>
       `;
       }).join('');
@@ -779,14 +780,15 @@ async function redeemFromRewardBox(itemId) {
     return;
   }
 
+  const redemptions = cachedData?.redemptions || [];
+  const alreadyPending = redemptions.find(rd => rd.rewardBoxItemId === itemId && rd.status === 'pending');
+  if (alreadyPending) {
+    showToast('已提交过，等待爸爸确认');
+    return;
+  }
+
   _redeemingRewardBox = true;
   try {
-    item.quantity -= 1;
-
-    const cleanedBox = rewardBox.filter(i => (i.quantity || 0) > 0);
-    await API.saveRewardBox(cleanedBox);
-
-    const redemptions = cachedData?.redemptions || [];
     redemptions.push({
       id: Util.genId(),
       itemName: item.name,
@@ -796,6 +798,7 @@ async function redeemFromRewardBox(itemId) {
       status: 'pending',
       createdAt: new Date().toISOString(),
       fromRewardBox: true,
+      rewardBoxItemId: item.id,
     });
     await API.saveRedemptions(redemptions);
 
@@ -807,7 +810,7 @@ async function redeemFromRewardBox(itemId) {
   }
 }
 
-async function cancelRedemption(redemptionId, rewardBoxItemId) {
+async function cancelRedemption(redemptionId) {
   if (_redeemingRewardBox) return;
   _redeemingRewardBox = true;
   try {
@@ -821,25 +824,27 @@ async function cancelRedemption(redemptionId, rewardBoxItemId) {
     r.status = 'cancelled';
     await API.saveRedemptions(redemptions);
 
-    const shopItems = cachedData?.shopItems || [];
-    const shopItem = shopItems.find(si => si.name === r.itemName);
-    if (shopItem) {
-      shopItem.remainingQuantity = (shopItem.remainingQuantity ?? 0) + 1;
-      await API.saveShopItems(shopItems);
-    }
+    if (!r.fromRewardBox) {
+      const shopItems = cachedData?.shopItems || [];
+      const shopItem = shopItems.find(si => si.name === r.itemName);
+      if (shopItem) {
+        shopItem.remainingQuantity = (shopItem.remainingQuantity ?? 0) + 1;
+        await API.saveShopItems(shopItems);
+      }
 
-    await API.updatePoints('earn', r.points, '撤回兑换：' + r.itemName);
+      await API.updatePoints('earn', r.points, '撤回兑换：' + r.itemName);
 
-    const rewardBox = cachedData?.rewardBox || [];
-    const idx = rewardBox.findIndex(rb => rb.id === rewardBoxItemId);
-    if (idx !== -1) {
-      rewardBox.splice(idx, 1);
-      await API.saveRewardBox(rewardBox);
+      const rewardBox = cachedData?.rewardBox || [];
+      const idx = rewardBox.findIndex(rb => rb.redemptionId === redemptionId);
+      if (idx !== -1) {
+        rewardBox.splice(idx, 1);
+        await API.saveRewardBox(rewardBox);
+      }
     }
 
     cachedData = await API.getData();
     showMyRewards();
-    showToast('已撤回兑换，积分已退回');
+    showToast('已撤回');
   } finally {
     _redeemingRewardBox = false;
   }
@@ -980,8 +985,8 @@ function confirmStartTask(hwId) {
     <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;">${hw.content}</p>
     <p style="text-align:center;color:var(--accent);font-size:14px;margin-bottom:16px;">建议 ${hw.suggestedDuration} 分钟内完成</p>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeStartConfirm()">取消</button>
-      <button class="btn-primary" onclick="closeStartConfirm(); startHomework('${hwId}', 'challenge')">⚔️ 开始</button>
+      <button onclick="closeStartConfirm()" style="padding:14px 32px;border:2px solid var(--text-secondary);border-radius:14px;background:transparent;color:var(--text-secondary);font-size:20px;font-weight:600;cursor:pointer;">取消</button>
+      <button onclick="closeStartConfirm(); startHomework('${hwId}', 'challenge')" style="padding:14px 32px;background:var(--accent);color:var(--bg);border:none;border-radius:14px;font-size:20px;font-weight:600;cursor:pointer;">⚔️ 开始</button>
     </div>
   `;
   modal.classList.add('show');

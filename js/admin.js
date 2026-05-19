@@ -703,30 +703,58 @@ async function fulfillRedemption(id) {
     r.status = 'fulfilled';
     await API.saveRedemptions(adminRedemptions);
 
-    const itemType = r.itemType;
-    let durationMinutes = r.durationMinutes || 0;
-
-    if ((!itemType || !durationMinutes) && r.itemName) {
-      const shopItem = adminShopItems.find(i => i.name === r.itemName);
-      if (shopItem) {
-        if (!itemType) r.itemType = shopItem.type;
-        if (!durationMinutes) durationMinutes = shopItem.durationMinutes || 0;
+    if (r.fromRewardBox) {
+      const rewardBox = await API.getRewardBox();
+      const rbItem = rewardBox.find(rb => rb.id === r.rewardBoxItemId);
+      if (rbItem) {
+        rbItem.quantity = (rbItem.quantity || 0) - 1;
+        if (rbItem.quantity <= 0) {
+          const idx = rewardBox.indexOf(rbItem);
+          if (idx !== -1) rewardBox.splice(idx, 1);
+        }
+        await API.saveRewardBox(rewardBox);
       }
-    }
 
-    if ((itemType || r.itemType) === 'time' && durationMinutes > 0) {
-      const dateKey = AdminUtil.dateKey(adminDate);
-      const freeTime = await API.getFreeTime(dateKey);
-      freeTime.push({
-        id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
-        name: r.itemName,
-        durationMinutes,
-        status: 'pending',
-        startedAt: null,
-        completedAt: null,
-        remainingSeconds: durationMinutes * 60,
-      });
-      await API.saveFreeTime(dateKey, freeTime);
+      if (r.itemType === 'time' && r.durationMinutes > 0) {
+        const dateKey = AdminUtil.dateKey(adminDate);
+        const freeTime = await API.getFreeTime(dateKey);
+        freeTime.push({
+          id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+          name: r.itemName,
+          durationMinutes: r.durationMinutes,
+          status: 'pending',
+          startedAt: null,
+          completedAt: null,
+          remainingSeconds: r.durationMinutes * 60,
+        });
+        await API.saveFreeTime(dateKey, freeTime);
+      }
+    } else {
+      const itemType = r.itemType;
+      let durationMinutes = r.durationMinutes || 0;
+
+      if ((!itemType || !durationMinutes) && r.itemName) {
+        const shopItem = adminShopItems.find(i => i.name === r.itemName);
+        if (shopItem) {
+          if (!itemType) r.itemType = shopItem.type;
+          if (!durationMinutes) durationMinutes = shopItem.durationMinutes || 0;
+        }
+      }
+
+      if ((itemType || r.itemType) === 'time' && durationMinutes > 0) {
+        const dateKey = AdminUtil.dateKey(adminDate);
+        const freeTime = await API.getFreeTime(dateKey);
+        freeTime.push({
+          id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+          name: r.itemName,
+          durationMinutes,
+          status: 'pending',
+          startedAt: null,
+          completedAt: null,
+          remainingSeconds: durationMinutes * 60,
+        });
+        await API.saveFreeTime(dateKey, freeTime);
+      }
     }
 
     await refreshAllData();
@@ -831,7 +859,7 @@ function renderStatsTab() {
         const s = cachedData?.dailySettlement?.[d];
         return `<div class="rating-history-item">
             <span>${d}</span>
-            <span>${s.basePoints + s.efficiencyBonus} × ${s.multiplier} = ${s.finalPoints}分</span>
+            <span>${s.basePoints + s.efficiencyBonus}×${s.multiplier}=${s.finalPoints}分</span>
             <span class="rating-grade ${s.rating}">${s.rating}</span>
           </div>`;
       }).join('')}
@@ -874,36 +902,83 @@ function renderSettingsTab() {
   const container = document.getElementById('adminContent');
   const balance = cachedData?.points?.balance ?? cachedData?.points ?? 0;
 
+  const calHtml = buildMiniCalendar();
+
   container.innerHTML = `
+    <div class="admin-card">
+      <div class="admin-card-title">📅 日期管理</div>
+      <div style="display:flex;gap:20px;align-items:flex-start;">
+        <div style="flex:0 0 auto;">
+          ${calHtml}
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:16px;font-weight:600;">${AdminUtil.formatDate(adminDate)}</div>
+          <button onclick="adminDate = new Date(); refreshAllData(); renderCurrentTab();" style="padding:10px 16px;background:var(--accent);color:var(--bg);border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;">📅 回到今天</button>
+          <button onclick="resetCurrentDate()" style="padding:10px 16px;background:var(--danger);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;">🔄 重置这一天</button>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">重置将清除该日所有作业、结算、自由时间</div>
+        </div>
+      </div>
+    </div>
+
     <div class="admin-card">
       <div class="admin-card-title">⚙️ 积分管理</div>
       <div class="settings-row" style="display:flex;align-items:center;gap:12px;">
         <label>当前余额</label>
         <span id="balanceDisplay" style="font-size:20px;font-weight:700;color:var(--accent);cursor:pointer;border-bottom:2px dashed var(--accent);" onclick="startEditBalance()" title="点击修改积分">${balance}</span>
         <span id="balanceEdit" style="display:none;gap:6px;align-items:center;">
-          <input type="number" id="pointsInput" value="" placeholder="+/- 数值"
+          <input type="number" id="pointsInput" value="" placeholder="新余额值"
             style="width:100px;padding:6px 10px;border:1px solid var(--accent);border-radius:6px;font-size:14px;background:var(--bg);color:var(--text);">
           <button id="btnPointsConfirm" onclick="confirmAdjustPoints()" style="padding:4px 8px;background:none;border:none;color:var(--success);font-size:20px;cursor:pointer;" title="确认">✓</button>
           <button id="btnPointsCancel" onclick="cancelAdjustPoints()" style="padding:4px 8px;background:none;border:none;color:var(--danger);font-size:20px;cursor:pointer;" title="取消">✕</button>
         </span>
       </div>
     </div>
-
-    <div class="admin-card">
-      <div class="admin-card-title">📅 日期管理</div>
-      <div style="display:flex;gap:16px;align-items:stretch;">
-        <div style="display:flex;align-items:center;gap:10px;flex:1;">
-          <button onclick="changeAdminDate(-1)" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);cursor:pointer;font-size:16px;">◀</button>
-          <span style="font-size:16px;font-weight:600;min-width:120px;text-align:center;">${AdminUtil.formatDate(adminDate)}</span>
-          <button onclick="changeAdminDate(1)" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);cursor:pointer;font-size:16px;">▶</button>
-          <button onclick="adminDate = new Date(); refreshAllData(); renderCurrentTab();" style="padding:8px 12px;border:1px solid var(--accent);border-radius:8px;background:transparent;color:var(--accent);cursor:pointer;font-size:13px;">今天</button>
-        </div>
-        <button onclick="resetCurrentDate()" style="padding:8px 16px;background:var(--danger);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">🔄 重置这一天</button>
-      </div>
-      <div style="font-size:12px;color:var(--text-secondary);margin-top:8px;">重置将清除该日所有作业、结算、自由时间，第二天商品库存会刷新</div>
-    </div>
-
   `;
+}
+
+function buildMiniCalendar() {
+  const year = adminDate.getFullYear();
+  const month = adminDate.getMonth();
+  const today = new Date();
+  const todayStr = AdminUtil.dateKey(today);
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  const dayHeaders = ['日','一','二','三','四','五','六'];
+
+  let html = `<div style="font-size:13px;font-weight:600;text-align:center;margin-bottom:6px;">${year} ${monthNames[month]}</div>`;
+  html += '<div style="display:grid;grid-template-columns:repeat(7,28px);gap:2px;text-align:center;">';
+
+  dayHeaders.forEach(d => {
+    html += `<div style="font-size:10px;color:var(--text-secondary);padding:2px 0;">${d}</div>`;
+  });
+
+  for (let i = 0; i < firstDay; i++) {
+    html += '<div></div>';
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const d = new Date(year, month, day);
+    const key = AdminUtil.dateKey(d);
+    const isSelected = key === AdminUtil.dateKey(adminDate);
+    const hasSettlement = cachedData?.dailySettlement?.[key];
+    const hasRating = hasSettlement?.rating;
+    const hasHomeworks = (cachedData?.homeworks?.[key] || []).length > 0;
+
+    let bg = 'transparent';
+    let color = 'var(--text-secondary)';
+    if (hasRating) { bg = 'rgba(74,222,128,0.3)'; color = 'var(--success)'; }
+    else if (hasHomeworks) { bg = 'rgba(56,189,248,0.2)'; color = 'var(--accent)'; }
+    if (isSelected) { bg = 'var(--accent)'; color = 'var(--bg)'; }
+    if (key === todayStr && !isSelected) { bg = 'rgba(255,255,255,0.1)'; color = 'var(--text)'; }
+
+    html += `<div onclick="adminDate=new Date(${year},${month},${day});refreshAllData();renderCurrentTab();" style="font-size:11px;padding:3px 0;border-radius:4px;cursor:pointer;background:${bg};color:${color};width:26px;justify-self:center;">${day}</div>`;
+  }
+
+  html += '</div>';
+  return html;
 }
 
 function startEditBalance() {
@@ -922,21 +997,23 @@ function cancelAdjustPoints() {
 
 async function confirmAdjustPoints() {
   const input = document.getElementById('pointsInput');
-  const amount = parseInt(input.value);
-  if (isNaN(amount) || amount === 0) {
+  const newBalance = parseInt(input.value);
+  if (isNaN(newBalance) || newBalance < 0) {
     showToast('请输入有效的积分值');
     return;
   }
   if (_adjustingPoints) return;
   _adjustingPoints = true;
   try {
-    const action = amount > 0 ? 'earn' : 'spend';
-    const absAmount = Math.abs(amount);
-    const label = amount > 0 ? '奖励' : '惩罚';
-    await API.updatePoints(action, absAmount, '爸爸' + label + ': ' + absAmount + '分');
+    const oldBalance = cachedData?.points?.balance ?? cachedData?.points ?? 0;
+    const diff = newBalance - oldBalance;
+    if (diff !== 0) {
+      const action = diff > 0 ? 'earn' : 'spend';
+      await API.updatePoints(action, Math.abs(diff), `爸爸调整积分至${newBalance}`);
+    }
     await refreshAllData();
     renderSettingsTab();
-    showToast((amount > 0 ? '奖励' : '惩罚') + absAmount + '分');
+    showToast('积分已更新为：' + newBalance);
   } finally {
     _adjustingPoints = false;
   }
