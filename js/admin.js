@@ -913,7 +913,6 @@ function renderSettingsTab() {
         </div>
         <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
           <div style="font-size:16px;font-weight:600;">${AdminUtil.formatDate(adminDate)}</div>
-          <button onclick="adminDate = new Date(); refreshAllData(); renderCurrentTab();" style="padding:10px 16px;background:var(--accent);color:var(--bg);border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;">📅 回到今天</button>
           <button onclick="resetCurrentDate()" style="padding:10px 16px;background:var(--danger);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;">🔄 重置这一天</button>
           <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">重置将清除该日所有作业、结算、自由时间</div>
         </div>
@@ -948,11 +947,11 @@ function buildMiniCalendar() {
   const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
   const dayHeaders = ['日','一','二','三','四','五','六'];
 
-  let html = `<div style="font-size:13px;font-weight:600;text-align:center;margin-bottom:6px;">${year} ${monthNames[month]}</div>`;
-  html += '<div style="display:grid;grid-template-columns:repeat(7,28px);gap:2px;text-align:center;">';
+  let html = `<div style="font-size:16px;font-weight:600;text-align:center;margin-bottom:8px;">${year} ${monthNames[month]}</div>`;
+  html += '<div style="display:grid;grid-template-columns:repeat(7,44px);gap:3px;text-align:center;">';
 
   dayHeaders.forEach(d => {
-    html += `<div style="font-size:10px;color:var(--text-secondary);padding:2px 0;">${d}</div>`;
+    html += `<div style="font-size:13px;color:var(--text-secondary);padding:4px 0;">${d}</div>`;
   });
 
   for (let i = 0; i < firstDay; i++) {
@@ -974,7 +973,7 @@ function buildMiniCalendar() {
     if (isSelected) { bg = 'var(--accent)'; color = 'var(--bg)'; }
     if (key === todayStr && !isSelected) { bg = 'rgba(255,255,255,0.1)'; color = 'var(--text)'; }
 
-    html += `<div onclick="adminDate=new Date(${year},${month},${day});refreshAllData();renderCurrentTab();" style="font-size:11px;padding:3px 0;border-radius:4px;cursor:pointer;background:${bg};color:${color};width:26px;justify-self:center;">${day}</div>`;
+    html += `<div onclick="adminDate=new Date(${year},${month},${day});refreshAllData();renderCurrentTab();" style="font-size:15px;padding:6px 0;border-radius:6px;cursor:pointer;background:${bg};color:${color};width:40px;justify-self:center;">${day}</div>`;
   }
 
   html += '</div>';
