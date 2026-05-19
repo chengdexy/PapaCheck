@@ -503,72 +503,85 @@ function openRewardBoxModal(mode, itemId) {
   adminEditingId = mode === 'edit' ? itemId : null;
   const item = adminEditingId ? adminRewardBox.find(i => i.id === adminEditingId) : null;
 
-  const shopHtml = mode === 'add' ? `
-    <div class="form-group">
-      <label>从积分商店选择（不减少库存）</label>
-      <div style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px;">
-        ${adminShopItems.length === 0
-          ? '<div style="text-align:center;color:var(--text-secondary);padding:8px;">商店暂无商品</div>'
-          : adminShopItems.map(si => `
-            <div class="shop-select-item" onclick="fillRewardFromShop('${si.name}','${si.type}','${si.durationMinutes || 0}')"
-              style="padding:8px 12px;cursor:pointer;border-radius:4px;display:flex;justify-content:space-between;align-items:center;"
-              onmouseover="this.style.background='rgba(255,255,255,0.05)'"
-              onmouseout="this.style.background='transparent'">
-              <span>${si.type === 'time' ? '⏱️' : '🎁'} ${si.name} · ${si.points}积分${si.type === 'time' && si.durationMinutes ? ' · ' + si.durationMinutes + '分钟' : ''}</span>
-              <span style="color:var(--accent);font-size:12px;">选择</span>
-            </div>
-          `).join('')}
-      </div>
-    </div>
-  ` : '';
-
   const modal = document.getElementById('adminModalContent');
-  modal.innerHTML = `
-    <h3>${adminEditingId ? '编辑奖励' : '添加奖励'}</h3>
-    ${shopHtml}
-    <div class="form-group">
-      <label>奖励名称</label>
-      <input type="text" id="adminItemName" value="${item?.name || ''}" placeholder="例如：游戏时间" maxlength="20">
-    </div>
-    <div class="form-group">
-      <label>奖励类型</label>
-      <div class="mode-selector">
-        <button class="mode-option ${(item?.type || 'time') === 'time' ? 'selected' : ''}"
-          onclick="selectRewardBoxType('time')">⏱️ 时间类</button>
-        <button class="mode-option ${(item?.type || 'time') === 'item' ? 'selected' : ''}"
-          onclick="selectRewardBoxType('item')">🎁 物品类</button>
+  if (mode === 'edit' && item) {
+    modal.innerHTML = `
+      <h3>编辑奖励</h3>
+      <div class="form-group">
+        <label>奖励名称</label>
+        <input type="text" id="adminItemName" value="${item.name}" maxlength="20">
       </div>
-    </div>
-    <div class="form-group" id="adminDurationGroup" style="display:${(item?.type || 'time') === 'item' ? 'none' : 'block'}">
-      <label>时长（分钟）</label>
-      <input type="number" id="adminItemDuration" value="${item?.durationMinutes || 30}" min="5" max="180" step="5">
-    </div>
-    <div class="form-group">
-      <label>数量</label>
-      <input type="number" id="adminItemQty" value="${item?.quantity || 1}" min="1" max="99">
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeAdminModal()">取消</button>
-      <button class="btn-primary" onclick="saveRewardBoxItem()">保存</button>
-    </div>
-  `;
+      <div class="form-group">
+        <label>奖励类型</label>
+        <div class="mode-selector">
+          <button class="mode-option ${item.type === 'time' ? 'selected' : ''}"
+            onclick="selectRewardBoxType('time')">⏱️ 时间类</button>
+          <button class="mode-option ${item.type === 'item' ? 'selected' : ''}"
+            onclick="selectRewardBoxType('item')">🎁 物品类</button>
+        </div>
+      </div>
+      <div class="form-group" id="adminDurationGroup" style="display:${item.type === 'item' ? 'none' : 'block'}">
+        <label>时长（分钟）</label>
+        <input type="number" id="adminItemDuration" value="${item.durationMinutes || 30}" min="5" max="180" step="5">
+      </div>
+      <div class="form-group">
+        <label>数量</label>
+        <input type="number" id="adminItemQty" value="${item.quantity || 1}" min="1" max="99">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeAdminModal()">取消</button>
+        <button class="btn-primary" onclick="saveRewardBoxItem()">保存</button>
+      </div>
+    `;
+    window._adminItemType = item.type;
+  } else {
+    modal.innerHTML = `
+      <h3>添加奖励 — 从积分商店选择</h3>
+      <div class="form-group">
+        <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
+          ${adminShopItems.length === 0
+            ? '<div style="text-align:center;color:var(--text-secondary);padding:16px;">商店暂无商品</div>'
+            : adminShopItems.map(si => `
+              <div style="padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);"
+                onmouseover="this.style.background='rgba(255,255,255,0.05)'"
+                onmouseout="this.style.background='transparent'"
+                onclick="addRewardFromShop('${si.name}','${si.type}','${si.durationMinutes || 0}')">
+                <div>
+                  <div style="font-weight:600;">${si.type === 'time' ? '⏱️' : '🎁'} ${si.name}</div>
+                  <div style="font-size:12px;color:var(--text-secondary);">${si.points}积分${si.type === 'time' && si.durationMinutes ? ' · ' + si.durationMinutes + '分钟' : ''}</div>
+                </div>
+                <span style="color:var(--accent);font-size:13px;font-weight:600;">+ 添加</span>
+              </div>
+            `).join('')}
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeAdminModal()">取消</button>
+      </div>
+    `;
+  }
 
-  window._adminItemType = item?.type || 'time';
   document.getElementById('adminModal').classList.add('show');
 }
 
-function fillRewardFromShop(name, type, durationMinutes) {
-  document.getElementById('adminItemName').value = name;
-  window._adminItemType = type;
-  document.querySelectorAll('#adminModalContent .mode-option').forEach(btn => {
-    const isTime = btn.textContent.includes('⏱️');
-    const isItem = btn.textContent.includes('🎁');
-    btn.classList.toggle('selected', (type === 'time' && isTime) || (type === 'item' && isItem));
-  });
-  if (type === 'time' && durationMinutes > 0) {
-    document.getElementById('adminItemDuration').value = durationMinutes;
+async function addRewardFromShop(name, type, durationMinutes) {
+  const exists = adminRewardBox.find(i => i.name === name);
+  if (exists) {
+    exists.quantity = (exists.quantity || 0) + 1;
+  } else {
+    adminRewardBox.push({
+      id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+      name,
+      type,
+      durationMinutes: type === 'time' ? (parseInt(durationMinutes) || 0) : 0,
+      quantity: 1,
+    });
   }
-  document.getElementById('adminDurationGroup').style.display = type === 'item' ? 'none' : 'block';
+  await API.saveRewardBox(adminRewardBox);
+  closeAdminModal();
+  await refreshAllData();
+  renderRewardBoxTab();
+  showToast('已添加：' + name);
 }
 
 function selectRewardBoxType(type) {
@@ -651,7 +664,7 @@ function renderRedeemTab() {
       : pending.map(r => `
           <div class="redeem-item">
             <div class="redeem-info">
-              <div class="redeem-name">${r.itemName}<span style="font-size:13px;color:var(--text-secondary);margin-left:6px;">${r.points}积分${r.itemType === 'time' && r.durationMinutes ? ' · ' + r.durationMinutes + '分钟' : ''}</span></div>
+              <div class="redeem-name">${r.itemName}${r.fromRewardBox ? ' <span style="font-size:12px;color:var(--accent);">🎁 奖励箱</span>' : ''}<span style="font-size:13px;color:var(--text-secondary);margin-left:6px;">${r.points > 0 ? r.points + '积分' : ''}${r.itemType === 'time' && r.durationMinutes ? (r.points > 0 ? ' · ' : '') + r.durationMinutes + '分钟' : ''}</span></div>
               <div class="redeem-time">${new Date(r.createdAt).toLocaleString('zh-CN')}</div>
             </div>
             <span class="redeem-status pending">待兑现</span>

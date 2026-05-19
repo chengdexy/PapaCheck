@@ -511,7 +511,7 @@ function updateHomeworkGrid() {
     }
 
     const modeLabel = '⚔️ ' + (hw.suggestedDuration || 0) + '分钟';
-    const clickAction = isDone ? '' : isActive ? '' : `onclick="startHomework('${hw.id}', 'challenge')"`;
+    const clickAction = isDone ? '' : isActive ? '' : `onclick="confirmStartTask('${hw.id}')"`;
 
     return `
       <div class="homework-card ${statusClass} ${isDone && hw._animClass ? hw._animClass : ''}" data-hw-id="${hw.id}" ${clickAction}>
@@ -786,24 +786,22 @@ async function redeemFromRewardBox(itemId) {
     const cleanedBox = rewardBox.filter(i => (i.quantity || 0) > 0);
     await API.saveRewardBox(cleanedBox);
 
-    if (item.type === 'time' && item.durationMinutes > 0) {
-      const dateKey = Util.dateKey(currentDate);
-      const freeTime = await API.getFreeTime(dateKey);
-      freeTime.push({
-        id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
-        name: item.name,
-        durationMinutes: item.durationMinutes,
-        status: 'pending',
-        startedAt: null,
-        completedAt: null,
-        remainingSeconds: item.durationMinutes * 60,
-      });
-      await API.saveFreeTime(dateKey, freeTime);
-    }
+    const redemptions = cachedData?.redemptions || [];
+    redemptions.push({
+      id: Util.genId(),
+      itemName: item.name,
+      itemType: item.type || 'item',
+      durationMinutes: item.durationMinutes || 0,
+      points: 0,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      fromRewardBox: true,
+    });
+    await API.saveRedemptions(redemptions);
 
     cachedData = await API.getData();
     showMyRewards();
-    showToast('已兑换：' + item.name);
+    showToast('已提交，等待爸爸确认');
   } finally {
     _redeemingRewardBox = false;
   }
@@ -966,6 +964,31 @@ async function backToMain() {
   currentPage = PAGE.MAIN;
   needsFullRender = true;
   updateBigScreen();
+}
+
+// ========== Start Confirm Modal ==========
+function confirmStartTask(hwId) {
+  const hw = homeworks.find(h => h.id === hwId);
+  if (!hw) return;
+
+  const subject = SUBJECTS[hw.subject] || SUBJECTS['其他'];
+  const modal = document.getElementById('startConfirmModal');
+  const content = document.getElementById('startConfirmModalContent');
+
+  content.innerHTML = `
+    <h3 style="text-align:center;margin-bottom:8px;">${subject.icon} ${hw.subject}</h3>
+    <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;">${hw.content}</p>
+    <p style="text-align:center;color:var(--accent);font-size:14px;margin-bottom:16px;">建议 ${hw.suggestedDuration} 分钟内完成</p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeStartConfirm()">取消</button>
+      <button class="btn-primary" onclick="closeStartConfirm(); startHomework('${hwId}', 'challenge')">⚔️ 开始</button>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function closeStartConfirm() {
+  document.getElementById('startConfirmModal').classList.remove('show');
 }
 
 // ========== Stats ==========
