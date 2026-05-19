@@ -684,9 +684,11 @@ function renderRedeemTab() {
             <span class="redeem-status fulfilled">已兑现 ✅</span>
           </div>
         `).join('')}
-      ${hasMore ? `<div style="text-align:center;padding:12px;">
-        <button class="btn-cancel" style="border:1px solid var(--text-secondary);padding:8px 24px;border-radius:8px;font-size:14px;"
-          onclick="_redeemShowCount += 10; renderRedeemTab();">查看更多 (剩余${fulfilled.length - _redeemShowCount}条)</button>
+      ${hasMore || _redeemShowCount > 3 ? `<div style="text-align:center;padding:12px;display:flex;gap:8px;justify-content:center;">
+        ${hasMore ? `<button class="btn-cancel" style="border:1px solid var(--text-secondary);padding:8px 24px;border-radius:8px;font-size:14px;"
+          onclick="_redeemShowCount += 10; renderRedeemTab();">查看更多 (剩余${fulfilled.length - _redeemShowCount}条)</button>` : ''}
+        ${_redeemShowCount > 3 ? `<button class="btn-cancel" style="border:1px solid var(--text-secondary);padding:8px 24px;border-radius:8px;font-size:14px;"
+          onclick="_redeemShowCount = 3; renderRedeemTab();">收起</button>` : ''}
       </div>` : ''}
     </div>`;
 }
@@ -901,15 +903,7 @@ function renderSettingsTab() {
       <div style="font-size:12px;color:var(--text-secondary);margin-top:8px;">重置将清除该日所有作业、结算、自由时间，第二天商品库存会刷新</div>
     </div>
 
-    <div class="admin-card">
-      <div class="admin-card-title">💾 数据管理</div>
-      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">导出为JSON备份文件，可随时导入恢复。导出不包含 data.db 原始数据库。</div>
-      <div class="settings-actions">
-        <button class="btn-primary" onclick="exportData()">导出数据</button>
-        <button class="btn-cancel" style="border:1px solid var(--text-secondary);" onclick="document.getElementById('importFileInput').click()">导入数据</button>
-        <input type="file" id="importFileInput" style="display:none;" accept=".json" onchange="importData(event)">
-      </div>
-    </div>`;
+  `;
 }
 
 function startEditBalance() {
@@ -967,37 +961,6 @@ async function changeAdminDate(delta) {
   document.getElementById('adminDate').textContent = AdminUtil.formatDate(adminDate);
   await refreshAllData();
   renderCurrentTab();
-}
-
-function exportData() {
-  const data = cachedData;
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'tinyschedule_backup_' + AdminUtil.dateKey(new Date()) + '.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('数据已导出');
-}
-
-async function importData(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  try {
-    const text = await file.text();
-    const data = JSON.parse(text);
-    await API._fetch('/api/data', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-    await refreshAllData();
-    renderCurrentTab();
-    showToast('数据已导入');
-  } catch (e) {
-    showToast('导入失败，请检查文件格式');
-  }
 }
 
 // ========== Modal ==========
