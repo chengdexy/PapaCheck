@@ -510,8 +510,8 @@ function updateHomeworkGrid() {
       }
     }
 
-    const modeLabel = hw.mode === 'challenge' ? '⚔️ 挑战' : hw.mode === 'timer' ? '⏱️ 计时' : '点击选择模式';
-    const clickAction = isDone ? '' : isActive ? '' : `onclick="showStartModeModal('${hw.id}')"`;
+    const modeLabel = '⚔️ ' + (hw.suggestedDuration || 0) + '分钟';
+    const clickAction = isDone ? '' : isActive ? '' : `onclick="startHomework('${hw.id}', 'challenge')"`;
 
     return `
       <div class="homework-card ${statusClass}" data-hw-id="${hw.id}" ${clickAction}>
@@ -920,37 +920,6 @@ async function backToMain() {
   currentPage = PAGE.MAIN;
   needsFullRender = true;
   updateBigScreen();
-}
-
-// ========== Start Mode Modal ==========
-function showStartModeModal(hwId) {
-  const hw = homeworks.find(h => h.id === hwId);
-  if (!hw) return;
-
-  const durText = '建议 ' + hw.suggestedDuration + ' 分钟';
-  const modal = document.getElementById('startModeModal');
-  const content = document.getElementById('startModeModalContent');
-
-  content.innerHTML = `
-    <h3 style="text-align:center;">${SUBJECTS[hw.subject]?.icon || '📚'} ${hw.subject}</h3>
-    <p style="text-align:center;color:var(--text-secondary);margin-bottom:8px;">${hw.content}</p>
-    <p style="text-align:center;color:var(--accent);font-size:14px;margin-bottom:16px;">${durText}</p>
-    <p style="text-align:center;color:var(--text-secondary);font-size:14px;margin-bottom:16px;">选择开始方式</p>
-    <div class="modal-actions" style="flex-direction:column;gap:10px;">
-      <button class="btn-primary" style="width:100%;padding:16px;font-size:22px;" onclick="closeModalAndStart('${hwId}', 'challenge')">
-        ⚔️ 挑战开始
-      </button>
-      <button class="btn-cancel" style="width:100%;padding:16px;font-size:22px;border:2px solid var(--accent);background:transparent;color:var(--accent);" onclick="closeModalAndStart('${hwId}', 'timer')">
-        ⏱️ 正常开始
-      </button>
-    </div>
-  `;
-  modal.classList.add('show');
-}
-
-function closeModalAndStart(hwId, mode) {
-  document.getElementById('startModeModal').classList.remove('show');
-  startHomework(hwId, mode);
 }
 
 // ========== Stats ==========

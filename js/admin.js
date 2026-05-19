@@ -127,9 +127,7 @@ function renderHomeworkTab() {
       ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无作业，点击下方添加</div>'
       : adminHomeworks.map(hw => {
         const subject = ADMIN_SUBJECTS.find(s => s.id === hw.subject) || ADMIN_SUBJECTS[4];
-        const modeText = hw.mode === 'challenge'
-          ? '⚔️ 挑战 · ' + hw.suggestedDuration + '分钟'
-          : '⏱️ 计时';
+        const modeText = '⚔️ ' + hw.suggestedDuration + '分钟';
         const statusText = hw.status === 'done' ? ' ✅' : hw.status === 'doing' ? ' 📝' : '';
         return `
               <div class="hw-admin-item">
@@ -825,12 +823,15 @@ function renderSettingsTab() {
         <label>当前余额</label>
         <span style="font-size:20px;font-weight:700;color:var(--accent);">${balance}</span>
       </div>
-      <div class="settings-actions">
-        <button class="btn-points-add" onclick="adjustPoints(10, '奖励')">+10</button>
-        <button class="btn-points-add" onclick="adjustPoints(50, '奖励')">+50</button>
-        <button class="btn-points-sub" onclick="adjustPoints(-10, '惩罚')">-10</button>
-        <button class="btn-points-sub" onclick="adjustPoints(-50, '惩罚')">-50</button>
-        <button class="btn-points-sub" style="background:#dc2626;" onclick="clearAllPoints()">清零</button>
+      <div class="settings-row" style="margin-top:12px;">
+        <label>调整积分</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="number" id="pointsInput" value="" placeholder="输入正数奖励，负数惩罚"
+            style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:16px;background:var(--bg);color:var(--text);"
+            oninput="document.getElementById('btnPointsConfirm').style.display='inline-block';document.getElementById('btnPointsCancel').style.display='inline-block';">
+          <button id="btnPointsConfirm" class="btn-primary" style="display:none;padding:10px 16px;" onclick="confirmAdjustPoints()">确认</button>
+          <button id="btnPointsCancel" class="btn-cancel" style="display:none;padding:10px 16px;" onclick="cancelAdjustPoints()">取消</button>
+        </div>
       </div>
     </div>
 
@@ -854,32 +855,30 @@ function renderSettingsTab() {
     </div>`;
 }
 
-async function adjustPoints(amount, label) {
+function cancelAdjustPoints() {
+  const input = document.getElementById('pointsInput');
+  if (input) input.value = '';
+  document.getElementById('btnPointsConfirm').style.display = 'none';
+  document.getElementById('btnPointsCancel').style.display = 'none';
+}
+
+async function confirmAdjustPoints() {
+  const input = document.getElementById('pointsInput');
+  const amount = parseInt(input.value);
+  if (isNaN(amount) || amount === 0) {
+    showToast('请输入有效的积分值');
+    return;
+  }
   if (_adjustingPoints) return;
   _adjustingPoints = true;
   try {
     const action = amount > 0 ? 'earn' : 'spend';
     const absAmount = Math.abs(amount);
+    const label = amount > 0 ? '奖励' : '惩罚';
     await API.updatePoints(action, absAmount, '爸爸' + label + ': ' + absAmount + '分');
     await refreshAllData();
     renderSettingsTab();
     showToast((amount > 0 ? '奖励' : '惩罚') + absAmount + '分');
-  } finally {
-    _adjustingPoints = false;
-  }
-}
-
-async function clearAllPoints() {
-  if (_adjustingPoints) return;
-  _adjustingPoints = true;
-  try {
-    const balance = cachedData?.points?.balance ?? cachedData?.points ?? 0;
-    if (balance > 0) {
-      await API.updatePoints('spend', balance, '清零积分');
-    }
-    await refreshAllData();
-    renderSettingsTab();
-    showToast('积分已清零');
   } finally {
     _adjustingPoints = false;
   }

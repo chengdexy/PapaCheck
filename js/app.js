@@ -106,6 +106,10 @@ async function completeHomework(id) {
   hw.completedAt = completedAt.toISOString();
   hw.actualDuration = actualDuration;
 
+  if (hw.mode === 'challenge' && hw.suggestedDuration > 0 && actualDuration > hw.suggestedDuration) {
+    hw.mode = 'timer';
+  }
+
   stopTickTimer();
   Voice.speak(hw.subject + '作业完成！');
   await saveHomeworksSilent();
