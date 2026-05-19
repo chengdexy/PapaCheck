@@ -100,7 +100,7 @@ async function completeHomework(id) {
 
   const completedAt = new Date();
   const startedAt = new Date(hw.startedAt);
-  const actualDuration = Math.round((completedAt - startedAt) / 60000);
+  const actualDuration = Math.max(1, Math.round((completedAt - startedAt) / 60000));
 
   hw.status = 'done';
   hw.completedAt = completedAt.toISOString();
