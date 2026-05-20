@@ -395,10 +395,10 @@ function renderShopTab() {
       ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无商品</div>'
       : adminShopItems.map(item => `
             <div class="shop-admin-item">
-              <div class="shop-admin-icon">${item.type === 'time' ? '🎮' : '🎁'}</div>
+              <div class="shop-admin-icon">${item.type === 'time' ? '🎮' : item.type === 'buff' ? '✨' : '🎁'}</div>
               <div class="shop-admin-info">
                 <div class="shop-admin-name">${item.name}</div>
-                <div class="shop-admin-meta">${item.points}积分 · 剩余${item.remainingQuantity ?? 0}件</div>
+                <div class="shop-admin-meta">${item.points}积分 · ${item.type === 'buff' && item.buffDuration ? item.buffDuration + (item.buffUnit === 'minutes' ? '分钟' : '天') + ' · ' : ''}剩余${item.remainingQuantity ?? 0}件</div>
               </div>
               <div class="shop-qty-controls">
                 <button class="btn-qty" onclick="adjustShopQty('${item.id}', -1)">−</button>
@@ -438,11 +438,19 @@ function openShopModal(mode, itemId) {
           onclick="selectAdminItemType('time')">⏱️ 时间类</button>
         <button class="mode-option ${(item?.type || 'time') === 'item' ? 'selected' : ''}"
           onclick="selectAdminItemType('item')">🎁 物品类</button>
+        <button class="mode-option ${(item?.type || 'time') === 'buff' ? 'selected' : ''}"
+          onclick="selectAdminItemType('buff')">✨ Buff类</button>
       </div>
     </div>
     <div class="form-group" id="adminDurationGroup" style="display:${(item?.type || 'time') === 'item' ? 'none' : 'block'}">
-      <label>奖励时长（分钟）</label>
-      <input type="number" id="adminItemDuration" value="${item?.durationMinutes || 30}" min="5" max="180" step="5">
+      <label>${(item?.type || 'time') === 'buff' ? '持续时长' : '奖励时长（分钟）'}</label>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="number" id="adminItemDuration" value="${(item?.type || 'time') === 'buff' ? (item?.buffDuration ?? 30) : (item?.durationMinutes || 30)}" min="1" max="180" step="1" style="width:80px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--bg);color:var(--text);text-align:center;">
+        <div class="mode-selector" id="adminBuffUnitGroup" style="display:${(item?.type || 'time') === 'buff' ? 'flex' : 'none'};">
+          <button class="mode-option ${(item?.buffUnit || 'days') === 'minutes' ? 'selected' : ''}" onclick="selectAdminBuffUnit('minutes')">分钟</button>
+          <button class="mode-option ${(item?.buffUnit || 'days') === 'days' ? 'selected' : ''}" onclick="selectAdminBuffUnit('days')">天</button>
+        </div>
+      </div>
     </div>
     <div class="form-group">
       <label>每日数量</label>
@@ -455,6 +463,7 @@ function openShopModal(mode, itemId) {
   `;
 
   window._adminItemType = item?.type || 'time';
+  window._adminBuffUnit = item?.buffUnit || 'days';
   document.getElementById('adminModal').classList.add('show');
 }
 
@@ -463,16 +472,31 @@ function selectAdminItemType(type) {
   document.querySelectorAll('#adminModalContent .mode-option').forEach(btn => {
     const isTime = btn.textContent.includes('⏱️');
     const isItem = btn.textContent.includes('🎁');
-    btn.classList.toggle('selected', (type === 'time' && isTime) || (type === 'item' && isItem));
+    const isBuff = btn.textContent.includes('✨');
+    btn.classList.toggle('selected', (type === 'time' && isTime) || (type === 'item' && isItem) || (type === 'buff' && isBuff));
   });
   document.getElementById('adminDurationGroup').style.display = type === 'item' ? 'none' : 'block';
+  const durLabel = document.querySelector('#adminDurationGroup label');
+  if (durLabel) durLabel.textContent = type === 'buff' ? '持续时长' : '奖励时长（分钟）';
+  const unitGroup = document.getElementById('adminBuffUnitGroup');
+  if (unitGroup) unitGroup.style.display = type === 'buff' ? 'flex' : 'none';
+}
+
+function selectAdminBuffUnit(unit) {
+  window._adminBuffUnit = unit;
+  document.querySelectorAll('#adminBuffUnitGroup .mode-option').forEach(btn => {
+    const btnUnit = btn.textContent.includes('分钟') ? 'minutes' : 'days';
+    btn.classList.toggle('selected', btnUnit === unit);
+  });
 }
 
 async function saveShopItem() {
   const name = document.getElementById('adminItemName').value.trim();
   const points = parseInt(document.getElementById('adminItemPoints').value) || getSetting('shopDefaultPoints');
   const type = window._adminItemType || 'time';
-  const durationMinutes = type === 'time' ? (parseInt(document.getElementById('adminItemDuration').value) || 30) : 0;
+  const durationMinutes = type === 'item' ? 0 : (parseInt(document.getElementById('adminItemDuration').value) || 30);
+  const buffDuration = type === 'buff' ? (parseInt(document.getElementById('adminItemDuration').value) || 30) : 0;
+  const buffUnit = type === 'buff' ? (window._adminBuffUnit || 'days') : '';
   const baseQuantity = parseInt(document.getElementById('adminItemBaseQty').value) || 3;
   if (!name) { showToast('请输入商品名称'); return; }
 
@@ -483,6 +507,8 @@ async function saveShopItem() {
       item.points = points;
       item.type = type;
       item.durationMinutes = durationMinutes;
+      item.buffDuration = buffDuration;
+      item.buffUnit = buffUnit;
       item.baseQuantity = baseQuantity;
     }
   } else {
@@ -492,6 +518,8 @@ async function saveShopItem() {
       points,
       type,
       durationMinutes,
+      buffDuration,
+      buffUnit,
       baseQuantity,
       remainingQuantity: baseQuantity,
     });
@@ -784,6 +812,20 @@ async function fulfillRedemption(id) {
         });
         await API.saveFreeTime(dateKey, freeTime);
       }
+
+      if (r.itemType === 'buff') {
+        const buffDuration = r.buffDuration ?? 30;
+        const buffUnit = r.buffUnit || 'days';
+        const buffs = await API.getActiveBuffs();
+        buffs.push({
+          id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+          name: r.itemName,
+          duration: buffDuration,
+          unit: buffUnit,
+          startDate: buffUnit === 'minutes' ? new Date().toISOString() : AdminUtil.dateKey(adminDate),
+        });
+        await API.saveActiveBuffs(buffs);
+      }
     } else {
       const itemType = r.itemType;
       let durationMinutes = r.durationMinutes || 0;
@@ -809,6 +851,21 @@ async function fulfillRedemption(id) {
           remainingSeconds: durationMinutes * 60,
         });
         await API.saveFreeTime(dateKey, freeTime);
+      }
+
+      if ((itemType || r.itemType) === 'buff') {
+        const shopItem = adminShopItems.find(i => i.name === r.itemName);
+        const buffDuration = r.buffDuration ?? shopItem?.buffDuration ?? 30;
+        const buffUnit = r.buffUnit || shopItem?.buffUnit || 'days';
+        const buffs = await API.getActiveBuffs();
+        buffs.push({
+          id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+          name: r.itemName,
+          duration: buffDuration,
+          unit: buffUnit,
+          startDate: buffUnit === 'minutes' ? new Date().toISOString() : AdminUtil.dateKey(adminDate),
+        });
+        await API.saveActiveBuffs(buffs);
       }
     }
 

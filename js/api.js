@@ -103,6 +103,18 @@ const API = {
     return true;
   },
 
+  async getActiveBuffs() {
+    return await this._fetch('/api/active-buffs');
+  },
+
+  async saveActiveBuffs(buffs) {
+    await this._fetch('/api/active-buffs', {
+      method: 'POST',
+      body: JSON.stringify({ buffs }),
+    });
+    return true;
+  },
+
   async getShopItems() {
     return await this._fetch('/api/shop');
   },

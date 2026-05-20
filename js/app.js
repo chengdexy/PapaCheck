@@ -12,6 +12,7 @@ let isScreenSaverActive = false;
 let saverTimeInterval = null;
 let tickInterval = null;
 let pollInterval = null;
+let _lastBuffs = null;
 
 // ========== Utility ==========
 const Util = {
@@ -355,6 +356,41 @@ function startPoll(intervalMs) {
     try {
       cachedData = await API.getData();
       const key = Util.dateKey(currentDate);
+
+      const buffs = cachedData.activeBuffs || [];
+      const now_ = new Date();
+      const remaining = [];
+      let buffsChanged = false;
+      for (const b of buffs) {
+        const unit = b.unit || 'days';
+        if (unit === 'minutes') {
+          const startTime = b.startDate ? new Date(b.startDate) : new Date();
+          const endTime = new Date(startTime.getTime() + (b.duration || 0) * 60000);
+          if (endTime <= now_) {
+            buffsChanged = true;
+          } else {
+            remaining.push(b);
+          }
+        } else {
+          const end = new Date(b.startDate);
+          end.setDate(end.getDate() + (b.duration || 1));
+          if (end <= now_) {
+            buffsChanged = true;
+          } else {
+            remaining.push(b);
+          }
+        }
+      }
+      if (buffsChanged) {
+        await API.saveActiveBuffs(remaining);
+        cachedData.activeBuffs = remaining;
+        needsFullRender = true;
+      }
+
+      if (JSON.stringify(cachedData.activeBuffs || []) !== JSON.stringify(_lastBuffs)) {
+        _lastBuffs = cachedData.activeBuffs || [];
+        needsFullRender = true;
+      }
 
       const newHw = cachedData.homeworks?.[key] || [];
       const oldHwJson = JSON.stringify(homeworks);

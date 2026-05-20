@@ -236,6 +236,7 @@ function updateMainPage() {
   currentPage = PAGE.MAIN;
 
   document.getElementById('bigHeader').style.display = '';
+  renderBuffBar();
   updateCurrentTask();
   updateHomeworkGrid();
   updateFreeTimeGrid();
@@ -245,6 +246,20 @@ function updateMainPage() {
   document.getElementById('shopContainer').style.display = 'none';
   document.getElementById('bigContent').style.display = '';
   document.getElementById('bigStats').style.display = '';
+}
+
+function renderBuffBar() {
+  const buffBar = document.getElementById('buffBar');
+  if (!buffBar) return;
+  const buffs = cachedData?.activeBuffs || [];
+  if (buffs.length === 0) {
+    buffBar.style.display = 'none';
+    return;
+  }
+  buffBar.style.display = 'flex';
+  buffBar.innerHTML = buffs.map(b => {
+    return `<span style="font-size:16px;font-weight:600;color:var(--accent);">✨ ${b.name}</span>`;
+  }).join('');
 }
 
 function updateCurrentTask() {
@@ -745,7 +760,9 @@ function showMyRewards() {
         const pendingR = redemptions.find(rd => rd.rewardBoxItemId === r.id && rd.status === 'pending');
         const metaStr = r.type === 'time'
           ? (r.durationMinutes || 0) + '分钟'
-          : '';
+          : r.type === 'buff'
+            ? (r.buffDuration ?? 0) + (r.buffUnit === 'minutes' ? '分钟' : '天')
+            : '';
         return `
         <div class="reward-item">
           <div class="reward-item-info">
@@ -794,6 +811,8 @@ async function redeemFromRewardBox(itemId) {
       itemName: item.name,
       itemType: item.type || 'item',
       durationMinutes: item.durationMinutes || 0,
+      buffDuration: item.buffDuration ?? 0,
+      buffUnit: item.buffUnit || '',
       points: 0,
       status: 'pending',
       createdAt: new Date().toISOString(),
@@ -873,7 +892,7 @@ async function updateShopPage() {
         const soldOut = remaining <= 0;
         return `
             <div class="shop-item-card${soldOut ? ' sold-out' : ''}">
-              <div class="shop-item-icon">${item.type === 'time' ? '⏱️' : '🎁'}</div>
+              <div class="shop-item-icon">${item.type === 'time' ? '⏱️' : item.type === 'buff' ? '✨' : '🎁'}</div>
               <div class="shop-item-name">${item.name}</div>
               <div class="shop-item-points">${item.points} 积分 · 剩${remaining}件</div>
               <button class="btn-shop-redeem" ${points < item.points || soldOut ? 'disabled' : ''}
@@ -911,23 +930,28 @@ async function redeemItem(itemId) {
     item.remainingQuantity = remaining - 1;
     await API.saveShopItems(items);
 
-    const redemptions = cachedData?.redemptions || [];
-    redemptions.push({
-      id: Util.genId(),
-      itemName: item.name,
-      itemType: item.type || 'item',
-      durationMinutes: item.durationMinutes || 0,
-      points: item.points,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    });
+    const rewardBox = cachedData?.rewardBox || [];
+    const existing = rewardBox.find(rb => rb.name === item.name);
+    if (existing) {
+      existing.quantity = (existing.quantity || 0) + 1;
+    } else {
+      rewardBox.push({
+        id: Util.genId(),
+        name: item.name,
+        type: item.type || 'item',
+        durationMinutes: item.durationMinutes || 0,
+        buffDuration: item.buffDuration ?? 0,
+        buffUnit: item.buffUnit || '',
+        quantity: 1,
+      });
+    }
+    await API.saveRewardBox(rewardBox);
 
-    await API.saveRedemptions(redemptions);
     await API.updatePoints('spend', item.points, '兑换：' + item.name);
 
     cachedData = await API.getData();
     updateShopPage();
-    showToast('兑换成功！等待爸爸确认');
+    showToast('兑换成功！');
     Voice.speak('兑换成功！');
   } finally {
     _redeemingItem = false;

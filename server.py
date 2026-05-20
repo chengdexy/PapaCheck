@@ -73,6 +73,10 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
             self.send_json(db.get_settings())
             return
 
+        if path == '/api/active-buffs':
+            self.send_json(db.get_active_buffs())
+            return
+
         if path.startswith('/api/efficiency/'):
             date_key = path[len('/api/efficiency/'):]
             self.send_json(db.get_efficiency(date_key))
@@ -144,6 +148,11 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
 
         if path == '/api/settings':
             db.save_settings(payload.get('settings', {}))
+            self.send_json({'ok': True})
+            return
+
+        if path == '/api/active-buffs':
+            db.save_active_buffs(payload.get('buffs', []))
             self.send_json({'ok': True})
             return
 
