@@ -13,6 +13,9 @@ let saverTimeInterval = null;
 let tickInterval = null;
 let pollInterval = null;
 let _lastBuffs = null;
+let _lastRewardBox = null;
+let _lastRatingInfo = null;
+let _lastPoints = null;
 
 // ========== Utility ==========
 const Util = {
@@ -45,8 +48,28 @@ const Util = {
 
 // ========== Voice ==========
 const Voice = {
+  _queue: [],
+  _playing: false,
   speak(text) {
-    // Voice disabled
+    this._queue.push(text);
+    if (!this._playing) this._playNext();
+  },
+  async _playNext() {
+    if (this._queue.length === 0) { this._playing = false; return; }
+    this._playing = true;
+    const text = this._queue.shift();
+    try {
+      const url = '/api/speak?' + new URLSearchParams({ text });
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('speak fail');
+      const blob = await resp.blob();
+      const audio = new Audio(URL.createObjectURL(blob));
+      audio.onended = () => this._playNext();
+      audio.onerror = () => this._playNext();
+      await audio.play();
+    } catch (e) {
+      this._playNext();
+    }
   },
 };
 
@@ -92,6 +115,7 @@ function startHomework(id, mode) {
   }
 
   startTickTimer();
+  Voice.speak('任务已继续');
   needsFullRender = true;
   updateBigScreen();
 }
@@ -114,16 +138,17 @@ async function completeHomework(id) {
     hw.mode = 'timer';
     hw._animClass = 'task-complete';
     toastMsg = '✅ ' + hw.subject + '完成';
+    Voice.speak('超时了，本次按计时模式统计，' + hw.subject + '作业完成');
   } else if (hw.mode === 'challenge') {
     hw._animClass = 'challenge-success';
     toastMsg = '⚡ 挑战成功！' + hw.subject + '提前完成';
+    Voice.speak('挑战成功！' + hw.subject + '提前完成');
   } else {
     hw._animClass = 'task-complete';
     toastMsg = '✅ ' + hw.subject + '完成';
+    Voice.speak(hw.subject + '作业完成！');
   }
-
   stopTickTimer();
-  Voice.speak(hw.subject + '作业完成！');
   await saveHomeworksSilent();
 
   checkAllDone();
@@ -182,6 +207,7 @@ function pauseActiveTask() {
   task.paused = true;
   task.wasPaused = true;
   stopTickTimer();
+  Voice.speak('任务已暂停');
   if (task.startedAt && task.status === 'doing') {
     task._pausedElapsed = Math.floor((new Date() - new Date(task.startedAt)) / 1000);
   }
@@ -226,6 +252,7 @@ function stopTickTimer() {
 
 // ========== Timer Reminders (Challenge mode) ==========
 let lastReminderTrigger = {};
+let lastOvertimeSpeak = {};
 
 function checkReminders(hw) {
   if (hw.mode !== 'challenge' || hw.status !== 'doing' || !hw.startedAt) return;
@@ -242,14 +269,28 @@ function checkReminders(hw) {
     Voice.speak('已用' + hw.suggestedDuration / 2 + '分钟，继续加油');
   }
 
-  if (!lastReminderTrigger[key].twoMin && totalSeconds - elapsedSeconds <= 120 && elapsedSeconds < totalSeconds) {
-    lastReminderTrigger[key].twoMin = true;
-    Voice.speak('还有2分钟，准备收尾');
+  if (!lastReminderTrigger[key].fiveMin && totalSeconds - elapsedSeconds <= 300 && elapsedSeconds < totalSeconds) {
+    lastReminderTrigger[key].fiveMin = true;
+    Voice.speak('还剩5分钟');
+  }
+
+  if (!lastReminderTrigger[key].oneMin && totalSeconds - elapsedSeconds <= 60 && elapsedSeconds < totalSeconds) {
+    lastReminderTrigger[key].oneMin = true;
+    Voice.speak('还剩1分钟');
   }
 
   if (!lastReminderTrigger[key].overtime && elapsedSeconds > totalSeconds) {
     lastReminderTrigger[key].overtime = true;
-    Voice.speak('已超时，尽快完成');
+    Voice.speak('已超时，请尽快完成');
+    lastOvertimeSpeak[key] = Date.now();
+  }
+
+  if (lastReminderTrigger[key].overtime && elapsedSeconds > totalSeconds) {
+    const lastSpeak = lastOvertimeSpeak[key] || 0;
+    if (Date.now() - lastSpeak >= 30 * 60 * 1000) {
+      Voice.speak('已超时，请尽快完成');
+      lastOvertimeSpeak[key] = Date.now();
+    }
   }
 }
 
@@ -341,7 +382,7 @@ async function submitForRating() {
     needsFullRender = true;
     updateBigScreen();
     showToast('已提交等待爸爸评级');
-    Voice.speak('请爸爸检查作业');
+    Voice.speak('全部作业已完成，等待爸爸评级');
   } finally {
     _submittingRating = false;
   }
@@ -387,9 +428,31 @@ function startPoll(intervalMs) {
         needsFullRender = true;
       }
 
-      if (JSON.stringify(cachedData.activeBuffs || []) !== JSON.stringify(_lastBuffs)) {
-        _lastBuffs = cachedData.activeBuffs || [];
+      if (_lastBuffs !== null && JSON.stringify(cachedData.activeBuffs || []) !== JSON.stringify(_lastBuffs)) {
+        const prevBuffs = _lastBuffs || [];
+        const newBuffs = cachedData.activeBuffs || [];
+        const added = newBuffs.filter(b => !prevBuffs.some(p => p.name === b.name && p.startDate === b.startDate));
+        for (const b of added) {
+          Voice.speak(b.name + '已生效');
+        }
+        _lastBuffs = newBuffs;
         needsFullRender = true;
+      }
+      if (_lastBuffs === null) {
+        _lastBuffs = cachedData.activeBuffs || [];
+      }
+
+      const rb = cachedData.rewardBox || [];
+      const prevRb = _lastRewardBox || [];
+      if (_lastRewardBox !== null && JSON.stringify(rb) !== JSON.stringify(prevRb)) {
+        const addedRb = rb.filter(r => !prevRb.some(p => p.name === r.name) || (r.quantity || 0) > (prevRb.find(p => p.name === r.name)?.quantity || 0));
+        if (addedRb.length > 0) {
+          Voice.speak('奖励箱有新奖励，快去看看吧');
+        }
+        _lastRewardBox = rb.concat();
+      }
+      if (_lastRewardBox === null) {
+        _lastRewardBox = rb.concat();
       }
 
       const newHw = cachedData.homeworks?.[key] || [];
@@ -414,7 +477,13 @@ function startPoll(intervalMs) {
       if ((!hasActive || isPaused) && tickInterval) stopTickTimer();
 
       const newSettlement = cachedData.dailySettlement?.[key] || null;
+      let ratingChanged = false;
       if (newSettlement) {
+        const prevRating = _lastRatingInfo;
+        if (newSettlement.rating && (!prevRating || prevRating.key !== key || prevRating.rating !== newSettlement.rating)) {
+          ratingChanged = true;
+          _lastRatingInfo = { key, rating: newSettlement.rating, finalPoints: newSettlement.finalPoints };
+        }
         cachedData._settlement = newSettlement;
         needsFullRender = true;
       } else {
@@ -422,9 +491,21 @@ function startPoll(intervalMs) {
         if (old && (old.submittedAt || old.rating)) {
           cachedData._settlement = null;
           window._settlement = null;
+          _lastRatingInfo = null;
           needsFullRender = true;
         }
       }
+
+      if (ratingChanged) {
+        const info = _lastRatingInfo;
+        Voice.speak('爸爸评了' + info.rating + '，获得' + (info.finalPoints || 0) + '分');
+      }
+
+      const points = cachedData?.points?.balance ?? cachedData?.points ?? 0;
+      if (_lastPoints !== null && points !== _lastPoints) {
+        Voice.speak('积分已更新为' + points + '分');
+      }
+      _lastPoints = points;
 
       if (needsFullRender) {
         updateBigScreen();
@@ -467,12 +548,23 @@ function wakeUp() {
   startScreenSaverTimer();
   pollServer();
   startPoll(5000);
+  Voice.speak('屏幕已唤醒');
 }
+
+let lastHourChime = null;
 
 function updateSaverTime() {
   const now = new Date();
   document.getElementById('saverTime').textContent = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   document.getElementById('saverDate').textContent = Util.formatDate(now);
+
+  if (now.getMinutes() === 0 && now.getSeconds() === 0) {
+    const hourKey = now.getHours();
+    if (lastHourChime !== hourKey) {
+      lastHourChime = hourKey;
+      Voice.speak('现在是' + hourKey + '点');
+    }
+  }
 }
 
 // ========== Connection Status ==========

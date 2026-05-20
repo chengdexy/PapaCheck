@@ -11,11 +11,34 @@ import json
 import os
 import sys
 import socket
+import asyncio
+import io
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import db
 
 PORT = 8080
+_tts_cache = {}
+
+def _gen_mp3(text):
+    if text in _tts_cache:
+        return _tts_cache[text]
+    async def _run():
+        import edge_tts
+        communicate = edge_tts.Communicate(text, 'zh-CN-XiaoxiaoNeural')
+        mp3_data = b''
+        async for chunk in communicate.stream():
+            if chunk['type'] == 'audio':
+                mp3_data += chunk['data']
+        return mp3_data
+    try:
+        loop = asyncio.new_event_loop()
+        mp3_data = loop.run_until_complete(_run())
+        loop.close()
+    except Exception:
+        mp3_data = b''
+    _tts_cache[text] = mp3_data
+    return mp3_data
 
 
 def get_local_ip():
@@ -37,6 +60,21 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
+
+        if path == '/api/speak':
+            qs = parse_qs(parsed.query)
+            text = qs.get('text', [''])[0]
+            if text:
+                mp3_data = _gen_mp3(text)
+                self.send_response(200)
+                self.send_header('Content-Type', 'audio/mpeg')
+                self.send_header('Content-Length', len(mp3_data))
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(mp3_data)
+            else:
+                self.send_error(400, 'Missing text')
+            return
 
         if path == '/api/data':
             self.send_json(db.get_full_data())

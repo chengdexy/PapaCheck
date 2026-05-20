@@ -824,6 +824,7 @@ async function redeemFromRewardBox(itemId) {
     cachedData = await API.getData();
     showMyRewards();
     showToast('已提交，等待爸爸确认');
+    Voice.speak('已提交申请，等待爸爸确认');
   } finally {
     _redeemingRewardBox = false;
   }
