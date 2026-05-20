@@ -304,6 +304,10 @@ body {
   color: var(--success);
 }
 
+.homework-status.rejected {
+  color: #f87171;
+}
+
 .homework-timer {
   font-size: 18px;
   font-weight: 700;

@@ -140,6 +140,7 @@ function renderHomeworkTab() {
                 <div class="hw-admin-actions">
                   ${hw.status === 'pending' ? `<button class="btn-sm btn-edit" onclick="openHwModal('edit', '${hw.id}')">编辑</button>` : ''}
                   ${hw.status === 'pending' ? `<button class="btn-sm btn-delete" onclick="deleteAdminHw('${hw.id}')">删除</button>` : ''}
+                  ${hw.status === 'done' && !hw.rejected ? `<button class="btn-sm" style="background:var(--warning);color:var(--bg);border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;" onclick="rejectHomework('${hw.id}')">驳回</button>` : ''}
                 </div>
               </div>`;
       }).join('')}
@@ -230,6 +231,27 @@ async function deleteAdminHw(id) {
   await refreshAllData();
   renderHomeworkTab();
   showToast('作业已删除');
+}
+
+async function rejectHomework(hwId) {
+  const hw = adminHomeworks.find(h => h.id === hwId);
+  if (!hw || hw.status !== 'done' || hw.rejected) return;
+
+  hw.status = 'pending';
+  hw.rejected = true;
+  hw.startedAt = null;
+  hw.completedAt = null;
+  hw.actualDuration = null;
+  hw.mode = 'pending';
+
+  const dateKey = AdminUtil.dateKey(adminDate);
+  await API.saveHomeworks(dateKey, adminHomeworks);
+
+  await API.saveSettlement(dateKey, {});
+
+  await refreshAllData();
+  renderHomeworkTab();
+  showToast('已驳回：' + hw.subject + ' - ' + hw.content);
 }
 
 // ========== Rating Modal ==========
@@ -785,7 +807,7 @@ function renderStatsTab() {
       value: totalCount > 0 ? Math.round(doneCount / totalCount * 100) : 0,
     });
 
-    const doneHw = hwList.filter(h => h.status === 'done' && h.actualDuration !== null && h.suggestedDuration > 0);
+    const doneHw = hwList.filter(h => h.status === 'done' && h.actualDuration !== null && h.suggestedDuration > 0 && !h.rejected);
     const ratios = doneHw.map(h => h.actualDuration / h.suggestedDuration);
     const avgRatio = ratios.length > 0 ? ratios.reduce((a, b) => a + b, 0) / ratios.length : 0;
     efficiencyRatios.push({

@@ -78,7 +78,7 @@ function startHomework(id, mode) {
   const hw = homeworks.find(h => h.id === id);
   if (!hw || hw.status !== 'pending') return;
 
-  hw.mode = mode || 'timer';
+  hw.mode = hw.rejected ? 'timer' : (mode || 'timer');
   hw.status = 'doing';
   hw.startedAt = new Date().toISOString();
   saveHomeworksSilent();
@@ -111,9 +111,12 @@ async function completeHomework(id) {
     hw.mode = 'timer';
     hw._animClass = 'task-complete';
     toastMsg = '✅ ' + hw.subject + '完成';
-  } else {
+  } else if (hw.mode === 'challenge') {
     hw._animClass = 'challenge-success';
     toastMsg = '⚡ 挑战成功！' + hw.subject + '提前完成';
+  } else {
+    hw._animClass = 'task-complete';
+    toastMsg = '✅ ' + hw.subject + '完成';
   }
 
   stopTickTimer();
@@ -256,7 +259,7 @@ async function checkAllDone() {
 }
 
 async function calculateSettlement() {
-  const challengeHw = homeworks.filter(h => h.mode === 'challenge' && h.status === 'done');
+  const challengeHw = homeworks.filter(h => h.mode === 'challenge' && h.status === 'done' && !h.rejected);
 
   const basePoints = homeworks.filter(h => h.status === 'done').length * 10;
   let efficiencyBonus = 0;

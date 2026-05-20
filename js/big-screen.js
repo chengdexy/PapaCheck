@@ -496,12 +496,12 @@ function updateHomeworkGrid() {
           '</div>';
       }
     } else {
-      statusText = '未开始';
-      statusClassName = 'pending';
+      statusText = hw.rejected ? '被驳回' : '未开始';
+      statusClassName = hw.rejected ? 'rejected' : 'pending';
 
       rightSection = '<div class="homework-status ' + statusClassName + '" style="flex-shrink:0;">' + statusText + '</div>';
 
-      if (hw.mode === 'challenge') {
+      if (hw.mode === 'challenge' && !hw.rejected) {
         rightSection = '<div style="text-align:right;flex-shrink:0;">' +
           '<div class="homework-timer" style="color:var(--accent);font-weight:600;font-size:16px;">' + hw.suggestedDuration + '分钟</div>' +
           '<div class="homework-status ' + statusClassName + '" style="margin-top:2px;">' + statusText + '</div>' +
@@ -512,7 +512,7 @@ function updateHomeworkGrid() {
       }
     }
 
-    const modeLabel = '⚔️ ' + (hw.suggestedDuration || 0) + '分钟';
+    const modeLabel = hw.rejected ? '⏱️ 不计时' : ('⚔️ ' + (hw.suggestedDuration || 0) + '分钟');
     const clickAction = isDone ? '' : isActive ? '' : `onclick="confirmStartTask('${hw.id}')"`;
 
     return `
@@ -980,15 +980,27 @@ function confirmStartTask(hwId) {
   const modal = document.getElementById('startConfirmModal');
   const content = document.getElementById('startConfirmModalContent');
 
-  content.innerHTML = `
-    <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon} ${hw.subject}</h3>
-    <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;font-size:20px;">${hw.content}</p>
-    <p style="text-align:center;color:var(--accent);font-size:20px;margin-bottom:16px;">建议 ${hw.suggestedDuration} 分钟内完成</p>
-    <div class="modal-actions">
-      <button onclick="closeStartConfirm()" style="padding:10px 24px;border:2px solid var(--text-secondary);border-radius:12px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;">取消</button>
-      <button onclick="closeStartConfirm(); startHomework('${hwId}', 'challenge')" style="padding:10px 24px;background:var(--accent);color:var(--bg);border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">⚔️ 开始</button>
-    </div>
-  `;
+  if (hw.rejected) {
+    content.innerHTML = `
+      <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon} ${hw.subject}</h3>
+      <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;font-size:20px;">${hw.content}</p>
+      <p style="text-align:center;color:#f87171;font-size:20px;margin-bottom:16px;">⚠️ 已驳回，不计时重新完成</p>
+      <div class="modal-actions">
+        <button onclick="closeStartConfirm()" style="padding:10px 24px;border:2px solid var(--text-secondary);border-radius:12px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;">取消</button>
+        <button onclick="closeStartConfirm(); startHomework('${hwId}', 'timer')" style="padding:10px 24px;background:var(--accent);color:var(--bg);border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">开始</button>
+      </div>
+    `;
+  } else {
+    content.innerHTML = `
+      <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon} ${hw.subject}</h3>
+      <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;font-size:20px;">${hw.content}</p>
+      <p style="text-align:center;color:var(--accent);font-size:20px;margin-bottom:16px;">建议 ${hw.suggestedDuration} 分钟内完成</p>
+      <div class="modal-actions">
+        <button onclick="closeStartConfirm()" style="padding:10px 24px;border:2px solid var(--text-secondary);border-radius:12px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;">取消</button>
+        <button onclick="closeStartConfirm(); startHomework('${hwId}', 'challenge')" style="padding:10px 24px;background:var(--accent);color:var(--bg);border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">⚔️ 开始</button>
+      </div>
+    `;
+  }
   modal.classList.add('show');
 }
 
