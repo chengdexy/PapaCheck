@@ -10,10 +10,34 @@ let adminRedemptions = [];
 let adminRewardBox = [];
 let adminCurrentTab = 'homework';
 let adminEditingId = null;
+let adminSettings = {};
 let _submittingAdminRating = false;
 let _fulfillingRedemption = false;
 let _adjustingPoints = false;
 let _redeemShowCount = 3;
+
+const SETTINGS_DEFAULTS = {
+  homeworkDefaultBasePoints: 10,
+  homeworkDefaultSuggestedDuration: 20,
+  ratingMultipliers: {
+    challenge: { '优': 2.0, '良': 1.5, '可': 1.2, '差': 0 },
+    timer: { '优': 1.5, '良': 1.2, '可': 1.0, '差': 0 }
+  },
+  challengeEfficiencyBonus: 5,
+  shopDefaultPoints: 15,
+};
+
+function getSetting(key) {
+  const val = adminSettings[key];
+  if (val !== undefined && val !== null) return val;
+  return SETTINGS_DEFAULTS[key];
+}
+
+function getSettingsRatingMultipliers() {
+  const stored = adminSettings.ratingMultipliers;
+  if (stored && stored.challenge && stored.timer) return stored;
+  return SETTINGS_DEFAULTS.ratingMultipliers;
+}
 
 const ADMIN_SUBJECTS = [
   { id: '语文', icon: '📖' },
@@ -56,7 +80,7 @@ async function initAdmin() {
   setInterval(async () => {
     await refreshAllData();
     renderCurrentTab();
-  }, 10000);
+  }, 5000);
 }
 
 async function refreshAllData() {
@@ -68,6 +92,7 @@ async function refreshAllData() {
       adminShopItems = data.shopItems || [];
       adminRedemptions = data.redemptions || [];
       adminRewardBox = data.rewardBox || [];
+      adminSettings = data.settings || {};
     }
   } catch (e) {
     // Server unreachable
@@ -129,13 +154,14 @@ function renderHomeworkTab() {
       : adminHomeworks.map(hw => {
         const subject = ADMIN_SUBJECTS.find(s => s.id === hw.subject) || ADMIN_SUBJECTS[4];
         const modeText = '⚔️ ' + hw.suggestedDuration + '分钟';
+        const bpText = (hw.basePoints ?? 10) !== 10 ? ' · ' + hw.basePoints + '分' : '';
         const statusText = hw.status === 'done' ? ' ✅' : hw.status === 'doing' ? ' 📝' : '';
         return `
               <div class="hw-admin-item">
                 <div class="hw-admin-icon">${subject.icon}</div>
                 <div class="hw-admin-info">
                   <div class="hw-admin-subject">${hw.subject} - ${hw.content}${statusText}</div>
-                  <div class="hw-admin-meta">${modeText}${hw.actualDuration !== null ? ' · 实际' + hw.actualDuration + '分钟' : ''}</div>
+                  <div class="hw-admin-meta">${modeText}${hw.actualDuration !== null ? ' · 实际' + hw.actualDuration + '分钟' : ''}${bpText}</div>
                 </div>
                 <div class="hw-admin-actions">
                   ${hw.status === 'pending' ? `<button class="btn-sm btn-edit" onclick="openHwModal('edit', '${hw.id}')">编辑</button>` : ''}
@@ -171,7 +197,11 @@ function openHwModal(mode, hwId) {
     </div>
     <div class="form-group">
       <label>建议时长（分钟）</label>
-      <input type="number" id="adminHwDuration" value="${hw?.suggestedDuration || 20}" min="5" max="180" step="5">
+      <input type="number" id="adminHwDuration" value="${hw?.suggestedDuration || getSetting('homeworkDefaultSuggestedDuration')}" min="5" max="180" step="5">
+    </div>
+    <div class="form-group">
+      <label>基础分</label>
+      <input type="number" id="adminHwBasePoints" value="${hw?.basePoints ?? getSetting('homeworkDefaultBasePoints')}" min="1" max="100">
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeAdminModal()">取消</button>
@@ -196,6 +226,7 @@ async function saveAdminHw() {
 
   const subject = window._adminSelectedSubject || '语文';
   const suggestedDuration = parseInt(document.getElementById('adminHwDuration').value) || 20;
+  const basePoints = parseInt(document.getElementById('adminHwBasePoints').value) ?? 10;
 
   if (adminEditingId) {
     const hw = adminHomeworks.find(h => h.id === adminEditingId);
@@ -203,6 +234,7 @@ async function saveAdminHw() {
       hw.subject = subject;
       hw.content = content;
       hw.suggestedDuration = suggestedDuration;
+      hw.basePoints = basePoints;
     }
   } else {
     adminHomeworks.push({
@@ -211,6 +243,7 @@ async function saveAdminHw() {
       content,
       mode: 'pending',
       suggestedDuration,
+      basePoints,
       status: 'pending',
       startedAt: null,
       completedAt: null,
@@ -308,10 +341,7 @@ async function submitRating(dateKey, rating) {
 
   _submittingAdminRating = true;
   try {
-    const multipliers = {
-      'challenge': { '优': 2.0, '良': 1.5, '可': 1.2, '差': 0 },
-      'timer': { '优': 1.5, '良': 1.2, '可': 1.0, '差': 0 },
-    };
+    const multipliers = getSettingsRatingMultipliers();
 
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -397,7 +427,7 @@ function openShopModal(mode, itemId) {
     </div>
     <div class="form-group">
       <label>所需积分</label>
-      <input type="number" id="adminItemPoints" value="${item?.points || 15}" min="1" max="999">
+      <input type="number" id="adminItemPoints" value="${item?.points || getSetting('shopDefaultPoints')}" min="1" max="999">
     </div>
     <div class="form-group">
       <label>商品类型</label>
@@ -438,7 +468,7 @@ function selectAdminItemType(type) {
 
 async function saveShopItem() {
   const name = document.getElementById('adminItemName').value.trim();
-  const points = parseInt(document.getElementById('adminItemPoints').value) || 15;
+  const points = parseInt(document.getElementById('adminItemPoints').value) || getSetting('shopDefaultPoints');
   const type = window._adminItemType || 'time';
   const durationMinutes = type === 'time' ? (parseInt(document.getElementById('adminItemDuration').value) || 30) : 0;
   const baseQuantity = parseInt(document.getElementById('adminItemBaseQty').value) || 3;
@@ -718,7 +748,7 @@ function renderRedeemTab() {
 async function fulfillRedemption(id) {
   if (_fulfillingRedemption) return;
   const r = adminRedemptions.find(r => r.id === id);
-  if (!r) return;
+  if (!r || r.status !== 'pending') return;
 
   _fulfillingRedemption = true;
   try {
@@ -928,20 +958,6 @@ function renderSettingsTab() {
 
   container.innerHTML = `
     <div class="admin-card">
-      <div class="admin-card-title">📅 日期管理</div>
-      <div style="display:flex;gap:20px;align-items:flex-start;">
-        <div style="flex:0 0 auto;">
-          ${calHtml}
-        </div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
-          <div style="font-size:22px;font-weight:700;">${AdminUtil.formatDate(adminDate)}</div>
-          <button onclick="resetCurrentDate()" style="padding:10px 20px;background:var(--danger);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;align-self:flex-start;">🔄 重置这一天</button>
-          <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">重置将清除该日所有作业、结算、自由时间</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="admin-card">
       <div class="admin-card-title">⚙️ 积分管理</div>
       <div class="settings-row" style="display:flex;align-items:center;gap:12px;">
         <label>当前余额</label>
@@ -954,7 +970,135 @@ function renderSettingsTab() {
         </span>
       </div>
     </div>
+
+    <div class="admin-card">
+      <div class="admin-card-title">⚙️ 参数配置</div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">📝 作业默认值</div>
+        <div class="settings-row">
+          <label>基础分</label>
+          <input id="cfg_hwBasePoints" class="settings-input" type="number" min="1" max="100" value="${getSetting('homeworkDefaultBasePoints')}">
+        </div>
+        <div class="settings-row">
+          <label>建议时长（分钟）</label>
+          <input id="cfg_hwDuration" class="settings-input" type="number" min="5" max="180" step="5" value="${getSetting('homeworkDefaultSuggestedDuration')}">
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">⭐ 评级倍率</div>
+        ${(() => {
+          const m = getSettingsRatingMultipliers();
+          const ch = m.challenge;
+          const ti = m.timer;
+          const inputHtml = (id, val) => `<input id="${id}" class="settings-input" type="number" step="0.1" min="0" max="10" value="${val}">`;
+          return `
+            <div class="rating-grid">
+              <span></span>
+              <span class="rating-header">优</span>
+              <span class="rating-header">良</span>
+              <span class="rating-header">可</span>
+              <span class="rating-header">差</span>
+              <span class="rating-label">⚔️ 挑战</span>
+              ${inputHtml('cfg_ch_you', ch['优'])}
+              ${inputHtml('cfg_ch_liang', ch['良'])}
+              ${inputHtml('cfg_ch_ke', ch['可'])}
+              ${inputHtml('cfg_ch_cha', ch['差'])}
+              <span class="rating-label">⏱️ 计时</span>
+              ${inputHtml('cfg_ti_you', ti['优'])}
+              ${inputHtml('cfg_ti_liang', ti['良'])}
+              ${inputHtml('cfg_ti_ke', ti['可'])}
+              ${inputHtml('cfg_ti_cha', ti['差'])}
+            </div>`;
+        })()}
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">🎯 积分与商品</div>
+        <div class="settings-row">
+          <label>挑战效率奖励</label>
+          <input id="cfg_effBonus" class="settings-input" type="number" min="0" max="100" value="${getSetting('challengeEfficiencyBonus')}">
+        </div>
+        <div class="settings-row">
+          <label>新商品默认积分</label>
+          <input id="cfg_shopPoints" class="settings-input" type="number" min="1" max="999" value="${getSetting('shopDefaultPoints')}">
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:12px;">
+        <button onclick="resetSettingsToDefaults()" style="flex:1;padding:12px;border:1px solid var(--text-secondary);border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;background:transparent;color:var(--text-secondary);">恢复默认值</button>
+        <button onclick="saveAllSettings()" style="flex:1;padding:12px;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;background:var(--accent);color:var(--bg);">保存配置</button>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <div class="admin-card-title">📅 日期管理</div>
+      <div style="display:flex;gap:20px;align-items:flex-start;">
+        <div style="flex:0 0 auto;">
+          ${calHtml}
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:22px;font-weight:700;">${AdminUtil.formatDate(adminDate)}</div>
+          <button onclick="resetCurrentDate()" style="padding:10px 20px;background:var(--danger);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;align-self:flex-start;">🔄 重置这一天</button>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">重置将清除该日所有作业、结算、自由时间</div>
+        </div>
+      </div>
+    </div>
   `;
+}
+
+async function saveAllSettings() {
+  const val = (id, parseFn) => {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const v = parseFn(el.value);
+    return isNaN(v) ? null : v;
+  };
+  const basePoints = val('cfg_hwBasePoints', parseFloat);
+  const duration = val('cfg_hwDuration', parseFloat);
+  const effBonus = val('cfg_effBonus', parseFloat);
+  const shopPoints = val('cfg_shopPoints', parseFloat);
+
+  const chYou = val('cfg_ch_you', parseFloat);
+  const chLiang = val('cfg_ch_liang', parseFloat);
+  const chKe = val('cfg_ch_ke', parseFloat);
+  const chCha = val('cfg_ch_cha', parseFloat);
+  const tiYou = val('cfg_ti_you', parseFloat);
+  const tiLiang = val('cfg_ti_liang', parseFloat);
+  const tiKe = val('cfg_ti_ke', parseFloat);
+  const tiCha = val('cfg_ti_cha', parseFloat);
+
+  if (basePoints === null || duration === null || effBonus === null || shopPoints === null ||
+      chYou === null || chLiang === null || chKe === null || chCha === null ||
+      tiYou === null || tiLiang === null || tiKe === null || tiCha === null) {
+    showToast('请填写所有数值');
+    return;
+  }
+
+  const newSettings = {
+    ...adminSettings,
+    homeworkDefaultBasePoints: basePoints,
+    homeworkDefaultSuggestedDuration: duration,
+    ratingMultipliers: {
+      challenge: { '优': chYou, '良': chLiang, '可': chKe, '差': chCha },
+      timer: { '优': tiYou, '良': tiLiang, '可': tiKe, '差': tiCha }
+    },
+    challengeEfficiencyBonus: effBonus,
+    shopDefaultPoints: shopPoints,
+  };
+
+  await API.saveSettings(newSettings);
+  adminSettings = newSettings;
+  renderSettingsTab();
+  showToast('配置已保存');
+}
+
+async function resetSettingsToDefaults() {
+  adminSettings = {};
+  await API.saveSettings({});
+  renderSettingsTab();
+  showToast('已恢复默认值');
 }
 
 function buildMiniCalendar() {

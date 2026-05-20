@@ -79,11 +79,17 @@ def init_db():
             data TEXT NOT NULL DEFAULT '[]'
         );
 
+        CREATE TABLE IF NOT EXISTS settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            data TEXT NOT NULL DEFAULT '{}'
+        );
+
         INSERT OR IGNORE INTO points (id, balance) VALUES (1, 0);
         INSERT OR IGNORE INTO shop_items (id, data) VALUES (1, '[]');
         INSERT OR IGNORE INTO redemptions (id, data) VALUES (1, '[]');
         INSERT OR IGNORE INTO badges (id, data) VALUES (1, '[]');
         INSERT OR IGNORE INTO reward_box (id, data) VALUES (1, '[]');
+        INSERT OR IGNORE INTO settings (id, data) VALUES (1, '{}');
     """)
     conn.commit()
     conn.close()
@@ -108,6 +114,7 @@ def get_full_data():
         'shopItems': json.loads(conn.execute("SELECT data FROM shop_items WHERE id = 1").fetchone()['data']),
         'redemptions': json.loads(conn.execute("SELECT data FROM redemptions WHERE id = 1").fetchone()['data']),
         'rewardBox': json.loads(conn.execute("SELECT data FROM reward_box WHERE id = 1").fetchone()['data']),
+        'settings': json.loads(conn.execute("SELECT data FROM settings WHERE id = 1").fetchone()['data']),
         'efficiencyHistory': {},
         'freeTimeTasks': {},
     }
@@ -298,6 +305,22 @@ def save_free_time(date_key, tasks):
     conn.close()
 
 
+# ==================== Settings ====================
+
+def get_settings():
+    conn = _connect()
+    data = conn.execute("SELECT data FROM settings WHERE id = 1").fetchone()['data']
+    conn.close()
+    return json.loads(data)
+
+
+def save_settings(data):
+    conn = _connect()
+    conn.execute("UPDATE settings SET data = ? WHERE id = 1", (json.dumps(data, ensure_ascii=False),))
+    conn.commit()
+    conn.close()
+
+
 # ==================== Import / Export ====================
 
 def import_full_data(data):
@@ -325,6 +348,8 @@ def import_full_data(data):
                  (json.dumps(data.get('redemptions', []), ensure_ascii=False),))
     conn.execute("UPDATE reward_box SET data = ? WHERE id = 1",
                  (json.dumps(data.get('rewardBox', []), ensure_ascii=False),))
+    conn.execute("UPDATE settings SET data = ? WHERE id = 1",
+                 (json.dumps(data.get('settings', {}), ensure_ascii=False),))
     for dk, v in data.get('efficiencyHistory', {}).items():
         conn.execute("INSERT OR REPLACE INTO efficiency_history (date_key, data) VALUES (?, ?)",
                      (dk, json.dumps(v, ensure_ascii=False)))

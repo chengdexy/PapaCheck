@@ -755,3 +755,66 @@ body {
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"] { -moz-appearance: textfield; }
+
+.settings-section {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.settings-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.settings-row label {
+  color: var(--text-secondary);
+  font-size: 14px;
+  min-width: 120px;
+}
+
+.settings-input {
+  width: 90px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+  text-align: center;
+}
+
+.rating-grid {
+  display: grid;
+  grid-template-columns: 80px repeat(4, 1fr);
+  gap: 6px 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.rating-header {
+  color: var(--text-secondary);
+  text-align: center;
+  font-weight: 600;
+}
+
+.rating-label {
+  font-weight: 600;
+  text-align: right;
+  padding-right: 4px;
+}

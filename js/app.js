@@ -11,6 +11,7 @@ let screenSaverTimer = null;
 let isScreenSaverActive = false;
 let saverTimeInterval = null;
 let tickInterval = null;
+let pollInterval = null;
 
 // ========== Utility ==========
 const Util = {
@@ -261,15 +262,17 @@ async function checkAllDone() {
 async function calculateSettlement() {
   const challengeHw = homeworks.filter(h => h.mode === 'challenge' && h.status === 'done' && !h.rejected);
 
-  const basePoints = homeworks.filter(h => h.status === 'done').length * 10;
+  const doneHw = homeworks.filter(h => h.status === 'done');
+  const basePoints = doneHw.reduce((sum, h) => sum + (h.basePoints ?? cachedData?.settings?.homeworkDefaultBasePoints ?? 10), 0);
   let efficiencyBonus = 0;
   const ratios = [];
+  const bonusPerTask = cachedData?.settings?.challengeEfficiencyBonus ?? 5;
 
   challengeHw.forEach(hw => {
     if (hw.actualDuration !== null && hw.suggestedDuration > 0) {
       const ratio = hw.actualDuration / hw.suggestedDuration;
       ratios.push(ratio);
-      if (ratio <= 0.8) efficiencyBonus += 5;
+      if (ratio <= 0.8) efficiencyBonus += bonusPerTask;
     }
   });
 
@@ -282,7 +285,7 @@ async function calculateSettlement() {
     efficiencyBonus,
     totalBeforeRating: basePoints + efficiencyBonus,
     challengeCount: challengeHw.length,
-    timerCount: homeworks.filter(h => h.mode === 'timer' && h.status === 'done').length,
+    timerCount: doneHw.filter(h => h.mode === 'timer').length,
   };
 
   window._settlement = settlementData;
@@ -341,6 +344,67 @@ async function submitForRating() {
   }
 }
 
+// ========== Server Polling ==========
+let pollServer = null;
+
+function startPoll(intervalMs) {
+  stopPoll();
+  pollServer = async () => {
+    try {
+      cachedData = await API.getData();
+      const key = Util.dateKey(currentDate);
+
+      const newHw = cachedData.homeworks?.[key] || [];
+      const oldHwJson = JSON.stringify(homeworks);
+      const newHwJson = JSON.stringify(newHw);
+      if (oldHwJson !== newHwJson) {
+        homeworks = newHw;
+        needsFullRender = true;
+      }
+
+      const newFreeTime = cachedData.freeTimeTasks?.[key] || [];
+      const oldFtJson = JSON.stringify(freeTimeTasks);
+      const newFtJson = JSON.stringify(newFreeTime);
+      if (oldFtJson !== newFtJson) {
+        freeTimeTasks = newFreeTime;
+        needsFullRender = true;
+      }
+
+      const hasActive = getActiveHomework() || getActiveFreeTime();
+      const isPaused = isAnyTaskPaused();
+      if (hasActive && !isPaused && !tickInterval) startTickTimer();
+      if ((!hasActive || isPaused) && tickInterval) stopTickTimer();
+
+      const newSettlement = cachedData.dailySettlement?.[key] || null;
+      if (newSettlement) {
+        cachedData._settlement = newSettlement;
+        needsFullRender = true;
+      } else {
+        const old = getSettlementData();
+        if (old && (old.submittedAt || old.rating)) {
+          cachedData._settlement = null;
+          window._settlement = null;
+          needsFullRender = true;
+        }
+      }
+
+      if (needsFullRender) {
+        updateBigScreen();
+      }
+    } catch (e) {
+      // Server unreachable — silently retry next cycle
+    }
+  };
+  pollInterval = setInterval(() => pollServer(), intervalMs);
+}
+
+function stopPoll() {
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+  }
+}
+
 // ========== Screen Saver ==========
 function startScreenSaverTimer() {
   clearTimeout(screenSaverTimer);
@@ -355,6 +419,7 @@ function showScreenSaver() {
   saver.classList.add('active');
   updateSaverTime();
   saverTimeInterval = setInterval(updateSaverTime, 1000);
+  startPoll(60000);
 }
 
 function wakeUp() {
@@ -362,6 +427,8 @@ function wakeUp() {
   document.getElementById('screenSaver').classList.remove('active');
   clearInterval(saverTimeInterval);
   startScreenSaverTimer();
+  pollServer();
+  startPoll(5000);
 }
 
 function updateSaverTime() {
@@ -426,53 +493,8 @@ async function init() {
   document.addEventListener('click', startScreenSaverTimer);
   document.addEventListener('touchstart', startScreenSaverTimer);
 
-  // Every 10s sync from server, full render only if data changed
-  setInterval(async () => {
-    try {
-      cachedData = await API.getData();
-      const key = Util.dateKey(currentDate);
-
-      const newHw = cachedData.homeworks?.[key] || [];
-      const oldHwJson = JSON.stringify(homeworks);
-      const newHwJson = JSON.stringify(newHw);
-      if (oldHwJson !== newHwJson) {
-        homeworks = newHw;
-        needsFullRender = true;
-      }
-
-      const newFreeTime = cachedData.freeTimeTasks?.[key] || [];
-      const oldFtJson = JSON.stringify(freeTimeTasks);
-      const newFtJson = JSON.stringify(newFreeTime);
-      if (oldFtJson !== newFtJson) {
-        freeTimeTasks = newFreeTime;
-        needsFullRender = true;
-      }
-
-      const hasActive = getActiveHomework() || getActiveFreeTime();
-      const isPaused = isAnyTaskPaused();
-      if (hasActive && !isPaused && !tickInterval) startTickTimer();
-      if ((!hasActive || isPaused) && tickInterval) stopTickTimer();
-
-      const newSettlement = cachedData.dailySettlement?.[key] || null;
-      if (newSettlement) {
-        cachedData._settlement = newSettlement;
-        needsFullRender = true;
-      } else {
-        const old = getSettlementData();
-        if (old && (old.submittedAt || old.rating)) {
-          cachedData._settlement = null;
-          window._settlement = null;
-          needsFullRender = true;
-        }
-      }
-
-      if (needsFullRender) {
-        updateBigScreen();
-      }
-    } catch (e) {
-      // Server unreachable — silently retry next cycle
-    }
-  }, 5000);
+  // Every 5s sync from server, full render only if data changed
+  startPoll(5000);
 
   updateConnStatus();
 }

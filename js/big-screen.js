@@ -833,13 +833,6 @@ async function cancelRedemption(redemptionId) {
       }
 
       await API.updatePoints('earn', r.points, '撤回兑换：' + r.itemName);
-
-      const rewardBox = cachedData?.rewardBox || [];
-      const idx = rewardBox.findIndex(rb => rb.redemptionId === redemptionId);
-      if (idx !== -1) {
-        rewardBox.splice(idx, 1);
-        await API.saveRewardBox(rewardBox);
-      }
     }
 
     cachedData = await API.getData();
@@ -920,9 +913,8 @@ async function redeemItem(itemId) {
     await API.saveShopItems(items);
 
     const redemptions = cachedData?.redemptions || [];
-    const redemptionId = Util.genId();
     redemptions.push({
-      id: redemptionId,
+      id: Util.genId(),
       itemName: item.name,
       itemType: item.type || 'item',
       durationMinutes: item.durationMinutes || 0,
@@ -933,17 +925,6 @@ async function redeemItem(itemId) {
 
     await API.saveRedemptions(redemptions);
     await API.updatePoints('spend', item.points, '兑换：' + item.name);
-
-    const rewardBox = cachedData?.rewardBox || [];
-    rewardBox.push({
-      id: Util.genId(),
-      name: item.name,
-      type: item.type || 'item',
-      durationMinutes: item.durationMinutes || 0,
-      quantity: 1,
-      redemptionId,
-    });
-    await API.saveRewardBox(rewardBox);
 
     cachedData = await API.getData();
     updateShopPage();

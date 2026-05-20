@@ -91,6 +91,18 @@ const API = {
     return true;
   },
 
+  async getSettings() {
+    return await this._fetch('/api/settings');
+  },
+
+  async saveSettings(settings) {
+    await this._fetch('/api/settings', {
+      method: 'POST',
+      body: JSON.stringify({ settings }),
+    });
+    return true;
+  },
+
   async getShopItems() {
     return await this._fetch('/api/shop');
   },

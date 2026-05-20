@@ -69,6 +69,10 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
             self.send_json(db.get_reward_box())
             return
 
+        if path == '/api/settings':
+            self.send_json(db.get_settings())
+            return
+
         if path.startswith('/api/efficiency/'):
             date_key = path[len('/api/efficiency/'):]
             self.send_json(db.get_efficiency(date_key))
@@ -135,6 +139,11 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
 
         if path == '/api/reward-box':
             db.save_reward_box(payload.get('items', []))
+            self.send_json({'ok': True})
+            return
+
+        if path == '/api/settings':
+            db.save_settings(payload.get('settings', {}))
             self.send_json({'ok': True})
             return
 
