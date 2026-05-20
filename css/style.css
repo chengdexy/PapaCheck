@@ -539,13 +539,23 @@ body {
 
 /* ========== Settlement Page ========== */
 .settlement-container,
-.rated-container,
-.shop-container {
+.rated-container {
   display: flex;
   align-items: center;
   justify-content: center;
   flex: 1;
   min-height: 0;
+  padding: 20px;
+}
+
+.shop-container {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 260;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 20px;
 }
 

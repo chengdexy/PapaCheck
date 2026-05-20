@@ -866,11 +866,6 @@ async function cancelRedemption(redemptionId) {
 // ========== Shop Page ==========
 function showShopPage() {
   currentPage = PAGE.SHOP;
-  document.getElementById('bigHeader').style.display = 'none';
-  document.getElementById('bigContent').style.display = 'none';
-  document.getElementById('bigStats').style.display = 'none';
-  document.getElementById('settlementContainer').style.display = 'none';
-  document.getElementById('ratedContainer').style.display = 'none';
   updateShopPage();
 }
 
@@ -972,6 +967,7 @@ async function backToMain() {
 
   forceMainPage = true;
   currentPage = PAGE.MAIN;
+  document.getElementById('shopContainer').style.display = 'none';
   needsFullRender = true;
   updateBigScreen();
 }

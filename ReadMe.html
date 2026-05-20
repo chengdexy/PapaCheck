@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TinySchedule - 家庭作业管理工具</title>
+<style>
+  :root {
+    --bg: #0b1120;
+    --card: #111827;
+    --card2: #1a2332;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --accent: #38bdf8;
+    --accent2: #818cf8;
+    --green: #4ade80;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --radius: 14px;
+    --maxw: 1000px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .container { max-width:var(--maxw); margin:0 auto; padding:0 24px; }
+
+  /* Hero */
+  .hero {
+    text-align:center; padding:80px 24px 60px;
+    background: linear-gradient(180deg, #0f1d32 0%, var(--bg) 100%);
+  }
+  .hero-icon { font-size:64px; margin-bottom:16px; }
+  .hero h1 { font-size:48px; font-weight:800; letter-spacing:-1px; margin-bottom:12px; }
+  .hero h1 span { background:linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .hero p { font-size:18px; color:var(--text2); max-width:600px; margin:0 auto 32px; }
+  .hero-badges { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .badge {
+    padding:6px 16px; border-radius:20px; font-size:13px; font-weight:600;
+    background:var(--card2); color:var(--text2); border:1px solid rgba(255,255,255,0.06);
+  }
+
+  /* Sections */
+  section { padding:60px 0; }
+  section:nth-child(even) { background:var(--card); }
+  .section-title { text-align:center; margin-bottom:48px; }
+  .section-title h2 { font-size:32px; font-weight:700; margin-bottom:8px; }
+  .section-title p { color:var(--text2); font-size:16px; }
+
+  /* Feature Grid */
+  .feature-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px; }
+  .feature-card {
+    background:var(--card2); border-radius:var(--radius); padding:28px;
+    border:1px solid rgba(255,255,255,0.04); transition:transform 0.2s, border-color 0.2s;
+  }
+  .feature-card:hover { transform:translateY(-2px); border-color:rgba(255,255,255,0.1); }
+  .feature-icon { font-size:36px; margin-bottom:14px; }
+  .feature-card h3 { font-size:18px; margin-bottom:8px; }
+  .feature-card p { font-size:14px; color:var(--text2); }
+
+  /* Images */
+  .showcase { text-align:center; margin:40px 0; }
+  .showcase img {
+    max-width:100%; border-radius:12px; box-shadow:0 8px 40px rgba(0,0,0,0.5);
+    border:1px solid rgba(255,255,255,0.08);
+  }
+  .showcase-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin:40px 0; }
+  @media (max-width:700px) { .showcase-grid { grid-template-columns:1fr; } }
+  .showcase-grid img {
+    width:100%; border-radius:12px; box-shadow:0 8px 40px rgba(0,0,0,0.5);
+    border:1px solid rgba(255,255,255,0.08);
+  }
+
+  /* Flow */
+  .flow { display:flex; flex-wrap:wrap; gap:16px; justify-content:center; align-items:center; margin:32px 0; }
+  .flow-step {
+    background:var(--card2); border-radius:var(--radius); padding:20px 24px; text-align:center;
+    flex:0 0 160px; border:1px solid rgba(255,255,255,0.06);
+  }
+  .flow-step .num { width:32px; height:32px; border-radius:50%; background:var(--accent); color:var(--bg); font-weight:800; font-size:16px; display:inline-flex; align-items:center; justify-content:center; margin-bottom:8px; }
+  .flow-step h4 { font-size:14px; margin-bottom:4px; }
+  .flow-step p { font-size:12px; color:var(--text2); }
+  .flow-arrow { font-size:24px; color:var(--text2); }
+
+  /* Specs table */
+  .specs-table { width:100%; border-collapse:collapse; margin:32px 0; font-size:14px; }
+  .specs-table th, .specs-table td { padding:12px 16px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.06); }
+  .specs-table th { color:var(--accent); font-weight:600; }
+  .specs-table td:last-child { color:var(--text2); }
+
+  /* CTA */
+  .cta { text-align:center; padding:80px 24px; background:linear-gradient(180deg, var(--bg) 0%, #0f1d32 100%); }
+  .cta h2 { font-size:36px; margin-bottom:16px; }
+  .cta p { color:var(--text2); font-size:16px; margin-bottom:32px; }
+  .cta code {
+    background:#1e293b; color:var(--accent); padding:14px 28px; border-radius:10px;
+    font-size:18px; font-family:'SF Mono','Fira Code',monospace; display:inline-block;
+  }
+
+  /* Footer */
+  footer { text-align:center; padding:32px 24px; color:var(--text2); font-size:13px; border-top:1px solid rgba(255,255,255,0.04); }
+  footer a { color:var(--accent); text-decoration:none; }
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="hero-icon">📅</div>
+  <h1><span>TinySchedule</span></h1>
+  <p>一款面向 10-14 岁儿童的每日学习计划管理工具。挂墙大屏展示任务进度，积分激励培养时间管理习惯，爸爸手机管理端轻松布置与评级。</p>
+  <div class="hero-badges">
+    <span class="badge">🖥️ 大屏端</span>
+    <span class="badge">📱 管理端</span>
+    <span class="badge">🔊 语音提醒</span>
+    <span class="badge">⭐ 积分系统</span>
+    <span class="badge">🏪 积分商店</span>
+    <span class="badge">🛡️ 局域网运行</span>
+  </div>
+</div>
+
+<!-- 使用场景 -->
+<section>
+  <div class="container">
+    <div class="section-title">
+      <h2>🏠 使用场景</h2>
+      <p>一个家庭，两块屏幕，一套系统</p>
+    </div>
+    <div class="showcase-grid">
+      <div>
+        <img src="images/big-screen.png" alt="孩子大屏端">
+        <p style="color:var(--text2);font-size:14px;margin-top:12px;">🖥️ 孩子大屏端 — 挂墙平板，查看作业、挑战计时、积分商店</p>
+      </div>
+      <div>
+        <img src="images/admin.png" alt="爸爸管理端">
+        <p style="color:var(--text2);font-size:14px;margin-top:12px;">📱 爸爸管理端 — 手机浏览器访问，布置作业、评级、配置</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 核心功能 -->
+<section>
+  <div class="container">
+    <div class="section-title">
+      <h2>⭐ 核心功能</h2>
+      <p>覆盖作业全生命周期的完整功能闭环</p>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">📝</div>
+        <h3>作业布置与管理</h3>
+        <p>爸爸用手机布置每日作业，设置科目、建议时长和基础分。支持驳回重做，灵活应对各种情况。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⏱️</div>
+        <h3>挑战 &amp; 计时双模式</h3>
+        <p>挑战模式显示倒计时和进度条，提前完成获效率奖励；计时模式记录实际用时，超时自动降级。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔊</div>
+        <h3>语音提醒</h3>
+        <p>挑战开始、时间过半、还剩 5 分钟、还剩 1 分钟、超时警告——全程语音陪伴，超时后每 30 分钟重复提醒。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⭐</div>
+        <h3>积分激励系统</h3>
+        <p>完成作业获得基础分，提前完成获效率奖励。爸爸评优/良/可/差，加倍系数累乘最终积分。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🏪</div>
+        <h3>积分商店 &amp; 奖励箱</h3>
+        <p>孩子用积分兑换商品：游戏时间、实物奖励、Buff 增益。两步兑换流程防止误操作。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">✨</div>
+        <h3>Buff 增益系统</h3>
+        <p>支持限时 Buff（持续 N 分钟）和每日 Buff（持续 N 天），如「晚睡 30 分钟」，到期自动消失。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>数据统计 &amp; 趋势</h3>
+        <p>爸爸端查看近 7 天完成率、效率比趋势、评级历史，清晰掌握孩子学习状态。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🖥️</div>
+        <h3>大屏屏保 &amp; 整点报时</h3>
+        <p>60 秒无操作进入大数字时钟屏保，整点语音报时。点击任意位置唤醒，语音确认。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 作业打卡流程 -->
+<section>
+  <div class="container">
+    <div class="section-title">
+      <h2>🔄 作业打卡流程</h2>
+      <p>从布置到结算，一气呵成</p>
+    </div>
+    <div class="flow">
+      <div class="flow-step"><div class="num">1</div><h4>爸爸布置作业</h4><p>选择科目、设定时长和基础分</p></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="num">2</div><h4>孩子开始任务</h4><p>大屏显示倒计时/正计时</p></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="num">3</div><h4>完成 &amp; 提审</h4><p>全部完成后提交等待评级</p></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="num">4</div><h4>爸爸评级</h4><p>评优/良/可/差，计算最终积分</p></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="num">5</div><h4>结算到账</h4><p>语音播报「爸爸评了优，获得 25 分」</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 兑换流程 -->
+<section>
+  <div class="container">
+    <div class="section-title">
+      <h2>🎁 兑换流程</h2>
+      <p>两步确认，防止误操作</p>
+    </div>
+    <div class="flow">
+      <div class="flow-step"><div class="num">1</div><h4>商店兑换</h4><p>孩子用积分兑换商品</p></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="num">2</div><h4>进入奖励箱</h4><p>商品暂存，孩子决定何时申请</p></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="num">3</div><h4>提交申请</h4><p>孩子在奖励箱点击兑换</p></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="num">4</div><h4>爸爸确认兑现</h4><p>时间类/物品类/Buff类自动处理</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 技术架构 -->
+<section>
+  <div class="container">
+    <div class="section-title">
+      <h2>🛠️ 技术架构</h2>
+      <p>极简部署，零依赖构建</p>
+    </div>
+    <table class="specs-table">
+      <tr><th>组件</th><th>技术</th></tr>
+      <tr><td>前端</td><td>纯 HTML + CSS + JavaScript，无框架，无构建工具</td></tr>
+      <tr><td>后端</td><td>Python 3 标准库 http.server</td></tr>
+      <tr><td>数据库</td><td>SQLite（单文件 data.db）</td></tr>
+      <tr><td>语音合成</td><td>edge-tts（微软 Edge TTS，zh-CN-XiaoxiaoNeural）</td></tr>
+      <tr><td>通信</td><td>局域网 HTTP REST API，每 5 秒轮询同步</td></tr>
+      <tr><td>部署</td><td>单命令 `python server.py` 启动，局域网所有设备可访问</td></tr>
+      <tr><td>存储</td><td>零云端依赖，全部数据存在本地 SQLite</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- API -->
+<section>
+  <div class="container">
+    <div class="section-title">
+      <h2>🔌 API 接口</h2>
+      <p>14 个 REST 端点，覆盖完整业务</p>
+    </div>
+    <table class="specs-table">
+      <tr><th>端点</th><th>说明</th></tr>
+      <tr><td>GET /api/data</td><td>获取全量数据</td></tr>
+      <tr><td>GET /api/speak?text=...</td><td>TTS 语音合成，返回 MP3 音频</td></tr>
+      <tr><td>GET/POST /api/homeworks/:date</td><td>作业 CRUD</td></tr>
+      <tr><td>GET/POST /api/settlement/:date</td><td>结算数据 CRUD</td></tr>
+      <tr><td>POST /api/points</td><td>积分增减（earn/spend/adjust）</td></tr>
+      <tr><td>GET/POST /api/shop</td><td>商店商品管理</td></tr>
+      <tr><td>GET/POST /api/redemptions</td><td>兑换券管理</td></tr>
+      <tr><td>GET/POST /api/reward-box</td><td>奖励箱管理</td></tr>
+      <tr><td>GET/POST /api/settings</td><td>系统参数配置</td></tr>
+      <tr><td>GET/POST /api/active-buffs</td><td>Buff 管理</td></tr>
+      <tr><td>GET/POST /api/freetime/:date</td><td>自由时间任务</td></tr>
+      <tr><td>POST /api/reset-date</td><td>重置当天数据</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- 快速开始 -->
+<section class="cta">
+  <h2>🚀 快速开始</h2>
+  <p>Python 3 环境，一条命令启动</p>
+  <code>python server.py</code>
+  <p style="margin-top:24px;font-size:14px;">
+    大屏访问地址：<strong>http://localhost:8080</strong><br>
+    管理端地址：<strong>http://localhost:8080/admin.html</strong><br>
+    局域网内手机访问：<strong>http://&lt;电脑 IP&gt;:8080/admin.html</strong>
+  </p>
+</section>
+
+<footer>
+  <p>TinySchedule — 让孩子学会管理时间，让爸爸轻松参与成长。</p>
+  <p style="margin-top:8px;">纯静态展示页，不参与项目逻辑。</p>
+</footer>
+
+</body>
+</html>
