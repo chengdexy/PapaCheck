@@ -744,8 +744,8 @@ function showMyRewards() {
         const qty = r.quantity || 0;
         const pendingR = redemptions.find(rd => rd.rewardBoxItemId === r.id && rd.status === 'pending');
         const metaStr = r.type === 'time'
-          ? '时间类 · ' + (r.durationMinutes || 0) + '分钟'
-          : '物品类';
+          ? (r.durationMinutes || 0) + '分钟'
+          : '';
         return `
         <div class="reward-item">
           <div class="reward-item-info">
@@ -875,7 +875,6 @@ async function updateShopPage() {
             <div class="shop-item-card${soldOut ? ' sold-out' : ''}">
               <div class="shop-item-icon">${item.type === 'time' ? '⏱️' : '🎁'}</div>
               <div class="shop-item-name">${item.name}</div>
-              <div class="shop-item-type">${item.type === 'time' ? '时间类' : '物品类'}</div>
               <div class="shop-item-points">${item.points} 积分 · 剩${remaining}件</div>
               <button class="btn-shop-redeem" ${points < item.points || soldOut ? 'disabled' : ''}
                 onclick="redeemItem('${item.id}')">

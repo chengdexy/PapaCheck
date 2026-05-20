@@ -14,6 +14,7 @@ let adminSettings = {};
 let _submittingAdminRating = false;
 let _fulfillingRedemption = false;
 let _adjustingPoints = false;
+let _editingBalance = false;
 let _redeemShowCount = 3;
 
 const SETTINGS_DEFAULTS = {
@@ -79,6 +80,7 @@ async function initAdmin() {
 
   setInterval(async () => {
     await refreshAllData();
+    if (adminCurrentTab === 'settings' && _editingBalance) return;
     renderCurrentTab();
   }, 5000);
 }
@@ -396,7 +398,7 @@ function renderShopTab() {
               <div class="shop-admin-icon">${item.type === 'time' ? '🎮' : '🎁'}</div>
               <div class="shop-admin-info">
                 <div class="shop-admin-name">${item.name}</div>
-                <div class="shop-admin-meta">${item.points}积分 · ${item.type === 'time' ? '时间类' : '物品类'} · 剩余${item.remainingQuantity ?? 0}件</div>
+                <div class="shop-admin-meta">${item.points}积分 · 剩余${item.remainingQuantity ?? 0}件</div>
               </div>
               <div class="shop-qty-controls">
                 <button class="btn-qty" onclick="adjustShopQty('${item.id}', -1)">−</button>
@@ -533,7 +535,7 @@ function renderRewardBoxTab() {
               <div class="shop-admin-icon">${item.type === 'time' ? '🎮' : '🎁'}</div>
               <div class="shop-admin-info">
                 <div class="shop-admin-name">${item.name}</div>
-                <div class="shop-admin-meta">${item.type === 'time' ? '时间类 · ' + (item.durationMinutes || 0) + '分钟' : '物品类'} · 数量${item.quantity || 0}</div>
+                <div class="shop-admin-meta">${item.type === 'time' && item.durationMinutes ? item.durationMinutes + '分钟' : ''}${item.type === 'time' && item.durationMinutes ? ' · ' : ''}数量${item.quantity || 0}</div>
               </div>
               <div class="shop-qty-controls">
                 <button class="btn-qty" onclick="adjustRewardBoxQty('${item.id}', -1)">−</button>
@@ -736,7 +738,8 @@ function renderRedeemTab() {
             <span class="redeem-status fulfilled">已兑现 ✅</span>
           </div>
         `).join('')}
-      ${hasMore || _redeemShowCount > 3 ? `<div style="text-align:center;padding:12px;display:flex;gap:8px;justify-content:center;">
+      ${hasMore || _redeemShowCount > 3 || fulfilled.length > 0 ? `<div style="text-align:center;padding:12px;display:flex;gap:8px;justify-content:center;">
+        ${fulfilled.length > 0 ? `<button onclick="clearRedemptionHistory()" style="padding:8px 24px;border:1px solid var(--danger);border-radius:8px;font-size:14px;color:var(--danger);background:transparent;cursor:pointer;">清空记录</button>` : ''}
         ${hasMore ? `<button class="btn-cancel" style="border:1px solid var(--text-secondary);padding:8px 24px;border-radius:8px;font-size:14px;"
           onclick="_redeemShowCount += 10; renderRedeemTab();">查看更多 (剩余${fulfilled.length - _redeemShowCount}条)</button>` : ''}
         ${_redeemShowCount > 3 ? `<button class="btn-cancel" style="border:1px solid var(--text-secondary);padding:8px 24px;border-radius:8px;font-size:14px;"
@@ -815,6 +818,16 @@ async function fulfillRedemption(id) {
   } finally {
     _fulfillingRedemption = false;
   }
+}
+
+async function clearRedemptionHistory() {
+  const fulfilled = adminRedemptions.filter(r => r.status === 'fulfilled');
+  if (fulfilled.length === 0) return;
+  adminRedemptions = adminRedemptions.filter(r => r.status !== 'fulfilled');
+  await API.saveRedemptions(adminRedemptions);
+  await refreshAllData();
+  renderRedeemTab();
+  showToast('已清空兑换历史');
 }
 
 // ========== Tab 5: Statistics ==========
@@ -1147,6 +1160,7 @@ function buildMiniCalendar() {
 }
 
 function startEditBalance() {
+  _editingBalance = true;
   document.getElementById('balanceDisplay').style.display = 'none';
   const edit = document.getElementById('balanceEdit');
   edit.style.display = 'flex';
@@ -1154,6 +1168,7 @@ function startEditBalance() {
 }
 
 function cancelAdjustPoints() {
+  _editingBalance = false;
   const input = document.getElementById('pointsInput');
   if (input) input.value = '';
   document.getElementById('balanceEdit').style.display = 'none';
@@ -1181,6 +1196,7 @@ async function confirmAdjustPoints() {
     showToast('积分已更新为：' + newBalance);
   } finally {
     _adjustingPoints = false;
+    _editingBalance = false;
   }
 }
 

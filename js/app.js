@@ -98,6 +98,7 @@ function startHomework(id, mode) {
 async function completeHomework(id) {
   const hw = homeworks.find(h => h.id === id);
   if (!hw || hw.status !== 'doing') return;
+  if (hw.paused) { showToast('请先继续任务再完成'); return; }
 
   const completedAt = new Date();
   const startedAt = new Date(hw.startedAt);
@@ -161,6 +162,7 @@ function startFreeTime(id) {
 function completeFreeTime(id) {
   const ft = freeTimeTasks.find(t => t.id === id);
   if (!ft || ft.status !== 'doing') return;
+  if (ft.paused) { showToast('请先继续任务再完成'); return; }
 
   ft.status = 'done';
   ft.completedAt = new Date().toISOString();

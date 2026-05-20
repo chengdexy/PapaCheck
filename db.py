@@ -241,7 +241,7 @@ def _reset_daily_shop_quantity():
         changed = False
         for item in items:
             base = item.get('baseQuantity', 0)
-            if item.get('remainingQuantity') != base:
+            if base > 0 and item.get('remainingQuantity') != base:
                 item['remainingQuantity'] = base
                 changed = True
         if changed:
