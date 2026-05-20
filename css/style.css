@@ -927,6 +927,33 @@ body {
   justify-content: center;
 }
 
+/* ========== Defer Homework ========== */
+.btn-defer-hw {
+  display: block;
+  width: 100%;
+  padding: 8px 0;
+  margin-top: 8px;
+  border: 1px solid var(--warning);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--warning);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-defer-hw:hover {
+  background: var(--warning);
+  color: var(--bg);
+}
+
+.homework-status.deferred {
+  color: var(--warning);
+  font-weight: 600;
+  font-size: 13px;
+}
+
 /* ========== Responsive ========== */
 @media (max-width: 900px) {
   .big-screen-mode.active {

@@ -16,6 +16,7 @@ let _lastBuffs = null;
 let _lastRewardBox = null;
 let _lastRatingInfo = null;
 let _lastPoints = null;
+let _lastSettings = null;
 
 // ========== Utility ==========
 const Util = {
@@ -94,6 +95,28 @@ function isAnyTaskActive() {
   return getActiveHomework() || getActiveFreeTime();
 }
 
+async function requestDeferHomework(hwId) {
+  if (_requestingDefer) return;
+  const hw = homeworks.find(h => h.id === hwId);
+  if (!hw || hw.status !== 'pending' || hw.deferRequest) return;
+
+  _requestingDefer = true;
+  try {
+    const dateKey = Util.dateKey(currentDate);
+    await API.deferHomework(dateKey, hwId, 'request', new Date().toISOString());
+    cachedData = await API.getData();
+    homeworks = cachedData.homeworks?.[dateKey] || [];
+    Voice.speak('已申请延后，等待爸爸确认');
+    needsFullRender = true;
+    updateBigScreen();
+    showToast('已申请将"' + hw.subject + ' - ' + hw.content + '"延后到明天');
+  } catch (e) {
+    showToast('申请失败，请重试');
+  } finally {
+    _requestingDefer = false;
+  }
+}
+
 function startHomework(id, mode) {
   if (isAnyTaskActive()) {
     showToast('请先完成当前任务');
@@ -115,7 +138,6 @@ function startHomework(id, mode) {
   }
 
   startTickTimer();
-  Voice.speak('任务已继续');
   needsFullRender = true;
   updateBigScreen();
 }
@@ -228,6 +250,7 @@ function resumeActiveTask() {
   }
   if (task.subject) saveHomeworksSilent();
   else saveFreeTimeSilent();
+  Voice.speak('任务已继续');
   startTickTimer();
   needsFullRender = true;
   updateBigScreen();
@@ -459,6 +482,16 @@ function startPoll(intervalMs) {
       const oldHwJson = JSON.stringify(homeworks);
       const newHwJson = JSON.stringify(newHw);
       if (oldHwJson !== newHwJson) {
+        const oldDeferred = homeworks.filter(h => h.deferRequest && h.deferRequest.status === 'pending');
+        const newDeferred = newHw.filter(h => h.deferRequest && h.deferRequest.status === 'pending');
+        for (const dh of oldDeferred) {
+          const stillThere = newHw.find(h => h.id === dh.id);
+          if (!stillThere) {
+            Voice.speak('爸爸批准了' + dh.subject + '的延后申请，明天再做');
+          } else if (!stillThere.deferRequest) {
+            Voice.speak('爸爸拒绝了' + dh.subject + '的延后申请，今天完成吧');
+          }
+        }
         homeworks = newHw;
         needsFullRender = true;
       }
@@ -506,6 +539,12 @@ function startPoll(intervalMs) {
         Voice.speak('积分已更新为' + points + '分');
       }
       _lastPoints = points;
+
+      const settings = cachedData?.settings || {};
+      if (_lastSettings !== null && JSON.stringify(settings) !== JSON.stringify(_lastSettings)) {
+        needsFullRender = true;
+      }
+      _lastSettings = settings;
 
       if (needsFullRender) {
         updateBigScreen();

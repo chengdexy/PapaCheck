@@ -178,6 +178,62 @@ PapaCheck/
 - 孩子的结算被清除
 - 重新开始时强制计时模式，不显示建议时长
 
+#### 4.1.4 周末作业延后
+
+**触发条件**：明天是假日（周六/周日自动判定 + 爸爸手动配置的自定义假日），且作业状态为 pending
+
+**完整流程**：
+
+```
+步骤1: 孩子在大屏端看到 pending 作业卡片
+  - 如果明天是假日，卡片底部出现「⏭️ 明天做」按钮
+  - 已有延后申请的作业显示「⏳ 等待确认...」，不可点击
+
+步骤2: 孩子点击「⏭️ 明天做」
+  - 弹窗确认 → 确认后语音「已申请延后，等待爸爸确认」
+  - 作业标记 deferRequest = { status: "pending", requestedAt: "..." }
+
+步骤3: 爸爸在管理端作业 Tab 看到延后提醒
+  - 顶部显示「⏭️ N 项作业申请延后到明天」
+  - 对应作业行显示「⏭️ 申请延后」标签 + 「批准」「拒绝」按钮
+
+步骤4: 爸爸点击「批准」
+  - 作业从当天移除，移至明天的 homeworks 列表
+  - 大屏端轮询检测到消失 → 语音「爸爸批准了XX的延后申请，明天再做」
+
+步骤5: 爸爸点击「拒绝」
+  - 作业 deferRequest 清除，恢复为正常 pending
+  - 大屏端语音「爸爸拒绝了XX的延后申请，今天完成吧」
+```
+
+**数据模型**：
+
+Homework 对象新增可选字段 `deferRequest`：
+```json
+{
+  "deferRequest": null  // 默认无延后申请
+}
+// 发起申请后:
+{
+  "deferRequest": {
+    "requestedAt": "2026-05-20T19:30:00.000Z",
+    "status": "pending"     // pending | approved | null(拒绝后清除)
+  }
+}
+```
+
+**假日判定规则**：
+1. 自动判定周六（getDay() === 6）和周日（getDay() === 0）
+2. Settings 的 `customHolidays` 数组（日期字符串列表），由爸爸在设置 Tab 管理
+3. 二者满足其一即为假日
+
+**约束**：
+- 只有 `status === 'pending'` 的作业可发起延后申请
+- 同一作业不能重复申请（已有 pending deferRequest 时不可再申请）
+- 被驳回过的作业（rejected=true）恢复 pending 后也可延后
+- 延后目标永远是"明天"（today + 1天），不递归跳过多日假期
+- 爸爸拒绝后 deferRequest 置为 null，作业留在当天
+
 ### 4.2 积分系统
 
 #### 4.2.1 积分计算规则
@@ -285,6 +341,9 @@ PapaCheck/
 | 奖励箱新品 | "奖励箱有新奖励，快去看看吧" |
 | 兑换成功 | "兑换成功！" |
 | 提交兑现申请 | "已提交申请，等待爸爸确认" |
+| 申请延后 | "已申请延后，等待爸爸确认" |
+| 延后批准 | "爸爸批准了XX的延后申请，明天再做" |
+| 延后拒绝 | "爸爸拒绝了XX的延后申请，今天完成吧" |
 | 屏幕唤醒 | "屏幕已唤醒" |
 | 整点报时 | "现在是X点" |
 
@@ -326,6 +385,7 @@ PapaCheck/
 | `/api/efficiency/{date}` | GET/POST | 效率数据 |
 | `/api/freetime/{date}` | GET/POST | 自由时间任务 |
 | `/api/reset-date` | POST | 重置某天所有数据 |
+| `/api/defer-homework` | POST | 作业延后申请/审批（action: request/approve/reject） |
 
 ---
 
@@ -390,6 +450,7 @@ PapaCheck/
 ### js/api.js
 - `API.getData()` - 获取全量数据
 - `API.saveHomeworks(dateKey, list)` - 保存作业
+- `API.deferHomework(dateKey, hwId, action, requestedAt)` - 作业延后申请/审批
 - `API.updatePoints(action, amount, detail)` - 积分操作
 - `API.getActiveBuffs()` / `API.saveActiveBuffs(buffs)` - Buff 管理
 - `API.saveSettings(settings)` - 保存设置
@@ -400,12 +461,14 @@ PapaCheck/
 - `Voice.speak(text)` - 语音播报（队列播放）
 - `checkReminders(hw)` - 挑战模式阶段性提醒
 - `calculateSettlement()` / `submitForRating()` - 结算流程
+- `requestDeferHomework(hwId)` - 发起延后申请
 - `startPoll(ms)` / `stopPoll()` - 服务器轮询
 
 ### js/big-screen.js
 - `SUBJECTS` - 科目配置（语文📖、数学🔢、英语🔤、科学🔬、其他📚）
 - `PAGE` - 页面状态枚举
 - `updateBigScreen()` - 主渲染入口
+- `isTomorrowHoliday()` - 判断明天是否假日（周末+自定义假日）
 - `renderBuffBar()` - Buff 栏渲染
 - `showShopPage()` / `backToMain()` - 商店页面切换
 
@@ -413,7 +476,12 @@ PapaCheck/
 - `switchTab(name)` - Tab 切换
 - `renderHomeworkTab()` / `renderShopTab()` / `renderRedeemTab()` ...
 - `fulfillRedemption(id)` - 确认兑现
+- `approveDeferHomework(hwId)` / `rejectDeferHomework(hwId)` - 审批延后
+- `addCustomHoliday()` / `removeCustomHoliday(dateStr)` - 假日管理
 - `saveShopItem()` - 保存商品（含 Buff 类型处理）
+
+### db.py
+- `move_homework(from_date, to_date, hw_id)` - 跨日期移动作业（延后审批）
 
 ---
 

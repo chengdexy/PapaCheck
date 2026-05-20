@@ -206,6 +206,44 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
             self.send_json({'ok': True})
             return
 
+        if path == '/api/defer-homework':
+            date_key = payload.get('date', '')
+            hw_id = payload.get('hwId', '')
+            action = payload.get('action', 'request')
+            if action == 'approve':
+                import datetime
+                tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+                to_key = tomorrow.isoformat()
+                hw = db.move_homework(date_key, to_key, hw_id)
+                if hw:
+                    to_list = db.get_homeworks(to_key)
+                    for h in to_list:
+                        if h.get('id') == hw_id:
+                            h['deferRequest'] = None
+                            h['status'] = 'pending'
+                            break
+                    db.save_homeworks(to_key, to_list)
+                self.send_json({'ok': True, 'homework': hw})
+            elif action == 'reject':
+                hw_list = db.get_homeworks(date_key)
+                for h in hw_list:
+                    if h.get('id') == hw_id and h.get('deferRequest') and h['deferRequest'].get('status') == 'pending':
+                        h['deferRequest'] = None
+                        break
+                db.save_homeworks(date_key, hw_list)
+                self.send_json({'ok': True})
+            elif action == 'request':
+                hw_list = db.get_homeworks(date_key)
+                for h in hw_list:
+                    if h.get('id') == hw_id and h.get('status') == 'pending' and not h.get('deferRequest'):
+                        h['deferRequest'] = {'requestedAt': payload.get('requestedAt', ''), 'status': 'pending'}
+                        break
+                db.save_homeworks(date_key, hw_list)
+                self.send_json({'ok': True})
+            else:
+                self.send_error(400, 'Unknown action')
+            return
+
         if path == '/api/reset-date':
             date_key = payload.get('date', '')
             if date_key:
@@ -243,13 +281,13 @@ def main():
 
     print()
     print('  ╔══════════════════════════════════════════════╗')
-    print('  ║       📅 PapaCheck（爸~检查！）服务器已启动   ║')
+    print('  ║     📅 PapaCheck（爸~检查！）服务器已启动    ║')
     print('  ╠══════════════════════════════════════════════╣')
     print(f'  ║                                              ║')
     print(f'  ║  大屏端:  http://localhost:{PORT}              ║')
     print(f'  ║  管理端:  http://localhost:{PORT}/admin.html   ║')
     print(f'  ║  局域网:  http://{ip}:{PORT}          ║')
-    print(f'  ║  存  储:  SQLite (data.db)                  ║')
+    print(f'  ║  存  储:  SQLite (data.db)                   ║')
     print(f'  ║                                              ║')
     print(f'  ║  按 Ctrl+C 停止服务器                        ║')
     print(f'  ║                                              ║')

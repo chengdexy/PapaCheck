@@ -16,6 +16,9 @@ let _fulfillingRedemption = false;
 let _adjustingPoints = false;
 let _editingBalance = false;
 let _redeemShowCount = 3;
+let _selectedCalendarDate = null;
+let _calendarYear = null;
+let _calendarMonth = null;
 
 const SETTINGS_DEFAULTS = {
   homeworkDefaultBasePoints: 10,
@@ -119,6 +122,10 @@ function switchTab(tab) {
 }
 
 function renderCurrentTab() {
+  if (adminCurrentTab !== 'settings') {
+    _calendarYear = null;
+    _calendarMonth = null;
+  }
   switch (adminCurrentTab) {
     case 'homework': renderHomeworkTab(); break;
     case 'shop': renderShopTab(); break;
@@ -137,6 +144,9 @@ function renderHomeworkTab() {
   const settlement = cachedData?.dailySettlement?.[submittedDate];
   const needsRating = settlement && settlement.submittedAt && !settlement.rating;
 
+  const deferPending = adminHomeworks.filter(h => h.deferRequest && h.deferRequest.status === 'pending');
+  const deferCount = deferPending.length;
+
   let ratingAlertHtml = '';
   if (needsRating) {
     ratingAlertHtml = `
@@ -146,10 +156,19 @@ function renderHomeworkTab() {
       </div>`;
   }
 
+  let deferAlertHtml = '';
+  if (deferCount > 0) {
+    deferAlertHtml = `
+      <div class="defer-alert">
+        <span>⏭️ ${deferCount} 项作业申请延后到明天</span>
+      </div>`;
+  }
+
   container.innerHTML = `
     <div class="admin-card">
       <div class="admin-card-title">📋 今日作业布置 · ${AdminUtil.formatDate(adminDate)}</div>
       ${ratingAlertHtml}
+      ${deferAlertHtml}
       <div id="adminHwList">
         ${adminHomeworks.length === 0
       ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无作业，点击下方添加</div>'
@@ -158,16 +177,25 @@ function renderHomeworkTab() {
         const modeText = '⚔️ ' + hw.suggestedDuration + '分钟';
         const bpText = (hw.basePoints ?? 10) !== 10 ? ' · ' + hw.basePoints + '分' : '';
         const statusText = hw.status === 'done' ? ' ✅' : hw.status === 'doing' ? ' 📝' : '';
+        const isDeferPending = hw.deferRequest && hw.deferRequest.status === 'pending';
+        const deferBadge = isDeferPending
+          ? ' <span style="background:var(--warning);color:var(--bg);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">⏭️ 申请延后</span>'
+          : '';
+        const deferActions = isDeferPending
+          ? `<button class="btn-sm" style="background:var(--success);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;margin-right:4px;" onclick="approveDeferHomework('${hw.id}', '${hw.deferRequest.requestedAt || ''}')">批准</button>
+             <button class="btn-sm" style="background:var(--danger);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;" onclick="rejectDeferHomework('${hw.id}')">拒绝</button>`
+          : '';
         return `
               <div class="hw-admin-item">
                 <div class="hw-admin-icon">${subject.icon}</div>
                 <div class="hw-admin-info">
-                  <div class="hw-admin-subject">${hw.subject} - ${hw.content}${statusText}</div>
+                  <div class="hw-admin-subject">${hw.subject} - ${hw.content}${statusText}${deferBadge}</div>
                   <div class="hw-admin-meta">${modeText}${hw.actualDuration !== null ? ' · 实际' + hw.actualDuration + '分钟' : ''}${bpText}</div>
                 </div>
                 <div class="hw-admin-actions">
-                  ${hw.status === 'pending' ? `<button class="btn-sm btn-edit" onclick="openHwModal('edit', '${hw.id}')">编辑</button>` : ''}
-                  ${hw.status === 'pending' ? `<button class="btn-sm btn-delete" onclick="deleteAdminHw('${hw.id}')">删除</button>` : ''}
+                  ${deferActions}
+                  ${hw.status === 'pending' && !isDeferPending ? `<button class="btn-sm btn-edit" onclick="openHwModal('edit', '${hw.id}')">编辑</button>` : ''}
+                  ${hw.status === 'pending' && !isDeferPending ? `<button class="btn-sm btn-delete" onclick="deleteAdminHw('${hw.id}')">删除</button>` : ''}
                   ${hw.status === 'done' && !hw.rejected ? `<button class="btn-sm" style="background:var(--warning);color:var(--bg);border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;" onclick="rejectHomework('${hw.id}')">驳回</button>` : ''}
                 </div>
               </div>`;
@@ -287,6 +315,30 @@ async function rejectHomework(hwId) {
   await refreshAllData();
   renderHomeworkTab();
   showToast('已驳回：' + hw.subject + ' - ' + hw.content);
+}
+
+async function approveDeferHomework(hwId, requestedAt) {
+  const hw = adminHomeworks.find(h => h.id === hwId);
+  if (!hw || !hw.deferRequest || hw.deferRequest.status !== 'pending') return;
+
+  const dateKey = AdminUtil.dateKey(adminDate);
+  await API.deferHomework(dateKey, hwId, 'approve', requestedAt);
+
+  await refreshAllData();
+  renderHomeworkTab();
+  showToast('已批准延后：' + hw.subject + ' - ' + hw.content);
+}
+
+async function rejectDeferHomework(hwId) {
+  const hw = adminHomeworks.find(h => h.id === hwId);
+  if (!hw || !hw.deferRequest || hw.deferRequest.status !== 'pending') return;
+
+  const dateKey = AdminUtil.dateKey(adminDate);
+  await API.deferHomework(dateKey, hwId, 'reject', '');
+
+  await refreshAllData();
+  renderHomeworkTab();
+  showToast('已拒绝延后：' + hw.subject + ' - ' + hw.content);
 }
 
 // ========== Rating Modal ==========
@@ -1109,13 +1161,96 @@ function renderSettingsTab() {
           ${calHtml}
         </div>
         <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
-          <div style="font-size:22px;font-weight:700;">${AdminUtil.formatDate(adminDate)}</div>
-          <button onclick="resetCurrentDate()" style="padding:10px 20px;background:var(--danger);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;align-self:flex-start;">🔄 重置这一天</button>
-          <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">重置将清除该日所有作业、结算、自由时间</div>
+          <div style="font-size:22px;font-weight:700;" id="selectedDateLabel">${AdminUtil.formatDate(adminDate)}</div>
+          <button onclick="switchToSelectedDate()" style="padding:10px 20px;border:1px solid var(--accent);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;background:transparent;color:var(--accent);align-self:stretch;">📅 切换到这一天</button>
+          <button onclick="toggleHolidayForDate()" id="btnToggleHoliday" style="padding:10px 20px;border:1px solid var(--warning);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;background:transparent;color:var(--warning);align-self:stretch;">🏖️ 标记为假日</button>
+          <button onclick="resetSelectedDate()" style="padding:10px 20px;background:var(--danger);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;align-self:stretch;">🔄 重置这一天</button>
         </div>
       </div>
     </div>
   `;
+
+  if (_calendarYear === null) {
+    const base = _selectedCalendarDate || AdminUtil.dateKey(adminDate);
+    const parts = base.split('-');
+    _calendarYear = parseInt(parts[0]);
+    _calendarMonth = parseInt(parts[1]) - 1;
+  }
+  if (!_selectedCalendarDate) {
+    _selectedCalendarDate = AdminUtil.dateKey(adminDate);
+  }
+  updateHolidayButtonLabel();
+}
+
+function updateHolidayButtonLabel() {
+  const btn = document.getElementById('btnToggleHoliday');
+  const label = document.getElementById('selectedDateLabel');
+  if (!btn || !_selectedCalendarDate) return;
+  const holidays = adminSettings.customHolidays || [];
+  if (holidays.includes(_selectedCalendarDate)) {
+    btn.textContent = '🏢 标记为工作日';
+    btn.style.color = 'var(--success)';
+    btn.style.borderColor = 'var(--success)';
+  } else {
+    btn.textContent = '🏖️ 标记为假日';
+    btn.style.color = 'var(--warning)';
+    btn.style.borderColor = 'var(--warning)';
+  }
+  if (label) {
+    const d = new Date(_selectedCalendarDate + 'T00:00:00');
+    label.textContent = AdminUtil.formatDate(d);
+  }
+}
+
+function selectCalendarDate(year, month, day) {
+  const d = new Date(year, month, day);
+  _selectedCalendarDate = AdminUtil.dateKey(d);
+  _calendarYear = year;
+  _calendarMonth = month;
+  renderSettingsTab();
+}
+
+async function switchToSelectedDate() {
+  if (!_selectedCalendarDate) return;
+  const parts = _selectedCalendarDate.split('-');
+  adminDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  document.getElementById('adminDate').textContent = AdminUtil.formatDate(adminDate);
+  await refreshAllData();
+  switchTab('homework');
+  showToast('已切换到 ' + AdminUtil.formatDate(adminDate));
+}
+
+async function toggleHolidayForDate() {
+  if (!_selectedCalendarDate) return;
+  const holidays = adminSettings.customHolidays || [];
+  const idx = holidays.indexOf(_selectedCalendarDate);
+  if (idx === -1) {
+    holidays.push(_selectedCalendarDate);
+    holidays.sort();
+    adminSettings.customHolidays = holidays;
+    await API.saveSettings(adminSettings);
+    await refreshAllData();
+    renderSettingsTab();
+    showToast('已标记为假日：' + _selectedCalendarDate);
+  } else {
+    holidays.splice(idx, 1);
+    adminSettings.customHolidays = holidays;
+    await API.saveSettings(adminSettings);
+    await refreshAllData();
+    renderSettingsTab();
+    showToast('已标记为工作日：' + _selectedCalendarDate);
+  }
+}
+
+async function resetSelectedDate() {
+  if (!_selectedCalendarDate) return;
+  await API._fetch('/api/reset-date', {
+    method: 'POST',
+    body: JSON.stringify({ date: _selectedCalendarDate }),
+  });
+  await refreshAllData();
+  renderSettingsTab();
+  showToast(_selectedCalendarDate + ' 已重置');
 }
 
 async function saveAllSettings() {
@@ -1171,9 +1306,16 @@ async function resetSettingsToDefaults() {
   showToast('已恢复默认值');
 }
 
+async function changeAdminDate(delta) {
+  adminDate.setDate(adminDate.getDate() + delta);
+  document.getElementById('adminDate').textContent = AdminUtil.formatDate(adminDate);
+  await refreshAllData();
+  renderCurrentTab();
+}
+
 function buildMiniCalendar() {
-  const year = adminDate.getFullYear();
-  const month = adminDate.getMonth();
+  const year = _calendarYear;
+  const month = _calendarMonth;
   const today = new Date();
   const todayStr = AdminUtil.dateKey(today);
 
@@ -1183,7 +1325,11 @@ function buildMiniCalendar() {
   const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
   const dayHeaders = ['日','一','二','三','四','五','六'];
 
-  let html = `<div style="font-size:16px;font-weight:600;text-align:center;margin-bottom:8px;">${year} ${monthNames[month]}</div>`;
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <span onclick="navigateCalendarMonth(-1)" style="cursor:pointer;font-size:18px;user-select:none;">◀</span>
+    <span style="font-size:16px;font-weight:600;">${year} ${monthNames[month]}</span>
+    <span onclick="navigateCalendarMonth(1)" style="cursor:pointer;font-size:18px;user-select:none;">▶</span>
+  </div>`;
   html += '<div style="display:grid;grid-template-columns:repeat(7,44px);gap:3px;text-align:center;">';
 
   dayHeaders.forEach(d => {
@@ -1197,7 +1343,7 @@ function buildMiniCalendar() {
   for (let day = 1; day <= daysInMonth; day++) {
     const d = new Date(year, month, day);
     const key = AdminUtil.dateKey(d);
-    const isSelected = key === AdminUtil.dateKey(adminDate);
+    const isSelected = _selectedCalendarDate && key === _selectedCalendarDate;
     const hasSettlement = cachedData?.dailySettlement?.[key];
     const hasRating = hasSettlement?.rating;
     const hasHomeworks = (cachedData?.homeworks?.[key] || []).length > 0;
@@ -1206,14 +1352,28 @@ function buildMiniCalendar() {
     let color = 'var(--text-secondary)';
     if (hasRating) { bg = 'rgba(74,222,128,0.3)'; color = 'var(--success)'; }
     else if (hasHomeworks) { bg = 'rgba(56,189,248,0.2)'; color = 'var(--accent)'; }
+    const holidays = adminSettings.customHolidays || [];
+    if (!hasRating && !hasHomeworks && holidays.includes(key)) { bg = 'rgba(251,191,36,0.2)'; color = 'var(--warning)'; }
     if (isSelected) { bg = 'var(--accent)'; color = 'var(--bg)'; }
     if (key === todayStr && !isSelected) { bg = 'rgba(255,255,255,0.1)'; color = 'var(--text)'; }
 
-    html += `<div onclick="adminDate=new Date(${year},${month},${day});refreshAllData();renderCurrentTab();" style="font-size:15px;padding:6px 0;border-radius:6px;cursor:pointer;background:${bg};color:${color};width:40px;justify-self:center;">${day}</div>`;
+    html += `<div onclick="selectCalendarDate(${year},${month},${day})" style="font-size:15px;padding:6px 0;border-radius:6px;cursor:pointer;background:${bg};color:${color};width:40px;justify-self:center;">${day}</div>`;
   }
 
   html += '</div>';
   return html;
+}
+
+function navigateCalendarMonth(delta) {
+  _calendarMonth += delta;
+  if (_calendarMonth < 0) {
+    _calendarMonth = 11;
+    _calendarYear -= 1;
+  } else if (_calendarMonth > 11) {
+    _calendarMonth = 0;
+    _calendarYear += 1;
+  }
+  renderSettingsTab();
 }
 
 function startEditBalance() {
@@ -1255,27 +1415,6 @@ async function confirmAdjustPoints() {
     _adjustingPoints = false;
     _editingBalance = false;
   }
-}
-
-async function resetCurrentDate() {
-  const dateKey = AdminUtil.dateKey(adminDate);
-
-  await API._fetch('/api/reset-date', {
-    method: 'POST',
-    body: JSON.stringify({ date: dateKey }),
-  });
-
-  adminHomeworks = [];
-  await refreshAllData();
-  renderCurrentTab();
-  showToast(AdminUtil.formatDate(adminDate) + ' 已重置');
-}
-
-async function changeAdminDate(delta) {
-  adminDate.setDate(adminDate.getDate() + delta);
-  document.getElementById('adminDate').textContent = AdminUtil.formatDate(adminDate);
-  await refreshAllData();
-  renderCurrentTab();
 }
 
 // ========== Modal ==========

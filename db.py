@@ -161,6 +161,36 @@ def save_homeworks(date_key, items):
     conn.close()
 
 
+def move_homework(from_date, to_date, hw_id):
+    conn = _connect()
+    from_row = conn.execute("SELECT data FROM homeworks WHERE date_key = ?", (from_date,)).fetchone()
+    if not from_row:
+        conn.close()
+        return None
+    from_list = json.loads(from_row['data'])
+    idx = next((i for i, h in enumerate(from_list) if h.get('id') == hw_id), -1)
+    if idx == -1:
+        conn.close()
+        return None
+    hw = from_list.pop(idx)
+    conn.execute(
+        "INSERT OR REPLACE INTO homeworks (date_key, data) VALUES (?, ?)",
+        (from_date, json.dumps(from_list, ensure_ascii=False))
+    )
+
+    to_row = conn.execute("SELECT data FROM homeworks WHERE date_key = ?", (to_date,)).fetchone()
+    to_list = json.loads(to_row['data']) if to_row else []
+    to_list.append(hw)
+    conn.execute(
+        "INSERT OR REPLACE INTO homeworks (date_key, data) VALUES (?, ?)",
+        (to_date, json.dumps(to_list, ensure_ascii=False))
+    )
+
+    conn.commit()
+    conn.close()
+    return hw
+
+
 # ==================== Settlement ====================
 
 def get_settlement(date_key):

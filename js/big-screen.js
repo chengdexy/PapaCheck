@@ -17,6 +17,17 @@ let needsFullRender = true;
 let forceMainPage = false;
 let _redeemingItem = false;
 let _redeemingRewardBox = false;
+let _requestingDefer = false;
+
+function isTomorrowHoliday() {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const day = tomorrow.getDay();
+  if (day === 0 || day === 6) return true;
+  const holidays = cachedData?.settings?.customHolidays || [];
+  const key = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+  return holidays.includes(key);
+}
 
 // ---- Lightweight per-second tick: clock + active timers ----
 function tickFrame() {
@@ -510,6 +521,21 @@ function updateHomeworkGrid() {
           '<div class="homework-status ' + statusClassName + '" data-role="hw-status" style="margin-top:2px;">' + statusText + '</div>' +
           '</div>';
       }
+    } else if (hw.deferRequest && hw.deferRequest.status === 'pending') {
+      statusText = '⏳ 等待确认...';
+      statusClassName = 'deferred';
+
+      rightSection = '<div class="homework-status ' + statusClassName + '" style="flex-shrink:0;">' + statusText + '</div>';
+
+      if (hw.mode === 'challenge') {
+        rightSection = '<div style="text-align:right;flex-shrink:0;">' +
+          '<div class="homework-timer" style="color:var(--accent);font-weight:600;font-size:16px;">' + hw.suggestedDuration + '分钟</div>' +
+          '<div class="homework-status ' + statusClassName + '" style="margin-top:2px;">' + statusText + '</div>' +
+          '</div>';
+        progressHtml = '<div class="homework-progress-bar">' +
+          '<div class="homework-progress-fill" style="width:0%;background:var(--warning);opacity:0.3;"></div>' +
+          '</div>';
+      }
     } else {
       statusText = hw.rejected ? '被驳回' : '未开始';
       statusClassName = hw.rejected ? 'rejected' : 'pending';
@@ -528,7 +554,7 @@ function updateHomeworkGrid() {
     }
 
     const modeLabel = hw.rejected ? '⏱️ 不计时' : ('⚔️ ' + (hw.suggestedDuration || 0) + '分钟');
-    const clickAction = isDone ? '' : isActive ? '' : `onclick="confirmStartTask('${hw.id}')"`;
+    const clickAction = isDone ? '' : isActive ? '' : (hw.deferRequest && hw.deferRequest.status === 'pending') ? '' : `onclick="confirmStartTask('${hw.id}')"`;
 
     return `
       <div class="homework-card ${statusClass} ${isDone && hw._animClass ? hw._animClass : ''}" data-hw-id="${hw.id}" ${clickAction}>
@@ -987,18 +1013,23 @@ function confirmStartTask(hwId) {
       <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;font-size:20px;">${hw.content}</p>
       <p style="text-align:center;color:#f87171;font-size:20px;margin-bottom:16px;">⚠️ 已驳回，不计时重新完成</p>
       <div class="modal-actions">
-        <button onclick="closeStartConfirm()" style="padding:10px 24px;border:2px solid var(--text-secondary);border-radius:12px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;">取消</button>
-        <button onclick="closeStartConfirm(); startHomework('${hwId}', 'timer')" style="padding:10px 24px;background:var(--accent);color:var(--bg);border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">开始</button>
+        <button onclick="closeStartConfirm()" style="padding:10px 16px;border:2px solid var(--text-secondary);border-radius:12px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">✕ 取消</button>
+        <button onclick="closeStartConfirm(); startHomework('${hwId}', 'timer')" style="padding:10px 16px;background:var(--accent);color:var(--bg);border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">开始</button>
       </div>
     `;
   } else {
+    const canDefer = !hw.deferRequest && isTomorrowHoliday();
+    const deferBtn = canDefer
+      ? '<button onclick="closeStartConfirm(); requestDeferHomework(\'' + hwId + '\')" style="padding:10px 16px;border:2px solid var(--warning);border-radius:12px;background:transparent;color:var(--warning);font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">⏭️ 明天做</button>'
+      : '';
     content.innerHTML = `
       <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon} ${hw.subject}</h3>
       <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;font-size:20px;">${hw.content}</p>
       <p style="text-align:center;color:var(--accent);font-size:20px;margin-bottom:16px;">建议 ${hw.suggestedDuration} 分钟内完成</p>
       <div class="modal-actions">
-        <button onclick="closeStartConfirm()" style="padding:10px 24px;border:2px solid var(--text-secondary);border-radius:12px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;">取消</button>
-        <button onclick="closeStartConfirm(); startHomework('${hwId}', 'challenge')" style="padding:10px 24px;background:var(--accent);color:var(--bg);border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">⚔️ 开始</button>
+        <button onclick="closeStartConfirm()" style="padding:10px 16px;border:2px solid var(--text-secondary);border-radius:12px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">✕ 取消</button>
+        ${deferBtn}
+        <button onclick="closeStartConfirm(); startHomework('${hwId}', 'challenge')" style="padding:10px 16px;background:var(--accent);color:var(--bg);border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">⚔️ 开始</button>
       </div>
     `;
   }

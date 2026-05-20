@@ -819,3 +819,18 @@ input[type="number"] { -moz-appearance: textfield; }
   text-align: right;
   padding-right: 4px;
 }
+
+/* ========== Defer Alert ========== */
+.defer-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid var(--warning);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--warning);
+}

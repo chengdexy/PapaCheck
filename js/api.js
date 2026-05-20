@@ -150,4 +150,11 @@ const API = {
     });
     return true;
   },
+
+  async deferHomework(dateKey, hwId, action, requestedAt) {
+    return await this._fetch('/api/defer-homework', {
+      method: 'POST',
+      body: JSON.stringify({ date: dateKey, hwId, action, requestedAt }),
+    });
+  },
 };
