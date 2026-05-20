@@ -2,7 +2,7 @@
 cd /d "%~dp0"
 
 echo.
-echo === TinySchedule ===
+echo === PapaCheck（爸~检查！）===
 echo.
 
 python --version >nul 2>nul

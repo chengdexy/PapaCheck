@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-TinySchedule - 局域网服务器
+PapaCheck（爸~检查！）- 局域网服务器
 用法: python server.py
 大屏访问 http://<本机IP>:8080
 管理端访问 http://<本机IP>:8080/admin.html
@@ -243,7 +243,7 @@ def main():
 
     print()
     print('  ╔══════════════════════════════════════════════╗')
-    print('  ║       📅 TinySchedule 服务器已启动           ║')
+    print('  ║       📅 PapaCheck（爸~检查！）服务器已启动   ║')
     print('  ╠══════════════════════════════════════════════╣')
     print(f'  ║                                              ║')
     print(f'  ║  大屏端:  http://localhost:{PORT}              ║')

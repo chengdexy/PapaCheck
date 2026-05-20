@@ -14,7 +14,7 @@ DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data.json'
 
 def migrate():
     print("=" * 50)
-    print("  TinySchedule 数据迁移: JSON → SQLite")
+    print("  PapaCheck（爸~检查！）数据迁移: JSON → SQLite")
     print("=" * 50)
 
     db.init_db()
