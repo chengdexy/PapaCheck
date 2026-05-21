@@ -51,6 +51,7 @@ const Util = {
 const Voice = {
   _queue: [],
   _playing: false,
+  _cache: new Map(),
   speak(text) {
     this._queue.push(text);
     if (!this._playing) this._playNext();
@@ -60,11 +61,18 @@ const Voice = {
     this._playing = true;
     const text = this._queue.shift();
     try {
-      const url = '/api/speak?' + new URLSearchParams({ text });
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error('speak fail');
-      const blob = await resp.blob();
-      const audio = new Audio(URL.createObjectURL(blob));
+      let audio;
+      if (this._cache.has(text)) {
+        audio = new Audio(this._cache.get(text));
+      } else {
+        const url = '/api/speak?' + new URLSearchParams({ text });
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('speak fail');
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        this._cache.set(text, blobUrl);
+        audio = new Audio(blobUrl);
+      }
       audio.onended = () => this._playNext();
       audio.onerror = () => this._playNext();
       await audio.play();
