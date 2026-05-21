@@ -42,6 +42,11 @@ function tickFrame() {
     checkReminders(activeHw);
   }
 
+  const activeFt = getActiveFreeTime();
+  if (activeFt) {
+    checkFreeTimeReminders(activeFt);
+  }
+
   if (currentPage !== PAGE.MAIN) return;
   if (needsFullRender) {
     needsFullRender = false;

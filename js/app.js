@@ -317,6 +317,50 @@ function checkReminders(hw) {
   }
 }
 
+// ========== Free Time Reminders (time-based rewards) ==========
+let lastFtReminderTrigger = {};
+let lastFtOvertimeSpeak = {};
+
+function checkFreeTimeReminders(ft) {
+  if (ft.status !== 'doing' || !ft.startedAt) return;
+
+  const startedAt = new Date(ft.startedAt);
+  const elapsedSeconds = Math.floor((new Date() - startedAt) / 1000);
+  const totalSeconds = ft.durationMinutes * 60;
+
+  const key = ft.id;
+  if (!lastFtReminderTrigger[key]) lastFtReminderTrigger[key] = {};
+
+  if (!lastFtReminderTrigger[key].half && elapsedSeconds >= totalSeconds * 0.5) {
+    lastFtReminderTrigger[key].half = true;
+    Voice.speak(ft.name + '已进行' + Math.floor(ft.durationMinutes / 2) + '分钟');
+  }
+
+  if (!lastFtReminderTrigger[key].fiveMin && totalSeconds - elapsedSeconds <= 300 && elapsedSeconds < totalSeconds) {
+    lastFtReminderTrigger[key].fiveMin = true;
+    Voice.speak(ft.name + '还剩5分钟');
+  }
+
+  if (!lastFtReminderTrigger[key].oneMin && totalSeconds - elapsedSeconds <= 60 && elapsedSeconds < totalSeconds) {
+    lastFtReminderTrigger[key].oneMin = true;
+    Voice.speak(ft.name + '还剩1分钟');
+  }
+
+  if (!lastFtReminderTrigger[key].overtime && elapsedSeconds > totalSeconds) {
+    lastFtReminderTrigger[key].overtime = true;
+    Voice.speak(ft.name + '时间到，请结束任务');
+    lastFtOvertimeSpeak[key] = Date.now();
+  }
+
+  if (lastFtReminderTrigger[key].overtime && elapsedSeconds > totalSeconds) {
+    const lastSpeak = lastFtOvertimeSpeak[key] || 0;
+    if (Date.now() - lastSpeak >= 30 * 60 * 1000) {
+      Voice.speak(ft.name + '时间到，请结束任务');
+      lastFtOvertimeSpeak[key] = Date.now();
+    }
+  }
+}
+
 // ========== Settlement ==========
 async function checkAllDone() {
   if (homeworks.length === 0) return;
