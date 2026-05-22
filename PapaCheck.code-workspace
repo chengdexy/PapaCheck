@@ -7,10 +7,6 @@
     {
       "name": "PapaCheck.Browser",
       "path": "PapaCheck.Browser"
-    },
-    {
-      "name": "PapaCheck.Flutter",
-      "path": "PapaCheck.Flutter"
     }
   ],
   "settings": {
