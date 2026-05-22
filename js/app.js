@@ -179,7 +179,7 @@ async function completeHomework(id) {
     Voice.speak(hw.subject + '作业完成！');
   }
   stopTickTimer();
-  await saveHomeworksSilent();
+  saveHomeworksSilent();
 
   checkAllDone();
   needsFullRender = true;

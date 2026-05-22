@@ -17,5 +17,8 @@ data.db
 .DS_Store
 Thumbs.db
 
+# 文档
+*.md
+
 # 日志
 *.log

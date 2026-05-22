@@ -1,8 +1,9 @@
 @echo off
+chcp 65001 > nul
 cd /d "%~dp0"
 
 echo.
-echo === PapaCheck（爸~检查！）===
+echo === PapaCheck ===
 echo.
 
 python --version >nul 2>nul

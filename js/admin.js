@@ -674,8 +674,8 @@ function openRewardBoxModal(mode, itemId) {
       <div class="form-group">
         <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
           ${adminShopItems.length === 0
-            ? '<div style="text-align:center;color:var(--text-secondary);padding:16px;">商店暂无商品</div>'
-            : adminShopItems.map(si => `
+        ? '<div style="text-align:center;color:var(--text-secondary);padding:16px;">商店暂无商品</div>'
+        : adminShopItems.map(si => `
               <div style="padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);"
                 onmouseover="this.style.background='rgba(255,255,255,0.05)'"
                 onmouseout="this.style.background='transparent'"
@@ -1076,6 +1076,16 @@ function renderSettingsTab() {
   const container = document.getElementById('adminContent');
   const balance = cachedData?.points?.balance ?? cachedData?.points ?? 0;
 
+  if (_calendarYear === null) {
+    const base = _selectedCalendarDate || AdminUtil.dateKey(adminDate);
+    const parts = base.split('-');
+    _calendarYear = parseInt(parts[0]);
+    _calendarMonth = parseInt(parts[1]) - 1;
+  }
+  if (!_selectedCalendarDate) {
+    _selectedCalendarDate = AdminUtil.dateKey(adminDate);
+  }
+
   const calHtml = buildMiniCalendar();
 
   container.innerHTML = `
@@ -1111,11 +1121,11 @@ function renderSettingsTab() {
       <div class="settings-section">
         <div class="settings-section-title">⭐ 评级倍率</div>
         ${(() => {
-          const m = getSettingsRatingMultipliers();
-          const ch = m.challenge;
-          const ti = m.timer;
-          const inputHtml = (id, val) => `<input id="${id}" class="settings-input" type="number" step="0.1" min="0" max="10" value="${val}">`;
-          return `
+      const m = getSettingsRatingMultipliers();
+      const ch = m.challenge;
+      const ti = m.timer;
+      const inputHtml = (id, val) => `<input id="${id}" class="settings-input" type="number" step="0.1" min="0" max="10" value="${val}">`;
+      return `
             <div class="rating-grid">
               <span></span>
               <span class="rating-header">优</span>
@@ -1133,7 +1143,7 @@ function renderSettingsTab() {
               ${inputHtml('cfg_ti_ke', ti['可'])}
               ${inputHtml('cfg_ti_cha', ti['差'])}
             </div>`;
-        })()}
+    })()}
       </div>
 
       <div class="settings-section">
@@ -1170,15 +1180,6 @@ function renderSettingsTab() {
     </div>
   `;
 
-  if (_calendarYear === null) {
-    const base = _selectedCalendarDate || AdminUtil.dateKey(adminDate);
-    const parts = base.split('-');
-    _calendarYear = parseInt(parts[0]);
-    _calendarMonth = parseInt(parts[1]) - 1;
-  }
-  if (!_selectedCalendarDate) {
-    _selectedCalendarDate = AdminUtil.dateKey(adminDate);
-  }
   updateHolidayButtonLabel();
 }
 
@@ -1275,8 +1276,8 @@ async function saveAllSettings() {
   const tiCha = val('cfg_ti_cha', parseFloat);
 
   if (basePoints === null || duration === null || effBonus === null || shopPoints === null ||
-      chYou === null || chLiang === null || chKe === null || chCha === null ||
-      tiYou === null || tiLiang === null || tiKe === null || tiCha === null) {
+    chYou === null || chLiang === null || chKe === null || chCha === null ||
+    tiYou === null || tiLiang === null || tiKe === null || tiCha === null) {
     showToast('请填写所有数值');
     return;
   }
@@ -1322,8 +1323,8 @@ function buildMiniCalendar() {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-  const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
-  const dayHeaders = ['日','一','二','三','四','五','六'];
+  const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+  const dayHeaders = ['日', '一', '二', '三', '四', '五', '六'];
 
   let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
     <span onclick="navigateCalendarMonth(-1)" style="cursor:pointer;font-size:18px;user-select:none;">◀</span>
