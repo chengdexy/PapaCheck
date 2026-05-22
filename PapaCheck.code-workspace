@@ -1,0 +1,20 @@
+{
+  "folders": [
+    {
+      "name": "PapaCheck (Root)",
+      "path": "."
+    },
+    {
+      "name": "PapaCheck.Browser",
+      "path": "PapaCheck.Browser"
+    },
+    {
+      "name": "PapaCheck.Flutter",
+      "path": "PapaCheck.Flutter"
+    }
+  ],
+  "settings": {
+    "dart.debugExternalPackageLibraries": false,
+    "dart.debugSdkLibraries": false
+  }
+}

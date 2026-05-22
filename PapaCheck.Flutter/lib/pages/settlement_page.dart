@@ -47,9 +47,11 @@ class SettlementPage extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              _SettlementRow(label: '基础积分', value: '+$basePoints', isTotal: false),
+              _SettlementRow(
+                  label: '基础积分', value: '+$basePoints', isTotal: false),
               const SizedBox(height: 8),
-              _SettlementRow(label: '效率奖励', value: '+$efficiencyBonus', isTotal: false),
+              _SettlementRow(
+                  label: '效率奖励', value: '+$efficiencyBonus', isTotal: false),
               const SizedBox(height: 8),
               _SettlementRow(
                 label: '待结算',
@@ -82,7 +84,7 @@ class SettlementPage extends ConsumerWidget {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 6),
                           child: Text(
-                            '${subject.icon} ${hw.subject} - ${hw.content}  ${actual} / $suggested 分钟$tag',
+                            '${subject.icon} ${hw.subject} - ${hw.content}  $actual / $suggested 分钟$tag',
                             style: const TextStyle(
                               fontSize: 17,
                               color: AppTheme.textSecondary,
@@ -134,9 +136,7 @@ class _SettlementRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.bg,
         borderRadius: BorderRadius.circular(14),
-        border: isTotal
-            ? Border.all(color: AppTheme.accent, width: 2)
-            : null,
+        border: isTotal ? Border.all(color: AppTheme.accent, width: 2) : null,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,

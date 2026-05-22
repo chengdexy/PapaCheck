@@ -47,13 +47,11 @@ class AppStateNotifier extends StateNotifier<AppData> {
 
   void _onPollDataChanged(Map<String, dynamic> data) {
     state = AppData(
-      homeworks:
-          (data['homeworks'] as Map<String, dynamic>?)?.map(
+      homeworks: (data['homeworks'] as Map<String, dynamic>?)?.map(
             (k, v) => MapEntry(k, v as List<dynamic>),
           ) ??
           {},
-      freeTimeTasks:
-          (data['freeTimeTasks'] as Map<String, dynamic>?)?.map(
+      freeTimeTasks: (data['freeTimeTasks'] as Map<String, dynamic>?)?.map(
             (k, v) => MapEntry(k, v as List<dynamic>),
           ) ??
           {},
@@ -118,7 +116,7 @@ class AppStateNotifier extends StateNotifier<AppData> {
   bool get isAnyTaskPaused {
     final t = activeHomework ?? activeFreeTime;
     return t != null && t is Homework
-        ? (t as Homework).paused
+        ? (t).paused
         : (t as FreeTimeTask?)?.paused ?? false;
   }
 
@@ -134,8 +132,9 @@ class AppStateNotifier extends StateNotifier<AppData> {
   bool isTomorrowHoliday() {
     final tomorrow = DateTime.now().add(const Duration(days: 1));
     if (tomorrow.weekday == DateTime.sunday ||
-        tomorrow.weekday == DateTime.saturday)
+        tomorrow.weekday == DateTime.saturday) {
       return true;
+    }
     final holidays = (state.settings['customHolidays'] as List<dynamic>?) ?? [];
     final key = du.dateKey(tomorrow);
     return holidays.contains(key);
@@ -247,13 +246,15 @@ class AppStateNotifier extends StateNotifier<AppData> {
     final isChallenge = list[idx]['mode'] == 'challenge';
     final subject = list[idx]['subject'] ?? '';
 
-    if (isChallenge && suggestedDuration > 0 && actualDuration > suggestedDuration) {
+    if (isChallenge &&
+        suggestedDuration > 0 &&
+        actualDuration > suggestedDuration) {
       list[idx]['mode'] = 'timer';
-      voice.speak('超时了，本次按计时模式统计，${subject}作业完成');
+      voice.speak('超时了，本次按计时模式统计，$subject作业完成');
     } else if (isChallenge) {
-      voice.speak('挑战成功！${subject}提前完成');
+      voice.speak('挑战成功！$subject提前完成');
     } else {
-      voice.speak('${subject}作业完成！');
+      voice.speak('$subject作业完成！');
     }
 
     _tickTimer?.cancel();
@@ -315,8 +316,7 @@ class AppStateNotifier extends StateNotifier<AppData> {
     if (Hw == null && Ft == null) return;
 
     final startedAtStr = (Hw?.startedAt ?? Ft?.startedAt) ?? '';
-    final startedAt =
-        DateTime.tryParse(startedAtStr) ?? DateTime.now();
+    final startedAt = DateTime.tryParse(startedAtStr) ?? DateTime.now();
     final pausedElapsed = DateTime.now().difference(startedAt).inSeconds;
 
     _tickTimer?.cancel();
@@ -492,9 +492,8 @@ class AppStateNotifier extends StateNotifier<AppData> {
 
   Future<void> _calculateSettlement() async {
     final hwList = homeworks;
-    final challengeHw = hwList
-        .where((h) => h.isChallenge && h.isDone && !h.rejected)
-        .toList();
+    final challengeHw =
+        hwList.where((h) => h.isChallenge && h.isDone && !h.rejected).toList();
     final doneHw = hwList.where((h) => h.isDone).toList();
 
     final basePoints = doneHw.fold<int>(0, (sum, h) => sum + (h.basePoints));
@@ -530,9 +529,8 @@ class AppStateNotifier extends StateNotifier<AppData> {
     });
 
     await _api.saveEfficiency(key, {
-      'averageRatio': ratios.isEmpty
-          ? 0
-          : ratios.reduce((a, b) => a + b) / ratios.length,
+      'averageRatio':
+          ratios.isEmpty ? 0 : ratios.reduce((a, b) => a + b) / ratios.length,
       'ratios': ratios,
     });
 

@@ -201,9 +201,8 @@ class _MainPageState extends ConsumerState<MainPage> {
 
   Widget _buildActionBar(AppStateNotifier notifier, dynamic active) {
     if (active == null) return const SizedBox.shrink();
-    final isPaused = active is Homework
-        ? (active as Homework).paused
-        : (active as FreeTimeTask).paused;
+    final isPaused =
+        active is Homework ? (active).paused : (active as FreeTimeTask).paused;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),

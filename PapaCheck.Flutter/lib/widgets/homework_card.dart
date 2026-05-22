@@ -23,9 +23,7 @@ class HomeworkCard extends StatelessWidget {
         color: AppTheme.bg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isActive
-              ? AppTheme.accent.withAlpha(200)
-              : Colors.transparent,
+          color: isActive ? AppTheme.accent.withAlpha(200) : Colors.transparent,
           width: 3,
         ),
       ),
@@ -156,7 +154,7 @@ class HomeworkCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
-            '已完成 · ${actual}分钟',
+            '已完成 · $actual分钟',
             style: const TextStyle(
               fontSize: 13,
               color: AppTheme.success,
@@ -207,12 +205,12 @@ class HomeworkCard extends StatelessWidget {
     }
 
     if (isActive && hw.isChallenge) {
-      final startedAt =
-          DateTime.tryParse(hw.startedAt ?? '') ?? DateTime.now();
+      final startedAt = DateTime.tryParse(hw.startedAt ?? '') ?? DateTime.now();
       final elapsedSeconds = DateTime.now().difference(startedAt).inSeconds;
       final totalSeconds = hw.suggestedDuration * 60;
-      final progressValue =
-          totalSeconds > 0 ? (elapsedSeconds / totalSeconds).clamp(0.0, 1.0) : 1.0;
+      final progressValue = totalSeconds > 0
+          ? (elapsedSeconds / totalSeconds).clamp(0.0, 1.0)
+          : 1.0;
 
       Color barColor = AppTheme.accent;
       if (progressValue >= 1.0) {
@@ -228,8 +226,8 @@ class HomeworkCard extends StatelessWidget {
     }
 
     if (isActive && !hw.isChallenge) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 6),
+      return const Padding(
+        padding: EdgeInsets.only(top: 6),
         child: _MiniProgress(value: 0, color: AppTheme.accent),
       );
     }

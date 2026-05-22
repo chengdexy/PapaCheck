@@ -89,9 +89,9 @@ class CurrentTaskCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-            Text(
+            const Text(
               '点击右侧作业卡片开始吧！',
-              style: const TextStyle(fontSize: 18, color: AppTheme.textSecondary),
+              style: TextStyle(fontSize: 18, color: AppTheme.textSecondary),
             ),
           ],
         ),
@@ -107,12 +107,15 @@ class CurrentTaskCard extends StatelessWidget {
             SizedBox(height: 12),
             Text(
               '今天没有作业',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: AppTheme.text),
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.text),
             ),
             SizedBox(height: 10),
             Text(
               '去玩吧！',
-              style: const TextStyle(fontSize: 18, color: AppTheme.textSecondary),
+              style: TextStyle(fontSize: 18, color: AppTheme.textSecondary),
             ),
           ],
         ),
@@ -128,7 +131,10 @@ class CurrentTaskCard extends StatelessWidget {
             SizedBox(height: 12),
             Text(
               '全部完成',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: AppTheme.success),
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.success),
             ),
             SizedBox(height: 10),
             Text(
@@ -141,7 +147,8 @@ class CurrentTaskCard extends StatelessWidget {
     }
 
     return const Center(
-      child: Text('暂无进行中的任务', style: TextStyle(color: AppTheme.textSecondary, fontSize: 18)),
+      child: Text('暂无进行中的任务',
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 18)),
     );
   }
 
@@ -285,7 +292,9 @@ class CurrentTaskCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            remainingSeconds > 0 ? '剩余 ${_formatTime(remainingSeconds)}' : '时间到！',
+            remainingSeconds > 0
+                ? '剩余 ${_formatTime(remainingSeconds)}'
+                : '时间到！',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w600,
