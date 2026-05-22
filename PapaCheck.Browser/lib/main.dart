@@ -82,28 +82,22 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
       setState(() => _url = storedUrl);
       _initController(storedUrl);
     } else {
-      final reconfigure = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          title: const Text('连接失败'),
-          content: Text('无法连接到 $storedUrl\n是否重新配置服务器地址？'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('退出'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('重新配置'),
-            ),
-          ],
-        ),
-      );
+      String? action = await _showConnectFailedDialog(storedUrl);
+
+      while (action == 'retry' && mounted) {
+        final ok = await _tryConnect(storedUrl);
+        if (!mounted) return;
+        if (ok) {
+          setState(() => _url = storedUrl);
+          _initController(storedUrl);
+          return;
+        }
+        action = await _showConnectFailedDialog(storedUrl);
+      }
 
       if (!mounted) return;
 
-      if (reconfigure == true) {
+      if (action == 'config') {
         final url = await IpConfigDialog.show(context, initialUrl: storedUrl);
         if (url != null && mounted) {
           setState(() => _url = url);
@@ -132,6 +126,31 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     } catch (_) {
       return false;
     }
+  }
+
+  Future<String?> _showConnectFailedDialog(String url) async {
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('连接失败'),
+        content: Text('无法连接到 $url\n请确认服务器已启动'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('退出'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('config'),
+            child: const Text('重新配置'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop('retry'),
+            child: const Text('重试'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _openConfig() async {
@@ -180,7 +199,7 @@ class _BrowserPageState extends State<BrowserPage> {
   Offset _indicatorPos = Offset.zero;
 
   static const double _zoneRatio = 0.35;
-  static const double _circleRadius = 30;
+  static const double _circleRadius = 50;
   static const double _moveThreshold = 15;
   static const int _longPressSeconds = 3;
 
