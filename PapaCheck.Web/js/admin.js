@@ -783,7 +783,9 @@ async function deleteRewardBoxItem(id) {
 // ========== Tab 4: Redemptions ==========
 function renderRedeemTab() {
   const pending = adminRedemptions.filter(r => r.status === 'pending');
-  const fulfilled = adminRedemptions.filter(r => r.status === 'fulfilled');
+  const fulfilled = adminRedemptions
+    .filter(r => r.status === 'fulfilled')
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const shownFulfilled = fulfilled.slice(0, _redeemShowCount);
   const hasMore = fulfilled.length > _redeemShowCount;
 

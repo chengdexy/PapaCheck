@@ -22,3 +22,10 @@ Thumbs.db
 
 # 日志
 *.log
+
+# Flutter
+PapaCheck.Flutter/.dart_tool/
+PapaCheck.Flutter/.flutter-plugins
+PapaCheck.Flutter/.flutter-plugins-dependencies
+PapaCheck.Flutter/build/
+PapaCheck.Flutter/.idea/
