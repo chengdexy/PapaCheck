@@ -140,9 +140,9 @@ function startHomework(id, mode) {
   saveHomeworksSilent();
 
   if (mode === 'challenge') {
-    Voice.speak('开始' + hw.subject + '作业，挑战' + hw.suggestedDuration + '分钟');
+    Voice.speak('开始' + hw.content + '，挑战' + hw.suggestedDuration + '分钟');
   } else {
-    Voice.speak('开始' + hw.subject + '作业');
+    Voice.speak('开始' + hw.content);
   }
 
   startTickTimer();
