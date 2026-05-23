@@ -13,6 +13,7 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   webview_flutter: ^4.10.0
+  webview_flutter_android: '>=4.3.2 <4.3.3'
   shared_preferences: ^2.5.3
 
 dev_dependencies:

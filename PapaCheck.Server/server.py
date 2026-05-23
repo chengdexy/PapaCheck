@@ -34,11 +34,13 @@ def _gen_mp3(text):
         return mp3_data
     try:
         loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         mp3_data = loop.run_until_complete(_run())
         loop.close()
     except Exception:
         mp3_data = b''
-    _tts_cache[text] = mp3_data
+    if mp3_data:
+        _tts_cache[text] = mp3_data
     return mp3_data
 
 

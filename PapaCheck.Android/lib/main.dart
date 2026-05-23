@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import 'services/config_service.dart';
 import 'widgets/ip_config_dialog.dart';
@@ -69,7 +70,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
       final url = await IpConfigDialog.show(context);
       if (url != null && mounted) {
         setState(() => _url = url);
-        _initController(url);
+        _initController(url, clearCache: true);
       }
       return;
     }
@@ -80,7 +81,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
 
     if (ok) {
       setState(() => _url = storedUrl);
-      _initController(storedUrl);
+      _initController(storedUrl, clearCache: true);
     } else {
       String? action = await _showConnectFailedDialog(storedUrl);
 
@@ -89,7 +90,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         if (!mounted) return;
         if (ok) {
           setState(() => _url = storedUrl);
-          _initController(storedUrl);
+          _initController(storedUrl, clearCache: true);
           return;
         }
         action = await _showConnectFailedDialog(storedUrl);
@@ -101,17 +102,27 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         final url = await IpConfigDialog.show(context, initialUrl: storedUrl);
         if (url != null && mounted) {
           setState(() => _url = url);
-          _initController(url);
+          _initController(url, clearCache: true);
         }
       }
     }
   }
 
-  void _initController(String url) {
+  Future<void> _initController(String url, {bool clearCache = false}) async {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.white)
-      ..loadRequest(Uri.parse(url));
+      ..setBackgroundColor(Colors.white);
+
+    if (_controller!.platform is AndroidWebViewController) {
+      (_controller!.platform as AndroidWebViewController)
+          .setMediaPlaybackRequiresUserGesture(false);
+    }
+
+    if (clearCache) {
+      await _controller!.clearCache();
+    }
+
+    _controller!.loadRequest(Uri.parse(url));
   }
 
   Future<bool> _tryConnect(String url) async {

@@ -558,7 +558,8 @@ function updateHomeworkGrid() {
       }
     }
 
-    const modeLabel = hw.rejected ? '⏱️ 不计时' : ('⚔️ ' + (hw.suggestedDuration || 0) + '分钟');
+    const bpText = ' · ' + (hw.basePoints ?? 10) + '分';
+    const modeLabel = hw.rejected ? '⏱️ 不计时' + bpText : ('⚔️ ' + (hw.suggestedDuration || 0) + '分钟' + bpText);
     const clickAction = isDone ? '' : isActive ? '' : (hw.deferRequest && hw.deferRequest.status === 'pending') ? '' : `onclick="confirmStartTask('${hw.id}')"`;
 
     return `

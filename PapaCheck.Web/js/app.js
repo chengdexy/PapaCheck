@@ -52,12 +52,17 @@ const Voice = {
   _queue: [],
   _playing: false,
   _cache: new Map(),
+  _unlocked: false,
   speak(text) {
     this._queue.push(text);
     if (!this._playing) this._playNext();
   },
   async _playNext() {
     if (this._queue.length === 0) { this._playing = false; return; }
+    if (!this._unlocked) {
+      this._playing = false;
+      return;
+    }
     this._playing = true;
     const text = this._queue.shift();
     try {
@@ -77,10 +82,35 @@ const Voice = {
       audio.onerror = () => this._playNext();
       await audio.play();
     } catch (e) {
+      if (e.name === 'NotAllowedError') {
+        this._queue.unshift(text);
+        this._playing = false;
+        return;
+      }
       this._playNext();
     }
   },
 };
+
+// 解锁音频自动播放（浏览器 Autoplay Policy 要求用户手势后才能 play）
+(function () {
+  var _unlockDone = false;
+  function unlockAudio() {
+    if (_unlockDone) return;
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    ctx.resume().then(function () {
+      Voice._unlocked = true;
+      _unlockDone = true;
+      document.removeEventListener('touchstart', unlockAudio);
+      document.removeEventListener('click', unlockAudio);
+      if (Voice._queue.length > 0 && !Voice._playing) {
+        Voice._playNext();
+      }
+    });
+  }
+  document.addEventListener('touchstart', unlockAudio, { once: false });
+  document.addEventListener('click', unlockAudio, { once: false });
+})();
 
 // ========== Toast ==========
 function showToast(msg) {

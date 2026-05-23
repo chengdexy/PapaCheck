@@ -183,13 +183,38 @@ function renderHomeworkTab() {
       <div class="admin-card-title">📋 今日作业布置 · ${AdminUtil.formatDate(adminDate)}</div>
       ${ratingAlertHtml}
       ${deferAlertHtml}
+      ${(() => {
+      const doneCount = adminHomeworks.filter(h => h.status === 'done').length;
+      const totalCount = adminHomeworks.length;
+      const doingCount = adminHomeworks.filter(h => h.status === 'doing').length;
+      if (totalCount > 0) {
+        let progressText = `完成进度: ${doneCount}/${totalCount}`;
+        if (doneCount === totalCount) progressText += ' ✅ 全部完成';
+        else if (doingCount > 0) progressText += ` · ${doingCount}项进行中`;
+        return `<div style="margin-bottom:12px;padding:8px 12px;background:rgba(56,189,248,0.08);border-radius:8px;font-size:14px;font-weight:600;color:var(--accent);">📊 ${progressText}</div>`;
+      }
+      return '';
+    })()}
       <div id="adminHwList">
         ${adminHomeworks.length === 0
       ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无作业，点击下方添加</div>'
-      : adminHomeworks.map(hw => {
+      : [...adminHomeworks].sort((a, b) => {
+        const priority = hw => {
+          if (hw.deferRequest && hw.deferRequest.status === 'pending') return 0;
+          if (hw.status === 'doing') return 1;
+          if (hw.status === 'pending') return 2;
+          return 3;
+        };
+        return priority(a) - priority(b);
+      }).map(hw => {
         const subject = ADMIN_SUBJECTS.find(s => s.id === hw.subject) || ADMIN_SUBJECTS[4];
         const modeText = '⚔️ ' + hw.suggestedDuration + '分钟';
-        const bpText = (hw.basePoints ?? 10) !== 10 ? ' · ' + hw.basePoints + '分' : '';
+        const bpText = ' · ' + (hw.basePoints ?? 10) + '分';
+        let elapsedText = '';
+        if (hw.status === 'doing' && hw.startedAt) {
+          const elapsed = Math.round((Date.now() - new Date(hw.startedAt)) / 60000);
+          elapsedText = ' · 已用' + elapsed + '分钟';
+        }
         const statusText = hw.status === 'done' ? ' ✅' : hw.status === 'doing' ? ' 📝' : '';
         const isDeferPending = hw.deferRequest && hw.deferRequest.status === 'pending';
         const deferBadge = isDeferPending
@@ -204,13 +229,14 @@ function renderHomeworkTab() {
                 <div class="hw-admin-icon">${subject.icon}</div>
                 <div class="hw-admin-info">
                   <div class="hw-admin-subject">${hw.subject} - ${hw.content}${statusText}${deferBadge}</div>
-                  <div class="hw-admin-meta">${modeText}${hw.actualDuration !== null ? ' · 实际' + hw.actualDuration + '分钟' : ''}${bpText}</div>
+                  <div class="hw-admin-meta">${modeText}${bpText}${hw.actualDuration !== null ? ' · 实际' + hw.actualDuration + '分钟' : ''}${elapsedText}</div>
                 </div>
                 <div class="hw-admin-actions">
                   ${deferActions}
                   ${hw.status === 'pending' && !isDeferPending ? `<button class="btn-sm btn-edit" onclick="openHwModal('edit', '${hw.id}')">编辑</button>` : ''}
                   ${hw.status === 'pending' && !isDeferPending ? `<button class="btn-sm btn-delete" onclick="deleteAdminHw('${hw.id}')">删除</button>` : ''}
                   ${hw.status === 'done' && !hw.rejected ? `<button class="btn-sm" style="background:var(--warning);color:var(--bg);border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;" onclick="rejectHomework('${hw.id}')">驳回</button>` : ''}
+                  ${hw.status === 'done' ? `<button class="btn-sm btn-delete" onclick="deleteAdminHw('${hw.id}')">删除</button>` : ''}
                 </div>
               </div>`;
       }).join('')}
