@@ -58,6 +58,20 @@ function showToast(msg) {
   setTimeout(() => toast.classList.remove('show'), 2500);
 }
 
+/**
+ * 预生成语音 — 将文本发送给 server 提前生成 TTS 缓存
+ * fire-and-forget，不阻塞管理端响应
+ */
+function pregenSpeech(texts) {
+  const unique = [...new Set(texts)].filter(t => t && t.trim());
+  if (unique.length === 0) return;
+  fetch('/api/pregen-speech', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texts: unique }),
+  }).catch(() => { });
+}
+
 const AdminUtil = {
   dateKey(d) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -285,6 +299,15 @@ async function saveAdminHw() {
   closeAdminModal();
   await refreshAllData();
   renderHomeworkTab();
+  // 预生成该作业的所有相关语音
+  pregenSpeech([
+    '开始' + content,
+    '开始' + content + '，挑战' + suggestedDuration + '分钟',
+    subject + '作业完成！',
+    '挑战成功！' + subject + '提前完成',
+    '超时了，本次按计时模式统计，' + subject + '作业完成',
+    '已用' + Math.floor(suggestedDuration / 2) + '分钟，继续加油',
+  ]);
   showToast(adminEditingId ? '作业已更新' : '作业已添加');
 }
 
@@ -326,6 +349,7 @@ async function approveDeferHomework(hwId, requestedAt) {
 
   await refreshAllData();
   renderHomeworkTab();
+  pregenSpeech(['爸爸批准了' + hw.subject + '的延后申请，明天再做']);
   showToast('已批准延后：' + hw.subject + ' - ' + hw.content);
 }
 
@@ -338,6 +362,7 @@ async function rejectDeferHomework(hwId) {
 
   await refreshAllData();
   renderHomeworkTab();
+  pregenSpeech(['爸爸拒绝了' + hw.subject + '的延后申请，今天完成吧']);
   showToast('已拒绝延后：' + hw.subject + ' - ' + hw.content);
 }
 
@@ -430,6 +455,10 @@ async function submitRating(dateKey, rating) {
     closeAdminModal();
     await refreshAllData();
     renderHomeworkTab();
+    // 预生成评级语音
+    if (finalPoints > 0) {
+      pregenSpeech(['爸爸评了' + rating + '，获得' + finalPoints + '分']);
+    }
     showToast(`已评级: ${rating} · 最终积分: ${finalPoints}`);
   } finally {
     _submittingAdminRating = false;
@@ -925,6 +954,23 @@ async function fulfillRedemption(id) {
 
     await refreshAllData();
     renderRedeemTab();
+    // 预生成兑现相关的语音
+    const texts = [];
+    const it = (r.itemType || 'time');
+    const dm = (r.durationMinutes || 0);
+    const nm = r.itemName;
+    if (it === 'time' && dm > 0) {
+      texts.push('开始' + nm + '，' + dm + '分钟');
+      texts.push(nm + '时间到！');
+      texts.push(nm + '已进行' + Math.floor(dm / 2) + '分钟');
+      texts.push(nm + '还剩5分钟');
+      texts.push(nm + '还剩1分钟');
+      texts.push(nm + '时间到，请结束任务');
+    }
+    if (it === 'buff') {
+      texts.push(nm + '已生效');
+    }
+    pregenSpeech(texts);
     showToast('已确认兑现');
   } finally {
     _fulfillingRedemption = false;
@@ -1413,6 +1459,7 @@ async function confirmAdjustPoints() {
     }
     await refreshAllData();
     renderSettingsTab();
+    pregenSpeech(['积分已更新为' + newBalance + '分']);
     showToast('积分已更新为：' + newBalance);
   } finally {
     _adjustingPoints = false;

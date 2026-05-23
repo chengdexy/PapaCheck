@@ -244,6 +244,17 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
                 self.send_error(400, 'Unknown action')
             return
 
+        if path == '/api/pregen-speech':
+            texts = payload.get('texts', [])
+            import threading
+            def _bg():
+                for text in texts:
+                    if text and text.strip():
+                        _gen_mp3(text)
+            threading.Thread(target=_bg, daemon=True).start()
+            self.send_json({'ok': True})
+            return
+
         if path == '/api/reset-date':
             date_key = payload.get('date', '')
             if date_key:
@@ -277,6 +288,29 @@ def main():
     sys.stdout.reconfigure(encoding='utf-8')
     db.init_db()
     ip = get_local_ip()
+
+    # 预生成固定语音短语（35 条），确保孩子端请求时缓存已命中
+    import threading
+    fixed_texts = [
+        '已申请延后，等待爸爸确认',
+        '任务已暂停',
+        '任务已继续',
+        '还剩5分钟',
+        '还剩1分钟',
+        '已超时，请尽快完成',
+        '全部作业已完成，等待爸爸评级',
+        '奖励箱有新奖励，快去看看吧',
+        '屏幕已唤醒',
+        '已提交申请，等待爸爸确认',
+        '兑换成功！',
+    ] + ['现在是' + str(h) + '点' for h in range(24)]
+
+    def _pregen_fixed():
+        for text in fixed_texts:
+            _gen_mp3(text)
+        print('  [TTS] 固定短语预生成完成 (' + str(len(fixed_texts)) + ' 条)', flush=True)
+    threading.Thread(target=_pregen_fixed, daemon=True).start()
+
     server = HTTPServer(('0.0.0.0', PORT), ScheduleHandler)
 
     print()
