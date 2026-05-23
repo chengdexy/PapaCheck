@@ -1,6 +1,6 @@
 {
-    "name": "papacheck_browser",
-    "short_name": "papacheck_browser",
+    "name": "papacheck_android",
+    "short_name": "papacheck_android",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

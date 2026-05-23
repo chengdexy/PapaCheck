@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.papacheck_browser"
+    namespace = "com.example.papacheck_android"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -19,7 +19,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.papacheck_browser"
+        applicationId = "com.example.papacheck_android"
         minSdk = 21
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

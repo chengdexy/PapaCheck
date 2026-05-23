@@ -1,4 +1,4 @@
-package com.example.papacheck_browser
+package com.example.papacheck_android
 
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity

@@ -24,8 +24,8 @@ Thumbs.db
 *.log
 
 # Flutter
-PapaCheck.Browser/.dart_tool/
-PapaCheck.Browser/.flutter-plugins
-PapaCheck.Browser/.flutter-plugins-dependencies
-PapaCheck.Browser/build/
-PapaCheck.Browser/.idea/
+PapaCheck.Android/.dart_tool/
+PapaCheck.Android/.flutter-plugins
+PapaCheck.Android/.flutter-plugins-dependencies
+PapaCheck.Android/build/
+PapaCheck.Android/.idea/
