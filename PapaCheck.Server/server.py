@@ -18,6 +18,7 @@ from urllib.parse import urlparse, parse_qs
 import db
 
 PORT = 8080
+_WEB_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'PapaCheck.Web'))
 _tts_cache = {}
 
 def _gen_mp3(text):
@@ -55,7 +56,7 @@ def get_local_ip():
 class ScheduleHandler(SimpleHTTPRequestHandler):
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=os.path.dirname(os.path.abspath(__file__)), **kwargs)
+        super().__init__(*args, directory=_WEB_ROOT, **kwargs)
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -284,7 +285,8 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
         print(f"  [{self.log_date_time_string()}] {args[0]}", flush=True)
 
 
-def main():
+def init_server():
+    """初始化服务器：数据库、TTS 预生成等，返回 (server, ip)"""
     sys.stdout.reconfigure(encoding='utf-8')
     db.init_db()
     ip = get_local_ip()
@@ -328,6 +330,12 @@ def main():
     print('  ╚══════════════════════════════════════════════╝')
     print()
 
+    return server, ip
+
+
+def main():
+    """命令行入口（保持兼容）"""
+    server, ip = init_server()
     try:
         server.serve_forever()
     except KeyboardInterrupt:

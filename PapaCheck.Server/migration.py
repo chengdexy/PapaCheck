@@ -9,7 +9,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import db
 
-DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data.json')
+DATA_FILE = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'PapaCheck.Web', 'data.json'))
 
 
 def migrate():
