@@ -30,6 +30,9 @@ PapaCheck.Android/.flutter-plugins-dependencies
 PapaCheck.Android/build/
 PapaCheck.Android/.idea/
 
+# 聊天素材（非项目文件）
+_chat/
+
 # PyInstaller
 PapaCheck.Windows/build/
 PapaCheck.Windows/dist/
