@@ -18,20 +18,30 @@
 - **家长（爸爸）**：使用管理端（admin.html，手机浏览器访问）布置作业、管理商店、确认兑换、作业评级、查看统计
 
 ### 1.3 技术栈
-- **前端**：纯 HTML + CSS + JavaScript，无框架、无构建工具
+- **前端（Web）**：纯 HTML + CSS + JavaScript，无框架、无构建工具
+- **前端（Android）**：Flutter/Dart，WebView 加载 Web 前端
 - **后端**：Python 3 标准库 http.server
-- **数据存储**：SQLite（data.db），单文件数据库，零配置
+- **数据存储**：SQLite（data.db），单文件数据库，零配置；支持 `PAPACHECK_DB_DIR` 环境变量自定义路径
 - **通信**：局域网 HTTP REST API，前端每 5 秒轮询同步（屏保模式降为 60 秒）
 - **语音**：edge-tts（微软 Edge TTS，zh-CN-XiaoxiaoNeural），动态生成 MP3
-- **部署**：局域网内运行，`python server.py` 一键启动
+- **Windows 桌面端**：tkinter + pystray 系统托盘 + PyInstaller 打包为单文件 EXE
 
 ### 1.4 启动方式
+
+**命令行启动（开发/调试）**：
 ```bash
+cd PapaCheck.Server
 python server.py
-# 本机访问: http://localhost:8080
 # 大屏端: http://localhost:8080
 # 管理端: http://localhost:8080/admin.html
 # 手机访问: http://<本机IP>:8080/admin.html
+```
+
+**Windows EXE 启动（生产使用）**：
+```bash
+cd PapaCheck.Windows
+python build_exe.py          # 打包
+dist/PapaCheck.exe           # 运行（自动启动服务器 + 系统托盘）
 ```
 
 ---
@@ -41,39 +51,70 @@ python server.py
 ### 2.1 文件结构
 ```
 PapaCheck/
-├── index.html               # 大屏端（孩子使用）
-├── admin.html               # 管理端（爸爸使用，手机浏览器）
-├── ReadMe.html              # 纯静态项目展示页（不参与逻辑）
-├── server.py                # Python 后端服务器（核心入口）
-├── db.py                    # SQLite 数据库层
-├── migration.py             # JSON → SQLite 数据迁移工具
-├── start.bat                # Windows 一键启动
 ├── .gitignore
-├── icon.svg                 # PWA 图标
-├── manifest.json            # PWA 清单
-├── PROJECT_CONTEXT.md       # 本文件（AI 助手上文）
-├── PapaCheck_设计报告.md     # 中文设计文档
-├── images/                  # 截图目录（手动放置）
-│   ├── big-screen.png
-│   └── admin.png
-├── css/
-│   ├── style.css            # 大屏端样式
-│   └── admin.css            # 管理端样式
-└── js/
-    ├── api.js               # 数据层（API 通信）
-    ├── big-screen.js         # 大屏端渲染逻辑
-    ├── app.js                # 大屏端应用主逻辑
-    └── admin.js              # 管理端逻辑（~1300 行）
+├── PROJECT_CONTEXT.md
+├── PapaCheck.Server/                # Python 后端服务器
+│   ├── server.py                    # HTTP 服务器入口，init_server(quiet=False)
+│   ├── db.py                        # SQLite 数据库层
+│   └── start.bat                    # Windows 命令行一键启动
+├── PapaCheck.Web/                   # Web 前端（纯静态）
+│   ├── index.html                   # 大屏端（孩子使用）
+│   ├── admin.html                   # 管理端（爸爸使用，手机浏览器）
+│   ├── css/
+│   │   ├── style.css                # 大屏端样式
+│   │   └── admin.css                # 管理端样式
+│   └── js/
+│       ├── api.js                   # 数据层（API 通信）
+│       ├── big-screen.js            # 大屏端渲染逻辑
+│       ├── app.js                   # 大屏端应用主逻辑
+│       └── admin.js                 # 管理端逻辑
+├── PapaCheck.Windows/               # Windows 桌面应用
+│   ├── app_gui.py                   # tkinter GUI 主程序（含系统托盘）
+│   ├── build_exe.py                 # PyInstaller 打包脚本
+│   ├── generate_icons.py            # 图标生成工具
+│   ├── icon.ico                     # 应用图标（含多尺寸）
+│   └── requirements.txt             # Python 依赖：edge_tts, pystray, Pillow, pyinstaller
+└── PapaCheck.Android/               # Flutter Android 孩子端
+    ├── pubspec.yaml
+    ├── assets/
+    │   └── icon.jpg
+    ├── lib/
+    │   ├── main.dart
+    │   ├── services/
+    │   │   └── config_service.dart
+    │   └── widgets/
+    │       └── ip_config_dialog.dart
+    └── android/                     # Android 原生壳（Kotlin + Gradle）
 ```
 
 ### 2.2 前后端分离规范
-- **改 API/后端**：只动 `js/api.js` + `server.py` + `db.py`
-- **改大屏样式**：只动 `css/style.css`
-- **改管理端样式**：只动 `css/admin.css`
-- **改大屏渲染**：只动 `js/big-screen.js`
-- **改管理端逻辑**：只动 `js/admin.js`
-- **改交互/业务逻辑**：只动 `js/app.js` 或 `js/admin.js`
+- **改 API/后端**：只动 `PapaCheck.Server/server.py` + `PapaCheck.Server/db.py`
+- **改大屏样式**：只动 `PapaCheck.Web/css/style.css`
+- **改管理端样式**：只动 `PapaCheck.Web/css/admin.css`
+- **改大屏渲染**：只动 `PapaCheck.Web/js/big-screen.js`
+- **改管理端逻辑**：只动 `PapaCheck.Web/js/admin.js`
+- **改 API 通信层**：只动 `PapaCheck.Web/js/api.js`
+- **改交互/业务逻辑**：只动 `PapaCheck.Web/js/app.js` 或 `PapaCheck.Web/js/admin.js`
 - **index.html / admin.html** 只包含 HTML 结构，尽量不动
+- **Windows GUI**：只动 `PapaCheck.Windows/app_gui.py`（服务器生命周期封装）
+
+### 2.3 关键约定
+
+**init_server(quiet=False)**：
+- 命令行 `python server.py` 默认 `quiet=False`，打印完整 banner 和 TTS 进度
+- GUI/EXE 模式调用 `init_server(quiet=True)`，不打印 banner
+
+**数据库路径**：
+- `PapaCheck.Server/db.py` 通过环境变量 `PAPACHECK_DB_DIR` 自定义数据库目录
+- 默认路径：`PapaCheck.Server/data.db`
+- Windows EXE 启动时设置 `PAPACHECK_DB_DIR` 指向共享数据库目录
+
+**Windows GUI 特性**：
+- 单实例保护：通过 socket 绑定 127.0.0.1:58080，重复启动还原已有窗口
+- 系统托盘：关闭窗口最小化到托盘（pystray），托盘菜单含显示/停止/自启/退出
+- 开机自启动：通过 Windows 注册表 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
+- 非阻塞停止：服务器停止在独立线程中执行，不阻塞 GUI 主线程
+- 打包方式：`python build_exe.py`（PyInstaller --onefile --windowed）
 
 ---
 
@@ -316,6 +357,7 @@ Homework 对象新增可选字段 `deferRequest`：
 - `GET /api/speak?text=...` 返回 `audio/mpeg`
 - 内存缓存 _tts_cache，同一文本只合成一次
 - 前端音频队列，前一段播完自动播下一段
+- 服务器启动时预生成 35 条固定短语 MP3，确保首次请求命中缓存
 
 #### 4.5.2 语音触发点（共 23 个）
 
@@ -447,7 +489,7 @@ Homework 对象新增可选字段 `deferRequest`：
 
 ## 7. 关键变量和函数
 
-### js/api.js
+### PapaCheck.Web/js/api.js
 - `API.getData()` - 获取全量数据
 - `API.saveHomeworks(dateKey, list)` - 保存作业
 - `API.deferHomework(dateKey, hwId, action, requestedAt)` - 作业延后申请/审批
@@ -456,7 +498,7 @@ Homework 对象新增可选字段 `deferRequest`：
 - `API.saveSettings(settings)` - 保存设置
 - `cachedData` - 服务器数据缓存
 
-### js/app.js
+### PapaCheck.Web/js/app.js
 - `homeworks` / `freeTimeTasks` - 当日任务列表
 - `Voice.speak(text)` - 语音播报（队列播放）
 - `checkReminders(hw)` - 挑战模式阶段性提醒
@@ -464,7 +506,7 @@ Homework 对象新增可选字段 `deferRequest`：
 - `requestDeferHomework(hwId)` - 发起延后申请
 - `startPoll(ms)` / `stopPoll()` - 服务器轮询
 
-### js/big-screen.js
+### PapaCheck.Web/js/big-screen.js
 - `SUBJECTS` - 科目配置（语文📖、数学🔢、英语🔤、科学🔬、其他📚）
 - `PAGE` - 页面状态枚举
 - `updateBigScreen()` - 主渲染入口
@@ -472,7 +514,7 @@ Homework 对象新增可选字段 `deferRequest`：
 - `renderBuffBar()` - Buff 栏渲染
 - `showShopPage()` / `backToMain()` - 商店页面切换
 
-### js/admin.js
+### PapaCheck.Web/js/admin.js
 - `switchTab(name)` - Tab 切换
 - `renderHomeworkTab()` / `renderShopTab()` / `renderRedeemTab()` ...
 - `fulfillRedemption(id)` - 确认兑现
@@ -480,8 +522,28 @@ Homework 对象新增可选字段 `deferRequest`：
 - `addCustomHoliday()` / `removeCustomHoliday(dateStr)` - 假日管理
 - `saveShopItem()` - 保存商品（含 Buff 类型处理）
 
-### db.py
+### PapaCheck.Server/server.py
+- `init_server(quiet=False)` - 初始化数据库 + TTS 预生成 + 启动 HTTP 服务器，返回 `(server, ip)`
+  - `quiet=True`：GUI/EXE 模式，不打印 banner 和 TTS 进度
+- `main()` - 命令行入口，调用 `init_server()` 后阻塞运行
+- `PORT = 8080`
+
+### PapaCheck.Server/db.py
+- `DB_FILE` - 数据库文件路径，默认 `PapaCheck.Server/data.db`，可通过 `PAPACHECK_DB_DIR` 环境变量覆盖
+- `init_db()` - 创建表结构 + 初始数据
+- `import_full_data(data)` - JSON 全量导入
 - `move_homework(from_date, to_date, hw_id)` - 跨日期移动作业（延后审批）
+
+### PapaCheck.Windows/app_gui.py
+- `PapaCheckApp` - tkinter GUI 主类，60 秒自动启动服务器，提供系统托盘、开机自启动、单实例保护
+- `ServerThread` - 非阻塞服务器线程封装，`stop()` 在独立 thread 中执行 shutdown
+- `LogRedirector` - 将服务器 stdout 重定向到 GUI 日志区
+- `_ensure_single_instance()` - socket 绑定 58080 实现单实例
+- `_toggle_server()` / `_stop_server()` / `_start_server()` - 服务器生命周期
+- `_set_autostart(enable)` - Windows 注册表操作
+
+### PapaCheck.Windows/build_exe.py
+- 一键 PyInstaller 打包脚本，输出 `dist/PapaCheck.exe`（--onefile --windowed）
 
 ---
 
@@ -497,3 +559,6 @@ Homework 对象新增可选字段 `deferRequest`：
 8. **挑战模式和计时模式在同一日可以混合使用**
 9. **数据库操作通过 db.py 函数**，不要直接操作 SQLite
 10. **语言播报前后端协同**：前端 Voice.speak() → 后端 /api/speak → edge-tts → MP3
+11. **不要提交数据库文件**：`data.db` 在 .gitignore 中，打包 EXE 时注意保护源目录
+12. **EXE 打包安全**：`build_exe.py` 不使用 `--clean`（PyInstaller 6.20 + Python 3.14 下会波及 --add-data 源目录）
+13. **Windows EXE 和命令行 server.py 共用同一个 data.db**（通过 `PAPACHECK_DB_DIR` 指向 PapCheck.Server/）
