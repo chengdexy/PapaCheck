@@ -16,7 +16,7 @@ cmd = [
     '--paths', SERVER_DIR,
     '--add-data', f'{SERVER_DIR};PapaCheck.Server',
     '--add-data', f'{WEB_DIR};PapaCheck.Web',
-    '--add-data', f'{os.path.join(WORK_DIR, "icon.png")};.',
+    '--add-data', f'{os.path.join(WORK_DIR, "icon.ico")};.',
     '--hidden-import', 'db',
     '--hidden-import', 'edge_tts',
     '--hidden-import', 'asyncio',

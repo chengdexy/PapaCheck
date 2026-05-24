@@ -29,11 +29,13 @@ if getattr(sys, 'frozen', False):
             except Exception:
                 pass
 
-    ICON_PNG = os.path.join(sys._MEIPASS, 'icon.png')
+    ICON_TRAY = os.path.join(sys._MEIPASS, 'icon.ico')
+    ICON_TBAR = os.path.join(sys._MEIPASS, 'icon.ico')
 else:
     _SERVER_DIR = os.path.normpath(os.path.join(_CUR_DIR, '..', 'PapaCheck.Server'))
     _DB_DIR = _SERVER_DIR
-    ICON_PNG = os.path.join(_CUR_DIR, 'icon.png')
+    ICON_TRAY = os.path.join(_CUR_DIR, 'icon.ico')
+    ICON_TBAR = os.path.join(_CUR_DIR, 'icon.ico')
 
 if _SERVER_DIR not in sys.path:
     sys.path.insert(0, _SERVER_DIR)
@@ -147,7 +149,7 @@ class PapaCheckApp:
         self._auto_start_var = tk.BooleanVar(value=self._is_autostart())
 
         try:
-            self.root.iconbitmap(os.path.join(_CUR_DIR, 'icon.ico'))
+            self.root.iconbitmap(ICON_TBAR)
         except Exception:
             pass
 
@@ -500,17 +502,16 @@ class PapaCheckApp:
 
     def _start_tray(self):
         self._append_log('正在启动系统托盘...')
-        self._append_log('图标路径: ' + ICON_PNG)
 
-        if not os.path.exists(ICON_PNG):
-            self._append_log('系统托盘启动失败: icon.png 不存在')
+        if not os.path.exists(ICON_TRAY):
+            self._append_log('系统托盘启动失败: icon.ico 不存在')
             return
 
         try:
             from PIL import Image
             import pystray
 
-            image = Image.open(ICON_PNG)
+            image = Image.open(ICON_TRAY)
 
             def _build_menu():
                 return pystray.Menu(
