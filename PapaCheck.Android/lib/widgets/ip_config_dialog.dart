@@ -3,16 +3,30 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../services/config_service.dart';
 
+class IpConfigResult {
+  final String url;
+  final DeviceRole role;
+  const IpConfigResult({required this.url, required this.role});
+}
+
 class IpConfigDialog extends StatefulWidget {
   final String? initialUrl;
+  final DeviceRole? initialRole;
 
-  const IpConfigDialog({super.key, this.initialUrl});
+  const IpConfigDialog({super.key, this.initialUrl, this.initialRole});
 
-  static Future<String?> show(BuildContext context, {String? initialUrl}) {
-    return showDialog<String>(
+  static Future<IpConfigResult?> show(
+    BuildContext context, {
+    String? initialUrl,
+    DeviceRole? initialRole,
+  }) {
+    return showDialog<IpConfigResult>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => IpConfigDialog(initialUrl: initialUrl),
+      builder: (_) => IpConfigDialog(
+        initialUrl: initialUrl,
+        initialRole: initialRole,
+      ),
     );
   }
 
@@ -23,16 +37,16 @@ class IpConfigDialog extends StatefulWidget {
 class _IpConfigDialogState extends State<IpConfigDialog> {
   late final TextEditingController _ipController;
   late final TextEditingController _portController;
+  late DeviceRole _role;
   bool _testing = false;
 
   @override
   void initState() {
     super.initState();
+    _role = widget.initialRole ?? DeviceRole.child;
     if (widget.initialUrl != null) {
       final uri = Uri.tryParse(widget.initialUrl!);
-      _ipController = TextEditingController(
-        text: uri?.host ?? '',
-      );
+      _ipController = TextEditingController(text: uri?.host ?? '');
       _portController = TextEditingController(
         text: (uri?.port ?? 8080).toString(),
       );
@@ -67,7 +81,7 @@ class _IpConfigDialogState extends State<IpConfigDialog> {
     if (ok) {
       await ConfigService.setUrl(url);
       if (!mounted) return;
-      Navigator.of(context).pop(url);
+      Navigator.of(context).pop(IpConfigResult(url: url, role: _role));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -84,12 +98,48 @@ class _IpConfigDialogState extends State<IpConfigDialog> {
       client.connectionTimeout = const Duration(seconds: 5);
       final request = await client.getUrl(Uri.parse(url));
       final response = await request.close().timeout(
-        const Duration(seconds: 5),
-      );
+            const Duration(seconds: 5),
+          );
       return response.statusCode < 500;
     } catch (_) {
       return false;
     }
+  }
+
+  Widget _buildRoleOption({
+    required String icon,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: selected ? Colors.blue.shade50 : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? Colors.blue : Colors.grey.shade300,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(icon, style: const TextStyle(fontSize: 28)),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                color: selected ? Colors.blue : Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -139,6 +189,35 @@ class _IpConfigDialogState extends State<IpConfigDialog> {
                       vertical: 10,
                     ),
                   ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 8),
+          const Text(
+            '设备角色：',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildRoleOption(
+                  icon: '\u{1F476}',
+                  label: '孩子端',
+                  selected: _role == DeviceRole.child,
+                  onTap: () => setState(() => _role = DeviceRole.child),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildRoleOption(
+                  icon: '\u{1F468}',
+                  label: '爸爸端',
+                  selected: _role == DeviceRole.parent,
+                  onTap: () => setState(() => _role = DeviceRole.parent),
                 ),
               ),
             ],

@@ -19,6 +19,8 @@ void main() {
     ),
   );
   SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,
   ]);
@@ -54,6 +56,7 @@ class PapaCheckApp extends StatefulWidget {
 
 class _PapaCheckAppState extends State<PapaCheckApp> {
   String? _url;
+  DeviceRole? _role;
   WebViewController? _controller;
 
   @override
@@ -64,45 +67,68 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
 
   Future<void> _startup() async {
     final storedUrl = await ConfigService.getUrl();
+    final storedRole = await ConfigService.getRole();
 
-    if (storedUrl == null || storedUrl.isEmpty) {
+    if (storedUrl == null || storedUrl.isEmpty || storedRole == null) {
       if (!mounted) return;
-      final url = await IpConfigDialog.show(context);
-      if (url != null && mounted) {
-        setState(() => _url = url);
-        _initController(url, clearCache: true);
+      final result = await IpConfigDialog.show(context);
+      if (result != null && mounted) {
+        await ConfigService.setUrl(result.url);
+        await ConfigService.setRole(result.role);
+        _applyOrientation(result.role);
+        final fullUrl = _buildFullUrl(result.url, result.role);
+        setState(() {
+          _url = fullUrl;
+          _role = result.role;
+        });
+        _initController(fullUrl, clearCache: true);
       }
       return;
     }
 
-    final ok = await _tryConnect(storedUrl);
+    _role = storedRole;
+    _applyOrientation(storedRole);
+    final fullUrl = _buildFullUrl(storedUrl, storedRole);
+
+    final ok = await _tryConnect(fullUrl);
 
     if (!mounted) return;
 
     if (ok) {
-      setState(() => _url = storedUrl);
-      _initController(storedUrl, clearCache: true);
+      setState(() => _url = fullUrl);
+      _initController(fullUrl, clearCache: true);
     } else {
-      String? action = await _showConnectFailedDialog(storedUrl);
+      String? action = await _showConnectFailedDialog(fullUrl);
 
       while (action == 'retry' && mounted) {
-        final ok = await _tryConnect(storedUrl);
+        final ok = await _tryConnect(fullUrl);
         if (!mounted) return;
         if (ok) {
-          setState(() => _url = storedUrl);
-          _initController(storedUrl, clearCache: true);
+          setState(() => _url = fullUrl);
+          _initController(fullUrl, clearCache: true);
           return;
         }
-        action = await _showConnectFailedDialog(storedUrl);
+        action = await _showConnectFailedDialog(fullUrl);
       }
 
       if (!mounted) return;
 
       if (action == 'config') {
-        final url = await IpConfigDialog.show(context, initialUrl: storedUrl);
-        if (url != null && mounted) {
-          setState(() => _url = url);
-          _initController(url, clearCache: true);
+        final result = await IpConfigDialog.show(
+          context,
+          initialUrl: storedUrl,
+          initialRole: storedRole,
+        );
+        if (result != null && mounted) {
+          await ConfigService.setUrl(result.url);
+          await ConfigService.setRole(result.role);
+          _applyOrientation(result.role);
+          final newFullUrl = _buildFullUrl(result.url, result.role);
+          setState(() {
+            _url = newFullUrl;
+            _role = result.role;
+          });
+          _initController(newFullUrl, clearCache: true);
         }
       }
     }
@@ -165,11 +191,50 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   }
 
   Future<void> _openConfig() async {
-    final url = await IpConfigDialog.show(context, initialUrl: _url);
-    if (url != null && mounted) {
-      setState(() => _url = url);
-      _initController(url);
+    final baseUrl = _getBaseUrl(_url!);
+    final result = await IpConfigDialog.show(
+      context,
+      initialUrl: baseUrl,
+      initialRole: _role,
+    );
+    if (result != null && mounted) {
+      await ConfigService.setUrl(result.url);
+      await ConfigService.setRole(result.role);
+      _applyOrientation(result.role);
+      final fullUrl = _buildFullUrl(result.url, result.role);
+      setState(() {
+        _url = fullUrl;
+        _role = result.role;
+      });
+      _initController(fullUrl);
     }
+  }
+
+  String _buildFullUrl(String baseUrl, DeviceRole role) {
+    if (role == DeviceRole.parent) {
+      return '$baseUrl/admin.html';
+    }
+    return baseUrl;
+  }
+
+  void _applyOrientation(DeviceRole role) {
+    if (role == DeviceRole.child) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    } else {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
+  }
+
+  String _getBaseUrl(String fullUrl) {
+    return fullUrl.replaceAll('/admin.html', '');
   }
 
   @override

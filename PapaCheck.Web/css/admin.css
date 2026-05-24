@@ -10,6 +10,7 @@
   --success: #4ade80;
   --warning: #fbbf24;
   --danger: #f87171;
+  --border: #334155;
   --shadow: 0 4px 20px rgba(0,0,0,0.3);
   --shadow-lg: 0 8px 40px rgba(0,0,0,0.4);
   --radius: 16px;
@@ -28,6 +29,15 @@ body {
   display: flex;
   flex-direction: column;
   -webkit-tap-highlight-color: transparent;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+@media (min-width: 521px) {
+  body {
+    border-left: 1px solid rgba(56, 189, 248, 0.12);
+    border-right: 1px solid rgba(56, 189, 248, 0.12);
+  }
 }
 
 .admin-content {
@@ -125,10 +135,10 @@ body {
 }
 
 .btn-sm {
-  padding: 6px 12px;
+  padding: 6px 14px;
   border: none;
-  border-radius: 8px;
-  font-size: 12px;
+  border-radius: 6px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
@@ -306,12 +316,12 @@ body {
 }
 
 .btn-fulfill {
-  padding: 8px 14px;
+  padding: 6px 14px;
   background: var(--success);
   color: var(--bg);
   border: none;
-  border-radius: 8px;
-  font-size: 12px;
+  border-radius: 6px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -501,8 +511,10 @@ body {
 .admin-tabs {
   position: fixed;
   bottom: 0;
-  left: 0;
-  right: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 520px;
   display: flex;
   background: var(--card);
   border-top: 1px solid rgba(255,255,255,0.05);
@@ -527,6 +539,9 @@ body {
   align-items: center;
   gap: 2px;
 }
+
+.tab-icon { font-size: 20px; line-height: 1; }
+.tab-label { line-height: 1; }
 
 .tab-btn.active {
   color: var(--accent);
@@ -735,6 +750,8 @@ body {
   bottom: 100px;
   left: 50%;
   transform: translateX(-50%);
+  width: 100%;
+  max-width: 520px;
   background: var(--card);
   color: var(--text);
   padding: 14px 28px;
@@ -791,33 +808,54 @@ input[type="number"] { -moz-appearance: textfield; }
 
 .settings-input {
   width: 90px;
-  padding: 7px 10px;
+  height: 34px;
+  padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 14px;
   background: var(--bg);
   color: var(--text);
   text-align: center;
+  box-sizing: border-box;
 }
 
-.rating-grid {
-  display: grid;
-  grid-template-columns: 80px repeat(4, 1fr);
-  gap: 6px 8px;
-  align-items: center;
+.rating-section {
+  margin-bottom: 14px;
+}
+
+.rating-section:last-child {
+  margin-bottom: 0;
+}
+
+.rating-section-label {
+  font-weight: 600;
   font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.rating-row {
+  display: flex;
+  gap: 12px;
+}
+
+.rating-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.rating-col .settings-input {
+  width: 100%;
 }
 
 .rating-header {
   color: var(--text-secondary);
-  text-align: center;
   font-weight: 600;
-}
-
-.rating-label {
-  font-weight: 600;
-  text-align: right;
-  padding-right: 4px;
+  font-size: 13px;
 }
 
 /* ========== Defer Alert ========== */
@@ -833,4 +871,142 @@ input[type="number"] { -moz-appearance: textfield; }
   font-size: 14px;
   font-weight: 600;
   color: var(--warning);
+}
+
+/* ========== Mobile (≤768px, 覆盖手机竖屏 + 小平板) ========== */
+@media (max-width: 768px) {
+  /* Header */
+  .admin-header { padding: 12px 16px; }
+  .admin-header h1 {
+    font-size: 16px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .admin-date { font-size: 12px; }
+
+  /* Content */
+  .admin-content { padding: 12px; padding-bottom: calc(88px + var(--safe-bottom)); }
+
+  /* Date nav */
+  .date-nav button { padding: 6px 12px; font-size: 13px; }
+
+  /* Bottom tabs → 6 个方形按钮一屏显示，图标在上文字在下 */
+  .admin-tabs {
+    overflow-x: visible;
+    gap: 1px;
+    padding: 4px 2px calc(4px + var(--safe-bottom));
+  }
+  .tab-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: 10px;
+    line-height: 1.2;
+    padding: 6px 2px 5px;
+    border-radius: 6px;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .tab-icon { font-size: 20px; }
+  .tab-label { font-size: 10px; }
+
+  /* Homework card → wrap actions */
+  .hw-admin-item { flex-wrap: wrap; }
+  .hw-admin-subject { font-size: 14px; }
+  .hw-admin-item > .hw-admin-actions {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: 6px;
+  }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+  /* Rating alert */
+  .rating-alert { flex-wrap: wrap; gap: 8px; font-size: 13px; }
+  .rating-alert .btn-rating { width: 100%; }
+
+  /* Rating modal buttons → 2x2 */
+  .rating-buttons { flex-wrap: wrap; }
+  .rating-buttons button {
+    flex: 1 1 45%;
+    font-size: 15px;
+    padding: 10px 6px;
+  }
+
+  /* Rating grid */
+  .rating-row { gap: 8px; }
+  .rating-col { gap: 2px; }
+  .rating-col .settings-input {
+    width: 100%;
+    padding: 5px 2px;
+    text-align: center;
+    font-size: 11px;
+  }
+  .rating-section-label { font-size: 12px; }
+
+  /* Stats cards */
+  .stat-card-value { font-size: 26px; }
+
+  /* Modal */
+  .modal-content { padding: 18px; border-radius: 14px; }
+  .modal-content h3 { font-size: 18px; }
+
+  /* Subject selector */
+  .subject-option { padding: 6px 10px; font-size: 12px; }
+
+  /* Shop items → 信息不挤压，名称可换行 */
+  .shop-admin-item {
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 10px;
+  }
+  .shop-admin-icon { font-size: 24px; }
+  .shop-admin-info {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .shop-admin-name { font-size: 14px; }
+  .shop-admin-meta { font-size: 11px; }
+  .shop-qty-controls {
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .btn-qty {
+    width: 26px;
+    height: 26px;
+    font-size: 14px;
+  }
+  .qty-value { font-size: 16px; min-width: 20px; }
+  .shop-admin-item .hw-admin-actions {
+    width: auto;
+    margin-top: 0;
+    gap: 4px;
+  }
+
+  /* Settings → 输入框不超出 */
+  .settings-row { flex-wrap: nowrap; gap: 6px; align-items: center; }
+  .settings-row label { min-width: 0; font-size: 12px; flex-shrink: 0; }
+  .settings-input {
+    width: 60px;
+    height: 34px;
+    padding: 0 6px;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  }
+
+  /* Redemption */
+  .redeem-name { font-size: 14px; }
+
+  /* Rating history */
+  .rating-history-item { font-size: 13px; }
+
+  /* Toast */
+  .toast { bottom: 85px; padding: 12px 20px; }
+
+  /* Date management → calendar + buttons wrap on narrow screens */
+  div[style*="gap:20px"] {
+    flex-wrap: wrap;
+    gap: 12px !important;
+    justify-content: center;
+  }
 }

@@ -122,15 +122,7 @@ async function refreshAllData() {
 function switchTab(tab) {
   adminCurrentTab = tab;
   document.querySelectorAll('.tab-btn').forEach(btn => {
-    const t = btn.textContent.trim();
-    btn.classList.toggle('active',
-      (tab === 'homework' && t.startsWith('📋 作业')) ||
-      (tab === 'shop' && t.startsWith('🏪 商店')) ||
-      (tab === 'rewardBox' && t.startsWith('🎁 奖励箱')) ||
-      (tab === 'redeem' && t.startsWith('📋 兑换')) ||
-      (tab === 'stats' && t.startsWith('📊 统计')) ||
-      (tab === 'settings' && t.startsWith('⚙️ 设置'))
-    );
+    btn.classList.toggle('active', btn.dataset.tab === tab);
   });
   renderCurrentTab();
 }
@@ -221,8 +213,8 @@ function renderHomeworkTab() {
           ? ' <span style="background:var(--warning);color:var(--bg);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">⏭️ 申请延后</span>'
           : '';
         const deferActions = isDeferPending
-          ? `<button class="btn-sm" style="background:var(--success);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;margin-right:4px;" onclick="approveDeferHomework('${hw.id}', '${hw.deferRequest.requestedAt || ''}')">批准</button>
-             <button class="btn-sm" style="background:var(--danger);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;" onclick="rejectDeferHomework('${hw.id}')">拒绝</button>`
+          ? `<button class="btn-sm" style="background:var(--success);color:#fff;margin-right:4px;" onclick="approveDeferHomework('${hw.id}', '${hw.deferRequest.requestedAt || ''}')">批准</button>
+             <button class="btn-sm" style="background:var(--danger);color:#fff;" onclick="rejectDeferHomework('${hw.id}')">拒绝</button>`
           : '';
         return `
               <div class="hw-admin-item">
@@ -235,7 +227,7 @@ function renderHomeworkTab() {
                   ${deferActions}
                   ${hw.status === 'pending' && !isDeferPending ? `<button class="btn-sm btn-edit" onclick="openHwModal('edit', '${hw.id}')">编辑</button>` : ''}
                   ${hw.status === 'pending' && !isDeferPending ? `<button class="btn-sm btn-delete" onclick="deleteAdminHw('${hw.id}')">删除</button>` : ''}
-                  ${hw.status === 'done' && !hw.rejected ? `<button class="btn-sm" style="background:var(--warning);color:var(--bg);border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;" onclick="rejectHomework('${hw.id}')">驳回</button>` : ''}
+                  ${hw.status === 'done' && !hw.rejected ? `<button class="btn-sm" style="background:var(--warning);color:var(--bg);" onclick="rejectHomework('${hw.id}')">驳回</button>` : ''}
                   ${hw.status === 'done' ? `<button class="btn-sm btn-delete" onclick="deleteAdminHw('${hw.id}')">删除</button>` : ''}
                 </div>
               </div>`;
@@ -1200,22 +1192,23 @@ function renderSettingsTab() {
       const ti = m.timer;
       const inputHtml = (id, val) => `<input id="${id}" class="settings-input" type="number" step="0.1" min="0" max="10" value="${val}">`;
       return `
-            <div class="rating-grid">
-              <span></span>
-              <span class="rating-header">优</span>
-              <span class="rating-header">良</span>
-              <span class="rating-header">可</span>
-              <span class="rating-header">差</span>
-              <span class="rating-label">⚔️ 挑战</span>
-              ${inputHtml('cfg_ch_you', ch['优'])}
-              ${inputHtml('cfg_ch_liang', ch['良'])}
-              ${inputHtml('cfg_ch_ke', ch['可'])}
-              ${inputHtml('cfg_ch_cha', ch['差'])}
-              <span class="rating-label">⏱️ 计时</span>
-              ${inputHtml('cfg_ti_you', ti['优'])}
-              ${inputHtml('cfg_ti_liang', ti['良'])}
-              ${inputHtml('cfg_ti_ke', ti['可'])}
-              ${inputHtml('cfg_ti_cha', ti['差'])}
+            <div class="rating-section">
+              <div class="rating-section-label">⚔️ 挑战</div>
+              <div class="rating-row">
+                <div class="rating-col"><span class="rating-header">优</span>${inputHtml('cfg_ch_you', ch['优'])}</div>
+                <div class="rating-col"><span class="rating-header">良</span>${inputHtml('cfg_ch_liang', ch['良'])}</div>
+                <div class="rating-col"><span class="rating-header">可</span>${inputHtml('cfg_ch_ke', ch['可'])}</div>
+                <div class="rating-col"><span class="rating-header">差</span>${inputHtml('cfg_ch_cha', ch['差'])}</div>
+              </div>
+            </div>
+            <div class="rating-section">
+              <div class="rating-section-label">⏱️ 计时</div>
+              <div class="rating-row">
+                <div class="rating-col"><span class="rating-header">优</span>${inputHtml('cfg_ti_you', ti['优'])}</div>
+                <div class="rating-col"><span class="rating-header">良</span>${inputHtml('cfg_ti_liang', ti['良'])}</div>
+                <div class="rating-col"><span class="rating-header">可</span>${inputHtml('cfg_ti_ke', ti['可'])}</div>
+                <div class="rating-col"><span class="rating-header">差</span>${inputHtml('cfg_ti_cha', ti['差'])}</div>
+              </div>
             </div>`;
     })()}
       </div>
@@ -1245,7 +1238,7 @@ function renderSettingsTab() {
           ${calHtml}
         </div>
         <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
-          <div style="font-size:22px;font-weight:700;" id="selectedDateLabel">${AdminUtil.formatDate(adminDate)}</div>
+          <div style="font-size:20px;color:var(--accent);" id="selectedDateLabel">当前操作数据为：${AdminUtil.formatDate(adminDate)}</div>
           <button onclick="switchToSelectedDate()" style="padding:10px 20px;border:1px solid var(--accent);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;background:transparent;color:var(--accent);align-self:stretch;">📅 切换到这一天</button>
           <button onclick="toggleHolidayForDate()" id="btnToggleHoliday" style="padding:10px 20px;border:1px solid var(--warning);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;background:transparent;color:var(--warning);align-self:stretch;">🏖️ 标记为假日</button>
           <button onclick="resetSelectedDate()" style="padding:10px 20px;background:var(--danger);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;align-self:stretch;">🔄 重置这一天</button>
@@ -1273,7 +1266,7 @@ function updateHolidayButtonLabel() {
   }
   if (label) {
     const d = new Date(_selectedCalendarDate + 'T00:00:00');
-    label.textContent = AdminUtil.formatDate(d);
+    label.textContent = '当前操作数据为：' + AdminUtil.formatDate(d);
   }
 }
 
