@@ -157,4 +157,11 @@ const API = {
       body: JSON.stringify({ date: dateKey, hwId, action, requestedAt }),
     });
   },
+
+  async resetDate(date) {
+    return await this._fetch('/api/reset-date', {
+      method: 'POST',
+      body: JSON.stringify({ date: date })
+    });
+  },
 };

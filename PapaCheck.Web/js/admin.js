@@ -3,6 +3,13 @@
  * 负责作业管理、商店管理、兑换管理、评级、统计、设置
  */
 
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 let adminDate = new Date();
 let adminHomeworks = [];
 let adminShopItems = [];
@@ -97,7 +104,8 @@ async function initAdmin() {
 
   setInterval(async () => {
     await refreshAllData();
-    if (adminCurrentTab === 'settings' && _editingBalance) return;
+    const modal = document.getElementById('adminModal');
+    if (modal && modal.classList.contains('show')) return;
     renderCurrentTab();
   }, 5000);
 }
@@ -220,7 +228,7 @@ function renderHomeworkTab() {
               <div class="hw-admin-item">
                 <div class="hw-admin-icon">${subject.icon}</div>
                 <div class="hw-admin-info">
-                  <div class="hw-admin-subject">${hw.subject} - ${hw.content}${statusText}${deferBadge}</div>
+                  <div class="hw-admin-subject">${escapeHtml(hw.subject)} - ${escapeHtml(hw.content)}${statusText}${deferBadge}</div>
                   <div class="hw-admin-meta">${modeText}${bpText}${hw.actualDuration !== null ? ' · 实际' + hw.actualDuration + '分钟' : ''}${elapsedText}</div>
                 </div>
                 <div class="hw-admin-actions">
@@ -300,7 +308,7 @@ async function saveAdminHw() {
     }
   } else {
     adminHomeworks.push({
-      id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+      id: Date.now().toString(36) + Math.random().toString(36).substring(2, 7),
       subject,
       content,
       mode: 'pending',
@@ -406,7 +414,7 @@ function openRatingModal(dateKey) {
     }
     return `<div class="rating-hw-item">
           <span>${subject.icon}</span>
-          <span>${hw.subject} - ${hw.content}</span>
+          <span>${escapeHtml(hw.subject)} - ${escapeHtml(hw.content)}</span>
           <span class="rating-hw-time">${timeInfo}</span>
         </div>`;
   }).join('')}
@@ -496,7 +504,7 @@ function renderShopTab() {
             <div class="shop-admin-item">
               <div class="shop-admin-icon">${item.type === 'time' ? '🎮' : item.type === 'buff' ? '✨' : '🎁'}</div>
               <div class="shop-admin-info">
-                <div class="shop-admin-name">${item.name}</div>
+                <div class="shop-admin-name">${escapeHtml(item.name)}</div>
                 <div class="shop-admin-meta">${item.points}积分 · ${item.type === 'buff' && item.buffDuration ? item.buffDuration + (item.buffUnit === 'minutes' ? '分钟' : '天') + ' · ' : ''}剩余${item.remainingQuantity ?? 0}件</div>
               </div>
               <div class="shop-qty-controls">
@@ -612,7 +620,7 @@ async function saveShopItem() {
     }
   } else {
     adminShopItems.push({
-      id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+      id: Date.now().toString(36) + Math.random().toString(36).substring(2, 7),
       name,
       points,
       type,
@@ -661,7 +669,7 @@ function renderRewardBoxTab() {
             <div class="shop-admin-item">
               <div class="shop-admin-icon">${item.type === 'time' ? '🎮' : '🎁'}</div>
               <div class="shop-admin-info">
-                <div class="shop-admin-name">${item.name}</div>
+                <div class="shop-admin-name">${escapeHtml(item.name)}</div>
                 <div class="shop-admin-meta">${item.type === 'time' && item.durationMinutes ? item.durationMinutes + '分钟' : ''}${item.type === 'time' && item.durationMinutes ? ' · ' : ''}数量${item.quantity || 0}</div>
               </div>
               <div class="shop-qty-controls">
@@ -726,9 +734,9 @@ function openRewardBoxModal(mode, itemId) {
               <div style="padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);"
                 onmouseover="this.style.background='rgba(255,255,255,0.05)'"
                 onmouseout="this.style.background='transparent'"
-                onclick="addRewardFromShop('${si.name}','${si.type}','${si.durationMinutes || 0}')">
+                onclick="addRewardFromShop('${escapeHtml(si.name)}','${si.type}','${si.durationMinutes || 0}')">
                 <div>
-                  <div style="font-weight:600;">${si.type === 'time' ? '⏱️' : '🎁'} ${si.name}</div>
+                  <div style="font-weight:600;">${si.type === 'time' ? '⏱️' : '🎁'} ${escapeHtml(si.name)}</div>
                   <div style="font-size:12px;color:var(--text-secondary);">${si.points}积分${si.type === 'time' && si.durationMinutes ? ' · ' + si.durationMinutes + '分钟' : ''}</div>
                 </div>
                 <span style="color:var(--accent);font-size:13px;font-weight:600;">+ 添加</span>
@@ -751,7 +759,7 @@ async function addRewardFromShop(name, type, durationMinutes) {
     exists.quantity = (exists.quantity || 0) + 1;
   } else {
     adminRewardBox.push({
-      id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+      id: Date.now().toString(36) + Math.random().toString(36).substring(2, 7),
       name,
       type,
       durationMinutes: type === 'time' ? (parseInt(durationMinutes) || 0) : 0,
@@ -792,7 +800,7 @@ async function saveRewardBoxItem() {
     }
   } else {
     adminRewardBox.push({
-      id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+      id: Date.now().toString(36) + Math.random().toString(36).substring(2, 7),
       name,
       type,
       durationMinutes,
@@ -847,7 +855,7 @@ function renderRedeemTab() {
       : pending.map(r => `
           <div class="redeem-item">
             <div class="redeem-info">
-              <div class="redeem-name">${r.itemName}${r.fromRewardBox ? ' <span style="font-size:12px;color:var(--accent);">🎁 奖励箱</span>' : ''}<span style="font-size:13px;color:var(--text-secondary);margin-left:6px;">${r.points > 0 ? r.points + '积分' : ''}${r.itemType === 'time' && r.durationMinutes ? (r.points > 0 ? ' · ' : '') + r.durationMinutes + '分钟' : ''}</span></div>
+              <div class="redeem-name">${escapeHtml(r.itemName)}${r.fromRewardBox ? ' <span style="font-size:12px;color:var(--accent);">🎁 奖励箱</span>' : ''}<span style="font-size:13px;color:var(--text-secondary);margin-left:6px;">${r.points > 0 ? r.points + '积分' : ''}${r.itemType === 'time' && r.durationMinutes ? (r.points > 0 ? ' · ' : '') + r.durationMinutes + '分钟' : ''}</span></div>
               <div class="redeem-time">${new Date(r.createdAt).toLocaleString('zh-CN')}</div>
             </div>
             <span class="redeem-status pending">待兑现</span>
@@ -861,7 +869,7 @@ function renderRedeemTab() {
       : shownFulfilled.map(r => `
           <div class="redeem-item">
             <div class="redeem-info">
-              <div class="redeem-name">${r.itemName}</div>
+              <div class="redeem-name">${escapeHtml(r.itemName)}</div>
               <div class="redeem-time">${new Date(r.createdAt).toLocaleString('zh-CN')}</div>
             </div>
             <span class="redeem-status fulfilled">已兑现 ✅</span>
@@ -877,106 +885,103 @@ function renderRedeemTab() {
     </div>`;
 }
 
+async function _handleTimeFulfillment(redemption, durationMinutes) {
+  const dateKey = AdminUtil.dateKey(adminDate);
+  const freeTime = await API.getFreeTime(dateKey);
+  freeTime.push({
+    id: Date.now().toString(36) + Math.random().toString(36).substring(2, 7),
+    name: redemption.itemName,
+    durationMinutes,
+    status: 'pending',
+    startedAt: null,
+    completedAt: null,
+    remainingSeconds: durationMinutes * 60,
+  });
+  await API.saveFreeTime(dateKey, freeTime);
+}
+
+async function _handleBuffFulfillment(redemption, buffDuration, buffUnit) {
+  const buffs = await API.getActiveBuffs();
+  buffs.push({
+    id: Date.now().toString(36) + Math.random().toString(36).substring(2, 7),
+    name: redemption.itemName,
+    duration: buffDuration,
+    unit: buffUnit,
+    startDate: buffUnit === 'minutes' ? new Date().toISOString() : AdminUtil.dateKey(adminDate),
+  });
+  await API.saveActiveBuffs(buffs);
+}
+
+async function _fulfillFromRewardBox(redemption) {
+  const rewardBox = await API.getRewardBox();
+  const rbItem = rewardBox.find(rb => rb.id === redemption.rewardBoxItemId);
+  if (rbItem) {
+    rbItem.quantity = (rbItem.quantity || 0) - 1;
+    if (rbItem.quantity <= 0) {
+      const idx = rewardBox.indexOf(rbItem);
+      if (idx !== -1) rewardBox.splice(idx, 1);
+    }
+    await API.saveRewardBox(rewardBox);
+  }
+
+  if (redemption.itemType === 'time' && redemption.durationMinutes > 0) {
+    await _handleTimeFulfillment(redemption, redemption.durationMinutes);
+  }
+
+  if (redemption.itemType === 'buff') {
+    const buffDuration = redemption.buffDuration ?? 30;
+    const buffUnit = redemption.buffUnit || 'days';
+    await _handleBuffFulfillment(redemption, buffDuration, buffUnit);
+  }
+}
+
+async function _fulfillDirectRedemption(redemption) {
+  const itemType = redemption.itemType;
+  let durationMinutes = redemption.durationMinutes || 0;
+
+  if ((!itemType || !durationMinutes) && redemption.itemName) {
+    const shopItem = adminShopItems.find(i => i.name === redemption.itemName);
+    if (shopItem) {
+      if (!itemType) redemption.itemType = shopItem.type;
+      if (!durationMinutes) durationMinutes = shopItem.durationMinutes || 0;
+    }
+  }
+
+  if ((itemType || redemption.itemType) === 'time' && durationMinutes > 0) {
+    await _handleTimeFulfillment(redemption, durationMinutes);
+  }
+
+  if ((itemType || redemption.itemType) === 'buff') {
+    const shopItem = adminShopItems.find(i => i.name === redemption.itemName);
+    const buffDuration = redemption.buffDuration ?? shopItem?.buffDuration ?? 30;
+    const buffUnit = redemption.buffUnit || shopItem?.buffUnit || 'days';
+    await _handleBuffFulfillment(redemption, buffDuration, buffUnit);
+  }
+}
+
 async function fulfillRedemption(id) {
   if (_fulfillingRedemption) return;
-  const r = adminRedemptions.find(r => r.id === id);
-  if (!r || r.status !== 'pending') return;
+  const redemption = adminRedemptions.find(r => r.id === id);
+  if (!redemption || redemption.status !== 'pending') return;
 
   _fulfillingRedemption = true;
   try {
-    r.status = 'fulfilled';
+    redemption.status = 'fulfilled';
     await API.saveRedemptions(adminRedemptions);
 
-    if (r.fromRewardBox) {
-      const rewardBox = await API.getRewardBox();
-      const rbItem = rewardBox.find(rb => rb.id === r.rewardBoxItemId);
-      if (rbItem) {
-        rbItem.quantity = (rbItem.quantity || 0) - 1;
-        if (rbItem.quantity <= 0) {
-          const idx = rewardBox.indexOf(rbItem);
-          if (idx !== -1) rewardBox.splice(idx, 1);
-        }
-        await API.saveRewardBox(rewardBox);
-      }
-
-      if (r.itemType === 'time' && r.durationMinutes > 0) {
-        const dateKey = AdminUtil.dateKey(adminDate);
-        const freeTime = await API.getFreeTime(dateKey);
-        freeTime.push({
-          id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
-          name: r.itemName,
-          durationMinutes: r.durationMinutes,
-          status: 'pending',
-          startedAt: null,
-          completedAt: null,
-          remainingSeconds: r.durationMinutes * 60,
-        });
-        await API.saveFreeTime(dateKey, freeTime);
-      }
-
-      if (r.itemType === 'buff') {
-        const buffDuration = r.buffDuration ?? 30;
-        const buffUnit = r.buffUnit || 'days';
-        const buffs = await API.getActiveBuffs();
-        buffs.push({
-          id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
-          name: r.itemName,
-          duration: buffDuration,
-          unit: buffUnit,
-          startDate: buffUnit === 'minutes' ? new Date().toISOString() : AdminUtil.dateKey(adminDate),
-        });
-        await API.saveActiveBuffs(buffs);
-      }
+    if (redemption.fromRewardBox) {
+      await _fulfillFromRewardBox(redemption);
     } else {
-      const itemType = r.itemType;
-      let durationMinutes = r.durationMinutes || 0;
-
-      if ((!itemType || !durationMinutes) && r.itemName) {
-        const shopItem = adminShopItems.find(i => i.name === r.itemName);
-        if (shopItem) {
-          if (!itemType) r.itemType = shopItem.type;
-          if (!durationMinutes) durationMinutes = shopItem.durationMinutes || 0;
-        }
-      }
-
-      if ((itemType || r.itemType) === 'time' && durationMinutes > 0) {
-        const dateKey = AdminUtil.dateKey(adminDate);
-        const freeTime = await API.getFreeTime(dateKey);
-        freeTime.push({
-          id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
-          name: r.itemName,
-          durationMinutes,
-          status: 'pending',
-          startedAt: null,
-          completedAt: null,
-          remainingSeconds: durationMinutes * 60,
-        });
-        await API.saveFreeTime(dateKey, freeTime);
-      }
-
-      if ((itemType || r.itemType) === 'buff') {
-        const shopItem = adminShopItems.find(i => i.name === r.itemName);
-        const buffDuration = r.buffDuration ?? shopItem?.buffDuration ?? 30;
-        const buffUnit = r.buffUnit || shopItem?.buffUnit || 'days';
-        const buffs = await API.getActiveBuffs();
-        buffs.push({
-          id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
-          name: r.itemName,
-          duration: buffDuration,
-          unit: buffUnit,
-          startDate: buffUnit === 'minutes' ? new Date().toISOString() : AdminUtil.dateKey(adminDate),
-        });
-        await API.saveActiveBuffs(buffs);
-      }
+      await _fulfillDirectRedemption(redemption);
     }
 
     await refreshAllData();
     renderRedeemTab();
     // 预生成兑现相关的语音
     const texts = [];
-    const it = (r.itemType || 'time');
-    const dm = (r.durationMinutes || 0);
-    const nm = r.itemName;
+    const it = (redemption.itemType || 'time');
+    const dm = (redemption.durationMinutes || 0);
+    const nm = redemption.itemName;
     if (it === 'time' && dm > 0) {
       texts.push('开始' + nm + '，' + dm + '分钟');
       texts.push(nm + '时间到！');
@@ -1312,10 +1317,7 @@ async function toggleHolidayForDate() {
 
 async function resetSelectedDate() {
   if (!_selectedCalendarDate) return;
-  await API._fetch('/api/reset-date', {
-    method: 'POST',
-    body: JSON.stringify({ date: _selectedCalendarDate }),
-  });
+  await API.resetDate(_selectedCalendarDate);
   await refreshAllData();
   renderSettingsTab();
   showToast(_selectedCalendarDate + ' 已重置');
@@ -1415,17 +1417,26 @@ function buildMiniCalendar() {
     const hasSettlement = cachedData?.dailySettlement?.[key];
     const hasRating = hasSettlement?.rating;
     const hasHomeworks = (cachedData?.homeworks?.[key] || []).length > 0;
-
-    let bg = 'transparent';
-    let color = 'var(--text-secondary)';
-    if (hasRating) { bg = 'rgba(74,222,128,0.3)'; color = 'var(--success)'; }
-    else if (hasHomeworks) { bg = 'rgba(56,189,248,0.2)'; color = 'var(--accent)'; }
     const holidays = adminSettings.customHolidays || [];
-    if (!hasRating && !hasHomeworks && holidays.includes(key)) { bg = 'rgba(251,191,36,0.2)'; color = 'var(--warning)'; }
-    if (isSelected) { bg = 'var(--accent)'; color = 'var(--bg)'; }
-    if (key === todayStr && !isSelected) { bg = 'rgba(255,255,255,0.1)'; color = 'var(--text)'; }
 
-    html += `<div onclick="selectCalendarDate(${year},${month},${day})" style="font-size:15px;padding:6px 0;border-radius:6px;cursor:pointer;background:${bg};color:${color};width:40px;justify-self:center;">${day}</div>`;
+    let className = 'mini-cal-day';
+    if (hasRating) {
+      className += ' has-rating';
+    } else if (hasHomeworks) {
+      className += ' has-homeworks';
+    } else if (holidays.includes(key)) {
+      className += ' holiday';
+    }
+    if (isSelected) {
+      className += ' selected';
+    } else if (key === todayStr) {
+      className += ' today';
+    }
+    if (!hasRating && !hasHomeworks && !holidays.includes(key) && !isSelected && key !== todayStr) {
+      className += ' no-data';
+    }
+
+    html += `<div class="${className}" onclick="selectCalendarDate(${year},${month},${day})">${day}</div>`;
   }
 
   html += '</div>';

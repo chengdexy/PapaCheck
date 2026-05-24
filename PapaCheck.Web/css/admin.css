@@ -11,14 +11,18 @@
   --warning: #fbbf24;
   --danger: #f87171;
   --border: #334155;
-  --shadow: 0 4px 20px rgba(0,0,0,0.3);
-  --shadow-lg: 0 8px 40px rgba(0,0,0,0.4);
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.4);
   --radius: 16px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* ========== Reset ========== */
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
@@ -393,9 +397,17 @@ body {
   min-height: 4px;
 }
 
-.chart-bar.efficiency { background: var(--accent); }
-.chart-bar.completion { background: var(--success); }
-.chart-bar.points { background: var(--warning); }
+.chart-bar.efficiency {
+  background: var(--accent);
+}
+
+.chart-bar.completion {
+  background: var(--success);
+}
+
+.chart-bar.points {
+  background: var(--warning);
+}
 
 .chart-bar-label {
   font-size: 11px;
@@ -415,7 +427,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 10px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   font-size: 14px;
 }
 
@@ -426,10 +438,25 @@ body {
   font-size: 12px;
 }
 
-.rating-grade.优 { background: var(--success); color: var(--bg); }
-.rating-grade.良 { background: var(--accent); color: var(--bg); }
-.rating-grade.可 { background: var(--warning); color: var(--bg); }
-.rating-grade.差 { background: var(--danger); color: white; }
+.rating-grade.优 {
+  background: var(--success);
+  color: var(--bg);
+}
+
+.rating-grade.良 {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.rating-grade.可 {
+  background: var(--warning);
+  color: var(--bg);
+}
+
+.rating-grade.差 {
+  background: var(--danger);
+  color: white;
+}
 
 /* ========== Settings ========== */
 .settings-row {
@@ -437,7 +464,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 14px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .settings-row label {
@@ -517,7 +544,7 @@ body {
   max-width: 520px;
   display: flex;
   background: var(--card);
-  border-top: 1px solid rgba(255,255,255,0.05);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
   padding: 8px 8px calc(8px + var(--safe-bottom));
   z-index: 50;
   gap: 4px;
@@ -540,8 +567,14 @@ body {
   gap: 2px;
 }
 
-.tab-icon { font-size: 20px; line-height: 1; }
-.tab-label { line-height: 1; }
+.tab-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.tab-label {
+  line-height: 1;
+}
 
 .tab-btn.active {
   color: var(--accent);
@@ -552,7 +585,7 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.7);
+  background: rgba(0, 0, 0, 0.7);
   z-index: 200;
   display: none;
   align-items: center;
@@ -560,7 +593,9 @@ body {
   padding: 20px;
 }
 
-.modal-overlay.show { display: flex; }
+.modal-overlay.show {
+  display: flex;
+}
 
 .modal-content {
   background: var(--card);
@@ -738,10 +773,25 @@ body {
   transition: all 0.15s;
 }
 
-.btn-rate-excellent { background: var(--success); color: var(--bg); }
-.btn-rate-good { background: var(--accent); color: var(--bg); }
-.btn-rate-ok { background: var(--warning); color: var(--bg); }
-.btn-rate-poor { background: var(--danger); color: white; }
+.btn-rate-excellent {
+  background: var(--success);
+  color: var(--bg);
+}
+
+.btn-rate-good {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.btn-rate-ok {
+  background: var(--warning);
+  color: var(--bg);
+}
+
+.btn-rate-poor {
+  background: var(--danger);
+  color: white;
+}
 
 /* ========== Toast ========== */
 .toast {
@@ -761,18 +811,39 @@ body {
   z-index: 300;
   box-shadow: var(--shadow-lg);
 }
-.toast.show { display: block; }
+
+.toast.show {
+  display: block;
+}
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
 
 /* Hide number input spinners */
 input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-input[type="number"] { -moz-appearance: textfield; }
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
 
 .settings-section {
   margin-bottom: 14px;
@@ -875,21 +946,34 @@ input[type="number"] { -moz-appearance: textfield; }
 
 /* ========== Mobile (≤768px, 覆盖手机竖屏 + 小平板) ========== */
 @media (max-width: 768px) {
+
   /* Header */
-  .admin-header { padding: 12px 16px; }
+  .admin-header {
+    padding: 12px 16px;
+  }
+
   .admin-header h1 {
     font-size: 16px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .admin-date { font-size: 12px; }
+
+  .admin-date {
+    font-size: 12px;
+  }
 
   /* Content */
-  .admin-content { padding: 12px; padding-bottom: calc(88px + var(--safe-bottom)); }
+  .admin-content {
+    padding: 12px;
+    padding-bottom: calc(88px + var(--safe-bottom));
+  }
 
   /* Date nav */
-  .date-nav button { padding: 6px 12px; font-size: 13px; }
+  .date-nav button {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
 
   /* Bottom tabs → 6 个方形按钮一屏显示，图标在上文字在下 */
   .admin-tabs {
@@ -897,6 +981,7 @@ input[type="number"] { -moz-appearance: textfield; }
     gap: 1px;
     padding: 4px 2px calc(4px + var(--safe-bottom));
   }
+
   .tab-btn {
     flex: 1 1 0;
     min-width: 0;
@@ -907,25 +992,51 @@ input[type="number"] { -moz-appearance: textfield; }
     flex-direction: column;
     gap: 1px;
   }
-  .tab-icon { font-size: 20px; }
-  .tab-label { font-size: 10px; }
+
+  .tab-icon {
+    font-size: 20px;
+  }
+
+  .tab-label {
+    font-size: 10px;
+  }
 
   /* Homework card → wrap actions */
-  .hw-admin-item { flex-wrap: wrap; }
-  .hw-admin-subject { font-size: 14px; }
-  .hw-admin-item > .hw-admin-actions {
+  .hw-admin-item {
+    flex-wrap: wrap;
+  }
+
+  .hw-admin-subject {
+    font-size: 14px;
+  }
+
+  .hw-admin-item>.hw-admin-actions {
     width: 100%;
     justify-content: flex-end;
     margin-top: 6px;
   }
-  .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+  .btn-sm {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
 
   /* Rating alert */
-  .rating-alert { flex-wrap: wrap; gap: 8px; font-size: 13px; }
-  .rating-alert .btn-rating { width: 100%; }
+  .rating-alert {
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .rating-alert .btn-rating {
+    width: 100%;
+  }
 
   /* Rating modal buttons → 2x2 */
-  .rating-buttons { flex-wrap: wrap; }
+  .rating-buttons {
+    flex-wrap: wrap;
+  }
+
   .rating-buttons button {
     flex: 1 1 45%;
     font-size: 15px;
@@ -933,25 +1044,45 @@ input[type="number"] { -moz-appearance: textfield; }
   }
 
   /* Rating grid */
-  .rating-row { gap: 8px; }
-  .rating-col { gap: 2px; }
+  .rating-row {
+    gap: 8px;
+  }
+
+  .rating-col {
+    gap: 2px;
+  }
+
   .rating-col .settings-input {
     width: 100%;
     padding: 5px 2px;
     text-align: center;
     font-size: 11px;
   }
-  .rating-section-label { font-size: 12px; }
+
+  .rating-section-label {
+    font-size: 12px;
+  }
 
   /* Stats cards */
-  .stat-card-value { font-size: 26px; }
+  .stat-card-value {
+    font-size: 26px;
+  }
 
   /* Modal */
-  .modal-content { padding: 18px; border-radius: 14px; }
-  .modal-content h3 { font-size: 18px; }
+  .modal-content {
+    padding: 18px;
+    border-radius: 14px;
+  }
+
+  .modal-content h3 {
+    font-size: 18px;
+  }
 
   /* Subject selector */
-  .subject-option { padding: 6px 10px; font-size: 12px; }
+  .subject-option {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
 
   /* Shop items → 信息不挤压，名称可换行 */
   .shop-admin-item {
@@ -959,23 +1090,40 @@ input[type="number"] { -moz-appearance: textfield; }
     gap: 8px;
     padding: 10px;
   }
-  .shop-admin-icon { font-size: 24px; }
+
+  .shop-admin-icon {
+    font-size: 24px;
+  }
+
   .shop-admin-info {
     flex: 1 1 auto;
     min-width: 0;
   }
-  .shop-admin-name { font-size: 14px; }
-  .shop-admin-meta { font-size: 11px; }
+
+  .shop-admin-name {
+    font-size: 14px;
+  }
+
+  .shop-admin-meta {
+    font-size: 11px;
+  }
+
   .shop-qty-controls {
     gap: 4px;
     flex-shrink: 0;
   }
+
   .btn-qty {
     width: 26px;
     height: 26px;
     font-size: 14px;
   }
-  .qty-value { font-size: 16px; min-width: 20px; }
+
+  .qty-value {
+    font-size: 16px;
+    min-width: 20px;
+  }
+
   .shop-admin-item .hw-admin-actions {
     width: auto;
     margin-top: 0;
@@ -983,8 +1131,18 @@ input[type="number"] { -moz-appearance: textfield; }
   }
 
   /* Settings → 输入框不超出 */
-  .settings-row { flex-wrap: nowrap; gap: 6px; align-items: center; }
-  .settings-row label { min-width: 0; font-size: 12px; flex-shrink: 0; }
+  .settings-row {
+    flex-wrap: nowrap;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .settings-row label {
+    min-width: 0;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
   .settings-input {
     width: 60px;
     height: 34px;
@@ -992,21 +1150,79 @@ input[type="number"] { -moz-appearance: textfield; }
     font-size: 13px;
     flex-shrink: 0;
   }
-  }
+}
 
-  /* Redemption */
-  .redeem-name { font-size: 14px; }
+/* Redemption */
+.redeem-name {
+  font-size: 14px;
+}
 
-  /* Rating history */
-  .rating-history-item { font-size: 13px; }
+/* Rating history */
+.rating-history-item {
+  font-size: 13px;
+}
 
-  /* Toast */
-  .toast { bottom: 85px; padding: 12px 20px; }
+/* Toast */
+.toast {
+  bottom: 85px;
+  padding: 12px 20px;
+}
 
-  /* Date management → calendar + buttons wrap on narrow screens */
-  div[style*="gap:20px"] {
-    flex-wrap: wrap;
-    gap: 12px !important;
-    justify-content: center;
-  }
+/* Date management → calendar + buttons wrap on narrow screens */
+div[style*="gap:20px"] {
+  flex-wrap: wrap;
+  gap: 12px !important;
+  justify-content: center;
+}
+}
+
+.mini-cal-day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  margin: 2px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.mini-cal-day.has-data {
+  cursor: pointer;
+  color: var(--accent, #38bdf8);
+}
+
+.mini-cal-day.today {
+  color: var(--bg, #0f172a);
+  background: var(--accent, #38bdf8);
+  font-weight: 700;
+}
+
+.mini-cal-day.selected {
+  color: white;
+  background: #2563eb;
+  font-weight: 700;
+}
+
+.mini-cal-day.no-data {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.mini-cal-day.has-rating {
+  background: rgba(74, 222, 128, 0.3);
+  color: var(--success, #4ade80);
+}
+
+.mini-cal-day.has-homeworks {
+  background: rgba(56, 189, 248, 0.2);
+  color: var(--accent, #38bdf8);
+}
+
+.mini-cal-day.holiday {
+  background: rgba(251, 191, 36, 0.2);
+  color: var(--warning, #fbbf24);
 }

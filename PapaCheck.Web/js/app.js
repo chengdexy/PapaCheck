@@ -21,7 +21,7 @@ let _lastSettings = null;
 // ========== Utility ==========
 const Util = {
   genId() {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+    return Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
   },
 
   dateKey(d) {
@@ -75,6 +75,11 @@ const Voice = {
         if (!resp.ok) throw new Error('speak fail');
         const blob = await resp.blob();
         const blobUrl = URL.createObjectURL(blob);
+        if (this._cache.size >= 50) {
+          const firstKey = this._cache.keys().next().value;
+          URL.revokeObjectURL(this._cache.get(firstKey));
+          this._cache.delete(firstKey);
+        }
         this._cache.set(text, blobUrl);
         audio = new Audio(blobUrl);
       }
@@ -155,7 +160,7 @@ async function requestDeferHomework(hwId) {
   }
 }
 
-function startHomework(id, mode) {
+async function startHomework(id, mode) {
   if (isAnyTaskActive()) {
     showToast('请先完成当前任务');
     return;
@@ -167,7 +172,7 @@ function startHomework(id, mode) {
   hw.mode = hw.rejected ? 'timer' : (mode || 'timer');
   hw.status = 'doing';
   hw.startedAt = new Date().toISOString();
-  saveHomeworksSilent();
+  await saveHomeworksSilent();
 
   if (mode === 'challenge') {
     Voice.speak('开始' + hw.content + '，挑战' + hw.suggestedDuration + '分钟');
@@ -180,41 +185,49 @@ function startHomework(id, mode) {
   updateBigScreen();
 }
 
+let _completingHomework = false;
+
 async function completeHomework(id) {
-  const hw = homeworks.find(h => h.id === id);
-  if (!hw || hw.status !== 'doing') return;
-  if (hw.paused) { showToast('请先继续任务再完成'); return; }
+  if (_completingHomework) return;
+  _completingHomework = true;
+  try {
+    const hw = homeworks.find(h => h.id === id);
+    if (!hw || hw.status !== 'doing') return;
+    if (hw.paused) { showToast('请先继续任务再完成'); return; }
 
-  const completedAt = new Date();
-  const startedAt = new Date(hw.startedAt);
-  const actualDuration = Math.max(1, Math.round((completedAt - startedAt) / 60000));
+    const completedAt = new Date();
+    const startedAt = new Date(hw.startedAt);
+    const actualDuration = Math.max(1, Math.round((completedAt - startedAt) / 60000));
 
-  hw.status = 'done';
-  hw.completedAt = completedAt.toISOString();
-  hw.actualDuration = actualDuration;
+    hw.status = 'done';
+    hw.completedAt = completedAt.toISOString();
+    hw.actualDuration = actualDuration;
 
-  let toastMsg;
-  if (hw.mode === 'challenge' && hw.suggestedDuration > 0 && actualDuration > hw.suggestedDuration) {
-    hw.mode = 'timer';
-    hw._animClass = 'task-complete';
-    toastMsg = '✅ ' + hw.subject + '完成';
-    Voice.speak('超时了，本次按计时模式统计，' + hw.subject + '作业完成');
-  } else if (hw.mode === 'challenge') {
-    hw._animClass = 'challenge-success';
-    toastMsg = '⚡ 挑战成功！' + hw.subject + '提前完成';
-    Voice.speak('挑战成功！' + hw.subject + '提前完成');
-  } else {
-    hw._animClass = 'task-complete';
-    toastMsg = '✅ ' + hw.subject + '完成';
-    Voice.speak(hw.subject + '作业完成！');
+    let toastMsg;
+    if (hw.mode === 'challenge' && hw.suggestedDuration > 0 && actualDuration > hw.suggestedDuration) {
+      hw.mode = 'timer';
+      hw._animClass = 'task-complete';
+      toastMsg = '✅ ' + hw.subject + '完成';
+      Voice.speak('超时了，本次按计时模式统计，' + hw.subject + '作业完成');
+    } else if (hw.mode === 'challenge') {
+      hw._animClass = 'challenge-success';
+      toastMsg = '⚡ 挑战成功！' + hw.subject + '提前完成';
+      Voice.speak('挑战成功！' + hw.subject + '提前完成');
+    } else {
+      hw._animClass = 'task-complete';
+      toastMsg = '✅ ' + hw.subject + '完成';
+      Voice.speak(hw.subject + '作业完成！');
+    }
+    stopTickTimer();
+    await saveHomeworksSilent();
+
+    await checkAllDone();
+    needsFullRender = true;
+    updateBigScreen();
+    showToast(toastMsg);
+  } finally {
+    _completingHomework = false;
   }
-  stopTickTimer();
-  await saveHomeworksSilent();
-
-  await checkAllDone();
-  needsFullRender = true;
-  updateBigScreen();
-  showToast(toastMsg);
 }
 
 async function saveHomeworksSilent() {
@@ -245,7 +258,7 @@ function startFreeTime(id) {
   updateBigScreen();
 }
 
-function completeFreeTime(id) {
+async function completeFreeTime(id) {
   const ft = freeTimeTasks.find(t => t.id === id);
   if (!ft || ft.status !== 'doing') return;
   if (ft.paused) { showToast('请先继续任务再完成'); return; }
@@ -256,12 +269,12 @@ function completeFreeTime(id) {
 
   stopTickTimer();
   Voice.speak(ft.name + '时间到！');
-  saveFreeTimeSilent();
+  await saveFreeTimeSilent();
   needsFullRender = true;
   updateBigScreen();
 }
 
-function pauseActiveTask() {
+async function pauseActiveTask() {
   const task = getActiveHomework() || getActiveFreeTime();
   if (!task || task.paused) return;
   task.paused = true;
@@ -271,13 +284,13 @@ function pauseActiveTask() {
   if (task.startedAt && task.status === 'doing') {
     task._pausedElapsed = Math.floor((new Date() - new Date(task.startedAt)) / 1000);
   }
-  if (task.subject) saveHomeworksSilent();
-  else saveFreeTimeSilent();
+  if (task.subject) await saveHomeworksSilent();
+  else await saveFreeTimeSilent();
   needsFullRender = true;
   updateBigScreen();
 }
 
-function resumeActiveTask() {
+async function resumeActiveTask() {
   const task = getActiveHomework() || getActiveFreeTime();
   if (!task || !task.paused) return;
   task.paused = false;
@@ -286,8 +299,8 @@ function resumeActiveTask() {
     task.startedAt = new Date(new Date() - pausedSeconds * 1000).toISOString();
     delete task._pausedElapsed;
   }
-  if (task.subject) saveHomeworksSilent();
-  else saveFreeTimeSilent();
+  if (task.subject) await saveHomeworksSilent();
+  else await saveFreeTimeSilent();
   Voice.speak('任务已继续');
   startTickTimer();
   needsFullRender = true;
@@ -340,17 +353,17 @@ function checkReminders(hw) {
     Voice.speak('还剩1分钟');
   }
 
-  if (!lastReminderTrigger[key].overtime && elapsedSeconds > totalSeconds) {
-    lastReminderTrigger[key].overtime = true;
-    Voice.speak('已超时，请尽快完成');
-    lastOvertimeSpeak[key] = Date.now();
-  }
-
-  if (lastReminderTrigger[key].overtime && elapsedSeconds > totalSeconds) {
-    const lastSpeak = lastOvertimeSpeak[key] || 0;
-    if (Date.now() - lastSpeak >= 30 * 60 * 1000) {
+  if (elapsedSeconds > totalSeconds) {
+    if (!lastReminderTrigger[key].overtime) {
+      lastReminderTrigger[key].overtime = true;
       Voice.speak('已超时，请尽快完成');
       lastOvertimeSpeak[key] = Date.now();
+    } else {
+      const lastSpeak = lastOvertimeSpeak[key] || 0;
+      if (Date.now() - lastSpeak >= 30 * 60 * 1000) {
+        Voice.speak('已超时，请尽快完成');
+        lastOvertimeSpeak[key] = Date.now();
+      }
     }
   }
 }
@@ -481,9 +494,13 @@ async function submitForRating() {
 
     await API.saveSettlement(dateKey, settlementData);
 
+    if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
+    cachedData.dailySettlement[dateKey] = settlementData;
+
     homeworks.forEach(hw => {
       if (hw.status === 'done') {
         delete lastReminderTrigger[hw.id];
+        delete lastOvertimeSpeak[hw.id];
       }
     });
 
@@ -734,14 +751,8 @@ async function init() {
     }
   }
 
-  if (getActiveHomework() || getActiveFreeTime()) {
-    startTickTimer();
-  }
-
   updateBigScreen();
-
-  // Lightweight per-second tick (clock + timers only, no DOM rebuild)
-  tickInterval = setInterval(() => tickFrame(), 1000);
+  startTickTimer();
 
   startScreenSaverTimer();
 
