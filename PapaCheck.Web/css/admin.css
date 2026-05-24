@@ -1150,13 +1150,18 @@ input[type="number"] {
     font-size: 13px;
     flex-shrink: 0;
   }
+}
 
-  /* Date management → calendar + buttons wrap on narrow screens */
-  div[style*="gap:20px"] {
-    flex-wrap: wrap;
-    gap: 12px !important;
-    justify-content: center;
-  }
+.date-mgmt-row {
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.date-mgmt-btns {
+  flex: none;
+  width: 100%;
+  max-width: 300px;
 }
 
 /* Redemption */

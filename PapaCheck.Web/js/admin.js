@@ -22,6 +22,7 @@ let _submittingAdminRating = false;
 let _fulfillingRedemption = false;
 let _adjustingPoints = false;
 let _editingBalance = false;
+let _editingSettings = false;
 let _redeemShowCount = 3;
 let _selectedCalendarDate = null;
 let _calendarYear = null;
@@ -105,7 +106,7 @@ async function initAdmin() {
   setInterval(async () => {
     await refreshAllData();
     const modal = document.getElementById('adminModal');
-    if ((modal && modal.classList.contains('show')) || _editingBalance) return;
+    if ((modal && modal.classList.contains('show')) || _editingBalance || _editingSettings) return;
     renderCurrentTab();
   }, 5000);
 }
@@ -1175,17 +1176,32 @@ function renderSettingsTab() {
     </div>
 
     <div class="admin-card">
+      <div class="admin-card-title">📅 日期管理</div>
+      <div class="date-mgmt-row" style="display:flex;flex-direction:column;gap:12px;align-items:center;">
+        <div style="flex:0 0 auto;">
+          ${calHtml}
+        </div>
+        <div class="date-mgmt-btns" style="display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:20px;color:var(--accent);" id="selectedDateLabel">当前操作数据为：${AdminUtil.formatDate(adminDate)}</div>
+          <button onclick="switchToSelectedDate()" style="padding:10px 20px;border:1px solid var(--accent);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;background:transparent;color:var(--accent);align-self:stretch;">📅 切换到这一天</button>
+          <button onclick="toggleHolidayForDate()" id="btnToggleHoliday" style="padding:10px 20px;border:1px solid var(--warning);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;background:transparent;color:var(--warning);align-self:stretch;">🏖️ 标记为假日</button>
+          <button onclick="resetSelectedDate()" style="padding:10px 20px;background:var(--danger);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;align-self:stretch;">🔄 重置这一天</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-card">
       <div class="admin-card-title">⚙️ 参数配置</div>
 
       <div class="settings-section">
         <div class="settings-section-title">📝 作业默认值</div>
         <div class="settings-row">
           <label>基础分</label>
-          <input id="cfg_hwBasePoints" class="settings-input" type="number" min="1" max="100" value="${getSetting('homeworkDefaultBasePoints')}">
+          <input id="cfg_hwBasePoints" onfocus="_editingSettings=true" onblur="_editingSettings=false" class="settings-input" type="number" min="1" max="100" value="${getSetting('homeworkDefaultBasePoints')}">
         </div>
         <div class="settings-row">
           <label>建议时长（分钟）</label>
-          <input id="cfg_hwDuration" class="settings-input" type="number" min="5" max="180" step="5" value="${getSetting('homeworkDefaultSuggestedDuration')}">
+          <input id="cfg_hwDuration" onfocus="_editingSettings=true" onblur="_editingSettings=false" class="settings-input" type="number" min="5" max="180" step="5" value="${getSetting('homeworkDefaultSuggestedDuration')}">
         </div>
       </div>
 
@@ -1195,7 +1211,7 @@ function renderSettingsTab() {
       const m = getSettingsRatingMultipliers();
       const ch = m.challenge;
       const ti = m.timer;
-      const inputHtml = (id, val) => `<input id="${id}" class="settings-input" type="number" step="0.1" min="0" max="10" value="${val}">`;
+      const inputHtml = (id, val) => `<input id="${id}" onfocus="_editingSettings=true" onblur="_editingSettings=false" class="settings-input" type="number" step="0.1" min="0" max="10" value="${val}">`;
       return `
             <div class="rating-section">
               <div class="rating-section-label">⚔️ 挑战</div>
@@ -1222,32 +1238,17 @@ function renderSettingsTab() {
         <div class="settings-section-title">🎯 积分与商品</div>
         <div class="settings-row">
           <label>挑战效率奖励</label>
-          <input id="cfg_effBonus" class="settings-input" type="number" min="0" max="100" value="${getSetting('challengeEfficiencyBonus')}">
+          <input id="cfg_effBonus" onfocus="_editingSettings=true" onblur="_editingSettings=false" class="settings-input" type="number" min="0" max="100" value="${getSetting('challengeEfficiencyBonus')}">
         </div>
         <div class="settings-row">
           <label>新商品默认积分</label>
-          <input id="cfg_shopPoints" class="settings-input" type="number" min="1" max="999" value="${getSetting('shopDefaultPoints')}">
+          <input id="cfg_shopPoints" onfocus="_editingSettings=true" onblur="_editingSettings=false" class="settings-input" type="number" min="1" max="999" value="${getSetting('shopDefaultPoints')}">
         </div>
       </div>
 
       <div style="display:flex;gap:10px;margin-top:12px;">
         <button onclick="resetSettingsToDefaults()" style="flex:1;padding:12px;border:1px solid var(--text-secondary);border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;background:transparent;color:var(--text-secondary);">恢复默认值</button>
         <button onclick="saveAllSettings()" style="flex:1;padding:12px;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;background:var(--accent);color:var(--bg);">保存配置</button>
-      </div>
-    </div>
-
-    <div class="admin-card">
-      <div class="admin-card-title">📅 日期管理</div>
-      <div style="display:flex;gap:20px;align-items:flex-start;">
-        <div style="flex:0 0 auto;">
-          ${calHtml}
-        </div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
-          <div style="font-size:20px;color:var(--accent);" id="selectedDateLabel">当前操作数据为：${AdminUtil.formatDate(adminDate)}</div>
-          <button onclick="switchToSelectedDate()" style="padding:10px 20px;border:1px solid var(--accent);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;background:transparent;color:var(--accent);align-self:stretch;">📅 切换到这一天</button>
-          <button onclick="toggleHolidayForDate()" id="btnToggleHoliday" style="padding:10px 20px;border:1px solid var(--warning);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;background:transparent;color:var(--warning);align-self:stretch;">🏖️ 标记为假日</button>
-          <button onclick="resetSelectedDate()" style="padding:10px 20px;background:var(--danger);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;align-self:stretch;">🔄 重置这一天</button>
-        </div>
       </div>
     </div>
   `;
