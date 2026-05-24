@@ -1150,6 +1150,13 @@ input[type="number"] {
     font-size: 13px;
     flex-shrink: 0;
   }
+
+  /* Date management → calendar + buttons wrap on narrow screens */
+  div[style*="gap:20px"] {
+    flex-wrap: wrap;
+    gap: 12px !important;
+    justify-content: center;
+  }
 }
 
 /* Redemption */
@@ -1166,13 +1173,6 @@ input[type="number"] {
 .toast {
   bottom: 85px;
   padding: 12px 20px;
-}
-
-/* Date management → calendar + buttons wrap on narrow screens */
-div[style*="gap:20px"] {
-  flex-wrap: wrap;
-  gap: 12px !important;
-  justify-content: center;
 }
 
 .mini-cal-day {
