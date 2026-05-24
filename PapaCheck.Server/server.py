@@ -14,7 +14,7 @@ import socket
 import asyncio
 import io
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, unquote
 import db
 
 PORT = 8080
@@ -284,7 +284,8 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def log_message(self, format, *args):
-        print(f"  [{self.log_date_time_string()}] {args[0]}", flush=True)
+        msg = unquote(args[0])
+        print(f"  [{self.log_date_time_string()}] {msg}", flush=True)
 
 
 def init_server(quiet=False):
@@ -318,6 +319,8 @@ def init_server(quiet=False):
             _gen_mp3(text)
         if not quiet:
             print('  [TTS] 固定短语预生成完成 (' + str(len(fixed_texts)) + ' 条)', flush=True)
+        else:
+            print('[TTS] 固定短语预生成完成 (' + str(len(fixed_texts)) + ' 条)', flush=True)
     threading.Thread(target=_pregen_fixed, daemon=True).start()
 
     server = HTTPServer(('0.0.0.0', PORT), ScheduleHandler)
@@ -337,6 +340,12 @@ def init_server(quiet=False):
         print(f'  ║                                              ║')
         print('  ╚══════════════════════════════════════════════╝')
         print()
+    else:
+        print('PapaCheck 服务器已启动', flush=True)
+        print('大屏端: http://localhost:' + str(PORT), flush=True)
+        print('管理端: http://localhost:' + str(PORT) + '/admin.html', flush=True)
+        print('局域网: http://' + ip + ':' + str(PORT), flush=True)
+        print('存储: SQLite (data.db)', flush=True)
 
     return server, ip
 

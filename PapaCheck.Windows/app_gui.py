@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+import re
 import shutil
 import socket
 import threading
@@ -131,9 +132,15 @@ class PapaCheckApp:
             return
 
         self.root.title('PapaCheck 服务器')
-        self.root.geometry('620x560')
         self.root.resizable(False, False)
         self.root.configure(bg='#0f172a')
+
+        self.root.withdraw()
+        self.root.update_idletasks()
+        sw = self.root.winfo_screenwidth()
+        sh = self.root.winfo_screenheight()
+        self.root.geometry(f'620x560+{(sw - 620) // 2}+{(sh - 560) // 2}')
+        self.root.deiconify()
 
         self.server = None
         self.server_thread = None
@@ -388,13 +395,14 @@ class PapaCheckApp:
             return
 
         self._append_log('正在启动服务器...')
-        with self.log_redirector:
-            try:
-                self.server, self.ip = init_server(quiet=True)
-            except Exception as e:
-                self._append_log('服务器启动失败: ' + str(e))
-                self._handle_server_exit()
-                return
+        self.log_redirector.__enter__()
+        try:
+            self.server, self.ip = init_server(quiet=True)
+        except Exception as e:
+            self.log_redirector.__exit__(None, None, None)
+            self._append_log('服务器启动失败: ' + str(e))
+            self._handle_server_exit()
+            return
 
         self.server_thread = ServerThread(self.server)
         self.server_thread.start()
@@ -406,8 +414,6 @@ class PapaCheckApp:
         self.ip_label.config(text='局域网 IP: ' + self.ip)
 
         self._append_log('服务器启动成功 (端口 ' + str(PORT) + ', 局域网 IP: ' + self.ip + ')')
-        self._append_log('孩子端: http://localhost:' + str(PORT))
-        self._append_log('管理端: http://localhost:' + str(PORT) + '/admin.html')
 
         self.root.after(2000, self._check_still_running)
 
@@ -441,6 +447,7 @@ class PapaCheckApp:
             self.root.after(2000, self._check_still_running)
 
     def _handle_server_exit(self):
+        self.log_redirector.__exit__(None, None, None)
         self.running = False
         self._set_status(False)
         self._append_log('服务器已停止')
@@ -483,6 +490,7 @@ class PapaCheckApp:
         for line in text.split('\n'):
             stripped = line.strip()
             if stripped:
+                stripped = re.sub(r'^\s*\[\d{2}/\w{3}/\d{4}\s\d{2}:\d{2}:\d{2}\]\s*', '', stripped)
                 self.log_text.insert(tk.END, stripped + '\n')
         self.log_text.see(tk.END)
         self.log_text.config(state=tk.DISABLED)
