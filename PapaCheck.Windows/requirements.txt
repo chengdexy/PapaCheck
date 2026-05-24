@@ -1,0 +1,4 @@
+edge_tts
+pystray
+Pillow
+pyinstaller

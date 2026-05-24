@@ -6,7 +6,8 @@ import json
 import os
 import sqlite3
 
-DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data.db')
+_DB_DIR = os.environ.get('PAPACHECK_DB_DIR', os.path.dirname(os.path.abspath(__file__)))
+DB_FILE = os.path.join(_DB_DIR, 'data.db')
 
 
 def _connect():

@@ -287,13 +287,17 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
         print(f"  [{self.log_date_time_string()}] {args[0]}", flush=True)
 
 
-def init_server():
-    """初始化服务器：数据库、TTS 预生成等，返回 (server, ip)"""
-    sys.stdout.reconfigure(encoding='utf-8')
+def init_server(quiet=False):
+    """初始化服务器：数据库、TTS 预生成等，返回 (server, ip)
+    quiet=True: 不打印 banner（GUI/EXE 模式）
+    """
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except (AttributeError, OSError):
+        pass
     db.init_db()
     ip = get_local_ip()
 
-    # 预生成固定语音短语（35 条），确保孩子端请求时缓存已命中
     import threading
     fixed_texts = [
         '已申请延后，等待爸爸确认',
@@ -312,25 +316,27 @@ def init_server():
     def _pregen_fixed():
         for text in fixed_texts:
             _gen_mp3(text)
-        print('  [TTS] 固定短语预生成完成 (' + str(len(fixed_texts)) + ' 条)', flush=True)
+        if not quiet:
+            print('  [TTS] 固定短语预生成完成 (' + str(len(fixed_texts)) + ' 条)', flush=True)
     threading.Thread(target=_pregen_fixed, daemon=True).start()
 
     server = HTTPServer(('0.0.0.0', PORT), ScheduleHandler)
 
-    print()
-    print('  ╔══════════════════════════════════════════════╗')
-    print('  ║     📅 PapaCheck（爸~检查！）服务器已启动    ║')
-    print('  ╠══════════════════════════════════════════════╣')
-    print(f'  ║                                              ║')
-    print(f'  ║  大屏端:  http://localhost:{PORT}              ║')
-    print(f'  ║  管理端:  http://localhost:{PORT}/admin.html   ║')
-    print(f'  ║  局域网:  http://{ip}:{PORT}          ║')
-    print(f'  ║  存  储:  SQLite (data.db)                   ║')
-    print(f'  ║                                              ║')
-    print(f'  ║  按 Ctrl+C 停止服务器                        ║')
-    print(f'  ║                                              ║')
-    print('  ╚══════════════════════════════════════════════╝')
-    print()
+    if not quiet:
+        print()
+        print('  ╔══════════════════════════════════════════════╗')
+        print('  ║     📅 PapaCheck（爸~检查！）服务器已启动    ║')
+        print('  ╠══════════════════════════════════════════════╣')
+        print(f'  ║                                              ║')
+        print(f'  ║  大屏端:  http://localhost:{PORT}              ║')
+        print(f'  ║  管理端:  http://localhost:{PORT}/admin.html   ║')
+        print(f'  ║  局域网:  http://{ip}:{PORT}          ║')
+        print(f'  ║  存  储:  SQLite (data.db)                   ║')
+        print(f'  ║                                              ║')
+        print(f'  ║  按 Ctrl+C 停止服务器                        ║')
+        print(f'  ║                                              ║')
+        print('  ╚══════════════════════════════════════════════╝')
+        print()
 
     return server, ip
 

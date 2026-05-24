@@ -29,3 +29,8 @@ PapaCheck.Android/.flutter-plugins
 PapaCheck.Android/.flutter-plugins-dependencies
 PapaCheck.Android/build/
 PapaCheck.Android/.idea/
+
+# PyInstaller
+PapaCheck.Windows/build/
+PapaCheck.Windows/dist/
+*.spec
