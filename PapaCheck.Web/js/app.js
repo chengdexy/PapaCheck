@@ -209,9 +209,9 @@ async function completeHomework(id) {
     Voice.speak(hw.subject + '作业完成！');
   }
   stopTickTimer();
-  saveHomeworksSilent();
+  await saveHomeworksSilent();
 
-  checkAllDone();
+  await checkAllDone();
   needsFullRender = true;
   updateBigScreen();
   showToast(toastMsg);
@@ -440,14 +440,18 @@ async function calculateSettlement() {
   window._settlement = settlementData;
 
   const dateKey = Util.dateKey(currentDate);
-  await API.saveSettlement(dateKey, {
+  const settlementToSave = {
     ...settlementData,
     rating: null,
     multiplier: null,
     finalPoints: null,
     submittedAt: null,
     ratedAt: null,
-  });
+  };
+  await API.saveSettlement(dateKey, settlementToSave);
+
+  if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
+  cachedData.dailySettlement[dateKey] = settlementToSave;
 
   await API.saveEfficiency(dateKey, { averageRatio, ratios });
 

@@ -242,9 +242,12 @@ function updateBigScreen() {
 
 function getSettlementData() {
   if (cachedData && cachedData.dailySettlement) {
-    return cachedData.dailySettlement[Util.dateKey(currentDate)] || null;
+    var serverData = cachedData.dailySettlement[Util.dateKey(currentDate)];
+    if (serverData) return serverData;
   }
-  return cachedData?._settlement || null;
+  if (cachedData && cachedData._settlement) return cachedData._settlement;
+  if (window._settlement) return window._settlement;
+  return null;
 }
 
 // ========== Main Page ==========
