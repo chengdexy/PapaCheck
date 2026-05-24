@@ -105,7 +105,7 @@ async function initAdmin() {
   setInterval(async () => {
     await refreshAllData();
     const modal = document.getElementById('adminModal');
-    if (modal && modal.classList.contains('show')) return;
+    if ((modal && modal.classList.contains('show')) || _editingBalance) return;
     renderCurrentTab();
   }, 5000);
 }
