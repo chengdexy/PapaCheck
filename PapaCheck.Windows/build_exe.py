@@ -20,7 +20,6 @@ cmd = [
     '--hidden-import', 'db',
     '--hidden-import', 'edge_tts',
     '--hidden-import', 'asyncio',
-    '--clean',
     '--noconfirm',
     os.path.join(WORK_DIR, 'app_gui.py'),
 ]
