@@ -4,6 +4,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVER_DIR = os.path.join(ROOT, 'PapaCheck.Server')
+EMAIL_DIR = os.path.join(ROOT, 'PapaCheck.Email')
 WEB_DIR = os.path.join(ROOT, 'PapaCheck.Web')
 WORK_DIR = os.path.join(ROOT, 'PapaCheck.Windows')
 
@@ -14,10 +15,12 @@ cmd = [
     '--name', 'PapaCheck',
     '--icon', os.path.join(WORK_DIR, 'icon.ico'),
     '--paths', SERVER_DIR,
+    '--paths', EMAIL_DIR,
     '--add-data', f'{SERVER_DIR};PapaCheck.Server',
     '--add-data', f'{WEB_DIR};PapaCheck.Web',
     '--add-data', f'{os.path.join(WORK_DIR, "icon.ico")};.',
     '--hidden-import', 'db',
+    '--hidden-import', 'email_client',
     '--hidden-import', 'edge_tts',
     '--hidden-import', 'asyncio',
     '--noconfirm',

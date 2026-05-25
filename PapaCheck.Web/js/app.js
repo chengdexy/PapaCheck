@@ -595,6 +595,15 @@ function startPoll(intervalMs) {
             Voice.speak('爸爸拒绝了' + dh.subject + '的延后申请，今天完成吧');
           }
         }
+
+        const newItems = newHw.filter(h => !homeworks.find(oh => oh.id === h.id));
+        if (newItems.length > 0) {
+          const emailNew = newItems.filter(h => h.source === 'email');
+          const manualNew = newItems.filter(h => h.source !== 'email');
+          if (emailNew.length > 0) Voice.speak('收到云端作业，请查看');
+          if (manualNew.length > 0) Voice.speak('收到新作业，请查看');
+        }
+
         homeworks = newHw;
         needsFullRender = true;
       }

@@ -254,7 +254,7 @@ def fetch_emails_from_sender(imap_server, port, email_addr, password, sender, se
     if not matched_ids:
         print(f'\n没有找到来自 {sender} 的邮件')
         mail.logout()
-        return []
+        return [], []
 
     total = len(matched_ids)
     print(f'找到 {total} 封来自 {sender} 的邮件，正在获取...\n')
@@ -274,7 +274,17 @@ def fetch_emails_from_sender(imap_server, port, email_addr, password, sender, se
         print(f'\n已将所有邮件标记为已读')
 
     mail.logout()
-    return messages
+    return messages, matched_ids
+
+
+def mark_matched_ids_as_unread(imap_server, port, email_addr, password, matched_ids):
+    socket.setdefaulttimeout(30)
+    mail = imaplib.IMAP4_SSL(imap_server, port)
+    mail.login(email_addr, password)
+    mail.select('INBOX')
+    for mid in matched_ids:
+        mail.store(mid, '-FLAGS', '\\Seen')
+    mail.logout()
 
 
 def parse_email(raw_bytes):
@@ -465,7 +475,7 @@ def main():
             print('\n程序退出')
             return
 
-        messages = fetch_emails_from_sender(
+        messages, _ = fetch_emails_from_sender(
             config['imap_server'],
             config['port'],
             config['email'],

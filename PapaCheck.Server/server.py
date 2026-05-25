@@ -19,11 +19,24 @@ import db
 
 PORT = 8080
 _WEB_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'PapaCheck.Web'))
+_TTS_CACHE_DIR = os.path.join(os.environ.get('PAPACHECK_DB_DIR', os.path.dirname(os.path.abspath(__file__))), 'tts_cache')
 _tts_cache = {}
+
+os.makedirs(_TTS_CACHE_DIR, exist_ok=True)
 
 def _gen_mp3(text):
     if text in _tts_cache:
         return _tts_cache[text]
+
+    import hashlib
+    safe_name = hashlib.md5(text.encode()).hexdigest() + '.mp3'
+    cache_path = os.path.join(_TTS_CACHE_DIR, safe_name)
+    if os.path.exists(cache_path):
+        with open(cache_path, 'rb') as f:
+            mp3_data = f.read()
+        _tts_cache[text] = mp3_data
+        return mp3_data
+
     async def _run():
         import edge_tts
         communicate = edge_tts.Communicate(text, 'zh-CN-XiaoxiaoNeural')
@@ -41,6 +54,8 @@ def _gen_mp3(text):
         mp3_data = b''
     if mp3_data:
         _tts_cache[text] = mp3_data
+        with open(cache_path, 'wb') as f:
+            f.write(mp3_data)
     return mp3_data
 
 
@@ -312,11 +327,21 @@ def init_server(quiet=False):
         '屏幕已唤醒',
         '已提交申请，等待爸爸确认',
         '兑换成功！',
+        '收到云端作业，请查看',
+        '收到新作业，请查看',
     ] + ['现在是' + str(h) + '点' for h in range(24)]
 
     def _pregen_fixed():
+        import hashlib
+        valid = {hashlib.md5(t.encode()).hexdigest() + '.mp3' for t in fixed_texts}
         for text in fixed_texts:
             _gen_mp3(text)
+        for fname in os.listdir(_TTS_CACHE_DIR):
+            if fname.endswith('.mp3') and fname not in valid:
+                try:
+                    os.remove(os.path.join(_TTS_CACHE_DIR, fname))
+                except Exception:
+                    pass
         if not quiet:
             print('  [TTS] 固定短语预生成完成 (' + str(len(fixed_texts)) + ' 条)', flush=True)
         else:

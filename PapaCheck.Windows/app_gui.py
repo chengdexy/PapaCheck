@@ -2,6 +2,7 @@
 import sys
 import os
 import re
+import json
 import shutil
 import socket
 import threading
@@ -9,8 +10,131 @@ import time
 import webbrowser
 import queue
 import tkinter as tk
+import tkinter.messagebox as tkmsg
+import ctypes
+import ctypes.wintypes
+import urllib.request
+import urllib.error
 
 _CUR_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# --- email_client 导入（需在 import server 之前，确保 db 可寻址） ---
+_EMAIL_DIR = os.path.normpath(os.path.join(_CUR_DIR, '..', 'PapaCheck.Email'))
+_SERVER_DIR2 = os.path.normpath(os.path.join(_CUR_DIR, '..', 'PapaCheck.Server'))
+for p in (_EMAIL_DIR, _SERVER_DIR2):
+    if p not in sys.path:
+        sys.path.insert(0, p)
+import email_client
+
+# --- Windows Credential Manager ---
+_CredWriteW = ctypes.windll.advapi32.CredWriteW
+_CredReadW = ctypes.windll.advapi32.CredReadW
+_CredDeleteW = ctypes.windll.advapi32.CredDeleteW
+_CRED_TYPE_GENERIC = 1
+_CRED_PERSIST_LOCAL_MACHINE = 2
+
+
+class _CREDENTIAL(ctypes.Structure):
+    _fields_ = [
+        ('Flags', ctypes.wintypes.DWORD),
+        ('Type', ctypes.wintypes.DWORD),
+        ('TargetName', ctypes.wintypes.LPCWSTR),
+        ('Comment', ctypes.wintypes.LPCWSTR),
+        ('LastWritten', ctypes.wintypes.FILETIME),
+        ('CredentialBlobSize', ctypes.wintypes.DWORD),
+        ('CredentialBlob', ctypes.wintypes.LPBYTE),
+        ('Persist', ctypes.wintypes.DWORD),
+        ('AttributeCount', ctypes.wintypes.DWORD),
+        ('Attributes', ctypes.c_void_p),
+        ('TargetAlias', ctypes.wintypes.LPCWSTR),
+        ('UserName', ctypes.wintypes.LPCWSTR),
+    ]
+
+
+def _credential_write(name, value):
+    value_bytes = (value + '\0').encode('utf-16-le')
+    blob = (ctypes.c_byte * len(value_bytes)).from_buffer_copy(value_bytes)
+    cred = _CREDENTIAL(
+        Type=_CRED_TYPE_GENERIC,
+        TargetName=name,
+        CredentialBlobSize=len(value_bytes),
+        CredentialBlob=ctypes.cast(blob, ctypes.wintypes.LPBYTE),
+        Persist=_CRED_PERSIST_LOCAL_MACHINE,
+        UserName=None,
+    )
+    _CredWriteW(ctypes.byref(cred), 0)
+
+
+def _credential_read(name):
+    pcred = ctypes.POINTER(_CREDENTIAL)()
+    ok = _CredReadW(name, _CRED_TYPE_GENERIC, 0, ctypes.byref(pcred))
+    if not ok:
+        return None
+    cred = pcred.contents
+    blob_size = cred.CredentialBlobSize
+    addr = ctypes.cast(cred.CredentialBlob, ctypes.c_void_p).value
+    raw = (ctypes.c_byte * blob_size).from_address(addr)
+    value = bytes(raw).decode('utf-16-le').rstrip('\0')
+    ctypes.windll.advapi32.CredFree(pcred)
+    return value
+
+
+def _credential_delete(name):
+    return _CredDeleteW(name, _CRED_TYPE_GENERIC, 0)
+
+
+# --- 配置路径 ---
+_CONFIG_DIR = os.path.join(os.environ['APPDATA'], 'PapaCheck')
+_CONFIG_PATH = os.path.join(_CONFIG_DIR, 'config.json')
+
+
+def _load_config():
+    if not os.path.exists(_CONFIG_PATH):
+        return None
+    try:
+        with open(_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _save_config(data):
+    os.makedirs(_CONFIG_DIR, exist_ok=True)
+    with open(_CONFIG_PATH, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+
+def _ensure_config():
+    if not os.path.exists(_CONFIG_PATH):
+        template = {
+            'imap_server': '',
+            'port': 993,
+            'email': '',
+            'sender': '',
+            'server_url': 'http://localhost:8080',
+            'mark_as_read': True,
+            'ai_base_url': 'https://api.deepseek.com',
+            'ai_model': 'deepseek-chat',
+        }
+        _save_config(template)
+    return _load_config()
+
+
+# --- HTTP API ---
+def save_homeworks_via_api(server_url, date_key, new_items):
+    url = f'{server_url}/api/homeworks/{date_key}'
+
+    req = urllib.request.Request(url)
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        existing = json.loads(resp.read())
+    manual = [h for h in existing if h.get('source') != 'email']
+
+    merged = manual + new_items
+    data = json.dumps({'homeworks': merged}).encode()
+    req = urllib.request.Request(url, data=data, method='POST')
+    req.add_header('Content-Type', 'application/json')
+    urllib.request.urlopen(req, timeout=10)
+
 
 if getattr(sys, 'frozen', False):
     _SERVER_DIR = os.path.join(sys._MEIPASS, 'PapaCheck.Server')
@@ -163,6 +287,12 @@ class PapaCheckApp:
         self._build_ui()
 
         self.root.protocol('WM_DELETE_WINDOW', self._on_close)
+
+        self._build_menu()
+        self._email_sync_btn = self._plain_btn(
+            self._btn_frame, '📧 邮件作业同步', self._on_email_sync)
+        self._email_sync_btn.pack(side=tk.LEFT, padx=(8, 0))
+
         self.root.after(100, self._start_server)
         self.root.after(200, self._poll_log_queue)
         self.root.after(300, self._start_tray)
@@ -266,6 +396,7 @@ class PapaCheckApp:
 
         # --- 按钮行：打开孩子端/管理端（左）+ 开机自启动/启动服务器（右） ---
         btn_frame = tk.Frame(self.root, bg=bg)
+        self._btn_frame = btn_frame
         btn_frame.pack(fill=tk.X, padx=20, pady=(0, 10))
 
         left_btns = tk.Frame(btn_frame, bg=bg)
@@ -339,6 +470,29 @@ class PapaCheckApp:
 
     def _open_parent(self):
         webbrowser.open('http://localhost:' + str(PORT) + '/admin.html')
+
+    # ===== 菜单栏 =====
+
+    def _build_menu(self):
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+
+        def _open_settings():
+            self.root.after(0, self._show_settings)
+
+        menubar.add_command(label='服务配置', accelerator='Ctrl+P',
+                            command=_open_settings)
+        menubar.add_command(label='最小化到托盘', accelerator='Ctrl+M',
+                            command=self._minimize_to_tray)
+        menubar.add_command(label='退出', accelerator='Ctrl+Q',
+                            command=self._quit_app)
+
+        self.root.bind_all('<Control-p>', lambda e: self._show_settings())
+        self.root.bind_all('<Control-P>', lambda e: self._show_settings())
+        self.root.bind_all('<Control-m>', lambda e: self._minimize_to_tray())
+        self.root.bind_all('<Control-M>', lambda e: self._minimize_to_tray())
+        self.root.bind_all('<Control-q>', lambda e: self._quit_app())
+        self.root.bind_all('<Control-Q>', lambda e: self._quit_app())
 
     # ===== 开机自启动 =====
 
@@ -588,6 +742,352 @@ class PapaCheckApp:
             except Exception:
                 pass
         self.root.after(100, self.root.destroy)
+
+    # ===== 服务配置窗口 & 邮件作业同步 =====
+
+    def _show_settings(self):
+        cfg = _ensure_config()
+
+        win = tk.Toplevel(self.root)
+        win.title('服务配置')
+        win.configure(bg='#0f172a')
+        win.transient(self.root)
+        win.withdraw()
+
+        fg = '#e2e8f0'
+        label_bg = '#0f172a'
+        entry_bg = '#1e293b'
+        entry_fg = '#e2e8f0'
+
+        row = 0
+
+        def _make_entry(col, default_val='', readonly=False):
+            var = tk.StringVar(value=default_val)
+            state = 'readonly' if readonly else 'normal'
+            ent = tk.Entry(win, textvariable=var, font=('Consolas', 10),
+                           bg=entry_bg, fg=entry_fg, bd=0,
+                           highlightthickness=0, insertbackground=entry_fg,
+                           state=state, width=36)
+            ent.grid(row=row, column=col, padx=(0, 10), pady=4, sticky='w')
+            return var
+
+        # --- 服务器地址 ---
+        tk.Label(win, text='服务器地址', font=('Microsoft YaHei UI', 10),
+                 bg=label_bg, fg='#94a3b8').grid(row=row, column=0, sticky='w', padx=16, pady=(16, 2))
+        _server_url_var = tk.StringVar(value=cfg.get('server_url', 'http://localhost:8080'))
+        server_ent = tk.Entry(win, textvariable=_server_url_var, font=('Consolas', 10),
+                               bg=entry_bg, fg=entry_fg, bd=0,
+                               highlightthickness=0, state='disabled',
+                               disabledforeground=entry_fg, disabledbackground=entry_bg,
+                               width=36)
+        server_ent.grid(row=row, column=1, padx=(0, 10), pady=4, sticky='w')
+        row += 1
+
+        # --- 分隔: 邮箱配置 ---
+        tk.Label(win, text='── 邮箱配置 ──', font=('Microsoft YaHei UI', 9),
+                 bg=label_bg, fg='#64748b').grid(row=row, column=0, columnspan=3,
+                                                  sticky='w', padx=16, pady=(12, 4))
+        row += 1
+
+        labels_and_keys = [
+            ('邮箱地址', 'email'),
+            ('密码/授权码', None),
+            ('IMAP 服务器', 'imap_server'),
+            ('端口', 'port'),
+            ('指定发件人', 'sender'),
+        ]
+        entries = {}
+        for text, key in labels_and_keys:
+            tk.Label(win, text=text, font=('Microsoft YaHei UI', 10),
+                     bg=label_bg, fg=fg).grid(row=row, column=0, sticky='w', padx=16, pady=2)
+            if text == '密码/授权码':
+                try:
+                    default_pw = _credential_read('PapaCheck/email_password') or ''
+                except Exception:
+                    default_pw = ''
+                var = tk.StringVar(value=default_pw)
+                ent = tk.Entry(win, textvariable=var, font=('Consolas', 10),
+                               bg=entry_bg, fg=entry_fg, bd=0,
+                               highlightthickness=0, insertbackground=entry_fg,
+                               show='*', width=36)
+                ent.grid(row=row, column=1, padx=(0, 10), pady=2, sticky='w')
+                entries['password'] = var
+            elif key == 'port':
+                var = _make_entry(1, str(cfg.get(key, 993)))
+                entries[key] = var
+            else:
+                var = _make_entry(1, cfg.get(key, ''))
+                entries[key] = var
+            row += 1
+
+        win._entries = entries
+
+        # 邮箱测试连通性按钮
+        tk.Button(win, text='测试连通性', font=('Microsoft YaHei UI', 9),
+                  bg='#334155', fg='#94a3b8',
+                  activebackground='#475569', activeforeground='white',
+                  relief=tk.FLAT, bd=0, padx=12, pady=4, cursor='hand2',
+                  command=lambda: self._test_email_connectivity(win)).grid(
+                      row=row, column=1, sticky='w', padx=(0, 10), pady=2)
+
+        row += 1
+        mark_read_var = tk.BooleanVar(value=cfg.get('mark_as_read', True))
+        tk.Checkbutton(win, text='读取后标记为已读', variable=mark_read_var,
+                       font=('Microsoft YaHei UI', 9),
+                       bg=label_bg, fg='#94a3b8',
+                       selectcolor=label_bg,
+                       activebackground=label_bg, activeforeground=fg).grid(
+                           row=row, column=1, sticky='w', padx=(0, 10), pady=2)
+        row += 2
+
+        # --- 分隔: AI 配置 ---
+        tk.Label(win, text='── AI 配置 ──', font=('Microsoft YaHei UI', 9),
+                 bg=label_bg, fg='#64748b').grid(row=row, column=0, columnspan=3,
+                                                  sticky='w', padx=16, pady=(12, 4))
+        row += 1
+
+        ai_labels = [
+            ('API Key', None),
+            ('Base URL', 'ai_base_url'),
+            ('模型', 'ai_model'),
+        ]
+        for text, key in ai_labels:
+            tk.Label(win, text=text, font=('Microsoft YaHei UI', 10),
+                     bg=label_bg, fg=fg).grid(row=row, column=0, sticky='w', padx=16, pady=2)
+            if text == 'API Key':
+                try:
+                    default_key = _credential_read('PapaCheck/ai_api_key') or ''
+                except Exception:
+                    default_key = ''
+                var = tk.StringVar(value=default_key)
+                ent = tk.Entry(win, textvariable=var, font=('Consolas', 10),
+                               bg=entry_bg, fg=entry_fg, bd=0,
+                               highlightthickness=0, insertbackground=entry_fg,
+                               show='*', width=36)
+                ent.grid(row=row, column=1, padx=(0, 10), pady=2, sticky='w')
+                entries['ai_api_key'] = var
+            else:
+                var = _make_entry(1, cfg.get(key, ''))
+                entries[key] = var
+            row += 1
+
+        # AI 测试连通性按钮
+        tk.Button(win, text='测试连通性', font=('Microsoft YaHei UI', 9),
+                  bg='#334155', fg='#94a3b8',
+                  activebackground='#475569', activeforeground='white',
+                  relief=tk.FLAT, bd=0, padx=12, pady=4, cursor='hand2',
+                  command=lambda: self._test_ai_connectivity(win)).grid(
+                      row=row, column=1, sticky='w', padx=(0, 10), pady=2)
+        row += 2
+
+        # --- 底部按钮 ---
+        btn_frame = tk.Frame(win, bg='#0f172a')
+        btn_frame.grid(row=row, column=0, columnspan=3, pady=(8, 16), padx=16, sticky='e')
+
+        def _save():
+            new_cfg = {}
+            for key in ('email', 'imap_server', 'sender', 'ai_base_url', 'ai_model'):
+                if key in entries:
+                    new_cfg[key] = entries[key].get().strip()
+            try:
+                new_cfg['port'] = int(entries['port'].get().strip())
+            except ValueError:
+                new_cfg['port'] = 993
+            new_cfg['server_url'] = _server_url_var.get().strip()
+            new_cfg['mark_as_read'] = mark_read_var.get()
+
+            required = {'email', 'imap_server', 'sender'}
+            for k in required:
+                if not new_cfg.get(k):
+                    tkmsg.showwarning('提示', f'请填写 {k}', parent=win)
+                    return
+
+            _save_config(new_cfg)
+
+            pw = entries['password'].get().strip()
+            if pw:
+                _credential_write('PapaCheck/email_password', pw)
+            else:
+                try:
+                    existing_pw = _credential_read('PapaCheck/email_password')
+                except Exception:
+                    existing_pw = None
+                if existing_pw is not None:
+                    if tkmsg.askyesno('确认清除凭据',
+                                      '确定要清除已保存的邮箱密码吗？\n此操作不可撤销。',
+                                      parent=win):
+                        _credential_delete('PapaCheck/email_password')
+                        self._append_log('已清除邮箱密码凭据')
+
+            ak = entries['ai_api_key'].get().strip()
+            if ak:
+                _credential_write('PapaCheck/ai_api_key', ak)
+            else:
+                try:
+                    existing_ak = _credential_read('PapaCheck/ai_api_key')
+                except Exception:
+                    existing_ak = None
+                if existing_ak is not None:
+                    if tkmsg.askyesno('确认清除凭据',
+                                      '确定要清除已保存的 AI API Key 吗？\n此操作不可撤销。',
+                                      parent=win):
+                        _credential_delete('PapaCheck/ai_api_key')
+                        self._append_log('已清除 AI API Key 凭据')
+
+            self._append_log('服务配置已保存')
+            win.destroy()
+
+        tk.Button(btn_frame, text='保存', font=('Microsoft YaHei UI', 9),
+                  bg='#22c55e', fg='white',
+                  activebackground='#16a34a', activeforeground='white',
+                  relief=tk.FLAT, bd=0, padx=20, pady=6, cursor='hand2',
+                  command=_save).pack(side=tk.RIGHT, padx=(8, 0))
+        tk.Button(btn_frame, text='取消', font=('Microsoft YaHei UI', 9),
+                  bg='#334155', fg='#e2e8f0',
+                  activebackground='#475569', activeforeground='white',
+                  relief=tk.FLAT, bd=0, padx=20, pady=6, cursor='hand2',
+                  command=win.destroy).pack(side=tk.RIGHT)
+
+        win.update_idletasks()
+        width = max(520, win.winfo_reqwidth())
+        height = max(460, win.winfo_reqheight())
+        root_x = self.root.winfo_x()
+        root_y = self.root.winfo_y()
+        root_w = self.root.winfo_width()
+        root_h = self.root.winfo_height()
+        x = root_x + (root_w - width) // 2
+        y = root_y + (root_h - height) // 2
+        win.geometry(f'{width}x{height}+{x}+{y}')
+        win.resizable(False, False)
+        win.deiconify()
+        win.grab_set()
+
+    def _test_email_connectivity(self, parent):
+        entries = getattr(parent, '_entries', {})
+        imap = entries.get('imap_server', tk.StringVar()).get().strip()
+        port_str = entries.get('port', tk.StringVar()).get().strip()
+        if not imap:
+            tkmsg.showwarning('提示', '请先填写 IMAP 服务器', parent=parent)
+            return
+        try:
+            port = int(port_str) if port_str else 993
+        except ValueError:
+            port = 993
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)
+            sock.connect((imap, port))
+            sock.close()
+            tkmsg.showinfo('成功', '✅ 邮箱服务连接成功', parent=parent)
+        except Exception as e:
+            tkmsg.showerror('失败', f'连接失败: {e}', parent=parent)
+
+    def _test_ai_connectivity(self, parent):
+        entries = getattr(parent, '_entries', {})
+        cfg = _load_config()
+        ak = entries.get('ai_api_key', tk.StringVar()).get().strip()
+        url = entries.get('ai_base_url', tk.StringVar()).get().strip()
+        model = entries.get('ai_model', tk.StringVar()).get().strip()
+        if not ak:
+            tkmsg.showwarning('提示', '请填写 API Key', parent=parent)
+            return
+        if not url:
+            url = cfg.get('ai_base_url', 'https://api.deepseek.com') if cfg else 'https://api.deepseek.com'
+        if not model:
+            model = cfg.get('ai_model', 'deepseek-chat') if cfg else 'deepseek-chat'
+
+        test_text = 'hello'
+        try:
+            email_client.call_ai(ak, url, model, test_text)
+            tkmsg.showinfo('成功', '✅ AI 服务连接正常', parent=parent)
+        except Exception as e:
+            tkmsg.showerror('失败', f'连接失败: {e}', parent=parent)
+
+    def _on_email_sync(self):
+        cfg = _load_config()
+        if not cfg:
+            tkmsg.showinfo('提示', '请先配置服务')
+            self.root.after(100, self._show_settings)
+            return
+
+        required = ('email', 'imap_server', 'sender', 'ai_base_url', 'ai_model')
+        for k in required:
+            if not cfg.get(k):
+                tkmsg.showinfo('提示', f'请完善服务配置（缺少 {k}）')
+                self.root.after(100, self._show_settings)
+                return
+
+        try:
+            pw = _credential_read('PapaCheck/email_password')
+        except Exception:
+            pw = None
+        if pw is None:
+            tkmsg.showinfo('提示', '请先配置邮箱密码/授权码')
+            self.root.after(100, self._show_settings)
+            return
+
+        try:
+            ak = _credential_read('PapaCheck/ai_api_key')
+        except Exception:
+            ak = None
+        if ak is None:
+            tkmsg.showinfo('提示', '请先配置 AI API Key')
+            self.root.after(100, self._show_settings)
+            return
+
+        self._email_sync_btn.config(state=tk.DISABLED, text='⏳ 同步中...')
+        self._append_log('开始邮件作业同步...')
+        threading.Thread(target=self._run_email_sync,
+                         args=(cfg, pw, ak), daemon=True).start()
+
+    def _run_email_sync(self, cfg, pw, ak):
+        matched_ids = None
+        try:
+            self.root.after(0, lambda: self._append_log('正在连接邮箱...'))
+            messages, matched_ids = email_client.fetch_emails_from_sender(
+                cfg['imap_server'], cfg['port'],
+                cfg['email'], pw,
+                cfg['sender'],
+                search_all=False, mark_as_read=cfg.get('mark_as_read', True),
+            )
+            if not messages:
+                self.root.after(0, lambda: self._append_log('未找到匹配的邮件，同步结束'))
+                return
+
+            self.root.after(0, lambda: self._append_log(f'共收取 {len(messages)} 封邮件'))
+
+            email_text = '\n'.join(m.get('body', '') for m in messages)
+
+            self.root.after(0, lambda: self._append_log('正在调用 AI 解析...'))
+            ai_output = email_client.call_ai(ak, cfg['ai_base_url'], cfg['ai_model'], email_text)
+
+            new_items = email_client._parse_homework_text(ai_output)
+            if not new_items:
+                self.root.after(0, lambda: self._append_log('AI 未解析出作业项'))
+                raise Exception('AI 未解析出作业项')
+
+            today = email_client._get_today_key()
+            save_homeworks_via_api(cfg['server_url'], today, new_items)
+
+            count = len(new_items)
+            self.root.after(0, lambda: self._append_log(f'已添加 {count} 项作业到今日作业清单'))
+            self.root.after(0, lambda: self._append_log('邮件作业同步完成'))
+
+        except Exception as e:
+            if matched_ids and cfg.get('mark_as_read', True):
+                try:
+                    email_client.mark_matched_ids_as_unread(
+                        cfg['imap_server'], cfg['port'],
+                        cfg['email'], pw,
+                        matched_ids,
+                    )
+                    self.root.after(0, lambda: self._append_log('已将邮件恢复为未读状态'))
+                except Exception:
+                    self.root.after(0, lambda: self._append_log('恢复邮件状态失败，请手动处理'))
+            self.root.after(0, lambda: self._append_log(f'错误: {e}'))
+        finally:
+            self.root.after(0, lambda: self._email_sync_btn.config(
+                state=tk.NORMAL, text='📧 邮件作业同步'))
 
     def run(self):
         if self._instance_sock is None:
