@@ -40,3 +40,6 @@ PapaCheck.Windows/dist/
 
 # PapaCheck.Email 配置文件（含敏感信息）
 PapaCheck.Email/config.json
+
+# TTS 缓存文件（预生成，可自动重建）
+PapaCheck.Server/tts_cache/*
