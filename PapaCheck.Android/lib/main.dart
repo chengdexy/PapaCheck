@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
+
+import 'package:open_filex/open_filex.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'services/config_service.dart';
 import 'widgets/ip_config_dialog.dart';
@@ -97,6 +101,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     if (ok) {
       setState(() => _url = fullUrl);
       _initController(fullUrl, clearCache: true);
+      await _checkVersion(storedUrl);
     } else {
       String? action = await _showConnectFailedDialog(fullUrl);
 
@@ -106,6 +111,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         if (ok) {
           setState(() => _url = fullUrl);
           _initController(fullUrl, clearCache: true);
+          await _checkVersion(storedUrl);
           return;
         }
         action = await _showConnectFailedDialog(fullUrl);
@@ -210,6 +216,84 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         _role = result.role;
       });
       _initController(fullUrl);
+    }
+  }
+
+  Future<Map<String, dynamic>?> _fetchServerVersion(String baseUrl) async {
+    try {
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 5);
+      final request = await client.getUrl(Uri.parse('$baseUrl/api/version'));
+      final response =
+          await request.close().timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        final body = await response.transform(utf8.decoder).join();
+        return jsonDecode(body) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> _checkVersion(String baseUrl) async {
+    final result = await _fetchServerVersion(baseUrl);
+    if (result == null) return;
+
+    final serverVersion = result['clientVersion'] ?? '?';
+    final packageInfo = await PackageInfo.fromPlatform();
+    final appVersion = packageInfo.version;
+
+    if (serverVersion == appVersion) return;
+    if (!mounted) return;
+
+    final action = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('发现新版本'),
+        content: Text(
+          '您正在使用旧版本Android端。\n'
+          'APK版本：$appVersion\n'
+          '最新版本：$serverVersion',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('cancel'),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop('update'),
+            child: const Text('更新'),
+          ),
+        ],
+      ),
+    );
+
+    if (action != 'update' || !mounted) return;
+    await _downloadAndInstall('$baseUrl/api/download');
+  }
+
+  Future<void> _downloadAndInstall(String url) async {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        title: Text('正在下载更新...'),
+        content: LinearProgressIndicator(),
+      ),
+    );
+
+    try {
+      final client = HttpClient();
+      final request = await client.getUrl(Uri.parse(url));
+      final response = await request.close();
+      final file = File('${Directory.systemTemp.path}/PapaCheck.apk');
+      await response.pipe(file.openWrite());
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      await OpenFilex.open(file.path);
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop();
     }
   }
 

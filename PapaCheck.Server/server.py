@@ -9,6 +9,7 @@ PapaCheck（爸~检查！）- 局域网服务器
 
 import json
 import os
+import re
 import sys
 import socket
 import asyncio
@@ -18,7 +19,10 @@ from urllib.parse import urlparse, parse_qs, unquote
 import db
 
 PORT = 8080
-_WEB_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'PapaCheck.Web'))
+_BASE = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+_WEB_ROOT = os.path.join(_BASE, 'PapaCheck.Web')
+if not os.path.isdir(_WEB_ROOT):
+    _WEB_ROOT = os.path.join(_BASE, 'Web')
 _TTS_CACHE_DIR = os.path.join(os.environ.get('PAPACHECK_DB_DIR', os.path.dirname(os.path.abspath(__file__))), 'tts_cache')
 _tts_cache = {}
 
@@ -127,6 +131,48 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
 
         if path == '/api/settings':
             self.send_json(db.get_settings())
+            return
+
+        if path == '/api/version':
+            try:
+                apk_dir = os.path.join(_WEB_ROOT, 'apk')
+                ver = '1.0.0'
+                if os.path.isdir(apk_dir):
+                    apks = sorted(
+                        [f for f in os.listdir(apk_dir) if f.endswith('.apk')],
+                        reverse=True
+                    )
+                    if apks:
+                        m = re.match(r'PapaCheck-(.+)\.apk$', apks[0])
+                        if m:
+                            ver = m.group(1)
+                self.send_json({'clientVersion': ver})
+            except Exception as e:
+                print(f'  [/api/version 错误] {e}', flush=True)
+                self.send_json({'clientVersion': '1.0.0'})
+            return
+
+        if path == '/api/download':
+            apk_dir = os.path.join(_WEB_ROOT, 'apk')
+            if os.path.isdir(apk_dir):
+                apks = sorted(
+                    [f for f in os.listdir(apk_dir) if f.endswith('.apk')],
+                    reverse=True
+                )
+                if apks:
+                    apk_name = apks[0]
+                    apk_path = os.path.join(apk_dir, apk_name)
+                    with open(apk_path, 'rb') as f:
+                        data = f.read()
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/vnd.android.package-archive')
+                    self.send_header('Content-Length', len(data))
+                    self.send_header('Content-Disposition', f'attachment; filename="{apk_name}"')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(data)
+                    return
+            self.send_error(404, 'APK not found')
             return
 
         if path == '/api/active-buffs':
@@ -299,7 +345,10 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def log_message(self, format, *args):
-        msg = unquote(args[0])
+        try:
+            msg = unquote(args[0])
+        except TypeError:
+            msg = str(args[0])
         print(f"  [{self.log_date_time_string()}] {msg}", flush=True)
 
 
@@ -359,7 +408,7 @@ def init_server(quiet=False):
         print(f'  ║  大屏端:  http://localhost:{PORT}              ║')
         print(f'  ║  管理端:  http://localhost:{PORT}/admin.html   ║')
         print(f'  ║  局域网:  http://{ip}:{PORT}          ║')
-        print(f'  ║  存  储:  SQLite (data.db)                   ║')
+        print(f'  ║  存  储:  {db.DB_FILE}                   ║')
         print(f'  ║                                              ║')
         print(f'  ║  按 Ctrl+C 停止服务器                        ║')
         print(f'  ║                                              ║')
@@ -367,10 +416,10 @@ def init_server(quiet=False):
         print()
     else:
         print('PapaCheck 服务器已启动', flush=True)
+        print('数据库: ' + db.DB_FILE, flush=True)
         print('大屏端: http://localhost:' + str(PORT), flush=True)
         print('管理端: http://localhost:' + str(PORT) + '/admin.html', flush=True)
         print('局域网: http://' + ip + ':' + str(PORT), flush=True)
-        print('存储: SQLite (data.db)', flush=True)
 
     return server, ip
 

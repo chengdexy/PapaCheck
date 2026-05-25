@@ -43,3 +43,7 @@ PapaCheck.Email/config.json
 
 # TTS 缓存文件（预生成，可自动重建）
 PapaCheck.Server/tts_cache/*.mp3
+
+# Android APK 构建产物
+PapaCheck.Android/apk/*.apk
+PapaCheck.Web/apk/*.apk

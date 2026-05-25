@@ -11,12 +11,23 @@ import webbrowser
 import queue
 import tkinter as tk
 import tkinter.messagebox as tkmsg
+from tkinter import filedialog
+from datetime import datetime
 import ctypes
 import ctypes.wintypes
 import urllib.request
 import urllib.error
 
 _CUR_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# --- 必须在任何 import db 之前设置 PAPACHECK_DB_DIR ---
+if getattr(sys, 'frozen', False):
+    _LOCAL_APP_DATA = os.environ.get('LOCALAPPDATA', os.path.expanduser('~'))
+    _DB_DIR = os.path.join(_LOCAL_APP_DATA, 'PapaCheck', 'Server')
+    os.makedirs(_DB_DIR, exist_ok=True)
+else:
+    _DB_DIR = os.path.normpath(os.path.join(_CUR_DIR, '..', 'PapaCheck.Server'))
+os.environ['PAPACHECK_DB_DIR'] = _DB_DIR
 
 # --- email_client 导入（需在 import server 之前，确保 db 可寻址） ---
 _EMAIL_DIR = os.path.normpath(os.path.join(_CUR_DIR, '..', 'PapaCheck.Email'))
@@ -115,6 +126,7 @@ def _ensure_config():
             'mark_as_read': True,
             'ai_base_url': 'https://api.deepseek.com',
             'ai_model': 'deepseek-chat',
+            'show_apk_hint': True,
         }
         _save_config(template)
     return _load_config()
@@ -137,35 +149,25 @@ def save_homeworks_via_api(server_url, date_key, new_items):
 
 
 if getattr(sys, 'frozen', False):
-    _SERVER_DIR = os.path.join(sys._MEIPASS, 'PapaCheck.Server')
-    _EXE_DIR = os.path.dirname(sys.executable)
+    _SERVER_DIR = os.path.join(sys._MEIPASS, 'Server')
 
-    _neighbor_db = os.path.normpath(os.path.join(
-        _EXE_DIR, '..', '..', 'PapaCheck.Server', 'data.db'))
-    if os.path.exists(_neighbor_db):
-        _DB_DIR = os.path.dirname(_neighbor_db)
-    else:
-        _DB_DIR = _EXE_DIR
-        _bundled_db = os.path.join(_SERVER_DIR, 'data.db')
-        _target_db = os.path.join(_EXE_DIR, 'data.db')
-        if os.path.exists(_bundled_db) and not os.path.exists(_target_db):
-            try:
-                shutil.copy2(_bundled_db, _target_db)
-            except Exception:
-                pass
+    _bundled_db = os.path.join(_SERVER_DIR, 'data.db')
+    _target_db = os.path.join(_DB_DIR, 'data.db')
+    if os.path.exists(_bundled_db) and not os.path.exists(_target_db):
+        try:
+            shutil.copy2(_bundled_db, _target_db)
+        except Exception:
+            pass
 
     ICON_TRAY = os.path.join(sys._MEIPASS, 'icon.ico')
     ICON_TBAR = os.path.join(sys._MEIPASS, 'icon.ico')
 else:
     _SERVER_DIR = os.path.normpath(os.path.join(_CUR_DIR, '..', 'PapaCheck.Server'))
-    _DB_DIR = _SERVER_DIR
     ICON_TRAY = os.path.join(_CUR_DIR, 'icon.ico')
     ICON_TBAR = os.path.join(_CUR_DIR, 'icon.ico')
 
 if _SERVER_DIR not in sys.path:
     sys.path.insert(0, _SERVER_DIR)
-
-os.environ['PAPACHECK_DB_DIR'] = _DB_DIR
 
 import winreg
 from server import init_server
@@ -263,8 +265,11 @@ class PapaCheckApp:
         self.root.update_idletasks()
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
-        self.root.geometry(f'620x560+{(sw - 620) // 2}+{(sh - 560) // 2}')
+        self._screen_w = sw
+        self._screen_h = sh
         self.root.deiconify()
+
+        self._apk_hint_visible = True
 
         self.server = None
         self.server_thread = None
@@ -281,6 +286,7 @@ class PapaCheckApp:
 
         try:
             self.root.iconbitmap(ICON_TBAR)
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('PapaCheck')
         except Exception:
             pass
 
@@ -376,10 +382,33 @@ class PapaCheckApp:
                       f'{SYMBOL_MAN} 爸爸管理端',
                       PORT, '/admin.html', 'parent_url', '#38bdf8', None)
 
+        # --- APK 下载提示 ---
+        cfg_hint = _load_config()
+        if cfg_hint and cfg_hint.get('show_apk_hint', True):
+            self._apk_hint_visible = True
+            hint_row = tk.Frame(urls_frame, bg='#1e293b')
+            hint_row.pack(fill=tk.X, padx=16, pady=(12, 0))
+            self._apk_hint_row = hint_row
+            self._apk_hint_label = tk.Label(hint_row,
+                text='📦 首次使用？在 Android 设备浏览器中访问:',
+                font=('Microsoft YaHei UI', 9), bg='#1e293b', fg='#fbbf24')
+            self._apk_hint_label.pack(side=tk.LEFT)
+            self._apk_dismiss_btn = tk.Label(hint_row,
+                text='不再提醒', font=('Microsoft YaHei UI', 8),
+                fg='#64748b', bg='#1e293b', cursor='hand2')
+            self._apk_dismiss_btn.bind('<Button-1>', lambda e: self._dismiss_apk_hint())
+            self._apk_dismiss_btn.pack(side=tk.RIGHT)
+            self._apk_url_label = tk.Label(urls_frame,
+                text='',
+                font=('Consolas', 9), bg='#1e293b', fg='#94a3b8')
+            self._apk_url_label.pack(fill=tk.X, padx=16, pady=(0, 12))
+        else:
+            self._apk_hint_visible = False
+
         # --- 分隔线标题：服务器日志 ---
-        sep_title = tk.Frame(self.root, bg=bg)
-        sep_title.pack(fill=tk.X, padx=20, pady=(4, 2))
-        tk.Label(sep_title, text='── 服务器日志 ──',
+        self._log_sep = tk.Frame(self.root, bg=bg)
+        self._log_sep.pack(fill=tk.X, padx=20, pady=(4, 2))
+        tk.Label(self._log_sep, text='── 服务器日志 ──',
                  font=('Microsoft YaHei UI', 9), bg=bg, fg='#64748b').pack(anchor=tk.W)
 
         # --- 日志区域（带边框，固定高度防止挤压按钮） ---
@@ -427,6 +456,34 @@ class PapaCheckApp:
                                             activebackground=bg, activeforeground=fg,
                                             command=self._toggle_autostart)
         self.auto_start_cb.pack(side=tk.RIGHT, padx=(0, 16))
+
+        h = 580 if self._apk_hint_visible else 520
+        self.root.geometry(f'620x{h}+{(self._screen_w - 620) // 2}+{(self._screen_h - h) // 2}')
+
+    def _apply_window_height(self, visible):
+        self._apk_hint_visible = visible
+        h = 580 if visible else 520
+        x = self.root.winfo_x()
+        y = self.root.winfo_y()
+        self.root.geometry(f'620x{h}+{x}+{y}')
+
+    def _dismiss_apk_hint(self):
+        self._apk_hint_row.pack_forget()
+        self._apk_url_label.pack_forget()
+        self._apply_window_height(False)
+        cfg = _load_config() or {}
+        cfg['show_apk_hint'] = False
+        _save_config(cfg)
+
+    def _restore_apk_hint(self):
+        self._apk_hint_row.pack(fill=tk.X, padx=16, pady=(12, 0),
+                                before=self._log_sep)
+        self._apk_url_label.pack(fill=tk.X, padx=16, pady=(0, 12),
+                                 before=self._log_sep)
+        self._apply_window_height(True)
+        cfg = _load_config() or {}
+        cfg['show_apk_hint'] = True
+        _save_config(cfg)
 
     def _plain_btn(self, parent, text, command):
         return tk.Button(parent, text=text, font=('Microsoft YaHei UI', 9),
@@ -533,6 +590,13 @@ class PapaCheckApp:
     # ===== 服务器生命周期 =====
 
     def _start_server(self):
+        if self.server:
+            try:
+                self.server.server_close()
+            except Exception:
+                pass
+            self.server = None
+
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         in_use = False
         try:
@@ -566,8 +630,12 @@ class PapaCheckApp:
         self._child_url_var.set('http://' + self.ip + ':' + str(PORT))
         self._parent_url_var.set('http://' + self.ip + ':' + str(PORT) + '/admin.html')
         self.ip_label.config(text='局域网 IP: ' + self.ip)
+        if self._apk_hint_visible:
+            self._apk_url_label.config(
+                text='http://' + self.ip + ':' + str(PORT) + '/api/download')
 
         self._append_log('服务器启动成功 (端口 ' + str(PORT) + ', 局域网 IP: ' + self.ip + ')')
+        self._append_log('数据库位置: ' + os.path.join(_DB_DIR, 'data.db'))
 
         self.root.after(2000, self._check_still_running)
 
@@ -601,6 +669,12 @@ class PapaCheckApp:
             self.root.after(2000, self._check_still_running)
 
     def _handle_server_exit(self):
+        if self.server:
+            try:
+                self.server.server_close()
+            except Exception:
+                pass
+            self.server = None
         self.log_redirector.__exit__(None, None, None)
         self.running = False
         self._set_status(False)
@@ -771,9 +845,15 @@ class PapaCheckApp:
             ent.grid(row=row, column=col, padx=(0, 10), pady=4, sticky='w')
             return var
 
-        # --- 服务器地址 ---
+        # --- 分隔: 服务器设置 ---
+        tk.Label(win, text='── 服务器设置 ──', font=('Microsoft YaHei UI', 9),
+                 bg=label_bg, fg='#64748b').grid(row=row, column=0, columnspan=3,
+                                                  sticky='w', padx=16, pady=(12, 4))
+        row += 1
+
+        # 服务器地址
         tk.Label(win, text='服务器地址', font=('Microsoft YaHei UI', 10),
-                 bg=label_bg, fg='#94a3b8').grid(row=row, column=0, sticky='w', padx=16, pady=(16, 2))
+                 bg=label_bg, fg='#94a3b8').grid(row=row, column=0, sticky='w', padx=16, pady=4)
         _server_url_var = tk.StringVar(value=cfg.get('server_url', 'http://localhost:8080'))
         server_ent = tk.Entry(win, textvariable=_server_url_var, font=('Consolas', 10),
                                bg=entry_bg, fg=entry_fg, bd=0,
@@ -782,6 +862,47 @@ class PapaCheckApp:
                                width=36)
         server_ent.grid(row=row, column=1, padx=(0, 10), pady=4, sticky='w')
         row += 1
+
+        show_hint_var = tk.BooleanVar(value=cfg.get('show_apk_hint', True))
+        tk.Checkbutton(win, text='显示 APK 下载提示', variable=show_hint_var,
+                       font=('Microsoft YaHei UI', 9),
+                       bg=label_bg, fg='#94a3b8',
+                       selectcolor=label_bg,
+                       activebackground=label_bg, activeforeground=fg).grid(
+                           row=row, column=1, sticky='w', padx=(0, 10), pady=2)
+        row += 1
+
+        def _import_database(win):
+            if self.running:
+                tkmsg.showwarning('提示',
+                    '服务器正在运行，请先停止服务器再导入数据库。',
+                    parent=win)
+                return
+            path = filedialog.askopenfilename(
+                parent=win, title='选择数据库文件',
+                filetypes=[('SQLite 数据库', '*.db'), ('所有文件', '*.*')])
+            if not path:
+                return
+            target = os.path.join(_DB_DIR, 'data.db')
+            backup = os.path.join(_DB_DIR, 'data.db.backup_' +
+                                  datetime.now().strftime('%Y%m%d_%H%M%S'))
+            try:
+                if os.path.exists(target):
+                    shutil.copy2(target, backup)
+                shutil.copy2(path, target)
+                tkmsg.showinfo('成功',
+                    '数据库已导入！\n原数据库已备份为:\n' + backup +
+                    '\n\n请重新启动服务器以加载新数据库。', parent=win)
+            except Exception as e:
+                tkmsg.showerror('导入失败', str(e), parent=win)
+
+        tk.Button(win, text='导入数据库', font=('Microsoft YaHei UI', 9),
+                  bg='#334155', fg='#fbbf24',
+                  activebackground='#475569', activeforeground='white',
+                  relief=tk.FLAT, bd=0, padx=12, pady=4, cursor='hand2',
+                  command=lambda: _import_database(win)).grid(
+                      row=row, column=1, sticky='w', padx=(0, 10), pady=2)
+        row += 2
 
         # --- 分隔: 邮箱配置 ---
         tk.Label(win, text='── 邮箱配置 ──', font=('Microsoft YaHei UI', 9),
@@ -895,6 +1016,7 @@ class PapaCheckApp:
                 new_cfg['port'] = 993
             new_cfg['server_url'] = _server_url_var.get().strip()
             new_cfg['mark_as_read'] = mark_read_var.get()
+            new_cfg['show_apk_hint'] = show_hint_var.get()
 
             required = {'email', 'imap_server', 'sender'}
             for k in required:
@@ -935,6 +1057,11 @@ class PapaCheckApp:
                         self._append_log('已清除 AI API Key 凭据')
 
             self._append_log('服务配置已保存')
+            if show_hint_var.get() != self._apk_hint_visible:
+                if show_hint_var.get():
+                    self._restore_apk_hint()
+                else:
+                    self._dismiss_apk_hint()
             win.destroy()
 
         tk.Button(btn_frame, text='保存', font=('Microsoft YaHei UI', 9),
