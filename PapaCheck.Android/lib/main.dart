@@ -174,7 +174,10 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         content: Text('无法连接到 $url\n请确认服务器已启动'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              SystemNavigator.pop();
+            },
             child: const Text('退出'),
           ),
           TextButton(
