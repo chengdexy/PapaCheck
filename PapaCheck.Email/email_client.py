@@ -97,9 +97,24 @@ def guess_imap_server(email_addr):
 def load_config():
     config_path = os.path.join(os.path.dirname(__file__), 'config.json')
     if not os.path.exists(config_path):
-        print(f'错误: 配置文件不存在: {config_path}')
-        print('请复制 config.json 模板并填写邮箱信息后重新运行')
-        raise FileNotFoundError(f'config.json not found at {config_path}')
+        template = {
+            "email": "",
+            "password": "",
+            "imap_server": "",
+            "port": 993,
+            "sender": "",
+            "search_all": False,
+            "mark_as_read": False,
+            "server_db_path": "../PapaCheck.Server/data.db",
+            "ai_api_key": "",
+            "ai_base_url": "https://api.deepseek.com",
+            "ai_model": "deepseek-chat",
+        }
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(template, f, ensure_ascii=False, indent=4)
+        print(f'已生成配置文件模板: {config_path}')
+        print('请编辑该文件填写邮箱和 AI 配置信息后重新运行')
+        raise FileNotFoundError(f'config.json 模板已生成，请填写后重试')
 
     with open(config_path, 'r', encoding='utf-8') as f:
         cfg = json.load(f)
