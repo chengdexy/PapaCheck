@@ -37,3 +37,6 @@ _chat/
 PapaCheck.Windows/build/
 PapaCheck.Windows/dist/
 *.spec
+
+# PapaCheck.Email 配置文件（含敏感信息）
+PapaCheck.Email/config.json
