@@ -128,6 +128,8 @@ def _ensure_config():
             'ai_model': 'deepseek-chat',
             'show_apk_hint': True,
             'email_attachment_dir': '',
+            'use_ai_email': False,
+            'auto_start_server': True,
         }
         _save_config(template)
     return _load_config()
@@ -313,10 +315,13 @@ class PapaCheckApp:
 
         self._build_menu()
         self._email_sync_btn = self._plain_btn(
-            self._btn_frame, '📧 邮件作业同步', self._on_email_sync)
-        self._email_sync_btn.pack(side=tk.LEFT, padx=(8, 0))
+            self._btn_frame, 'AI 发作业', self._on_email_sync)
 
-        self.root.after(100, self._start_server)
+        cfg = _load_config() or {}
+        if cfg.get('use_ai_email', False):
+            self._email_sync_btn.pack(side=tk.LEFT, padx=(8, 0))
+
+        self.root.after(100, self._start_server) if cfg.get('auto_start_server', True) else None
         self.root.after(200, self._poll_log_queue)
         self.root.after(300, self._start_tray)
 
@@ -453,14 +458,16 @@ class PapaCheckApp:
         left_btns = tk.Frame(btn_frame, bg=bg)
         left_btns.pack(side=tk.LEFT)
         self._plain_btn(left_btns,
-                        f'{SYMBOL_PHONE} 打开孩子端',
+                        '打开孩子端',
                         self._open_child).pack(side=tk.LEFT)
         self._plain_btn(left_btns,
-                        f'{SYMBOL_CLIPBOARD} 打开管理端',
+                        '打开管理端',
                         self._open_parent).pack(side=tk.LEFT, padx=(8, 0))
         self._open_attach_btn = self._plain_btn(left_btns,
-                        '📂 附件文件夹', self._open_attach_dir)
-        self._open_attach_btn.pack(side=tk.LEFT, padx=(8, 0))
+                        '查看作业附件', self._open_attach_dir)
+        cfg_ui = _load_config() or {}
+        if cfg_ui.get('use_ai_email', False):
+            self._open_attach_btn.pack(side=tk.LEFT, padx=(8, 0))
 
         right_btns = tk.Frame(btn_frame, bg=bg)
         right_btns.pack(side=tk.RIGHT)
@@ -877,16 +884,6 @@ class PapaCheckApp:
 
         row = 0
 
-        def _make_entry(col, default_val='', readonly=False):
-            var = tk.StringVar(value=default_val)
-            state = 'readonly' if readonly else 'normal'
-            ent = tk.Entry(win, textvariable=var, font=('Consolas', 10),
-                           bg=entry_bg, fg=entry_fg, bd=0,
-                           highlightthickness=0, insertbackground=entry_fg,
-                           state=state, width=36)
-            ent.grid(row=row, column=col, padx=(0, 10), pady=4, sticky='w')
-            return var
-
         # --- 分隔: 服务器设置 ---
         tk.Label(win, text='── 服务器设置 ──', font=('Microsoft YaHei UI', 9),
                  bg=label_bg, fg='#64748b').grid(row=row, column=0, columnspan=3,
@@ -905,6 +902,49 @@ class PapaCheckApp:
         server_ent.grid(row=row, column=1, padx=(0, 10), pady=4, sticky='w')
         row += 1
 
+        _email_ai_widgets = []
+
+        def _toggle_email_ai_sections():
+            if _use_ai_email_var.get():
+                for w in _email_ai_widgets:
+                    w.grid()
+            else:
+                for w in _email_ai_widgets:
+                    w.grid_remove()
+            win.resizable(True, True)
+            win.geometry('')
+            win.update_idletasks()
+            w = max(520, win.winfo_reqwidth())
+            h = win.winfo_reqheight()
+            rwx = self.root.winfo_x()
+            rwy = self.root.winfo_y()
+            rww = self.root.winfo_width()
+            rwh = self.root.winfo_height()
+            x = rwx + (rww - w) // 2
+            y = rwy + (rwh - h) // 2
+            win.geometry(f'{w}x{h}+{x}+{y}')
+            win.resizable(False, False)
+
+        _use_ai_email_var = tk.BooleanVar(value=cfg.get('use_ai_email', False))
+        tk.Checkbutton(win, text='使用AI 解析邮件，自动发布作业到孩子端',
+                       variable=_use_ai_email_var,
+                       font=('Microsoft YaHei UI', 9),
+                       bg=label_bg, fg='#fbbf24',
+                       selectcolor=label_bg,
+                       activebackground=label_bg, activeforeground='#fbbf24',
+                       command=_toggle_email_ai_sections).grid(
+                           row=row, column=1, sticky='w', padx=(0, 10), pady=2)
+        row += 1
+
+        _auto_start_server_var = tk.BooleanVar(value=cfg.get('auto_start_server', True))
+        tk.Checkbutton(win, text='程序启动时，自动启动服务器', variable=_auto_start_server_var,
+                       font=('Microsoft YaHei UI', 9),
+                       bg=label_bg, fg='#94a3b8',
+                       selectcolor=label_bg,
+                       activebackground=label_bg, activeforeground=fg).grid(
+                           row=row, column=1, sticky='w', padx=(0, 10), pady=2)
+        row += 1
+
         show_hint_var = tk.BooleanVar(value=cfg.get('show_apk_hint', True))
         tk.Checkbutton(win, text='显示 APK 下载提示', variable=show_hint_var,
                        font=('Microsoft YaHei UI', 9),
@@ -921,31 +961,6 @@ class PapaCheckApp:
                        selectcolor=label_bg,
                        activebackground=label_bg, activeforeground=fg).grid(
                            row=row, column=1, sticky='w', padx=(0, 10), pady=2)
-        row += 1
-
-        default_dir = _get_attachment_dir(cfg)
-        tk.Label(win, text='附件下载目录', font=('Microsoft YaHei UI', 10),
-                 bg=label_bg, fg='#94a3b8').grid(row=row, column=0, sticky='w', padx=16, pady=4)
-        _attach_dir_var = tk.StringVar(value=cfg.get('email_attachment_dir', '') or _get_default_attachment_dir())
-        attach_ent = tk.Entry(win, textvariable=_attach_dir_var, font=('Consolas', 10),
-                               bg=entry_bg, fg=entry_fg, bd=0,
-                               highlightthickness=0, insertbackground=entry_fg,
-                               width=36)
-        attach_ent.grid(row=row, column=1, padx=(0, 10), pady=4, sticky='w')
-
-        def _browse_attach_dir():
-            path = filedialog.askdirectory(
-                parent=win, title='选择附件下载目录',
-                initialdir=_attach_dir_var.get() or default_dir)
-            if path:
-                _attach_dir_var.set(path)
-
-        tk.Button(win, text='选择文件夹', font=('Microsoft YaHei UI', 9),
-                  bg='#334155', fg='#94a3b8',
-                  activebackground='#475569', activeforeground='white',
-                  relief=tk.FLAT, bd=0, padx=12, pady=4, cursor='hand2',
-                  command=_browse_attach_dir).grid(
-                      row=row, column=2, sticky='w', padx=(0, 10), pady=2)
         row += 1
 
         def _import_database(win):
@@ -981,9 +996,11 @@ class PapaCheckApp:
         row += 2
 
         # --- 分隔: 邮箱配置 ---
-        tk.Label(win, text='── 邮箱配置 ──', font=('Microsoft YaHei UI', 9),
-                 bg=label_bg, fg='#64748b').grid(row=row, column=0, columnspan=3,
-                                                  sticky='w', padx=16, pady=(12, 4))
+        email_section_label = tk.Label(win, text='── 邮箱配置 ──', font=('Microsoft YaHei UI', 9),
+                 bg=label_bg, fg='#64748b')
+        email_section_label.grid(row=row, column=0, columnspan=3,
+                                  sticky='w', padx=16, pady=(4, 4))
+        _email_ai_widgets.append(email_section_label)
         row += 1
 
         labels_and_keys = [
@@ -995,8 +1012,10 @@ class PapaCheckApp:
         ]
         entries = {}
         for text, key in labels_and_keys:
-            tk.Label(win, text=text, font=('Microsoft YaHei UI', 10),
-                     bg=label_bg, fg=fg).grid(row=row, column=0, sticky='w', padx=16, pady=2)
+            lbl = tk.Label(win, text=text, font=('Microsoft YaHei UI', 10),
+                     bg=label_bg, fg=fg)
+            lbl.grid(row=row, column=0, sticky='w', padx=16, pady=2)
+            _email_ai_widgets.append(lbl)
             if text == '密码/授权码':
                 try:
                     default_pw = _credential_read('PapaCheck/email_password') or ''
@@ -1008,39 +1027,86 @@ class PapaCheckApp:
                                highlightthickness=0, insertbackground=entry_fg,
                                show='*', width=36)
                 ent.grid(row=row, column=1, padx=(0, 10), pady=2, sticky='w')
+                _email_ai_widgets.append(ent)
                 entries['password'] = var
             elif key == 'port':
-                var = _make_entry(1, str(cfg.get(key, 993)))
+                var = tk.StringVar(value=str(cfg.get(key, 993)))
+                ent = tk.Entry(win, textvariable=var, font=('Consolas', 10),
+                               bg=entry_bg, fg=entry_fg, bd=0,
+                               highlightthickness=0, insertbackground=entry_fg,
+                               width=36)
+                ent.grid(row=row, column=1, padx=(0, 10), pady=2, sticky='w')
+                _email_ai_widgets.append(ent)
                 entries[key] = var
             else:
-                var = _make_entry(1, cfg.get(key, ''))
+                var = tk.StringVar(value=cfg.get(key, ''))
+                ent = tk.Entry(win, textvariable=var, font=('Consolas', 10),
+                               bg=entry_bg, fg=entry_fg, bd=0,
+                               highlightthickness=0, insertbackground=entry_fg,
+                               width=36)
+                ent.grid(row=row, column=1, padx=(0, 10), pady=2, sticky='w')
+                _email_ai_widgets.append(ent)
                 entries[key] = var
             row += 1
 
         win._entries = entries
 
-        # 邮箱测试连通性按钮
-        tk.Button(win, text='测试连通性', font=('Microsoft YaHei UI', 9),
+        email_test_row = tk.Frame(win, bg=label_bg)
+        email_test_row.grid(row=row, column=1, sticky='w', padx=(0, 10), pady=2)
+
+        email_test_btn = tk.Button(email_test_row, text='测试连通性', font=('Microsoft YaHei UI', 9),
                   bg='#334155', fg='#94a3b8',
                   activebackground='#475569', activeforeground='white',
                   relief=tk.FLAT, bd=0, padx=12, pady=4, cursor='hand2',
-                  command=lambda: self._test_email_connectivity(win)).grid(
-                      row=row, column=1, sticky='w', padx=(0, 10), pady=2)
+                  command=lambda: self._test_email_connectivity(win))
+        email_test_btn.pack(side=tk.LEFT)
 
-        row += 1
         mark_read_var = tk.BooleanVar(value=cfg.get('mark_as_read', True))
-        tk.Checkbutton(win, text='读取后标记为已读', variable=mark_read_var,
+        mark_read_cb = tk.Checkbutton(email_test_row, text='读取后标记为已读', variable=mark_read_var,
                        font=('Microsoft YaHei UI', 9),
                        bg=label_bg, fg='#94a3b8',
                        selectcolor=label_bg,
-                       activebackground=label_bg, activeforeground=fg).grid(
-                           row=row, column=1, sticky='w', padx=(0, 10), pady=2)
+                       activebackground=label_bg, activeforeground=fg)
+        mark_read_cb.pack(side=tk.LEFT, padx=(8, 0))
+
+        _email_ai_widgets.append(email_test_row)
+        row += 1
+
+        default_dir = _get_attachment_dir(cfg)
+        attach_lbl = tk.Label(win, text='附件下载目录', font=('Microsoft YaHei UI', 10),
+                 bg=label_bg, fg=fg)
+        attach_lbl.grid(row=row, column=0, sticky='w', padx=16, pady=4)
+        _email_ai_widgets.append(attach_lbl)
+        _attach_dir_var = tk.StringVar(value=cfg.get('email_attachment_dir', '') or _get_default_attachment_dir())
+        attach_ent = tk.Entry(win, textvariable=_attach_dir_var, font=('Consolas', 10),
+                               bg=entry_bg, fg=entry_fg, bd=0,
+                               highlightthickness=0, insertbackground=entry_fg,
+                               width=36)
+        attach_ent.grid(row=row, column=1, padx=(0, 10), pady=4, sticky='w')
+        _email_ai_widgets.append(attach_ent)
+
+        def _browse_attach_dir():
+            path = filedialog.askdirectory(
+                parent=win, title='选择附件下载目录',
+                initialdir=_attach_dir_var.get() or default_dir)
+            if path:
+                _attach_dir_var.set(path)
+
+        browse_btn = tk.Button(win, text='选择文件夹', font=('Microsoft YaHei UI', 9),
+                  bg='#334155', fg='#94a3b8',
+                  activebackground='#475569', activeforeground='white',
+                  relief=tk.FLAT, bd=0, padx=12, pady=4, cursor='hand2',
+                  command=_browse_attach_dir)
+        browse_btn.grid(row=row, column=2, sticky='w', padx=(0, 10), pady=2)
+        _email_ai_widgets.append(browse_btn)
         row += 2
 
         # --- 分隔: AI 配置 ---
-        tk.Label(win, text='── AI 配置 ──', font=('Microsoft YaHei UI', 9),
-                 bg=label_bg, fg='#64748b').grid(row=row, column=0, columnspan=3,
-                                                  sticky='w', padx=16, pady=(12, 4))
+        ai_section_label = tk.Label(win, text='── AI 配置 ──', font=('Microsoft YaHei UI', 9),
+                 bg=label_bg, fg='#64748b')
+        ai_section_label.grid(row=row, column=0, columnspan=3,
+                                  sticky='w', padx=16, pady=(4, 4))
+        _email_ai_widgets.append(ai_section_label)
         row += 1
 
         ai_labels = [
@@ -1049,8 +1115,10 @@ class PapaCheckApp:
             ('模型', 'ai_model'),
         ]
         for text, key in ai_labels:
-            tk.Label(win, text=text, font=('Microsoft YaHei UI', 10),
-                     bg=label_bg, fg=fg).grid(row=row, column=0, sticky='w', padx=16, pady=2)
+            lbl = tk.Label(win, text=text, font=('Microsoft YaHei UI', 10),
+                     bg=label_bg, fg=fg)
+            lbl.grid(row=row, column=0, sticky='w', padx=16, pady=2)
+            _email_ai_widgets.append(lbl)
             if text == 'API Key':
                 try:
                     default_key = _credential_read('PapaCheck/ai_api_key') or ''
@@ -1062,20 +1130,31 @@ class PapaCheckApp:
                                highlightthickness=0, insertbackground=entry_fg,
                                show='*', width=36)
                 ent.grid(row=row, column=1, padx=(0, 10), pady=2, sticky='w')
+                _email_ai_widgets.append(ent)
                 entries['ai_api_key'] = var
             else:
-                var = _make_entry(1, cfg.get(key, ''))
+                var = tk.StringVar(value=cfg.get(key, ''))
+                ent = tk.Entry(win, textvariable=var, font=('Consolas', 10),
+                               bg=entry_bg, fg=entry_fg, bd=0,
+                               highlightthickness=0, insertbackground=entry_fg,
+                               width=36)
+                ent.grid(row=row, column=1, padx=(0, 10), pady=2, sticky='w')
+                _email_ai_widgets.append(ent)
                 entries[key] = var
             row += 1
 
-        # AI 测试连通性按钮
-        tk.Button(win, text='测试连通性', font=('Microsoft YaHei UI', 9),
+        ai_test_btn = tk.Button(win, text='测试连通性', font=('Microsoft YaHei UI', 9),
                   bg='#334155', fg='#94a3b8',
                   activebackground='#475569', activeforeground='white',
                   relief=tk.FLAT, bd=0, padx=12, pady=4, cursor='hand2',
-                  command=lambda: self._test_ai_connectivity(win)).grid(
-                      row=row, column=1, sticky='w', padx=(0, 10), pady=2)
+                  command=lambda: self._test_ai_connectivity(win))
+        ai_test_btn.grid(row=row, column=1, sticky='w', padx=(0, 10), pady=2)
+        _email_ai_widgets.append(ai_test_btn)
         row += 2
+
+        if not _use_ai_email_var.get():
+            for w in _email_ai_widgets:
+                w.grid_remove()
 
         # --- 底部按钮 ---
         btn_frame = tk.Frame(win, bg='#0f172a')
@@ -1095,6 +1174,8 @@ class PapaCheckApp:
                 'mark_as_read': mark_read_var.get(),
                 'show_apk_hint': show_hint_var.get(),
                 'email_attachment_dir': _attach_dir_var.get().strip(),
+                'use_ai_email': _use_ai_email_var.get(),
+                'auto_start_server': _auto_start_server_var.get(),
             }
 
         _original_cfg = _snapshot_cfg()
@@ -1131,12 +1212,16 @@ class PapaCheckApp:
             new_cfg['show_apk_hint'] = show_hint_var.get()
             new_cfg['email_attachment_dir'] = _attach_dir_var.get().strip()
             new_cfg['show_polling_log'] = _show_polling_log_var.get()
+            new_cfg['use_ai_email'] = _use_ai_email_var.get()
+            new_cfg['auto_start_server'] = _auto_start_server_var.get()
 
             required = {'email', 'imap_server', 'sender'}
-            for k in required:
-                if not new_cfg.get(k):
-                    tkmsg.showwarning('提示', f'请填写 {k}', parent=win)
-                    return
+            use_ai = _use_ai_email_var.get()
+            if use_ai:
+                for k in required:
+                    if not new_cfg.get(k):
+                        tkmsg.showwarning('提示', f'请填写 {k}', parent=win)
+                        return
 
             _save_config(new_cfg)
 
@@ -1185,6 +1270,7 @@ class PapaCheckApp:
                     self._restore_apk_hint()
                 else:
                     self._dismiss_apk_hint()
+            self._update_email_ai_buttons(_use_ai_email_var.get())
             win.destroy()
 
         tk.Button(btn_frame, text='保存', font=('Microsoft YaHei UI', 9),
@@ -1213,6 +1299,18 @@ class PapaCheckApp:
         win.resizable(False, False)
         win.deiconify()
         win.grab_set()
+
+    def _update_email_ai_buttons(self, visible):
+        if visible:
+            if not self._email_sync_btn.winfo_ismapped():
+                self._email_sync_btn.pack(side=tk.LEFT, padx=(8, 0))
+            if not self._open_attach_btn.winfo_ismapped():
+                self._open_attach_btn.pack(side=tk.LEFT, padx=(8, 0))
+        else:
+            if self._email_sync_btn.winfo_ismapped():
+                self._email_sync_btn.pack_forget()
+            if self._open_attach_btn.winfo_ismapped():
+                self._open_attach_btn.pack_forget()
 
     def _test_email_connectivity(self, parent):
         entries = getattr(parent, '_entries', {})
@@ -1352,7 +1450,7 @@ class PapaCheckApp:
             self.root.after(0, lambda: self._append_log(f'错误: {e}'))
         finally:
             self.root.after(0, lambda: self._email_sync_btn.config(
-                state=tk.NORMAL, text='📧 邮件作业同步'))
+                state=tk.NORMAL, text='AI 发作业'))
 
     def run(self):
         if self._instance_sock is None:
