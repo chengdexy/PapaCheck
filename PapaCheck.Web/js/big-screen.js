@@ -93,28 +93,30 @@ function tickActiveTimers(activeHw) {
       }
       if (labelEl) labelEl.textContent = progress + '%';
     } else if (activeHw) {
-      const totalSeconds = activeHw.suggestedDuration * 60;
-      const remainingSeconds = Math.max(0, totalSeconds - elapsedSeconds);
-      const progress = Math.min(100, Math.round(elapsedSeconds / totalSeconds * 100));
+      if (activeHw.mode === 'challenge') {
+        const totalSeconds = activeHw.suggestedDuration * 60;
+        const remainingSeconds = Math.max(0, totalSeconds - elapsedSeconds);
+        const progress = Math.min(100, Math.round(elapsedSeconds / totalSeconds * 100));
 
-      if (timerEl) timerEl.textContent = remainingSeconds > 0
-        ? '倒计时: ' + Util.formatDuration(remainingSeconds)
-        : '超时 ' + Util.formatDuration(elapsedSeconds - totalSeconds);
+        if (timerEl) timerEl.textContent = remainingSeconds > 0
+          ? '倒计时: ' + Util.formatDuration(remainingSeconds)
+          : '超时 ' + Util.formatDuration(elapsedSeconds - totalSeconds);
 
-      let cls = 'homework-timer countdown';
-      if (progress >= 100) cls = 'homework-timer overtime';
-      else if (progress >= 80) cls = 'homework-timer warning';
-      if (timerEl) timerEl.className = cls;
+        let cls = 'homework-timer countdown';
+        if (progress >= 100) cls = 'homework-timer overtime';
+        else if (progress >= 80) cls = 'homework-timer warning';
+        if (timerEl) timerEl.className = cls;
 
-      if (pbarEl) {
-        pbarEl.style.width = progress + '%';
-        pbarEl.className = 'homework-progress-fill' + (progress >= 100 ? ' overtime' : progress >= 80 ? ' warning' : '');
-      }
-      if (labelEl) labelEl.textContent = progress + '%';
-    } else {
-      if (timerEl) {
-        timerEl.textContent = '已用: ' + Util.formatDuration(elapsedSeconds);
-        timerEl.className = 'homework-timer elapsed';
+        if (pbarEl) {
+          pbarEl.style.width = progress + '%';
+          pbarEl.className = 'homework-progress-fill' + (progress >= 100 ? ' overtime' : progress >= 80 ? ' warning' : '');
+        }
+        if (labelEl) labelEl.textContent = progress + '%';
+      } else {
+        if (timerEl) {
+          timerEl.textContent = '已用: ' + Util.formatDuration(elapsedSeconds);
+          timerEl.className = 'homework-timer elapsed';
+        }
       }
     }
   }

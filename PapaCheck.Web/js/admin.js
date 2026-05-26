@@ -337,6 +337,9 @@ async function saveAdminHw() {
   }
 
   await API.saveHomeworks(AdminUtil.dateKey(adminDate), adminHomeworks);
+  if (!adminEditingId) {
+    await API.saveSettlement(AdminUtil.dateKey(adminDate), {});
+  }
   closeAdminModal();
   await refreshAllData();
   renderHomeworkTab();
@@ -498,7 +501,7 @@ async function submitRating(dateKey, rating) {
     renderHomeworkTab();
     // 预生成评级语音
     if (finalPoints > 0) {
-      pregenSpeech(['爸爸评了' + rating + '，获得' + finalPoints + '分']);
+      pregenSpeech(['今天作业获得的评价是……' + rating + '！']);
     }
     showToast(`已评级: ${rating} · 最终积分: ${finalPoints}`);
   } finally {
@@ -1677,10 +1680,15 @@ async function confirmAdjustPoints() {
     if (diff !== 0) {
       const action = diff > 0 ? 'earn' : 'spend';
       await API.updatePoints(action, Math.abs(diff), `爸爸调整积分至${newBalance}`);
+      const note = diff > 0
+        ? '获得奖励积分：' + diff + '分'
+        : '被惩罚，扣除积分：' + Math.abs(diff) + '分';
+      const s = { ...(cachedData?.settings || {}), _pointsAdjustmentNote: note };
+      await API.saveSettings(s);
+      pregenSpeech([note]);
     }
     await refreshAllData();
     renderSettingsTab();
-    pregenSpeech(['积分已更新为' + newBalance + '分']);
     showToast('积分已更新为：' + newBalance);
   } finally {
     _adjustingPoints = false;
