@@ -25,6 +25,7 @@ if not os.path.isdir(_WEB_ROOT):
     _WEB_ROOT = os.path.join(_BASE, 'Web')
 _TTS_CACHE_DIR = os.path.join(os.environ.get('PAPACHECK_DB_DIR', os.path.dirname(os.path.abspath(__file__))), 'tts_cache')
 _tts_cache = {}
+_show_polling_log = False
 
 os.makedirs(_TTS_CACHE_DIR, exist_ok=True)
 
@@ -249,7 +250,10 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
             return
 
         if path == '/api/settings':
-            db.save_settings(payload.get('settings', {}))
+            data = payload.get('settings', {})
+            db.save_settings(data)
+            global _show_polling_log
+            _show_polling_log = data.get('show_polling_log', False)
             self.send_json({'ok': True})
             return
 
@@ -349,6 +353,8 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
             msg = unquote(args[0])
         except TypeError:
             msg = str(args[0])
+        if not _show_polling_log and 'GET /api/data' in msg:
+            return
         print(f"  [{self.log_date_time_string()}] {msg}", flush=True)
 
 
@@ -362,6 +368,11 @@ def init_server(quiet=False):
         pass
     db.init_db()
     ip = get_local_ip()
+
+    s = db.get_settings()
+    if s:
+        global _show_polling_log
+        _show_polling_log = s.get('show_polling_log', False)
 
     import threading
     fixed_texts = [

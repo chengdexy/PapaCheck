@@ -914,6 +914,40 @@ class PapaCheckApp:
                            row=row, column=1, sticky='w', padx=(0, 10), pady=2)
         row += 1
 
+        _show_polling_log_var = tk.BooleanVar(value=cfg.get('show_polling_log', False))
+        tk.Checkbutton(win, text='显示轮询日志', variable=_show_polling_log_var,
+                       font=('Microsoft YaHei UI', 9),
+                       bg=label_bg, fg='#94a3b8',
+                       selectcolor=label_bg,
+                       activebackground=label_bg, activeforeground=fg).grid(
+                           row=row, column=1, sticky='w', padx=(0, 10), pady=2)
+        row += 1
+
+        default_dir = _get_attachment_dir(cfg)
+        tk.Label(win, text='附件下载目录', font=('Microsoft YaHei UI', 10),
+                 bg=label_bg, fg='#94a3b8').grid(row=row, column=0, sticky='w', padx=16, pady=4)
+        _attach_dir_var = tk.StringVar(value=cfg.get('email_attachment_dir', '') or _get_default_attachment_dir())
+        attach_ent = tk.Entry(win, textvariable=_attach_dir_var, font=('Consolas', 10),
+                               bg=entry_bg, fg=entry_fg, bd=0,
+                               highlightthickness=0, insertbackground=entry_fg,
+                               width=36)
+        attach_ent.grid(row=row, column=1, padx=(0, 10), pady=4, sticky='w')
+
+        def _browse_attach_dir():
+            path = filedialog.askdirectory(
+                parent=win, title='选择附件下载目录',
+                initialdir=_attach_dir_var.get() or default_dir)
+            if path:
+                _attach_dir_var.set(path)
+
+        tk.Button(win, text='选择文件夹', font=('Microsoft YaHei UI', 9),
+                  bg='#334155', fg='#94a3b8',
+                  activebackground='#475569', activeforeground='white',
+                  relief=tk.FLAT, bd=0, padx=12, pady=4, cursor='hand2',
+                  command=_browse_attach_dir).grid(
+                      row=row, column=2, sticky='w', padx=(0, 10), pady=2)
+        row += 1
+
         def _import_database(win):
             if self.running:
                 tkmsg.showwarning('提示',
@@ -1043,37 +1077,6 @@ class PapaCheckApp:
                       row=row, column=1, sticky='w', padx=(0, 10), pady=2)
         row += 2
 
-        # --- 分隔: 附件下载 ---
-        tk.Label(win, text='── 附件下载 ──', font=('Microsoft YaHei UI', 9),
-                 bg=label_bg, fg='#64748b').grid(row=row, column=0, columnspan=3,
-                                                  sticky='w', padx=16, pady=(12, 4))
-        row += 1
-
-        default_dir = _get_attachment_dir(cfg)
-        tk.Label(win, text='下载目录', font=('Microsoft YaHei UI', 10),
-                 bg=label_bg, fg='#94a3b8').grid(row=row, column=0, sticky='w', padx=16, pady=4)
-        _attach_dir_var = tk.StringVar(value=cfg.get('email_attachment_dir', '') or _get_default_attachment_dir())
-        attach_ent = tk.Entry(win, textvariable=_attach_dir_var, font=('Consolas', 10),
-                               bg=entry_bg, fg=entry_fg, bd=0,
-                               highlightthickness=0, insertbackground=entry_fg,
-                               width=36)
-        attach_ent.grid(row=row, column=1, padx=(0, 10), pady=4, sticky='w')
-
-        def _browse_attach_dir():
-            path = filedialog.askdirectory(
-                parent=win, title='选择附件下载目录',
-                initialdir=_attach_dir_var.get() or default_dir)
-            if path:
-                _attach_dir_var.set(path)
-
-        tk.Button(win, text='选择文件夹', font=('Microsoft YaHei UI', 9),
-                  bg='#334155', fg='#94a3b8',
-                  activebackground='#475569', activeforeground='white',
-                  relief=tk.FLAT, bd=0, padx=12, pady=4, cursor='hand2',
-                  command=_browse_attach_dir).grid(
-                      row=row, column=2, sticky='w', padx=(0, 10), pady=2)
-        row += 2
-
         # --- 底部按钮 ---
         btn_frame = tk.Frame(win, bg='#0f172a')
         btn_frame.grid(row=row, column=0, columnspan=3, pady=(8, 16), padx=16, sticky='e')
@@ -1127,6 +1130,7 @@ class PapaCheckApp:
             new_cfg['mark_as_read'] = mark_read_var.get()
             new_cfg['show_apk_hint'] = show_hint_var.get()
             new_cfg['email_attachment_dir'] = _attach_dir_var.get().strip()
+            new_cfg['show_polling_log'] = _show_polling_log_var.get()
 
             required = {'email', 'imap_server', 'sender'}
             for k in required:
@@ -1135,6 +1139,15 @@ class PapaCheckApp:
                     return
 
             _save_config(new_cfg)
+
+            try:
+                url = _server_url_var.get().strip().rstrip('/') + '/api/settings'
+                payload = json.dumps({'settings': {'show_polling_log': _show_polling_log_var.get()}}).encode()
+                req = urllib.request.Request(url, data=payload, method='POST')
+                req.add_header('Content-Type', 'application/json')
+                urllib.request.urlopen(req, timeout=5)
+            except Exception:
+                pass
 
             pw = entries['password'].get().strip()
             if pw:
