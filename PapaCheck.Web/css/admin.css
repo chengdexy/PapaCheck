@@ -872,6 +872,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 input[type="number"] {
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 .settings-section {
@@ -1266,6 +1267,7 @@ input[type="number"] {
     font-weight: 900;
     background: linear-gradient(135deg, #38bdf8, #818cf8);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
   }
 
@@ -1712,6 +1714,7 @@ input[type="number"] {
     font-weight: 900;
     background: linear-gradient(135deg, #38bdf8, #818cf8);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     padding: 4px 12px 20px;
     margin-bottom: 8px;
