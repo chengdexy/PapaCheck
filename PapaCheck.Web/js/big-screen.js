@@ -778,15 +778,21 @@ function updateRatedPage() {
 
 // ========== My Rewards ==========
 function showMyRewards() {
+  if (isAnyTaskActive()) {
+    showToast('请先完成当前任务');
+    return;
+  }
   const overlay = document.getElementById('myRewardsOverlay');
   const content = document.getElementById('myRewardsContent');
   const rewardBox = cachedData?.rewardBox || [];
   const redemptions = cachedData?.redemptions || [];
+  const now = Date.now();
+  const sorted = [...rewardBox].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-  if (rewardBox.length === 0) {
+  if (sorted.length === 0) {
     content.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:18px;">你还没有获得奖励，<br>快去获取积分兑换吧！</div>';
   } else {
-    const available = rewardBox.filter(r => (r.quantity || 0) > 0);
+    const available = sorted.filter(r => (r.quantity || 0) > 0);
     if (available.length === 0) {
       content.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:18px;">你还没有获得奖励，<br>快去获取积分兑换吧！</div>';
     } else {
@@ -798,10 +804,11 @@ function showMyRewards() {
           : r.type === 'buff'
             ? (r.buffDuration ?? 0) + (r.buffUnit === 'minutes' ? '分钟' : '天')
             : '';
+        const isNew = (r.createdAt && now - r.createdAt < 86400000) || (window._recentNewRewardIds && window._recentNewRewardIds.has(r.id));
         return `
         <div class="reward-item">
           <div class="reward-item-info">
-            <div class="reward-item-name">${r.name}</div>
+            <div class="reward-item-name">${r.name}${isNew ? ' <span class="new-badge">NEW</span>' : ''}</div>
             <div class="reward-item-meta">${metaStr}</div>
           </div>
           <span class="reward-qty">× ${qty}</span>
@@ -900,6 +907,10 @@ async function cancelRedemption(redemptionId) {
 
 // ========== Shop Page ==========
 function showShopPage() {
+  if (isAnyTaskActive()) {
+    showToast('请先完成当前任务');
+    return;
+  }
   currentPage = PAGE.SHOP;
   updateShopPage();
 }
@@ -910,19 +921,23 @@ async function updateShopPage() {
 
   const shopItems = cachedData?.shopItems || [];
   const points = cachedData?.points?.balance ?? cachedData?.points ?? 0;
+  const sorted = [...shopItems].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const now = Date.now();
 
   container.innerHTML = `
     <div class="shop-card">
       <div class="settlement-title">积分商店</div>
       <div class="shop-balance">余额: ${points}</div>
       <div class="shop-grid">
-        ${shopItems.length === 0
+        ${sorted.length === 0
       ? '<div style="text-align:center;color:var(--text-secondary);padding:40px;font-size:20px;">商店暂无商品<br>等待爸爸添加</div>'
-      : shopItems.map(item => {
+      : sorted.map(item => {
         const remaining = item.remainingQuantity ?? 0;
         const soldOut = remaining <= 0;
+        const isNew = item.createdAt && (now - item.createdAt < 86400000);
         return `
             <div class="shop-item-card${soldOut ? ' sold-out' : ''}">
+              ${isNew ? '<span class="new-badge">NEW</span>' : ''}
               <div class="shop-item-icon">${item.type === 'time' ? '⏱️' : item.type === 'buff' ? '✨' : '🎁'}</div>
               <div class="shop-item-name">${item.name}</div>
               <div class="shop-item-points">${item.points} 积分 · 剩${remaining}件</div>

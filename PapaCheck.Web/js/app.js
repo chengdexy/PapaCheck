@@ -14,6 +14,8 @@ let tickInterval = null;
 let pollInterval = null;
 let _lastBuffs = null;
 let _lastRewardBox = null;
+let _lastShopItems = null;
+window._recentNewRewardIds = new Set();
 let _lastRatingInfo = null;
 let _lastPoints = null;
 let _lastSettings = null;
@@ -568,12 +570,26 @@ function startPoll(intervalMs) {
         _lastBuffs = cachedData.activeBuffs || [];
       }
 
+      const shopItems = cachedData.shopItems || [];
+      const prevShop = _lastShopItems || [];
+      if (_lastShopItems !== null && JSON.stringify(shopItems) !== JSON.stringify(prevShop)) {
+        const added = shopItems.filter(s => !prevShop.some(p => p.id === s.id));
+        if (added.length > 0) {
+          Voice.speak('积分商店上新啦');
+        }
+        _lastShopItems = shopItems.concat();
+      }
+      if (_lastShopItems === null) {
+        _lastShopItems = shopItems.concat();
+      }
+
       const rb = cachedData.rewardBox || [];
       const prevRb = _lastRewardBox || [];
       if (_lastRewardBox !== null && JSON.stringify(rb) !== JSON.stringify(prevRb)) {
         const addedRb = rb.filter(r => !prevRb.some(p => p.name === r.name) || (r.quantity || 0) > (prevRb.find(p => p.name === r.name)?.quantity || 0));
         if (addedRb.length > 0) {
           Voice.speak('奖励箱有新奖励，快去看看吧');
+          addedRb.forEach(r => window._recentNewRewardIds.add(r.id));
         }
         _lastRewardBox = rb.concat();
       }
