@@ -10,22 +10,39 @@
   <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
+  <div class="admin-layout">
 
-  <div class="admin-header">
-    <h1>PapaCheck 爸~检查！管理端</h1>
-    <span class="admin-date" id="adminDate">--</span>
-  </div>
+    <!-- Sidebar Tabs (wide screens) -->
+    <div class="sidebar-tabs">
+      <div class="sidebar-brand">PapaCheck</div>
+      <button class="tab-btn active" onclick="switchTab('homework')" data-tab="homework"><span class="tab-icon">📋</span><span class="tab-label">作业</span></button>
+      <button class="tab-btn" onclick="switchTab('shop')" data-tab="shop"><span class="tab-icon">🏪</span><span class="tab-label">商店</span></button>
+      <button class="tab-btn" onclick="switchTab('rewardBox')" data-tab="rewardBox"><span class="tab-icon">🎁</span><span class="tab-label">奖励箱</span></button>
+      <button class="tab-btn" onclick="switchTab('redeem')" data-tab="redeem"><span class="tab-icon">📋</span><span class="tab-label">兑换</span></button>
+      <button class="tab-btn" onclick="switchTab('stats')" data-tab="stats"><span class="tab-icon">📊</span><span class="tab-label">统计</span></button>
+      <button class="tab-btn" onclick="switchTab('settings')" data-tab="settings"><span class="tab-icon">⚙️</span><span class="tab-label">设置</span></button>
+    </div>
 
-  <div class="admin-content" id="adminContent"></div>
+    <!-- Main Area -->
+    <div class="main-area">
+      <div class="admin-header">
+        <h1>PapaCheck 爸~检查！管理端</h1>
+        <span class="admin-date" id="adminDate">--</span>
+      </div>
 
-  <!-- Tab Navigation -->
-  <div class="admin-tabs">
-    <button class="tab-btn active" onclick="switchTab('homework')" data-tab="homework"><span class="tab-icon">📋</span><span class="tab-label">作业</span></button>
-    <button class="tab-btn" onclick="switchTab('shop')" data-tab="shop"><span class="tab-icon">🏪</span><span class="tab-label">商店</span></button>
-    <button class="tab-btn" onclick="switchTab('rewardBox')" data-tab="rewardBox"><span class="tab-icon">🎁</span><span class="tab-label">奖励箱</span></button>
-    <button class="tab-btn" onclick="switchTab('redeem')" data-tab="redeem"><span class="tab-icon">📋</span><span class="tab-label">兑换</span></button>
-    <button class="tab-btn" onclick="switchTab('stats')" data-tab="stats"><span class="tab-icon">📊</span><span class="tab-label">统计</span></button>
-    <button class="tab-btn" onclick="switchTab('settings')" data-tab="settings"><span class="tab-icon">⚙️</span><span class="tab-label">设置</span></button>
+      <div class="admin-content" id="adminContent"></div>
+    </div>
+
+    <!-- Bottom Tab Navigation (narrow screens) -->
+    <div class="admin-tabs">
+      <button class="tab-btn active" onclick="switchTab('homework')" data-tab="homework"><span class="tab-icon">📋</span><span class="tab-label">作业</span></button>
+      <button class="tab-btn" onclick="switchTab('shop')" data-tab="shop"><span class="tab-icon">🏪</span><span class="tab-label">商店</span></button>
+      <button class="tab-btn" onclick="switchTab('rewardBox')" data-tab="rewardBox"><span class="tab-icon">🎁</span><span class="tab-label">奖励箱</span></button>
+      <button class="tab-btn" onclick="switchTab('redeem')" data-tab="redeem"><span class="tab-icon">📋</span><span class="tab-label">兑换</span></button>
+      <button class="tab-btn" onclick="switchTab('stats')" data-tab="stats"><span class="tab-icon">📊</span><span class="tab-label">统计</span></button>
+      <button class="tab-btn" onclick="switchTab('settings')" data-tab="settings"><span class="tab-icon">⚙️</span><span class="tab-label">设置</span></button>
+    </div>
+
   </div>
 
   <!-- Modal -->
