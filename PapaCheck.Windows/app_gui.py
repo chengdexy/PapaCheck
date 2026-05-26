@@ -127,9 +127,25 @@ def _ensure_config():
             'ai_base_url': 'https://api.deepseek.com',
             'ai_model': 'deepseek-chat',
             'show_apk_hint': True,
+            'email_attachment_dir': '',
         }
         _save_config(template)
     return _load_config()
+
+
+def _get_default_attachment_dir():
+    if getattr(sys, 'frozen', False):
+        base = os.path.dirname(sys.executable)
+    else:
+        base = _CUR_DIR
+    return os.path.join(base, 'Download')
+
+
+def _get_attachment_dir(cfg):
+    path = cfg.get('email_attachment_dir', '').strip()
+    if path:
+        return path
+    return _get_default_attachment_dir()
 
 
 # --- HTTP API ---
@@ -267,7 +283,6 @@ class PapaCheckApp:
         sh = self.root.winfo_screenheight()
         self._screen_w = sw
         self._screen_h = sh
-        self.root.deiconify()
 
         self._apk_hint_visible = True
 
@@ -291,6 +306,8 @@ class PapaCheckApp:
             pass
 
         self._build_ui()
+
+        self.root.deiconify()
 
         self.root.protocol('WM_DELETE_WINDOW', self._on_close)
 
@@ -422,6 +439,11 @@ class PapaCheckApp:
                                 font=('Consolas', 9), wrap=tk.WORD, state=tk.DISABLED,
                                 bd=0, padx=10, pady=8, highlightthickness=0)
         self.log_text.pack(fill=tk.BOTH, expand=True)
+        self.log_text.tag_config('success', foreground='#4ade80')
+        self.log_text.tag_config('error', foreground='#f87171')
+        self.log_text.tag_config('warning', foreground='#fbbf24')
+        self.log_text.tag_config('info', foreground='#94a3b8')
+        self.log_text.tag_config('highlight', foreground='#60a5fa')
 
         # --- 按钮行：打开孩子端/管理端（左）+ 开机自启动/启动服务器（右） ---
         btn_frame = tk.Frame(self.root, bg=bg)
@@ -436,6 +458,9 @@ class PapaCheckApp:
         self._plain_btn(left_btns,
                         f'{SYMBOL_CLIPBOARD} 打开管理端',
                         self._open_parent).pack(side=tk.LEFT, padx=(8, 0))
+        self._open_attach_btn = self._plain_btn(left_btns,
+                        '📂 附件文件夹', self._open_attach_dir)
+        self._open_attach_btn.pack(side=tk.LEFT, padx=(8, 0))
 
         right_btns = tk.Frame(btn_frame, bg=bg)
         right_btns.pack(side=tk.RIGHT)
@@ -458,14 +483,14 @@ class PapaCheckApp:
         self.auto_start_cb.pack(side=tk.RIGHT, padx=(0, 16))
 
         h = 580 if self._apk_hint_visible else 520
-        self.root.geometry(f'620x{h}+{(self._screen_w - 620) // 2}+{(self._screen_h - h) // 2}')
+        self.root.geometry(f'720x{h}+{(self._screen_w - 720) // 2}+{(self._screen_h - h) // 2}')
 
     def _apply_window_height(self, visible):
         self._apk_hint_visible = visible
         h = 580 if visible else 520
         x = self.root.winfo_x()
         y = self.root.winfo_y()
-        self.root.geometry(f'620x{h}+{x}+{y}')
+        self.root.geometry(f'720x{h}+{x}+{y}')
 
     def _dismiss_apk_hint(self):
         self._apk_hint_row.pack_forget()
@@ -714,14 +739,31 @@ class PapaCheckApp:
     def _write_log(self, text):
         timestamp = time.strftime('%H:%M:%S')
         self.log_text.config(state=tk.NORMAL)
-        self.log_text.insert(tk.END, '[' + timestamp + '] ')
+        tag = self._log_tag(text)
+        self.log_text.insert(tk.END, '[' + timestamp + '] ', 'info')
         for line in text.split('\n'):
             stripped = line.strip()
             if stripped:
                 stripped = re.sub(r'^\s*\[\d{2}/\w{3}/\d{4}\s\d{2}:\d{2}:\d{2}\]\s*', '', stripped)
-                self.log_text.insert(tk.END, stripped + '\n')
+                self.log_text.insert(tk.END, stripped + '\n', tag)
         self.log_text.see(tk.END)
         self.log_text.config(state=tk.DISABLED)
+
+    @staticmethod
+    def _log_tag(text):
+        err_kw = ('错误', '失败', '拒绝', '已被占用')
+        if any(k in text for k in err_kw):
+            return 'error'
+        warn_kw = ('请先', '未找到', '未匹配', '不存在', '无读写', 'AI 未解析')
+        if any(k in text for k in warn_kw):
+            return 'warning'
+        succ_kw = ('成功', '完成', '已复制', '已添加', '已保存', '已清除')
+        if any(k in text for k in succ_kw):
+            return 'success'
+        high_kw = ('服务器启动成功', '数据库位置', '下载了')
+        if any(k in text for k in high_kw):
+            return 'highlight'
+        return 'info'
 
     # ===== 窗口 & 托盘 =====
 
@@ -1001,9 +1043,76 @@ class PapaCheckApp:
                       row=row, column=1, sticky='w', padx=(0, 10), pady=2)
         row += 2
 
+        # --- 分隔: 附件下载 ---
+        tk.Label(win, text='── 附件下载 ──', font=('Microsoft YaHei UI', 9),
+                 bg=label_bg, fg='#64748b').grid(row=row, column=0, columnspan=3,
+                                                  sticky='w', padx=16, pady=(12, 4))
+        row += 1
+
+        default_dir = _get_attachment_dir(cfg)
+        tk.Label(win, text='下载目录', font=('Microsoft YaHei UI', 10),
+                 bg=label_bg, fg='#94a3b8').grid(row=row, column=0, sticky='w', padx=16, pady=4)
+        _attach_dir_var = tk.StringVar(value=cfg.get('email_attachment_dir', '') or _get_default_attachment_dir())
+        attach_ent = tk.Entry(win, textvariable=_attach_dir_var, font=('Consolas', 10),
+                               bg=entry_bg, fg=entry_fg, bd=0,
+                               highlightthickness=0, insertbackground=entry_fg,
+                               width=36)
+        attach_ent.grid(row=row, column=1, padx=(0, 10), pady=4, sticky='w')
+
+        def _browse_attach_dir():
+            path = filedialog.askdirectory(
+                parent=win, title='选择附件下载目录',
+                initialdir=_attach_dir_var.get() or default_dir)
+            if path:
+                _attach_dir_var.set(path)
+
+        tk.Button(win, text='选择文件夹', font=('Microsoft YaHei UI', 9),
+                  bg='#334155', fg='#94a3b8',
+                  activebackground='#475569', activeforeground='white',
+                  relief=tk.FLAT, bd=0, padx=12, pady=4, cursor='hand2',
+                  command=_browse_attach_dir).grid(
+                      row=row, column=2, sticky='w', padx=(0, 10), pady=2)
+        row += 2
+
         # --- 底部按钮 ---
         btn_frame = tk.Frame(win, bg='#0f172a')
         btn_frame.grid(row=row, column=0, columnspan=3, pady=(8, 16), padx=16, sticky='e')
+
+        def _snapshot_cfg():
+            return {
+                'email': entries.get('email', tk.StringVar()).get().strip(),
+                'imap_server': entries.get('imap_server', tk.StringVar()).get().strip(),
+                'port': entries.get('port', tk.StringVar()).get().strip(),
+                'sender': entries.get('sender', tk.StringVar()).get().strip(),
+                'password': entries.get('password', tk.StringVar()).get().strip(),
+                'ai_api_key': entries.get('ai_api_key', tk.StringVar()).get().strip(),
+                'ai_base_url': entries.get('ai_base_url', tk.StringVar()).get().strip(),
+                'ai_model': entries.get('ai_model', tk.StringVar()).get().strip(),
+                'server_url': _server_url_var.get().strip(),
+                'mark_as_read': mark_read_var.get(),
+                'show_apk_hint': show_hint_var.get(),
+                'email_attachment_dir': _attach_dir_var.get().strip(),
+            }
+
+        _original_cfg = _snapshot_cfg()
+
+        def _has_changes():
+            curr = _snapshot_cfg()
+            return curr != _original_cfg
+
+        def _confirm_close():
+            if _has_changes():
+                resp = tkmsg.askyesnocancel('配置未保存',
+                    '配置已修改，是否保存？',
+                    parent=win)
+                if resp is None:
+                    return
+                if resp:
+                    _save()
+                else:
+                    win.destroy()
+            else:
+                win.destroy()
 
         def _save():
             new_cfg = {}
@@ -1017,6 +1126,7 @@ class PapaCheckApp:
             new_cfg['server_url'] = _server_url_var.get().strip()
             new_cfg['mark_as_read'] = mark_read_var.get()
             new_cfg['show_apk_hint'] = show_hint_var.get()
+            new_cfg['email_attachment_dir'] = _attach_dir_var.get().strip()
 
             required = {'email', 'imap_server', 'sender'}
             for k in required:
@@ -1073,7 +1183,9 @@ class PapaCheckApp:
                   bg='#334155', fg='#e2e8f0',
                   activebackground='#475569', activeforeground='white',
                   relief=tk.FLAT, bd=0, padx=20, pady=6, cursor='hand2',
-                  command=win.destroy).pack(side=tk.RIGHT)
+                  command=_confirm_close).pack(side=tk.RIGHT)
+
+        win.protocol('WM_DELETE_WINDOW', _confirm_close)
 
         win.update_idletasks()
         width = max(520, win.winfo_reqwidth())
@@ -1130,6 +1242,12 @@ class PapaCheckApp:
         except Exception as e:
             tkmsg.showerror('失败', f'连接失败: {e}', parent=parent)
 
+    def _open_attach_dir(self):
+        cfg = _load_config()
+        path = _get_attachment_dir(cfg or {})
+        os.makedirs(path, exist_ok=True)
+        os.startfile(path)
+
     def _on_email_sync(self):
         cfg = _load_config()
         if not cfg:
@@ -1176,12 +1294,19 @@ class PapaCheckApp:
                 cfg['email'], pw,
                 cfg['sender'],
                 search_all=False, mark_as_read=cfg.get('mark_as_read', True),
+                attachment_dir=_get_attachment_dir(cfg),
             )
             if not messages:
                 self.root.after(0, lambda: self._append_log('未找到匹配的邮件，同步结束'))
                 return
 
             self.root.after(0, lambda: self._append_log(f'共收取 {len(messages)} 封邮件'))
+
+            attach_count = sum(len(m.get('attachments', [])) for m in messages)
+            if attach_count:
+                attach_dir = _get_attachment_dir(cfg)
+                self.root.after(0, lambda c=attach_count, d=attach_dir: self._append_log(f'下载了 {c} 个附件到 {d}'))
+                self.root.after(100, lambda: self._open_attach_dir())
 
             email_text = '\n'.join(m.get('body', '') for m in messages)
 

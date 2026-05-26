@@ -109,6 +109,7 @@ def load_config():
             "ai_api_key": "",
             "ai_base_url": "https://api.deepseek.com",
             "ai_model": "deepseek-chat",
+            "email_attachment_dir": "",
         }
         with open(config_path, 'w', encoding='utf-8') as f:
             json.dump(template, f, ensure_ascii=False, indent=4)
@@ -214,7 +215,7 @@ def _matches_sender(msg, sender):
     return sender.lower() in from_addr.lower()
 
 
-def fetch_emails_from_sender(imap_server, port, email_addr, password, sender, search_all=False, mark_as_read=False):
+def fetch_emails_from_sender(imap_server, port, email_addr, password, sender, search_all=False, mark_as_read=False, attachment_dir=None):
     print(f'\n正在连接 {imap_server}:{port} ...')
 
     socket.setdefaulttimeout(30)
@@ -229,12 +230,14 @@ def fetch_emails_from_sender(imap_server, port, email_addr, password, sender, se
 
     mail.select('INBOX')
 
+    today_str = date.today().strftime('%d-%b-%Y')
+
     if search_all:
         typ, data = mail.search(None, 'ALL')
         label = '全部邮件'
     else:
-        typ, data = mail.search(None, 'UNSEEN')
-        label = '未读邮件'
+        typ, data = mail.search(None, 'UNSEEN', 'SINCE', today_str)
+        label = '今天未读邮件'
 
     if typ != 'OK':
         raise Exception('搜索邮件失败')
@@ -264,7 +267,7 @@ def fetch_emails_from_sender(imap_server, port, email_addr, password, sender, se
         typ, data = mail.fetch(msg_id, '(RFC822)')
         if typ == 'OK':
             raw_email = data[0][1]
-            parsed = parse_email(raw_email)
+            parsed = parse_email(raw_email, attachment_dir)
             messages.append(parsed)
             print(f'[{i}/{total}] {parsed["subject"]}')
 
@@ -287,7 +290,7 @@ def mark_matched_ids_as_unread(imap_server, port, email_addr, password, matched_
     mail.logout()
 
 
-def parse_email(raw_bytes):
+def parse_email(raw_bytes, attachment_dir=None):
     msg = email.message_from_bytes(raw_bytes, policy=email.policy.default)
 
     subject = decode_str(msg['Subject'])
@@ -296,18 +299,34 @@ def parse_email(raw_bytes):
     date = msg['Date'] or ''
 
     body_text = ''
+    attachments = []
 
     if msg.is_multipart():
         for part in msg.walk():
             content_type = part.get_content_type()
-            content_disposition = str(part.get('Content-Disposition', ''))
+            content_disposition = str(part.get('Content-Disposition', '')).lower()
 
-            if 'attachment' not in content_disposition and content_type == 'text/plain' and not body_text:
+            if 'attachment' in content_disposition or ('inline' in content_disposition and part.get_filename()):
+                filename = part.get_filename()
+                if filename:
+                    filename = decode_str(filename)
+                    file_data = part.get_payload(decode=True)
+                    if file_data and attachment_dir:
+                        os.makedirs(attachment_dir, exist_ok=True)
+                        save_path = _unique_filename(attachment_dir, filename)
+                        with open(save_path, 'wb') as f:
+                            f.write(file_data)
+                        attachments.append({
+                            'filename': filename,
+                            'path': save_path,
+                            'size': len(file_data),
+                        })
+            elif content_type == 'text/plain' and not body_text:
                 try:
                     body_text = part.get_content().strip()
                 except Exception:
                     body_text = ''
-            elif 'attachment' not in content_disposition and content_type == 'text/html' and not body_text:
+            elif content_type == 'text/html' and not body_text:
                 try:
                     body_html = part.get_content()
                     body_text = f'[HTML 内容，共 {len(body_html)} 字符]'
@@ -327,13 +346,26 @@ def parse_email(raw_bytes):
             except Exception:
                 body_text = ''
 
-    return {
+    result = {
         'subject': subject or '(无主题)',
         'from': from_addr,
         'to': to_addr,
         'date': date,
         'body': body_text or '(无正文)',
     }
+    if attachments:
+        result['attachments'] = attachments
+    return result
+
+
+def _unique_filename(directory, filename):
+    base, ext = os.path.splitext(filename)
+    counter = 1
+    path = os.path.join(directory, filename)
+    while os.path.exists(path):
+        path = os.path.join(directory, f'{base}_{counter}{ext}')
+        counter += 1
+    return path
 
 
 def print_email(info):
@@ -475,6 +507,8 @@ def main():
             print('\n程序退出')
             return
 
+        attachment_dir = config.get('email_attachment_dir', '').strip() or None
+
         messages, _ = fetch_emails_from_sender(
             config['imap_server'],
             config['port'],
@@ -483,6 +517,7 @@ def main():
             config['sender'],
             config['search_all'],
             config['mark_as_read'],
+            attachment_dir,
         )
 
         if not messages:

@@ -47,3 +47,6 @@ PapaCheck.Server/tts_cache/*.mp3
 # Android APK 构建产物
 PapaCheck.Android/apk/*.apk
 PapaCheck.Web/apk/*.apk
+
+# 邮件附件下载目录
+PapaCheck.Windows/Download/
