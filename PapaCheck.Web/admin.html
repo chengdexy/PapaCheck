@@ -28,6 +28,7 @@
       <div class="admin-header">
         <h1>PapaCheck 爸~检查！管理端</h1>
         <span class="admin-date" id="adminDate">--</span>
+        <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleMobileNav()" title="菜单">☰</button>
       </div>
 
       <div class="admin-content" id="adminContent"></div>
@@ -43,6 +44,21 @@
       <button class="tab-btn" onclick="switchTab('settings')" data-tab="settings"><span class="tab-icon">⚙️</span><span class="tab-label">设置</span></button>
     </div>
 
+  </div>
+
+  <!-- Mobile Nav Overlay (≤520px) -->
+  <div class="mobile-nav-overlay" id="mobileNavOverlay" onclick="toggleMobileNav()"></div>
+  <div class="mobile-nav" id="mobileNav">
+    <div class="mobile-nav-header">
+      <span>PapaCheck</span>
+      <button onclick="toggleMobileNav()">✕</button>
+    </div>
+    <button class="tab-btn active" onclick="switchTab('homework'); closeMobileNav()" data-tab="homework"><span class="tab-icon">📋</span><span class="tab-label">作业</span></button>
+    <button class="tab-btn" onclick="switchTab('shop'); closeMobileNav()" data-tab="shop"><span class="tab-icon">🏪</span><span class="tab-label">商店</span></button>
+    <button class="tab-btn" onclick="switchTab('rewardBox'); closeMobileNav()" data-tab="rewardBox"><span class="tab-icon">🎁</span><span class="tab-label">奖励箱</span></button>
+    <button class="tab-btn" onclick="switchTab('redeem'); closeMobileNav()" data-tab="redeem"><span class="tab-icon">📋</span><span class="tab-label">兑换</span></button>
+    <button class="tab-btn" onclick="switchTab('stats'); closeMobileNav()" data-tab="stats"><span class="tab-icon">📊</span><span class="tab-label">统计</span></button>
+    <button class="tab-btn" onclick="switchTab('settings'); closeMobileNav()" data-tab="settings"><span class="tab-icon">⚙️</span><span class="tab-label">设置</span></button>
   </div>
 
   <!-- Modal -->
