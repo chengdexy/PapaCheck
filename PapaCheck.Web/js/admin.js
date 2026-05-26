@@ -640,6 +640,7 @@ async function saveShopItem() {
   closeAdminModal();
   await refreshAllData();
   renderShopTab();
+  if (!adminEditingId) pregenSpeech(['积分商店上新啦']);
   showToast(adminEditingId ? '商品已更新' : '商品已添加');
 }
 
@@ -776,6 +777,7 @@ async function addRewardFromShop(name, type, durationMinutes) {
   closeAdminModal();
   await refreshAllData();
   renderRewardBoxTab();
+  pregenSpeech(['奖励箱有新奖励，快去看看吧']);
   showToast('已添加：' + name);
 }
 
@@ -819,6 +821,7 @@ async function saveRewardBoxItem() {
   closeAdminModal();
   await refreshAllData();
   renderRewardBoxTab();
+  if (!adminEditingId) pregenSpeech(['奖励箱有新奖励，快去看看吧']);
   showToast(adminEditingId ? '奖励已更新' : '奖励已添加');
 }
 
@@ -832,6 +835,7 @@ async function adjustRewardBoxQty(itemId, delta) {
   await API.saveRewardBox(adminRewardBox);
   await refreshAllData();
   renderRewardBoxTab();
+  if (delta > 0) pregenSpeech(['奖励箱有新奖励，快去看看吧']);
 }
 
 async function deleteRewardBoxItem(id) {
