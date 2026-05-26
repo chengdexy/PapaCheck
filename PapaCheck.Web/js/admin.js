@@ -24,6 +24,7 @@ let _adjustingPoints = false;
 let _editingBalance = false;
 let _editingSettings = false;
 let _redeemShowCount = 3;
+let _ratingShowCount = 5;
 let _selectedCalendarDate = null;
 let _calendarYear = null;
 let _calendarMonth = null;
@@ -495,13 +496,14 @@ async function submitRating(dateKey, rating) {
 // ========== Tab 2: Shop ==========
 function renderShopTab() {
   const container = document.getElementById('adminContent');
+  const sorted = [...adminShopItems].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   container.innerHTML = `
     <div class="admin-card">
       <div class="admin-card-title">🏪 积分商店管理</div>
       <div id="adminShopList">
         ${adminShopItems.length === 0
       ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无商品</div>'
-      : adminShopItems.map(item => `
+      : sorted.map(item => `
             <div class="shop-admin-item">
               <div class="shop-admin-icon">${item.type === 'time' ? '🎮' : item.type === 'buff' ? '✨' : '🎁'}</div>
               <div class="shop-admin-info">
@@ -630,6 +632,7 @@ async function saveShopItem() {
       buffUnit,
       baseQuantity,
       remainingQuantity: baseQuantity,
+      createdAt: Date.now(),
     });
   }
 
@@ -660,13 +663,14 @@ async function deleteShopItem(id) {
 // ========== Tab 3: Reward Box ==========
 function renderRewardBoxTab() {
   const container = document.getElementById('adminContent');
+  const sorted = [...adminRewardBox].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   container.innerHTML = `
     <div class="admin-card">
       <div class="admin-card-title">🎁 奖励箱管理</div>
       <div id="adminRewardBoxList">
         ${adminRewardBox.length === 0
       ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">奖励箱为空</div>'
-      : adminRewardBox.map(item => `
+      : sorted.map(item => `
             <div class="shop-admin-item">
               <div class="shop-admin-icon">${item.type === 'time' ? '🎮' : '🎁'}</div>
               <div class="shop-admin-info">
@@ -765,6 +769,7 @@ async function addRewardFromShop(name, type, durationMinutes) {
       type,
       durationMinutes: type === 'time' ? (parseInt(durationMinutes) || 0) : 0,
       quantity: 1,
+      createdAt: Date.now(),
     });
   }
   await API.saveRewardBox(adminRewardBox);
@@ -806,6 +811,7 @@ async function saveRewardBoxItem() {
       type,
       durationMinutes,
       quantity,
+      createdAt: Date.now(),
     });
   }
 
@@ -1011,104 +1017,264 @@ async function clearRedemptionHistory() {
   showToast('已清空兑换历史');
 }
 
+// ========== SVG Chart Helpers ==========
+function renderSvgLineChart(data, options) {
+  const { width = 600, height = 180, color = 'var(--success)', avgColor = 'var(--accent)', unit = '', yMax } = options;
+  const pad = { top: 20, right: 20, bottom: 25, left: 40 };
+  const chartW = width - pad.left - pad.right;
+  const chartH = height - pad.top - pad.bottom;
+  const values = data.map(d => d.value);
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const maxVal = yMax || rawMax;
+  const minVal = rawMin > 0 ? Math.max(0, Math.floor(rawMin * 0.9 / 10) * 10) : 0;
+  const range = maxVal - minVal || 1;
+  const avg = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+
+  const points = data.map((d, i) => {
+    const x = pad.left + (i / Math.max(data.length - 1, 1)) * chartW;
+    const y = pad.top + chartH - ((d.value - minVal) / range) * chartH;
+    return { x, y, label: d.label, value: d.value };
+  });
+
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+  const circles = points.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3" fill="${color}" stroke="var(--card)" stroke-width="1.5"/>`).join('');
+  const maxLabels = Math.min(points.length, 10);
+  const labelStep = points.length > 1 ? (points.length - 1) / Math.max(maxLabels - 1, 1) : 1;
+  const labelIndices = [];
+  for (let k = 0; k < maxLabels; k++) labelIndices.push(Math.min(Math.round(k * labelStep), points.length - 1));
+  const labels = labelIndices.map(i => `<text x="${points[i].x}" y="${height - 5}" text-anchor="middle" font-size="10" fill="var(--text-secondary)">${points[i].label}</text>`).join('');
+  const showValues = data.length <= 10;
+  const valuesTxt = showValues ? points.map(p => `<text x="${p.x}" y="${p.y - 8}" text-anchor="middle" font-size="10" fill="${color}">${p.value}${unit}</text>`).join('') : '';
+  const yLabels = [];
+  const ySteps = 4;
+  for (let i = 0; i <= ySteps; i++) {
+    const val = Math.round(minVal + (range / ySteps) * (ySteps - i));
+    const yy = pad.top + (chartH / ySteps) * i;
+    yLabels.push(`<text x="${pad.left - 6}" y="${yy + 3}" text-anchor="end" font-size="10" fill="var(--text-secondary)">${val}</text>`);
+    if (i > 0) yLabels.push(`<line x1="${pad.left}" y1="${yy}" x2="${width - pad.right}" y2="${yy}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`);
+  }
+
+  const avgY = pad.top + chartH - ((avg - minVal) / range) * chartH;
+  let avgLine = '';
+  if (avg > 0 && values.length > 1) {
+    avgLine = `<line x1="${pad.left}" y1="${avgY}" x2="${width - pad.right}" y2="${avgY}" stroke="${avgColor}" stroke-dasharray="4,4" stroke-width="1.5"/>
+      <text x="${width - pad.right}" y="${avgY - 4}" text-anchor="end" font-size="10" fill="${avgColor}">平均 ${Math.round(avg)}${unit}</text>`;
+  }
+
+  return `
+    <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:${height}px;">
+      ${yLabels.join('')}
+      <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>
+      ${circles}
+      ${avgLine}
+      ${valuesTxt}
+      ${labels}
+    </svg>`;
+}
+
+function renderSvgPieChart(data, total) {
+  const cx = 80, cy = 70, r = 55;
+  let curAngle = -90;
+  const colors = { '优': 'var(--success)', '良': 'var(--accent)', '可': 'var(--warning)', '差': 'var(--danger)' };
+  const segments = data.map(d => {
+    const angle = (d.count / total) * 360;
+    const start = curAngle;
+    const end = curAngle + angle;
+    curAngle = end;
+    return { ...d, start, end };
+  });
+  const paths = segments.map(d => {
+    if (d.count === 0) return '';
+    const sr = (d.start * Math.PI) / 180, er = (d.end * Math.PI) / 180;
+    const x1 = cx + r * Math.cos(sr), y1 = cy + r * Math.sin(sr);
+    const x2 = cx + r * Math.cos(er), y2 = cy + r * Math.sin(er);
+    const large = d.end - d.start > 180 ? 1 : 0;
+    return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z" fill="${colors[d.rating] || 'var(--text-secondary)'}"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 160 140" style="width:160px;height:140px;">${paths}</svg>`;
+}
+
 // ========== Tab 5: Statistics ==========
+let _statsRange = 'week';
+
+function setStatsRange(range) {
+  _statsRange = range;
+  renderStatsTab();
+}
+
+function getGroupMode(dateCount) {
+  if (_statsRange !== 'all') return 'day';
+  if (dateCount <= 31) return 'day';
+  if (dateCount <= 180) return 'week';
+  return 'month';
+}
+
+function getWeekStart(dateStr) {
+  const d = new Date(dateStr);
+  const day = d.getDay();
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - ((day + 6) % 7));
+  return mon.toISOString().slice(0, 10);
+}
+
+function formatWeekLabel(key) {
+  const parts = key.split('-');
+  const d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+  const end = new Date(d);
+  end.setDate(d.getDate() + 6);
+  return `${d.getMonth()+1}/${d.getDate()}-${end.getMonth()+1}/${end.getDate()}`;
+}
+
+function aggregateDaily(data, groupMode, mode) {
+  if (!data.length) return [];
+  if (groupMode === 'day') return data.map(d => ({ label: d.date.slice(5), value: d.value }));
+
+  const groups = {};
+  data.forEach((d, i) => {
+    const key = groupMode === 'week' ? getWeekStart(d.date) : d.date.slice(0, 7);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(d);
+  });
+
+  return Object.entries(groups).map(([key, items]) => {
+    const sum = items.reduce((s, d) => s + d.value, 0);
+    const value = mode === 'mean' ? Math.round(sum / items.length) : Math.round(sum);
+    return {
+      label: groupMode === 'week' ? formatWeekLabel(key) : key,
+      value,
+    };
+  });
+}
+
 function renderStatsTab() {
   const container = document.getElementById('adminContent');
 
   const allDates = Object.keys(cachedData?.dailySettlement || {}).sort();
-  const recentDates = allDates.slice(-7);
+  const maxDays = _statsRange === 'month' ? 30 : _statsRange === 'week' ? 7 : 9999;
+  const dateRange = maxDays >= 9999 ? allDates : allDates.slice(-maxDays);
+  const groupMode = getGroupMode(dateRange.length);
 
-  const completionRates = [];
-  const efficiencyRatios = [];
-  const dailyPoints = [];
+  const totalMinData = [];
+  const effRatioData = [];
+  const dailyPointsData = [];
 
-  recentDates.forEach(date => {
+  dateRange.forEach(date => {
     const hwList = cachedData?.homeworks?.[date] || [];
-    const doneCount = hwList.filter(h => h.status === 'done').length;
-    const totalCount = hwList.length;
-    completionRates.push({
-      date: date.slice(5),
-      value: totalCount > 0 ? Math.round(doneCount / totalCount * 100) : 0,
-    });
+    const doneHw = hwList.filter(h => h.status === 'done' && !h.rejected);
+    const totalMin = doneHw.reduce((sum, h) => sum + (h.actualDuration || 0), 0);
+    totalMinData.push({ date, value: totalMin });
 
-    const doneHw = hwList.filter(h => h.status === 'done' && h.actualDuration !== null && h.suggestedDuration > 0 && !h.rejected);
-    const ratios = doneHw.map(h => h.actualDuration / h.suggestedDuration);
-    const avgRatio = ratios.length > 0 ? ratios.reduce((a, b) => a + b, 0) / ratios.length : 0;
-    efficiencyRatios.push({
-      date: date.slice(5),
-      value: Math.round(avgRatio * 100),
-    });
+    const effHw = doneHw.filter(h => h.suggestedDuration > 0 && h.actualDuration !== null);
+    const ratios = effHw.map(h => h.actualDuration / h.suggestedDuration);
+    const avgRatio = ratios.length > 0 ? Math.round(ratios.reduce((a, b) => a + b, 0) / ratios.length * 100) : 0;
+    effRatioData.push({ date, value: avgRatio });
 
     const settlement = cachedData?.dailySettlement?.[date];
-    dailyPoints.push({
-      date: date.slice(5),
-      value: settlement?.finalPoints ?? 0,
-    });
+    dailyPointsData.push({ date, value: settlement?.finalPoints ?? 0 });
   });
 
-  const ratingsList = allDates.slice(-10).reverse()
-    .filter(d => cachedData?.dailySettlement?.[d]?.rating);
+  const totalMinutes = aggregateDaily(totalMinData, groupMode, 'mean');
+  const efficiencyRatios = aggregateDaily(effRatioData, groupMode, 'mean');
+  const dailyPoints = aggregateDaily(dailyPointsData, groupMode);
 
-  const streakDays = calcStreak(allDates);
+  const ratingsList = allDates.filter(d => cachedData?.dailySettlement?.[d]?.rating).reverse();
+  const ratingCounts = {};
+  const ratingColors = { '优': 'var(--success)', '良': 'var(--accent)', '可': 'var(--warning)', '差': 'var(--danger)' };
+  ratingsList.forEach(d => {
+    const r = cachedData?.dailySettlement?.[d]?.rating;
+    if (r) ratingCounts[r] = (ratingCounts[r] || 0) + 1;
+  });
+  const ratingPieData = Object.entries(ratingCounts).map(([rating, count]) => ({ rating, count }));
+  const ratingTotal = ratingPieData.reduce((s, d) => s + d.count, 0);
+
+  const shownRatings = ratingsList.slice(0, _ratingShowCount);
+  const hasMoreRatings = ratingsList.length > _ratingShowCount;
+
+  const avgTotalMin = totalMinutes.length > 0 ? Math.round(totalMinutes.reduce((a, b) => a + b.value, 0) / totalMinutes.length) : 0;
+  const avgEff = efficiencyRatios.filter(e => e.value > 0);
+  const avgEffVal = avgEff.length > 0 ? Math.round(avgEff.reduce((a, b) => a + b.value, 0) / avgEff.length) : 0;
+
+  const rangeOptions = [
+    { key: 'week', label: '周' },
+    { key: 'month', label: '月' },
+    { key: 'all', label: '总计' },
+  ];
+
+  const dateCount = dateRange.length;
+  const groupLabels = { day: '每日', week: '每周', month: '每月' };
+
+  const makeRangeBtn = (opt) =>
+    `<button class="mode-option${_statsRange === opt.key ? ' selected' : ''}" onclick="setStatsRange('${opt.key}')">${opt.label}</button>`;
 
   container.innerHTML = `
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-card-value">${completionRates.length > 0 ? Math.round(completionRates.reduce((a, b) => a + b.value, 0) / completionRates.length) : 0}%</div>
-        <div class="stat-card-label">平均完成率</div>
+        <div class="stat-card-value">${avgTotalMin}分钟</div>
+        <div class="stat-card-label">${groupLabels[groupMode] === '每日' ? '日均' : groupLabels[groupMode] === '每周' ? '周均' : '月均'}用时</div>
       </div>
       <div class="stat-card">
-        <div class="stat-card-value">${efficiencyRatios.length > 0 ? Math.round(efficiencyRatios.filter(e => e.value > 0).reduce((a, b) => a + b.value, 0) / Math.max(1, efficiencyRatios.filter(e => e.value > 0).length)) : 0}%</div>
+        <div class="stat-card-value">${avgEffVal}%</div>
         <div class="stat-card-label">平均效率比</div>
       </div>
       <div class="stat-card">
         <div class="stat-card-value">${dailyPoints.reduce((a, b) => a + b.value, 0)}</div>
-        <div class="stat-card-label">近期获得积分</div>
+        <div class="stat-card-label">获得积分</div>
       </div>
       <div class="stat-card">
-        <div class="stat-card-value">${streakDays}</div>
+        <div class="stat-card-value">${calcStreak(allDates)}</div>
         <div class="stat-card-label">连续全勤天数</div>
       </div>
     </div>
 
-    <div class="chart-container">
-      <div class="chart-title">📈 每日完成率趋势</div>
-      <div class="chart-bars">
-        ${completionRates.map(d => `
-          <div class="chart-bar-wrap">
-            <div class="chart-bar-value">${d.value}%</div>
-            <div class="chart-bar completion" style="height:${d.value}px;"></div>
-            <div class="chart-bar-label">${d.date}</div>
-          </div>
-        `).join('')}
-      </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
+      ${rangeOptions.map(makeRangeBtn).join('')}
+      <span style="font-size:12px;color:var(--text-secondary);margin-left:auto;">${dateCount} 天${groupMode !== 'day' ? ' · 按' + groupLabels[groupMode] + '聚合' : ''}</span>
     </div>
 
     <div class="chart-container">
-      <div class="chart-title">📊 效率比（实际/参考）</div>
-      <div class="chart-bars">
-        ${efficiencyRatios.map(d => `
-          <div class="chart-bar-wrap">
-            <div class="chart-bar-value">${d.value}%</div>
-            <div class="chart-bar efficiency" style="height:${Math.min(100, d.value)}px;"></div>
-            <div class="chart-bar-label">${d.date}</div>
-          </div>
-        `).join('')}
-      </div>
+      <div class="chart-title">📈 ${groupLabels[groupMode]}总用时（分钟）</div>
+      ${totalMinutes.length === 0
+        ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'
+        : renderSvgLineChart(totalMinutes, { color: 'var(--success)', avgColor: 'var(--accent)', unit: '分钟' })}
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-title">📊 ${groupLabels[groupMode]}效率比（实际/参考）</div>
+      ${efficiencyRatios.length === 0 || efficiencyRatios.every(d => d.value === 0)
+        ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'
+        : renderSvgLineChart(efficiencyRatios, { color: 'var(--warning)', avgColor: 'var(--accent)', unit: '%' })}
     </div>
 
     <div class="chart-container">
       <div class="chart-title">📅 评级历史</div>
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:8px;">
+        ${ratingTotal > 0 ? renderSvgPieChart(ratingPieData, ratingTotal) : ''}
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          ${ratingPieData.map(d =>
+            `<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+              <span style="width:10px;height:10px;border-radius:2px;background:${ratingColors[d.rating] || 'var(--text-secondary)'};display:inline-block;"></span>
+              ${d.rating}: ${d.count}次 (${Math.round(d.count / ratingTotal * 100)}%)
+            </div>`
+          ).join('')}
+        </div>
+      </div>
       ${ratingsList.length === 0
-      ? '<div style="text-align:center;color:var(--text-secondary);padding:12px;font-size:14px;">暂无评级记录</div>'
-      : ratingsList.map(d => {
-        const s = cachedData?.dailySettlement?.[d];
-        return `<div class="rating-history-item">
-            <span>${d}</span>
-            <span>${s.basePoints + s.efficiencyBonus}×${s.multiplier}=${s.finalPoints}分</span>
-            <span class="rating-grade ${s.rating}">${s.rating}</span>
-          </div>`;
-      }).join('')}
+        ? '<div style="text-align:center;color:var(--text-secondary);padding:12px;font-size:14px;">暂无评级记录</div>'
+        : shownRatings.map(d => {
+          const s = cachedData?.dailySettlement?.[d];
+          return `<div class="rating-history-item">
+              <span>${d}</span>
+              <span>${s.basePoints + s.efficiencyBonus}×${s.multiplier}=${s.finalPoints}分</span>
+              <span class="rating-grade ${s.rating}">${s.rating}</span>
+            </div>`;
+        }).join('')}
+      ${hasMoreRatings || _ratingShowCount > 5 ? `<div style="text-align:center;padding:12px;display:flex;gap:8px;justify-content:center;">
+        ${hasMoreRatings ? `<button class="btn-cancel" style="border:1px solid var(--text-secondary);padding:8px 24px;border-radius:8px;font-size:14px;"
+          onclick="_ratingShowCount += 10; renderStatsTab();">查看更多 (剩余${ratingsList.length - _ratingShowCount}条)</button>` : ''}
+        ${_ratingShowCount > 5 ? `<button class="btn-cancel" style="border:1px solid var(--text-secondary);padding:8px 24px;border-radius:8px;font-size:14px;"
+          onclick="_ratingShowCount = 5; renderStatsTab();">收起</button>` : ''}
+      </div>` : ''}
     </div>`;
 }
 
