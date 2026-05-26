@@ -4,12 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="PapaCheck — 爸~检查！AI 自动收作业，游戏化激励，让孩子主动完成作业。">
+    <meta name="description" content="PapaCheck — 爸~检查！AI 自动收作业，游戏化激励，让孩子主动完成作业。免费下载 Windows 和 Android 客户端。">
     <meta name="theme-color" content="#0f172a">
     <meta property="og:title" content="PapaCheck — 爸~检查！">
     <meta property="og:description" content="让写作业变成一场闯关游戏。AI 自动收作业，孩子自主赚积分，家长远程做管理。">
     <meta property="og:image" content="assets/PapaCheck_ban.png">
-    <title>PapaCheck — 爸~检查！</title>
+    <title>PapaCheck — 爸~检查！让写作业变成闯关游戏</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600;700;900&display=swap"
@@ -26,10 +26,10 @@
             <a href="#" class="nav-logo">PapaCheck</a>
             <div class="nav-links">
                 <a href="#features">功能</a>
-                <a href="#workflow">使用流程</a>
-                <a href="#tech">技术栈</a>
-                <a href="https://github.com/chengdexy/PapaCheck" class="nav-cta" target="_blank"
-                    rel="noopener">GitHub</a>
+                <a href="#download">下载</a>
+                <a href="#guide">使用指南</a>
+                <a href="https://github.com/chengdexy/PapaCheck" target="_blank" rel="noopener"
+                    class="nav-cta">GitHub</a>
             </div>
         </div>
     </nav>
@@ -37,24 +37,27 @@
     <section class="hero">
         <div class="hero-grid"></div>
         <div class="hero-content">
-            <div class="hero-badge reveal">🎮 v1.0 开源发布</div>
+            <div class="hero-badge reveal">🎮 v1.0 预览版</div>
             <h1 class="hero-title reveal">
                 <span class="hero-title-sub">爸~检查！</span>
                 <span class="hero-title-main">PapaCheck</span>
             </h1>
             <p class="hero-desc reveal">
-                让写作业变成一场<span class="text-accent">闯关游戏</span>。<br>
-                AI 自动收作业，孩子自主赚积分，家长远程做管理。
+                从此不用催作业<br>
+                <span class="text-accent">AI 自动收</span> · <span class="text-accent">孩子主动做</span> · <span
+                    class="text-accent">家长远程管</span>
             </p>
             <div class="hero-actions reveal">
-                <a href="https://github.com/chengdexy/PapaCheck" class="btn btn-primary" target="_blank" rel="noopener">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path
-                            d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                <a href="#download" class="btn btn-primary">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
-                    <span>Star on GitHub</span>
+                    <span>免费下载</span>
                 </a>
-                <a href="#features" class="btn btn-ghost">了解功能 ↓</a>
+                <a href="#features" class="btn btn-ghost">了解更多 ↓</a>
             </div>
         </div>
         <div class="hero-scroll-indicator">
@@ -65,7 +68,7 @@
 
     <section class="banner-section">
         <div class="banner-wrapper reveal">
-            <img src="assets/PapaCheck_ban.png" alt="PapaCheck Banner" class="banner-img" loading="lazy">
+            <img src="assets/PapaCheck_ban.png" alt="PapaCheck 产品截图" class="banner-img" loading="lazy">
         </div>
     </section>
 
@@ -73,129 +76,139 @@
         <div class="section-header reveal">
             <span class="section-label">核心功能</span>
             <h2 class="section-title">写作业也可以是<span class="text-gradient">一场冒险</span></h2>
-            <p class="section-desc">从 AI 自动收录到积分兑换奖励，孩子自主完成整个闭环</p>
+            <p class="section-desc">从 AI 自动收录到积分兑换奖励，让孩子主动完成作业</p>
         </div>
         <div class="features-grid">
             <div class="feature-card reveal" data-delay="0">
                 <div class="feature-icon" style="--card-accent: #38bdf8">📋</div>
-                <h3 class="feature-title">作业管理</h3>
-                <p class="feature-desc">挑战模式 &amp; 计时模式双模式，实时进度条与动画反馈，效率越高奖励越多</p>
+                <h3 class="feature-title">双模式作业计时</h3>
+                <p class="feature-desc">挑战模式设定目标时长，提前完成额外奖励积分；计时模式自由记录，实时进度条与动画反馈</p>
             </div>
             <div class="feature-card reveal" data-delay="100">
                 <div class="feature-icon" style="--card-accent: #818cf8">📧</div>
-                <h3 class="feature-title">AI 邮件解析</h3>
-                <p class="feature-desc">DeepSeek 自动解析老师发来的作业邮件，零手动录入，直接入库</p>
+                <h3 class="feature-title">AI 自动收录作业</h3>
+                <p class="feature-desc">老师发邮件布置作业，AI 自动解析内容并写入清单，家长孩子都不用操心录入</p>
             </div>
             <div class="feature-card reveal" data-delay="200">
                 <div class="feature-icon" style="--card-accent: #4ade80">⭐</div>
-                <h3 class="feature-title">积分 &amp; 评级</h3>
-                <p class="feature-desc">家长远程评级（优/良/可/差），效率加成计算积分，差评归零正向激励</p>
+                <h3 class="feature-title">积分评级体系</h3>
+                <p class="feature-desc">家长远程评级（优/良/可/差），效率加成计算积分。差评积分归零，正向激励效果拉满</p>
             </div>
             <div class="feature-card reveal" data-delay="300">
                 <div class="feature-icon" style="--card-accent: #fbbf24">🏪</div>
-                <h3 class="feature-title">积分商店</h3>
-                <p class="feature-desc">兑换游戏时间、实物奖励，支持 Buff 增益系统，三层激励停不下来</p>
+                <h3 class="feature-title">积分商店兑换</h3>
+                <p class="feature-desc">孩子用积分自主兑换游戏时间、玩具、零食，还可购买增益 Buff，三层激励停不下来</p>
             </div>
             <div class="feature-card reveal" data-delay="400">
                 <div class="feature-icon" style="--card-accent: #f472b6">🎁</div>
-                <h3 class="feature-title">奖励箱</h3>
-                <p class="feature-desc">家长直接发放奖励，孩子自主兑换，惊喜感满满</p>
+                <h3 class="feature-title">家长奖励箱</h3>
+                <p class="feature-desc">家长随时发放惊喜奖励，孩子自主兑换。做得好就奖励，惊喜感满满</p>
             </div>
             <div class="feature-card reveal" data-delay="500">
                 <div class="feature-icon" style="--card-accent: #38bdf8">🔊</div>
-                <h3 class="feature-title">语音陪伴</h3>
-                <p class="feature-desc">TTS 全程语音播报：任务提醒、倒计时、评级结果、整点报时，近 20 个场景</p>
+                <h3 class="feature-title">语音提醒陪伴</h3>
+                <p class="feature-desc">TTS 中文语音全程陪伴：任务提醒、超时预警、评级播报、整点报时，覆盖近 20 个场景</p>
             </div>
         </div>
     </section>
 
-    <section class="workflow" id="workflow">
+    <section class="download-section" id="download">
         <div class="section-header reveal">
-            <span class="section-label">使用流程</span>
-            <h2 class="section-title">三步开启<span class="text-gradient">家庭作业新方式</span></h2>
+            <span class="section-label">免费下载</span>
+            <h2 class="section-title">选择你的平台<span class="text-gradient">开始使用</span></h2>
+            <p class="section-desc">Windows 版和 Android 版均可免费下载使用，在家庭局域网内自托管</p>
         </div>
-        <div class="workflow-steps">
-            <div class="workflow-step reveal" data-delay="0">
-                <div class="step-number">01</div>
-                <div class="step-content">
-                    <h3 class="step-title">启动服务端</h3>
-                    <p class="step-desc">一行命令启动 Python HTTP 服务器，自动创建数据库和 TTS 缓存，零配置运行</p>
-                    <div class="step-code">
-                        <code>cd PapaCheck.Server && python server.py</code>
-                    </div>
+        <div class="download-cards reveal">
+            <div class="download-card">
+                <div class="download-icon">🪟</div>
+                <h3 class="download-title">Windows 桌面版</h3>
+                <p class="download-desc">系统托盘运行，支持开机自启动、配置管理、邮件同步和日志查看</p>
+                <div class="download-meta">
+                    <span>v1.0 预览版</span>
+                    <span>约 46 MB</span>
                 </div>
-            </div>
-            <div class="workflow-connector"></div>
-            <div class="workflow-step reveal" data-delay="150">
-                <div class="step-number">02</div>
-                <div class="step-content">
-                    <h3 class="step-title">配置邮件同步</h3>
-                    <p class="step-desc">填写 IMAP 邮箱信息，AI 自动拉取老师布置的作业邮件，解析内容并录入清单</p>
-                </div>
-            </div>
-            <div class="workflow-connector"></div>
-            <div class="workflow-step reveal" data-delay="300">
-                <div class="step-number">03</div>
-                <div class="step-content">
-                    <h3 class="step-title">全平台使用</h3>
-                    <p class="step-desc">孩子用手机/平板打开 Web 大屏端开始做作业，家长用管理端远程评级，Windows 桌面端可选</p>
-                    <div class="step-platforms">
-                        <span>🌐 Web</span>
-                        <span>📱 Android</span>
-                        <span>🍎 iOS PWA</span>
-                        <span>🪟 Windows</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section class="tech-stack" id="tech">
-        <div class="section-header reveal">
-            <span class="section-label">技术栈</span>
-            <h2 class="section-title">纯 Python 后端 · 零云依赖<span class="text-gradient">私有部署</span></h2>
-        </div>
-        <div class="tech-tags reveal">
-            <span class="tech-tag" style="--tag-color: #38bdf8">Python 3</span>
-            <span class="tech-tag" style="--tag-color: #4ade80">SQLite</span>
-            <span class="tech-tag" style="--tag-color: #fbbf24">edge-tts</span>
-            <span class="tech-tag" style="--tag-color: #818cf8">http.server</span>
-            <span class="tech-tag" style="--tag-color: #f472b6">DeepSeek API</span>
-            <span class="tech-tag" style="--tag-color: #38bdf8">IMAP4_SSL</span>
-            <span class="tech-tag" style="--tag-color: #34d399">tkinter</span>
-            <span class="tech-tag" style="--tag-color: #f59e0b">Flutter</span>
-            <span class="tech-tag" style="--tag-color: #a78bfa">HTML/CSS/JS</span>
-            <span class="tech-tag" style="--tag-color: #22d3ee">Windows 凭据管理</span>
-        </div>
-    </section>
-
-    <footer class="footer">
-        <div class="footer-inner">
-            <div class="footer-brand">
-                <span class="footer-logo">PapaCheck</span>
-                <p class="footer-desc">让家庭教育更高效，让孩子成长更快乐。</p>
-            </div>
-            <div class="footer-links">
-                <a href="https://github.com/chengdexy/PapaCheck" target="_blank" rel="noopener" class="footer-link">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path
-                            d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                <a href="https://github.com/chengdexy/PapaCheck/releases/download/v1.0.0/PapaCheck.exe"
+                    class="btn btn-primary download-btn" target="_blank" rel="noopener">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
-                    GitHub
+                    下载 EXE
+                </a>
+            </div>
+            <div class="download-card">
+                <div class="download-icon">📱</div>
+                <h3 class="download-title">Android 版</h3>
+                <p class="download-desc">Flutter WebView 混合应用，在手机/平板上运行，适配大屏儿童模式</p>
+                <div class="download-meta">
+                    <span>v1.0 预览版</span>
+                    <span>约 23 MB</span>
+                </div>
+                <a href="https://github.com/chengdexy/PapaCheck/releases/download/v1.0.0/PapaCheck-1.0.0.apk"
+                    class="btn btn-primary download-btn" target="_blank" rel="noopener">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    下载 APK
+                </a>
+            </div>
+            <div class="download-card">
+                <div class="download-icon">🌐</div>
+                <h3 class="download-title">Web 版（无需安装）</h3>
+                <p class="download-desc">电脑、平板、手机浏览器直接访问，iOS 还可添加到主屏幕作为 PWA 使用</p>
+                <div class="download-meta">
+                    <span>全平台支持</span>
+                    <span>无需下载</span>
+                </div>
+                <a href="https://github.com/chengdexy/PapaCheck" class="btn btn-ghost download-btn" target="_blank"
+                    rel="noopener">
+                    查看部署方式
                 </a>
             </div>
         </div>
-        <div class="footer-bottom">
-            <span>Released under the MIT License</span>
-            <span class="footer-sep">·</span>
-            <span>Made with ❤️ for families</span>
+    </section>
+
+    <section class="guide-section" id="guide">
+        <div class="section-header reveal">
+            <span class="section-label">使用指南</span>
+            <h2 class="section-title">三步搞定<span class="text-gradient">全家使用</span></h2>
+            <p class="section-desc">不需要懂编程，跟着步骤走就能让全家用起来</p>
         </div>
-    </footer>
+        <div class="guide-steps reveal">
+            <div class="guide-step">
+                <div class="guide-step-num">1</div>
+                <div class="guide-step-body">
+                    <h3>下载并启动服务端</h3>
+                    <p>在家庭电脑上下载 Windows 版（或运行 Python 服务端），启动后自动创建数据库，零配置即可运行</p>
+                </div>
+            </div>
+            <div class="guide-step">
+                <div class="guide-step-num">2</div>
+                <div class="guide-step-body">
+                    <h3>配置邮件同步（可选）</h3>
+                    <p>在管理端填入老师和自己的邮箱信息，AI 自动拉取作业邮件并解析入库，以后都不用手动添加作业</p>
+                </div>
+            </div>
+            <div class="guide-step">
+                <div class="guide-step-num">3</div>
+                <div class="guide-step-body">
+                    <h3>孩子用手机打开大屏端</h3>
+                    <p>孩子在手机/平板浏览器上打开链接，即可看到作业清单，开始挑战模式赚积分，在商店兑换奖励</p>
+                </div>
+            </div>
+        </div>
+        <div class="guide-note reveal">
+            <p>📌 整套系统在家庭局域网内运行，数据不经过云端，无需注册账号，用完即走</p>
+        </div>
+    </section>
 
-    <script src="js/main.js"></script>
-</body>
-
-</html>        <div class="section-header reveal">
+    <section class="platform-section">
+        <div class="section-header reveal">
             <span class="section-label">全平台覆盖</span>
             <h2 class="section-title">无论用什么设备<span class="text-gradient">都能用</span></h2>
         </div>
@@ -231,7 +244,10 @@
             </div>
             <div class="footer-links">
                 <a href="https://github.com/chengdexy/PapaCheck" target="_blank" rel="noopener" class="footer-link">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                    </svg>
                     开源仓库
                 </a>
             </div>
@@ -245,4 +261,5 @@
 
     <script src="js/main.js"></script>
 </body>
+
 </html>
