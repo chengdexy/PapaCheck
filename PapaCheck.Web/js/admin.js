@@ -152,6 +152,19 @@ function renderCurrentTab() {
   }
 }
 
+function toggleMobileNav() {
+  document.getElementById('mobileNav').classList.toggle('open');
+  document.getElementById('mobileNavOverlay').classList.toggle('open');
+  document.getElementById('hamburgerBtn').textContent =
+    document.getElementById('mobileNav').classList.contains('open') ? '✕' : '☰';
+}
+
+function closeMobileNav() {
+  document.getElementById('mobileNav').classList.remove('open');
+  document.getElementById('mobileNavOverlay').classList.remove('open');
+  document.getElementById('hamburgerBtn').textContent = '☰';
+}
+
 // ========== Tab 1: Homework ==========
 function renderHomeworkTab() {
   const container = document.getElementById('adminContent');
@@ -1049,7 +1062,7 @@ function renderSvgLineChart(data, options) {
   for (let k = 0; k < maxLabels; k++) labelIndices.push(Math.min(Math.round(k * labelStep), points.length - 1));
   const labels = labelIndices.map(i => `<text x="${points[i].x}" y="${height - 5}" text-anchor="middle" font-size="10" fill="var(--text-secondary)">${points[i].label}</text>`).join('');
   const showValues = data.length <= 10;
-  const valuesTxt = showValues ? points.map(p => `<text x="${p.x}" y="${p.y - 8}" text-anchor="middle" font-size="10" fill="${color}">${p.value}${unit}</text>`).join('') : '';
+  const valuesTxt = showValues ? points.map(p => `<text class="chart-value-label" x="${p.x}" y="${p.y - 8}" text-anchor="middle" font-size="10" fill="${color}">${p.value}${unit}</text>`).join('') : '';
   const yLabels = [];
   const ySteps = 4;
   for (let i = 0; i <= ySteps; i++) {
@@ -1104,6 +1117,7 @@ let _statsRange = 'week';
 
 function setStatsRange(range) {
   _statsRange = range;
+  _ratingShowCount = 5;
   renderStatsTab();
 }
 
@@ -1182,7 +1196,7 @@ function renderStatsTab() {
   const efficiencyRatios = aggregateDaily(effRatioData, groupMode, 'mean');
   const dailyPoints = aggregateDaily(dailyPointsData, groupMode);
 
-  const ratingsList = allDates.filter(d => cachedData?.dailySettlement?.[d]?.rating).reverse();
+  const ratingsList = dateRange.filter(d => cachedData?.dailySettlement?.[d]?.rating).reverse();
   const ratingCounts = {};
   const ratingColors = { '优': 'var(--success)', '良': 'var(--accent)', '可': 'var(--warning)', '差': 'var(--danger)' };
   ratingsList.forEach(d => {
@@ -1252,6 +1266,7 @@ function renderStatsTab() {
 
     <div class="chart-container">
       <div class="chart-title">📅 评级历史</div>
+      <div class="chart-pie-section">
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:8px;">
         ${ratingTotal > 0 ? renderSvgPieChart(ratingPieData, ratingTotal) : ''}
         <div style="display:flex;flex-direction:column;gap:4px;">
@@ -1263,6 +1278,8 @@ function renderStatsTab() {
           ).join('')}
         </div>
       </div>
+      </div>
+      <div class="chart-list-section">
       ${ratingsList.length === 0
         ? '<div style="text-align:center;color:var(--text-secondary);padding:12px;font-size:14px;">暂无评级记录</div>'
         : shownRatings.map(d => {
@@ -1279,6 +1296,7 @@ function renderStatsTab() {
         ${_ratingShowCount > 5 ? `<button class="btn-cancel" style="border:1px solid var(--text-secondary);padding:8px 24px;border-radius:8px;font-size:14px;"
           onclick="_ratingShowCount = 5; renderStatsTab();">收起</button>` : ''}
       </div>` : ''}
+      </div>
     </div>`;
 }
 
@@ -1331,20 +1349,7 @@ function renderSettingsTab() {
   const calHtml = buildMiniCalendar();
 
   container.innerHTML = `
-    <div class="admin-card">
-      <div class="admin-card-title">⚙️ 积分管理</div>
-      <div class="settings-row" style="display:flex;align-items:center;gap:12px;">
-        <label>当前余额</label>
-        <span id="balanceDisplay" style="font-size:20px;font-weight:700;color:var(--accent);cursor:pointer;border-bottom:2px dashed var(--accent);" onclick="startEditBalance()" title="点击修改积分">${balance}</span>
-        <span id="balanceEdit" style="display:none;gap:6px;align-items:center;">
-          <input type="number" id="pointsInput" value="" placeholder="新余额值"
-            style="width:100px;padding:6px 10px;border:1px solid var(--accent);border-radius:6px;font-size:14px;background:var(--bg);color:var(--text);">
-          <button id="btnPointsConfirm" onclick="confirmAdjustPoints()" style="padding:4px 8px;background:none;border:none;color:var(--success);font-size:20px;cursor:pointer;" title="确认">✓</button>
-          <button id="btnPointsCancel" onclick="cancelAdjustPoints()" style="padding:4px 8px;background:none;border:none;color:var(--danger);font-size:20px;cursor:pointer;" title="取消">✕</button>
-        </span>
-      </div>
-    </div>
-
+    <div class="settings-grid">
     <div class="admin-card">
       <div class="admin-card-title">📅 日期管理</div>
       <div class="date-mgmt-row" style="display:flex;flex-direction:column;gap:12px;align-items:center;">
@@ -1362,6 +1367,20 @@ function renderSettingsTab() {
 
     <div class="admin-card">
       <div class="admin-card-title">⚙️ 参数配置</div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">💰 当前余额</div>
+        <div class="settings-row" style="display:flex;align-items:center;gap:12px;">
+          <label>余额</label>
+          <span id="balanceDisplay" style="font-size:20px;font-weight:700;color:var(--accent);cursor:pointer;border-bottom:2px dashed var(--accent);" onclick="startEditBalance()" title="点击修改积分">${balance}</span>
+          <span id="balanceEdit" style="display:none;gap:6px;align-items:center;">
+            <input type="number" id="pointsInput" value="" placeholder="新余额值"
+              style="width:100px;padding:6px 10px;border:1px solid var(--accent);border-radius:6px;font-size:14px;background:var(--bg);color:var(--text);">
+            <button id="btnPointsConfirm" onclick="confirmAdjustPoints()" style="padding:4px 8px;background:none;border:none;color:var(--success);font-size:20px;cursor:pointer;" title="确认">✓</button>
+            <button id="btnPointsCancel" onclick="cancelAdjustPoints()" style="padding:4px 8px;background:none;border:none;color:var(--danger);font-size:20px;cursor:pointer;" title="取消">✕</button>
+          </span>
+        </div>
+      </div>
 
       <div class="settings-section">
         <div class="settings-section-title">📝 作业默认值</div>
@@ -1420,6 +1439,7 @@ function renderSettingsTab() {
         <button onclick="resetSettingsToDefaults()" style="flex:1;padding:12px;border:1px solid var(--text-secondary);border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;background:transparent;color:var(--text-secondary);">恢复默认值</button>
         <button onclick="saveAllSettings()" style="flex:1;padding:12px;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;background:var(--accent);color:var(--bg);">保存配置</button>
       </div>
+    </div>
     </div>
   `;
 
