@@ -1001,6 +1001,8 @@ async function redeemItem(itemId) {
     updateShopPage();
     showToast('兑换成功！');
     Voice.speak('兑换成功！');
+    Voice.speak('奖励箱有新奖励，快去看看吧');
+    window._rewardBoxVoiceHandled = true;
   } finally {
     _redeemingItem = false;
   }

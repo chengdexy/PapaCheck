@@ -588,7 +588,11 @@ function startPoll(intervalMs) {
       if (_lastRewardBox !== null && JSON.stringify(rb) !== JSON.stringify(prevRb)) {
         const addedRb = rb.filter(r => !prevRb.some(p => p.name === r.name) || (r.quantity || 0) > (prevRb.find(p => p.name === r.name)?.quantity || 0));
         if (addedRb.length > 0) {
-          Voice.speak('奖励箱有新奖励，快去看看吧');
+          if (window._rewardBoxVoiceHandled) {
+            window._rewardBoxVoiceHandled = false;
+          } else {
+            Voice.speak('奖励箱有新奖励，快去看看吧');
+          }
           addedRb.forEach(r => window._recentNewRewardIds.add(r.id));
         }
         _lastRewardBox = rb.concat();
