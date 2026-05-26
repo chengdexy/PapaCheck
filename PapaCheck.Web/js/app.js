@@ -17,7 +17,7 @@ let _lastRewardBox = null;
 let _lastShopItems = null;
 window._recentNewRewardIds = new Set();
 let _lastRatingInfo = null;
-let _lastPoints = null;
+let _lastPointsNote = null;
 let _lastSettings = null;
 
 // ========== Utility ==========
@@ -620,8 +620,25 @@ function startPoll(intervalMs) {
           if (manualNew.length > 0) Voice.speak('收到新作业，请查看');
         }
 
-        homeworks = newHw;
-        needsFullRender = true;
+        const oldDoneIds = new Set(homeworks.filter(h => h.status === 'done').map(h => h.id));
+        const newlyRejected = newHw.filter(h => h.status === 'pending' && h.rejected && oldDoneIds.has(h.id));
+        if (newlyRejected.length > 0) {
+          Voice.speak('作业被驳回，请查看');
+        }
+
+        if (!_completingHomework) {
+          homeworks = newHw;
+          needsFullRender = true;
+          const settlement = getSettlementData();
+          if (settlement && !settlement.rating) {
+            const allDone = newHw.every(h => h.status === 'done');
+            if (!allDone) {
+              cachedData._settlement = null;
+              window._settlement = null;
+              if (cachedData.dailySettlement) cachedData.dailySettlement[key] = null;
+            }
+          }
+        }
       }
 
       const newFreeTime = cachedData.freeTimeTasks?.[key] || [];
@@ -659,18 +676,19 @@ function startPoll(intervalMs) {
 
       if (ratingChanged) {
         const info = _lastRatingInfo;
-        Voice.speak('爸爸评了' + info.rating + '，获得' + (info.finalPoints || 0) + '分');
+        Voice.speak('今天作业获得的评价是……' + info.rating + '！');
       }
-
-      const points = cachedData?.points?.balance ?? cachedData?.points ?? 0;
-      if (_lastPoints !== null && points !== _lastPoints) {
-        Voice.speak('积分已更新为' + points + '分');
-      }
-      _lastPoints = points;
 
       const settings = cachedData?.settings || {};
       if (_lastSettings !== null && JSON.stringify(settings) !== JSON.stringify(_lastSettings)) {
         needsFullRender = true;
+      }
+      if (settings._pointsAdjustmentNote && settings._pointsAdjustmentNote !== _lastPointsNote) {
+        Voice.speak(settings._pointsAdjustmentNote);
+        _lastPointsNote = settings._pointsAdjustmentNote;
+        const cleanSettings = { ...settings };
+        delete cleanSettings._pointsAdjustmentNote;
+        API.saveSettings(cleanSettings).catch(() => { });
       }
       _lastSettings = settings;
 
