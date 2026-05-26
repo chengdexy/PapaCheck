@@ -853,7 +853,26 @@ class PapaCheckApp:
         self.destroyed = True
         self.running = False
         if self.server_thread and self.server_thread.is_alive():
+            self._append_log('正在停止服务器...')
             self.server_thread.stop()
+            self._quit_wait_count = 0
+            self.root.after(200, self._wait_quit)
+        else:
+            self._do_destroy()
+
+    def _wait_quit(self):
+        self._quit_wait_count += 1
+        if self.server_thread and self.server_thread.is_alive():
+            if self._quit_wait_count < 25:
+                self.root.after(200, self._wait_quit)
+            else:
+                self._append_log('服务器停止超时，强制退出')
+                self._do_destroy()
+        else:
+            self._append_log('服务器已安全停止')
+            self._do_destroy()
+
+    def _do_destroy(self):
         if self._instance_sock:
             try:
                 self._instance_sock.close()
