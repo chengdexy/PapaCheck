@@ -1461,6 +1461,7 @@ class PapaCheckApp:
             self.root.after(0, lambda: self._append_log('邮件作业同步完成'))
 
         except Exception as e:
+            error_msg = str(e)
             if matched_ids and cfg.get('mark_as_read', True):
                 try:
                     email_client.mark_matched_ids_as_unread(
@@ -1471,7 +1472,7 @@ class PapaCheckApp:
                     self.root.after(0, lambda: self._append_log('已将邮件恢复为未读状态'))
                 except Exception:
                     self.root.after(0, lambda: self._append_log('恢复邮件状态失败，请手动处理'))
-            self.root.after(0, lambda: self._append_log(f'错误: {e}'))
+            self.root.after(0, lambda: self._append_log(f'错误: {error_msg}'))
         finally:
             self.root.after(0, lambda: self._email_sync_btn.config(
                 state=tk.NORMAL, text='AI 发作业'))
