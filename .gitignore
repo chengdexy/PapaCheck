@@ -21,6 +21,7 @@ Thumbs.db
 # 文档（README 除外）
 *.md
 !README.md
+!RELEASE_USAGE.md
 
 # 日志
 *.log
@@ -52,3 +53,6 @@ PapaCheck.Web/apk/*.apk
 
 # 邮件附件下载目录
 PapaCheck.Windows/Download/
+
+# PyInstaller version file（构建时自动生成）
+PapaCheck.Windows/version_info.txt

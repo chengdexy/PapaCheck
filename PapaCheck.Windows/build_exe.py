@@ -3,12 +3,21 @@ import os
 import sys
 import shutil
 import re
+import json
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVER_DIR = os.path.join(ROOT, 'PapaCheck.Server')
 EMAIL_DIR = os.path.join(ROOT, 'PapaCheck.Email')
 WEB_DIR = os.path.join(ROOT, 'PapaCheck.Web')
 WORK_DIR = os.path.join(ROOT, 'PapaCheck.Windows')
+
+build_config_path = os.path.join(WORK_DIR, 'build_config.json')
+exe_version = '1.0.0'
+if os.path.exists(build_config_path):
+    with open(build_config_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+        exe_version = config.get('exe_version', '1.0.0')
+print(f'EXE 版本: {exe_version}')
 
 # --- APK 处理 ---
 pubspec_path = os.path.join(ROOT, 'PapaCheck.Android', 'pubspec.yaml')
@@ -50,6 +59,44 @@ else:
     if ans != 'y':
         sys.exit(0)
 
+exe_version_tuple = tuple(int(x) for x in exe_version.split('.'))
+if len(exe_version_tuple) < 4:
+    exe_version_tuple = exe_version_tuple + (0,) * (4 - len(exe_version_tuple))
+
+version_file_content = f"""# UTF-8
+#
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=({exe_version_tuple[0]},{exe_version_tuple[1]},{exe_version_tuple[2]},{exe_version_tuple[3]}),
+    prodvers=({exe_version_tuple[0]},{exe_version_tuple[1]},{exe_version_tuple[2]},{exe_version_tuple[3]}),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo(
+      [
+        StringTable(
+          u'040904B0',
+          [StringStruct(u'FileVersion', u'{exe_version_tuple[0]}.{exe_version_tuple[1]}.{exe_version_tuple[2]}.{exe_version_tuple[3]}'),
+           StringStruct(u'ProductVersion', u'{exe_version_tuple[0]}.{exe_version_tuple[1]}.{exe_version_tuple[2]}.{exe_version_tuple[3]}'),
+           StringStruct(u'FileDescription', u'PapaCheck'),
+           StringStruct(u'ProductName', u'PapaCheck'),
+           StringStruct(u'LegalCopyright', u'Copyright (c) PapaCheck'),
+           StringStruct(u'OriginalFilename', u'PapaCheck-{exe_version}.exe')])
+      ]),
+    VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
+  ]
+)
+"""
+
+version_file_path = os.path.join(WORK_DIR, 'version_info.txt')
+with open(version_file_path, 'w', encoding='utf-8') as f:
+    f.write(version_file_content)
+
 cmd = [
     sys.executable, '-m', 'PyInstaller',
     '--onefile',
@@ -67,6 +114,7 @@ cmd = [
     '--hidden-import', 'edge_tts',
     '--hidden-import', 'asyncio',
     '--noconfirm',
+    '--version-file', version_file_path,
     os.path.join(WORK_DIR, 'app_gui.py'),
 ]
 
@@ -75,4 +123,22 @@ print(' '.join(cmd))
 print()
 
 result = subprocess.run(cmd, cwd=WORK_DIR)
+
+if result.returncode == 0:
+    exe_src = os.path.join(WORK_DIR, 'dist', 'PapaCheck.exe')
+    exe_dst = os.path.join(WORK_DIR, 'dist', f'PapaCheck-{exe_version}.exe')
+    if os.path.exists(exe_src):
+        if os.path.exists(exe_dst):
+            os.remove(exe_dst)
+        os.rename(exe_src, exe_dst)
+
+    dist_dir = os.path.join(WORK_DIR, 'dist')
+    for fname in os.listdir(dist_dir):
+        full = os.path.join(dist_dir, fname)
+        if os.path.isfile(full) and fname.startswith('PapaCheck-') and fname.endswith('.exe'):
+            if fname != f'PapaCheck-{exe_version}.exe':
+                os.remove(full)
+
+    print(f'EXE 已构建: PapaCheck-{exe_version}.exe')
+
 sys.exit(result.returncode)
