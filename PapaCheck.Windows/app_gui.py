@@ -501,6 +501,9 @@ class PapaCheckApp:
         self.root.geometry(f'720x{h}+{x}+{y}')
 
     def _dismiss_apk_hint(self):
+        self._apk_hint_visible = False
+        if not hasattr(self, '_apk_hint_row'):
+            return
         self._apk_hint_row.pack_forget()
         self._apk_url_label.pack_forget()
         self._apply_window_height(False)
@@ -509,6 +512,8 @@ class PapaCheckApp:
         _save_config(cfg)
 
     def _restore_apk_hint(self):
+        if not hasattr(self, '_apk_hint_row'):
+            return
         self._apk_hint_row.pack(fill=tk.X, padx=16, pady=(12, 0),
                                 before=self._log_sep)
         self._apk_url_label.pack(fill=tk.X, padx=16, pady=(0, 12),
