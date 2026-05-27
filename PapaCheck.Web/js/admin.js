@@ -115,6 +115,7 @@ async function refreshAllData() {
     const data = await API.getData();
     if (data) {
       cachedData = data;
+      API.migrateBountyCompletionsToTotal(cachedData);
       adminHomeworks = data.homeworks?.[AdminUtil.dateKey(adminDate)] || [];
       adminShopItems = data.shopItems || [];
       adminRedemptions = data.redemptions || [];
@@ -891,56 +892,74 @@ async function deleteRewardBoxItem(id) {
 }
 
 // ========== Bounty Tasks ==========
+function debugBounty() {
+  console.log('adminBountyCompletions:', JSON.parse(JSON.stringify(adminBountyCompletions)));
+  console.log('historyCounts:', window._bountyHistoryCounts);
+  console.log('tasks:', adminBountyTasks.map(t => ({ id: t.id, name: t.name, type: t.type })));
+}
 function renderBountyTab() {
   const container = document.getElementById('adminContent');
   const dateKey = AdminUtil.dateKey(adminDate);
   const submissions = adminBountySubmissions[dateKey] || [];
   const pendingSubmissions = submissions.filter(s => s.status === 'submitted');
+  const pendingTaskIds = new Set(pendingSubmissions.map(s => s.taskId));
+  const doingTaskIds = new Set(submissions.filter(s => s.status === 'doing').map(s => s.taskId));
 
   const sorted = [...adminBountyTasks].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-  let reviewHtml = '';
-  if (pendingSubmissions.length > 0) {
-    reviewHtml = `
-      <div style="margin-bottom:16px;">
-        <div class="redeem-section-title">📋 待审核 (${pendingSubmissions.length})</div>
-        ${pendingSubmissions.map(s => {
-      const task = adminBountyTasks.find(t => t.id === s.taskId);
-      const name = task ? task.name : '（已删除）';
-      const time = s.submittedAt ? new Date(s.submittedAt).toLocaleString('zh-CN') : '';
-      return `<div class="redeem-item">
-            <div class="redeem-info">
-              <div class="redeem-name">${escapeHtml(name)}${task ? ' <span style="font-size:13px;color:var(--accent);">+' + (task.points || 0) + '分</span>' : ''}</div>
-              <div class="redeem-time">${time}</div>
-            </div>
-            <span class="redeem-status pending">待审核</span>
-            <button class="btn-fulfill" style="background:var(--success);margin-right:4px;" onclick="approveBountySubmission('${dateKey}', '${s.taskId}')">通过</button>
-            <button class="btn-fulfill" style="background:var(--danger);" onclick="rejectBountySubmission('${dateKey}', '${s.taskId}')">拒绝</button>
-          </div>`;
-    }).join('')}
-      </div>`;
+  const historyCounts = {};
+  const totalComps = (adminBountyCompletions && adminBountyCompletions._total) || {};
+  for (const tid of Object.keys(totalComps)) {
+    const v = totalComps[tid];
+    const delta = typeof v === 'number' ? v : (v ? 1 : 0);
+    if (delta > 0) historyCounts[tid] = delta;
   }
+  window._bountyHistoryCounts = historyCounts;
+
+  const titleCount = pendingSubmissions.length > 0
+    ? ` (${pendingSubmissions.length} 待审核)`
+    : '';
 
   container.innerHTML = `
     <div class="admin-card">
-      <div class="admin-card-title">💰 赏金任务管理</div>
-      ${reviewHtml}
+      <div class="admin-card-title">💰 赏金任务管理${titleCount}</div>
       <div id="adminBountyList">
         ${adminBountyTasks.length === 0
       ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无赏金任务</div>'
-      : sorted.map(item => `
-            <div class="shop-admin-item">
-              <div class="shop-admin-icon">💰</div>
+      : sorted.map(item => {
+        const isPending = pendingTaskIds.has(item.id);
+        const isDoing = doingTaskIds.has(item.id);
+        const submission = submissions.find(s => s.taskId === item.id);
+        const submitTime = submission?.submittedAt ? new Date(submission.submittedAt).toLocaleString('zh-CN') : '';
+        let statusMeta = '';
+        if (item.completedAt) statusMeta = ' · 已完成';
+        else if (isPending) statusMeta = ' · 待审核 ' + submitTime;
+        else if (isDoing) statusMeta = ' · 进行中';
+        const countVal = item.type !== 'once' ? historyCounts[item.id] : 0;
+        const countHtml = countVal ? `<span style="margin-left:auto;margin-right:16px;font-size:18px;font-weight:700;color:var(--accent);white-space:nowrap;">x ${countVal}</span>` : '';
+        let actionsHtml = '';
+        if (isPending) {
+          actionsHtml = `
+          <button class="btn-sm" style="background:var(--warning);color:var(--bg);" onclick="approveBountySubmission('${dateKey}', '${item.id}')">通过</button>
+          <button class="btn-sm" style="background:var(--danger);color:#fff;" onclick="rejectBountySubmission('${dateKey}', '${item.id}')">拒绝</button>`;
+        } else {
+          actionsHtml = `
+          <button class="btn-sm btn-edit" onclick="openBountyModal('edit', '${item.id}')">编辑</button>
+          <button class="btn-sm btn-delete" onclick="deleteBountyTask('${item.id}')">删除</button>`;
+        }
+        return `
+            <div class="shop-admin-item"${isPending ? ' style="border-left:3px solid var(--warning);"' : ''}>
+              <div class="shop-admin-icon">${item.type === 'once' ? '🪙' : '💰'}</div>
               <div class="shop-admin-info">
                 <div class="shop-admin-name">${escapeHtml(item.name)}</div>
-                <div class="shop-admin-meta">+${item.points || 0}分 · ${item.type === 'once' ? '一次性' : '常驻'}${item.completedAt ? ' · 已完成' : ''} · ${item.enabled !== false ? '已启用' : '已禁用'}</div>
+                <div class="shop-admin-meta">+${item.points || 0}分 · ${item.type === 'once' ? '一次性' : '常驻'}${statusMeta} · ${item.enabled !== false ? '已启用' : '已禁用'}</div>
               </div>
+              ${countHtml}
               <div class="hw-admin-actions">
-                <button class="btn-sm btn-edit" onclick="openBountyModal('edit', '${item.id}')">编辑</button>
-                <button class="btn-sm btn-delete" onclick="deleteBountyTask('${item.id}')">删除</button>
+                ${actionsHtml}
               </div>
-            </div>
-          `).join('')}
+            </div>`;
+      }).join('')}
       </div>
       <button class="btn-add" onclick="openBountyModal('add')">+ 添加赏金任务</button>
     </div>`;
@@ -1041,9 +1060,9 @@ async function approveBountySubmission(dateKey, taskId) {
     submissions.splice(idx, 1);
     await API.saveBountySubmissions(dateKey, submissions);
 
-    const completions = adminBountyCompletions[dateKey] || {};
-    completions[taskId] = true;
-    await API.saveBountyCompletions(dateKey, completions);
+    if (!adminBountyCompletions._total) adminBountyCompletions._total = {};
+    adminBountyCompletions._total[taskId] = (adminBountyCompletions._total[taskId] || 0) + 1;
+    await API.saveBountyCompletions('_total', adminBountyCompletions._total);
 
     const task = adminBountyTasks.find(t => t.id === taskId);
     if (task && task.points > 0) {
@@ -1055,8 +1074,9 @@ async function approveBountySubmission(dateKey, taskId) {
       await API.saveBountyTasks(adminBountyTasks);
     }
 
-    pregenSpeech(['赏金任务通过！', '赏金任务' + (task ? task.name : '') + '已通过']);
+    pregenSpeech([(task ? task.name : '任务') + '完成，加' + (task.points || 0) + '分！']);
     await refreshAllData();
+
     renderBountyTab();
     showToast('赏金任务已通过' + (task ? '：' + task.name : ''));
   } finally {
@@ -1074,7 +1094,7 @@ async function rejectBountySubmission(dateKey, taskId) {
   await API.saveBountySubmissions(dateKey, submissions);
 
   const task = adminBountyTasks.find(t => t.id === taskId);
-  pregenSpeech(['赏金任务未通过，再试试吧']);
+  pregenSpeech([(task ? task.name : '任务') + '失败了，下次加油！']);
   await refreshAllData();
   renderBountyTab();
   showToast('赏金任务已退回' + (task ? '：' + task.name : ''));
