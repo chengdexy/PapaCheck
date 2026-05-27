@@ -198,10 +198,33 @@ function renderHomeworkTab() {
       const totalCount = adminHomeworks.length;
       const doingCount = adminHomeworks.filter(h => h.status === 'doing').length;
       if (totalCount > 0) {
+        const submittedDate = AdminUtil.dateKey(adminDate);
+        const settlement = cachedData?.dailySettlement?.[submittedDate];
+
+        const totalChallengeMinutes = adminHomeworks.reduce((sum, h) => sum + (h.suggestedDuration || 0), 0);
+        const hours = Math.floor(totalChallengeMinutes / 60);
+        const mins = totalChallengeMinutes % 60;
+        const formattedDuration = hours > 0 ? `${hours}小时${mins > 0 ? mins + '分钟' : ''}` : `${mins}分钟`;
+
+        const totalRewardScore = adminHomeworks.reduce((sum, h) => sum + (h.basePoints || 0), 0);
+
+        const earnedScore = settlement?.homeworkBonus ??
+          adminHomeworks.filter(h => h.status === 'done' && h.mode === 'challenge' && !h.rejected)
+            .reduce((sum, h) => sum + (h.basePoints || 0), 0);
+
         let progressText = `完成进度: ${doneCount}/${totalCount}`;
         if (doneCount === totalCount) progressText += ' ✅ 全部完成';
         else if (doingCount > 0) progressText += ` · ${doingCount}项进行中`;
-        return `<div style="margin-bottom:12px;padding:8px 12px;background:rgba(56,189,248,0.08);border-radius:8px;font-size:14px;font-weight:600;color:var(--accent);">📊 ${progressText}</div>`;
+
+        return `<div style="margin-bottom:12px;padding:8px 12px;background:rgba(56,189,248,0.08);border-radius:8px;font-size:14px;font-weight:600;color:var(--accent);display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+          <span>📋 ${progressText}</span>
+          <span style="color:var(--text-secondary);margin:0 2px;">·</span>
+          <span>⏱️ 挑战总时长: ${formattedDuration}</span>
+          <span style="color:var(--text-secondary);margin:0 2px;">·</span>
+          <span>🏆 总奖励分: ${totalRewardScore}分</span>
+          <span style="color:var(--text-secondary);margin:0 2px;">·</span>
+          <span>💰 已获得积分: ${earnedScore}分</span>
+        </div>`;
       }
       return '';
     })()}
