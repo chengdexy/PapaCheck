@@ -204,7 +204,10 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
             self.send_json(db.get_bounty_completions(date_key))
             return
 
-        super().do_GET()
+        try:
+            super().do_GET()
+        except (ConnectionAbortedError, ConnectionResetError):
+            pass
 
     def do_POST(self):
         parsed = urlparse(self.path)
@@ -363,6 +366,10 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
 
         self.send_error(404, 'Not Found')
 
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        super().end_headers()
+
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -377,7 +384,10 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
         self.send_header('Content-Length', len(body))
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except (ConnectionAbortedError, ConnectionResetError):
+            pass
 
     def log_message(self, format, *args):
         try:
@@ -426,6 +436,7 @@ def init_server(quiet=False):
         '今天作业获得的评价是……良！',
         '今天作业获得的评价是……可！',
         '今天作业获得的评价是……差！',
+        '已提交',
     ] + ['现在是' + str(h) + '点' for h in range(24)]
 
     def _pregen_fixed():

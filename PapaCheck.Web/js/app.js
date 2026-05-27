@@ -7,6 +7,13 @@
 let currentDate = new Date();
 let homeworks = [];
 let freeTimeTasks = [];
+
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
 let screenSaverTimer = null;
 let isScreenSaverActive = false;
 let saverTimeInterval = null;
@@ -15,6 +22,8 @@ let pollInterval = null;
 let _lastBuffs = null;
 let _lastRewardBox = null;
 let _lastShopItems = null;
+let _lastBountySubmissions = null;
+let _lastBountyCompletions = null;
 window._recentNewRewardIds = new Set();
 let _lastRatingInfo = null;
 let _lastPointsNote = null;
@@ -139,8 +148,15 @@ function getActiveFreeTime() {
   return freeTimeTasks.find(ft => ft.status === 'doing');
 }
 
+function getActiveBounty() {
+  if (!cachedData) return null;
+  const dateKey = Util.dateKey(currentDate);
+  const submissions = cachedData.bountySubmissions?.[dateKey] || [];
+  return submissions.find(s => s.status === 'doing') || null;
+}
+
 function isAnyTaskActive() {
-  return getActiveHomework() || getActiveFreeTime();
+  return getActiveHomework() || getActiveFreeTime() || getActiveBounty();
 }
 
 async function requestDeferHomework(hwId) {
@@ -538,6 +554,7 @@ function startPoll(intervalMs) {
   pollServer = async () => {
     try {
       cachedData = await API.getData();
+      API.migrateBountyCompletionsToTotal(cachedData);
       const key = Util.dateKey(currentDate);
 
       const buffs = cachedData.activeBuffs || [];
@@ -710,6 +727,53 @@ function startPoll(intervalMs) {
       }
       _lastSettings = settings;
 
+      const newBountySubs = cachedData.bountySubmissions?.[key] || [];
+      const prevBountySubs = _lastBountySubmissions?.[key] || [];
+      const newBountyComps = cachedData.bountyCompletions?._total || {};
+      const prevBountyComps = _lastBountyCompletions?._total || {};
+      if (_lastBountySubmissions !== null) {
+        for (const [tid, newVal] of Object.entries(newBountyComps)) {
+          const prevVal = prevBountyComps[tid];
+          const nv = typeof newVal === 'number' ? newVal : (newVal ? 1 : 0);
+          const pv = typeof prevVal === 'number' ? prevVal : (prevVal ? 1 : 0);
+          if (nv > pv) {
+            const task = (cachedData.bountyTasks || []).find(t => t.id === tid);
+            Voice.speak((task ? task.name : '任务') + '完成，加' + (task ? task.points || 0 : 0) + '分！');
+            needsFullRender = true;
+            if (typeof backToMain === 'function') backToMain();
+            break;
+          }
+        }
+        for (const prevSub of prevBountySubs) {
+          if (prevSub.status === 'submitted' && !newBountySubs.some(s => s.taskId === prevSub.taskId)) {
+            needsFullRender = true;
+          }
+        }
+        for (const newSub of newBountySubs) {
+          const prevSub = prevBountySubs.find(s => s.taskId === newSub.taskId);
+          if (prevSub && prevSub.status === 'submitted' && newSub.status === 'doing') {
+            const task = (cachedData.bountyTasks || []).find(t => t.id === newSub.taskId);
+            Voice.speak((task ? task.name : '任务') + '失败了，下次加油！');
+            needsFullRender = true;
+          }
+        }
+      }
+      _lastBountyCompletions = {};
+      if (cachedData.bountyCompletions?._total) {
+        _lastBountyCompletions._total = { ...cachedData.bountyCompletions._total };
+      }
+      if (_lastBountySubmissions === null) {
+        _lastBountySubmissions = {};
+        for (const dk of Object.keys(cachedData.bountySubmissions || {})) {
+          _lastBountySubmissions[dk] = (cachedData.bountySubmissions[dk] || []).map(s => ({ ...s }));
+        }
+      } else {
+        _lastBountySubmissions = {};
+        for (const dk of Object.keys(cachedData.bountySubmissions || {})) {
+          _lastBountySubmissions[dk] = (cachedData.bountySubmissions[dk] || []).map(s => ({ ...s }));
+        }
+      }
+
       if (needsFullRender) {
         updateBigScreen();
       }
@@ -800,6 +864,7 @@ async function init() {
     updateConnStatus();
     return;
   }
+  API.migrateBountyCompletionsToTotal(cachedData);
   const key = Util.dateKey(currentDate);
 
   homeworks = cachedData.homeworks?.[key] || [];

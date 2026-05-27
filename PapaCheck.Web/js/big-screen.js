@@ -19,6 +19,7 @@ let _redeemingItem = false;
 let _redeemingRewardBox = false;
 let _requestingDefer = false;
 let _startingBounty = false;
+let _submittingBounty = false;
 
 function isTomorrowHoliday() {
   const tomorrow = new Date();
@@ -228,11 +229,11 @@ function updateBigScreen() {
     updateRatedPage();
     return;
   }
-  if (!forceMainPage && settlement && settlement.submittedAt && !settlement.rating) {
+  if (!forceMainPage && !getActiveBounty() && settlement && settlement.submittedAt && !settlement.rating) {
     updateSettlementPage();
     return;
   }
-  if (!forceMainPage && settlement && settlement.dailyBase !== undefined && !settlement.submittedAt && !settlement.rating) {
+  if (!forceMainPage && !getActiveBounty() && settlement && settlement.dailyBase !== undefined && !settlement.submittedAt && !settlement.rating) {
     window._settlement = settlement;
     updateSettlementPage();
     return;
@@ -263,7 +264,6 @@ function updateMainPage() {
   updateCurrentTask();
   updateHomeworkGrid();
   updateFreeTimeGrid();
-  updateBountyGrid();
 
   document.getElementById('settlementContainer').style.display = 'none';
   document.getElementById('ratedContainer').style.display = 'none';
@@ -299,6 +299,48 @@ function updateCurrentTask() {
   if (activeHw) {
     renderActiveHomeworkInCurrentTask(display, activeHw);
     return;
+  }
+
+  {
+    const activeBounty = getActiveBounty();
+    if (activeBounty) {
+      const bountyTasks = cachedData?.bountyTasks || [];
+      const task = bountyTasks.find(t => t.id === activeBounty.taskId);
+      if (task) {
+        const allC = cachedData?.bountyCompletions || {};
+        const totalComps = allC._total || {};
+        const v = totalComps[task.id];
+        const cCount = typeof v === 'number' ? v : (v ? 1 : 0);
+        const cBadge = task.type !== 'once' && cCount > 0 ? ' <span style="font-size:18px;font-weight:700;color:var(--accent);">x' + cCount + '</span>' : '';
+        display.innerHTML = `
+          <div class="current-task-icon">${task.type === 'once' ? '🪙' : '💰'}</div>
+          <div class="current-task-name">赏金任务：${escapeHtml(task.name)}</div>
+          <div class="current-task-time">进行中 · +${task.points || 0}分 · ${task.type === 'once' ? '一次性' : '常驻'}${cBadge}</div>
+          <div class="task-actions" style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
+            <button onclick="abandonBountyTask('${task.id}')" style="padding:10px 28px;border:1px solid var(--danger);border-radius:12px;background:transparent;color:var(--danger);font-size:18px;font-weight:600;cursor:pointer;">放弃</button>
+            <button onclick="submitBountyTask('${task.id}')" style="padding:10px 28px;border:none;border-radius:12px;background:var(--accent);color:var(--bg);font-size:18px;font-weight:600;cursor:pointer;">完成</button>
+          </div>
+        `;
+        return;
+      }
+    }
+  }
+
+  {
+    const dateKey = Util.dateKey(currentDate);
+    const submissions = cachedData?.bountySubmissions?.[dateKey] || [];
+    const submittedBounty = submissions.find(s => s.status === 'submitted');
+    if (submittedBounty) {
+      const task = (cachedData?.bountyTasks || []).find(t => t.id === submittedBounty.taskId);
+      if (task) {
+        display.innerHTML = `
+          <div class="current-task-icon">⏳</div>
+          <div class="current-task-name">${escapeHtml(task.name)}</div>
+          <div class="current-task-time">等待爸爸审核中...</div>
+        `;
+        return;
+      }
+    }
   }
 
   const settlement = getSettlementData();
@@ -445,22 +487,65 @@ function updateHomeworkGrid() {
 
   const pendingHomeworks = homeworks.filter(h => h.status !== 'done');
 
-  if (homeworks.length === 0) {
+  if (pendingHomeworks.length === 0) {
     card.style.display = 'block';
-    grid.innerHTML = '<div class="homework-empty">📝 今天还没有留作业</div>';
+
+    const dateKey = Util.dateKey(currentDate);
+    const bountyTasks = cachedData?.bountyTasks || [];
+    const submissions = cachedData?.bountySubmissions?.[dateKey] || [];
+    const allCompletions = cachedData?.bountyCompletions || {};
+
+    const historyCounts = {};
+    const totalComps = allCompletions._total || {};
+    for (const tid of Object.keys(totalComps)) {
+      const v = totalComps[tid];
+      const delta = typeof v === 'number' ? v : (v ? 1 : 0);
+      if (delta > 0) historyCounts[tid] = delta;
+    }
+
+    const typeLabel = (t) => ' <span style="font-size:13px;color:var(--text-secondary);">+' + (t.points || 0) + '分 · ' + (t.type === 'once' ? '一次性' : '常驻') + '</span>';
+    const bountyEmoji = (t) => t.type === 'once' ? '🪙' : '💰';
+
+    const availableBounty = bountyTasks.filter(task => {
+      if (task.enabled === false) return false;
+      if (task.type === 'once' && task.completedAt) return false;
+      if (task.type !== 'once' && submissions.some(s => s.taskId === task.id)) return false;
+      return true;
+    });
+    const doingSubs = submissions.filter(s => s.status === 'doing');
+    const submittedSubs = submissions.filter(s => s.status === 'submitted');
+
+    const bountyCards = [];
+    bountyCards.push(...submittedSubs.map(sub => {
+      const task = bountyTasks.find(t => t.id === sub.taskId);
+      if (!task) return '';
+      return '<div class="homework-card" style="border-left:3px solid var(--warning);opacity:0.8;"><div class="homework-card-row"><span style="font-size:28px;flex-shrink:0;">⏳</span><div class="homework-card-info"><div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-size:18px;font-weight:600;">' + escapeHtml(task.name) + typeLabel(task) + '</span>' + (historyCounts[task.id] ? '<span style="font-size:18px;font-weight:700;color:var(--accent);">x' + historyCounts[task.id] + '</span>' : '') + '</div><div style="font-size:13px;color:var(--warning);margin-top:2px;">等待爸爸审核中...</div></div></div></div>';
+    }));
+    bountyCards.push(...doingSubs.map(sub => {
+      const task = bountyTasks.find(t => t.id === sub.taskId);
+      if (!task) return '';
+      return '<div class="homework-card" style="border-left:3px solid var(--accent);"><div class="homework-card-row"><span style="font-size:28px;flex-shrink:0;">' + bountyEmoji(task) + '</span><div class="homework-card-info"><div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-size:18px;font-weight:600;">' + escapeHtml(task.name) + typeLabel(task) + '</span>' + (historyCounts[task.id] ? '<span style="font-size:18px;font-weight:700;color:var(--accent);">x' + historyCounts[task.id] + '</span>' : '') + '</div><div style="font-size:13px;color:var(--text-secondary);margin-top:2px;">进行中</div></div></div></div>';
+    }));
+    bountyCards.push(...availableBounty
+      .filter(t => !doingSubs.some(s => s.taskId === t.id) && !submittedSubs.some(s => s.taskId === t.id))
+      .map(task => {
+        return '<div class="homework-card" onclick="confirmStartBounty(\'' + task.id + '\')" style="cursor:pointer;"><div class="homework-card-row"><span style="font-size:28px;flex-shrink:0;">' + bountyEmoji(task) + '</span><div class="homework-card-info"><div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-size:18px;font-weight:600;">' + escapeHtml(task.name) + typeLabel(task) + '</span>' + (historyCounts[task.id] ? '<span style="font-size:18px;font-weight:700;color:var(--accent);">x' + historyCounts[task.id] + '</span>' : '') + '</div></div></div></div>';
+      }));
+
+    const titleEl = document.querySelector('#homeworkCard .big-card-title');
+    if (bountyCards.length > 0) {
+      if (titleEl) titleEl.textContent = '💰 赏金任务';
+      grid.innerHTML = bountyCards.join('');
+    } else {
+      if (titleEl) titleEl.textContent = '📝 今日作业';
+      grid.innerHTML = '';
+    }
     return;
   }
 
-  if (pendingHomeworks.length === 0) {
-    const settlement = getSettlementData();
-    card.style.display = 'block';
-    if (settlement && settlement.rating) {
-      const emoji = { '优': '🌟', '良': '👍', '可': '👌', '差': '💪' };
-      grid.innerHTML = '<div class="homework-empty">' + (emoji[settlement.rating] || '🎉') + ' 全部完成！爸爸评级：' + settlement.rating + '</div>';
-    } else {
-      grid.innerHTML = '<div class="homework-empty">🎉 全部完成！等待评级中...</div>';
-    }
-    return;
+  {
+    const titleEl = document.querySelector('#homeworkCard .big-card-title');
+    if (titleEl) titleEl.textContent = '📝 今日作业';
   }
 
   grid.innerHTML = pendingHomeworks.map(hw => {
@@ -673,107 +758,12 @@ function updateFreeTimeGrid() {
   }).join('');
 }
 
-// ========== Bounty Tasks ==========
-function updateBountyGrid() {
-  const card = document.getElementById('bountyCard');
-  const grid = document.getElementById('bountyGrid');
-
-  const allDone = homeworks.length > 0 && homeworks.every(h => h.status === 'done');
-  if (!allDone) {
-    card.style.display = 'none';
-    return;
-  }
-
-  const dateKey = Util.dateKey(currentDate);
-  const bountyTasks = cachedData?.bountyTasks || [];
-  const submissions = cachedData?.bountySubmissions?.[dateKey] || [];
-  const completions = cachedData?.bountyCompletions?.[dateKey] || {};
-
-  const available = bountyTasks.filter(task => {
-    if (task.enabled === false) return false;
-    if (task.type === 'once' && task.completedAt) return false;
-    if (task.type !== 'once' && completions[task.id]) return false;
-    return true;
-  });
-
-  const doingSubmissions = submissions.filter(s => s.status === 'doing');
-  const submittedSubmissions = submissions.filter(s => s.status === 'submitted');
-
-  const addAvailableCard = (task) => {
-    const clickAction = `onclick="startBountyTask('${task.id}')"`;
-    return `
-      <div class="homework-card" ${clickAction} style="cursor:pointer;">
-        <div class="homework-card-row">
-          <span style="font-size:28px;flex-shrink:0;">💰</span>
-          <div class="homework-card-info">
-            <div style="display:flex;align-items:center;justify-content:space-between;">
-              <span style="font-size:18px;font-weight:600;">${escapeHtml(task.name)}</span>
-              <span style="font-size:14px;color:var(--accent);font-weight:600;">+${task.points || 0}分</span>
-            </div>
-          </div>
-        </div>
-      </div>`;
-  };
-
-  const addDoingCard = (sub) => {
-    const task = bountyTasks.find(t => t.id === sub.taskId);
-    if (!task) return '';
-    return `
-      <div class="homework-card" style="border-left:3px solid var(--accent);">
-        <div class="homework-card-row">
-          <span style="font-size:28px;flex-shrink:0;">⏳</span>
-          <div class="homework-card-info">
-            <div style="display:flex;align-items:center;justify-content:space-between;">
-              <span style="font-size:18px;font-weight:600;">${escapeHtml(task.name)}</span>
-              <span style="font-size:14px;color:var(--accent);font-weight:600;">+${task.points || 0}分</span>
-            </div>
-            <div style="font-size:13px;color:var(--text-secondary);margin-top:2px;">进行中</div>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:8px;">
-          <button onclick="event.stopPropagation();abandonBountyTask('${task.id}')" style="flex:1;padding:8px;border:1px solid var(--danger);border-radius:8px;background:transparent;color:var(--danger);font-size:14px;font-weight:600;cursor:pointer;">放弃</button>
-          <button onclick="event.stopPropagation();submitBountyTask('${task.id}')" style="flex:1;padding:8px;border:none;border-radius:8px;background:var(--accent);color:var(--bg);font-size:14px;font-weight:600;cursor:pointer;">提交审核</button>
-        </div>
-      </div>`;
-  };
-
-  const addSubmittedCard = (sub) => {
-    const task = bountyTasks.find(t => t.id === sub.taskId);
-    if (!task) return '';
-    return `
-      <div class="homework-card" style="border-left:3px solid var(--warning);opacity:0.8;">
-        <div class="homework-card-row">
-          <span style="font-size:28px;flex-shrink:0;">⏳</span>
-          <div class="homework-card-info">
-            <div style="display:flex;align-items:center;justify-content:space-between;">
-              <span style="font-size:18px;font-weight:600;">${escapeHtml(task.name)}</span>
-              <span style="font-size:14px;color:var(--text-secondary);">+${task.points || 0}分</span>
-            </div>
-            <div style="font-size:13px;color:var(--warning);margin-top:2px;">等待爸爸审核中...</div>
-          </div>
-        </div>
-      </div>`;
-  };
-
-  const availableCards = available
-    .filter(t => !doingSubmissions.some(s => s.taskId === t.id) && !submittedSubmissions.some(s => s.taskId === t.id))
-    .map(addAvailableCard);
-
-  if (availableCards.length === 0 && doingSubmissions.length === 0 && submittedSubmissions.length === 0) {
-    card.style.display = 'none';
-    return;
-  }
-
-  card.style.display = 'block';
-  grid.innerHTML = [
-    ...submittedSubmissions.map(s => addSubmittedCard(s)),
-    ...doingSubmissions.map(s => addDoingCard(s)),
-    ...availableCards,
-  ].join('');
-}
-
 async function startBountyTask(taskId) {
   if (_startingBounty) return;
+  if (isAnyTaskActive()) {
+    showToast('请先完成当前任务');
+    return;
+  }
   _startingBounty = true;
   try {
     const dateKey = Util.dateKey(currentDate);
@@ -783,6 +773,9 @@ async function startBountyTask(taskId) {
     await API.saveBountySubmissions(dateKey, submissions);
     if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
     cachedData.bountySubmissions[dateKey] = submissions;
+    const task = (cachedData?.bountyTasks || []).find(t => t.id === taskId);
+    Voice.clear();
+    Voice.speak('开始' + (task ? task.name : '') + '！');
     needsFullRender = true;
     updateBigScreen();
   } finally {
@@ -791,29 +784,44 @@ async function startBountyTask(taskId) {
 }
 
 async function abandonBountyTask(taskId) {
-  const dateKey = Util.dateKey(currentDate);
-  let submissions = await API.getBountySubmissions(dateKey) || [];
-  submissions = submissions.filter(s => s.taskId !== taskId);
-  await API.saveBountySubmissions(dateKey, submissions);
-  if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
-  cachedData.bountySubmissions[dateKey] = submissions;
-  needsFullRender = true;
-  updateBigScreen();
+  if (_submittingBounty) return;
+  _submittingBounty = true;
+  try {
+    const dateKey = Util.dateKey(currentDate);
+    let submissions = await API.getBountySubmissions(dateKey) || [];
+    submissions = submissions.filter(s => s.taskId !== taskId);
+    await API.saveBountySubmissions(dateKey, submissions);
+    if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
+    cachedData.bountySubmissions[dateKey] = submissions;
+    needsFullRender = true;
+    updateBigScreen();
+  } finally {
+    _submittingBounty = false;
+  }
 }
 
 async function submitBountyTask(taskId) {
-  const dateKey = Util.dateKey(currentDate);
-  const submissions = await API.getBountySubmissions(dateKey) || [];
-  const sub = submissions.find(s => s.taskId === taskId);
-  if (!sub || sub.status !== 'doing') return;
-  sub.status = 'submitted';
-  sub.submittedAt = new Date().toISOString();
-  await API.saveBountySubmissions(dateKey, submissions);
-  if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
-  cachedData.bountySubmissions[dateKey] = submissions;
-  needsFullRender = true;
-  updateBigScreen();
-  showToast('赏金任务已提交审核');
+  if (_submittingBounty) return;
+  _submittingBounty = true;
+  try {
+    const dateKey = Util.dateKey(currentDate);
+    const submissions = await API.getBountySubmissions(dateKey) || [];
+    const sub = submissions.find(s => s.taskId === taskId);
+    if (!sub || sub.status !== 'doing') return;
+    sub.status = 'submitted';
+    sub.submittedAt = new Date().toISOString();
+    await API.saveBountySubmissions(dateKey, submissions);
+    if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
+    cachedData.bountySubmissions[dateKey] = submissions;
+    Voice.clear();
+    Voice.speak('已提交');
+    needsFullRender = true;
+    updateBigScreen();
+    showToast('赏金任务已完成');
+    if (typeof backToMain === 'function') backToMain();
+  } finally {
+    _submittingBounty = false;
+  }
 }
 
 // ========== Settlement Page ==========
@@ -873,8 +881,8 @@ function updateSettlementPage() {
       return '<div class="settlement-hw-item">' + subject.icon + ' ' + hw.subject + ' - ' + hw.content + ' ' + timeInfo + '</div>';
     }).join('')}
       </div>
-    </div>
-  `;
+    </div >
+    `;
 }
 
 // ========== Rated Page ==========
@@ -920,8 +928,8 @@ function updateRatedPage() {
       </div>
       <div class="rated-encouragement">${encouragement[settlement.rating] || ''}</div>
       <button class="btn-submit-rating" onclick="backToMain()" style="margin-top:16px;margin-bottom:0;background:var(--bg);color:var(--text);border:1px solid var(--text-secondary);">← 回到首页</button>
-    </div>
-  `;
+    </div >
+    `;
 }
 
 // ========== My Rewards ==========
@@ -954,7 +962,7 @@ function showMyRewards() {
             : '';
         const isNew = (r.createdAt && now - r.createdAt < 86400000) || (window._recentNewRewardIds && window._recentNewRewardIds.has(r.id));
         return `
-        <div class="reward-item">
+    <div class="reward-item">
           <div class="reward-item-info">
             <div class="reward-item-name">${r.name}${isNew ? ' <span class="new-badge">NEW</span>' : ''}</div>
             <div class="reward-item-meta">${metaStr}</div>
@@ -965,8 +973,8 @@ function showMyRewards() {
                <button onclick="cancelRedemption('${pendingR.id}')" style="padding:8px 16px;font-size:14px;border-radius:8px;border:1px solid var(--text-secondary);background:transparent;color:var(--text-secondary);cursor:pointer;">撤回</button>`
             : `<button class="btn-redeem-sm" onclick="redeemFromRewardBox('${r.id}')">兑换</button>`
           }
-        </div>
-      `;
+        </div >
+    `;
       }).join('');
     }
   }
@@ -1097,8 +1105,8 @@ async function updateShopPage() {
           `}).join('')}
       </div>
       <button class="btn-cancel" style="margin-top:20px;padding:14px 24px;border:none;border-radius:14px;font-size:20px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--text);" onclick="backToMain()">返回</button>
-    </div>
-  `;
+    </div >
+    `;
 }
 
 async function redeemItem(itemId) {
@@ -1183,21 +1191,21 @@ function confirmStartTask(hwId) {
 
   if (hw.rejected) {
     content.innerHTML = `
-      <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon} ${hw.subject}</h3>
+    <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon} ${hw.subject}</h3>
       <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;font-size:20px;">${hw.content}</p>
       <p style="text-align:center;color:#f87171;font-size:20px;margin-bottom:16px;">⚠️ 已驳回，不计时重新完成</p>
       <div class="modal-actions">
         <button onclick="closeStartConfirm()" style="padding:10px 16px;border:2px solid var(--text-secondary);border-radius:12px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">✕ 取消</button>
         <button onclick="closeStartConfirm(); startHomework('${hwId}', 'timer')" style="padding:10px 16px;background:var(--accent);color:var(--bg);border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">开始</button>
       </div>
-    `;
+  `;
   } else {
     const canDefer = !hw.deferRequest && isTomorrowHoliday();
     const deferBtn = canDefer
       ? '<button onclick="closeStartConfirm(); requestDeferHomework(\'' + hwId + '\')" style="padding:10px 16px;border:2px solid var(--warning);border-radius:12px;background:transparent;color:var(--warning);font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">⏭️ 明天做</button>'
       : '';
     content.innerHTML = `
-      <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon} ${hw.subject}</h3>
+    <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon} ${hw.subject}</h3>
       <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;font-size:20px;">${hw.content}</p>
       <p style="text-align:center;color:var(--accent);font-size:20px;margin-bottom:16px;">建议 ${hw.suggestedDuration} 分钟内完成</p>
       <div class="modal-actions">
@@ -1205,8 +1213,28 @@ function confirmStartTask(hwId) {
         ${deferBtn}
         <button onclick="closeStartConfirm(); startHomework('${hwId}', 'challenge')" style="padding:10px 16px;background:var(--accent);color:var(--bg);border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">⚔️ 开始</button>
       </div>
-    `;
+  `;
   }
+  modal.classList.add('show');
+}
+
+function confirmStartBounty(taskId) {
+  const bt = cachedData?.bountyTasks || [];
+  const task = bt.find(t => t.id === taskId);
+  if (!task) return;
+
+  const modal = document.getElementById('startConfirmModal');
+  const content = document.getElementById('startConfirmModalContent');
+
+  content.innerHTML = `
+    <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${task.type === 'once' ? '🪙' : '💰'} 赏金任务</h3>
+    <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;font-size:20px;">${escapeHtml(task.name)}</p>
+    <p style="text-align:center;color:var(--accent);font-size:20px;margin-bottom:16px;">+${task.points || 0} 分 · 不限时</p>
+    <div class="modal-actions">
+      <button onclick="closeStartConfirm()" style="padding:10px 16px;border:2px solid var(--text-secondary);border-radius:12px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">✕ 取消</button>
+      <button onclick="closeStartConfirm(); startBountyTask('${taskId}')" style="padding:10px 16px;background:var(--success);color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">💰 开始</button>
+    </div>
+  `;
   modal.classList.add('show');
 }
 

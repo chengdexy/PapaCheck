@@ -194,6 +194,28 @@ const API = {
     return true;
   },
 
+  migrateBountyCompletionsToTotal(data) {
+    if (!data || !data.bountyCompletions) return data;
+    const comps = data.bountyCompletions;
+    if (comps._total) return data;
+    const total = {};
+    for (const dk of Object.keys(comps)) {
+      const entry = comps[dk];
+      if (entry && typeof entry === 'object') {
+        for (const tid of Object.keys(entry)) {
+          const v = entry[tid];
+          const delta = typeof v === 'number' ? v : (v ? 1 : 0);
+          total[tid] = (total[tid] || 0) + delta;
+        }
+      }
+    }
+    comps._total = total;
+    if (Object.keys(total).length > 0) {
+      this.saveBountyCompletions('_total', total);
+    }
+    return data;
+  },
+
   async resetDate(date) {
     return await this._fetch('/api/reset-date', {
       method: 'POST',
