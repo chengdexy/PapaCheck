@@ -11,6 +11,7 @@ data.db.*
 # 编辑器
 .vscode/
 .idea/
+.trae/
 *.swp
 *.swo
 
