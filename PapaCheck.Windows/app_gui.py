@@ -514,10 +514,8 @@ class PapaCheckApp:
     def _restore_apk_hint(self):
         if not hasattr(self, '_apk_hint_row'):
             return
-        self._apk_hint_row.pack(fill=tk.X, padx=16, pady=(12, 0),
-                                before=self._log_sep)
-        self._apk_url_label.pack(fill=tk.X, padx=16, pady=(0, 12),
-                                 before=self._log_sep)
+        self._apk_hint_row.pack(fill=tk.X, padx=16, pady=(12, 0))
+        self._apk_url_label.pack(fill=tk.X, padx=16, pady=(0, 12))
         self._apply_window_height(True)
         cfg = _load_config() or {}
         cfg['show_apk_hint'] = True
