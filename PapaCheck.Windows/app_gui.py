@@ -295,6 +295,7 @@ class PapaCheckApp:
         self.tray_icon = None
         self.tray_thread = None
         self.destroyed = False
+        self._quitting = False
 
         self.log_queue = queue.Queue()
         self.log_redirector = LogRedirector(self.log_queue)
@@ -683,7 +684,10 @@ class PapaCheckApp:
             self.root.after(200, self._wait_shutdown)
         else:
             self._handle_server_exit()
-            self.start_btn.config(state=tk.NORMAL)
+            if self._quitting:
+                self._do_destroy()
+            else:
+                self.start_btn.config(state=tk.NORMAL)
 
     def _toggle_server(self):
         if self.running:
@@ -850,27 +854,28 @@ class PapaCheckApp:
         self.root.after(200, self._update_tray_menu)
 
     def _quit_app(self):
-        self.destroyed = True
-        self.running = False
+        self._quitting = True
+        self._disable_ui()
         if self.server_thread and self.server_thread.is_alive():
             self._append_log('正在停止服务器...')
-            self.server_thread.stop()
-            self._quit_wait_count = 0
-            self.root.after(200, self._wait_quit)
+            self._stop_server()
         else:
             self._do_destroy()
 
-    def _wait_quit(self):
-        self._quit_wait_count += 1
-        if self.server_thread and self.server_thread.is_alive():
-            if self._quit_wait_count < 25:
-                self.root.after(200, self._wait_quit)
-            else:
-                self._append_log('服务器停止超时，强制退出')
-                self._do_destroy()
-        else:
-            self._append_log('服务器已安全停止')
-            self._do_destroy()
+    def _disable_ui(self):
+        for child in self.root.winfo_children():
+            self._disable_widget_tree(child)
+        self.root.config(menu=None)
+
+    def _disable_widget_tree(self, widget):
+        if isinstance(widget, (tk.Button, tk.Checkbutton, tk.Entry,
+                               tk.Text, tk.Listbox, tk.Spinbox)):
+            try:
+                widget.config(state=tk.DISABLED)
+            except Exception:
+                pass
+        for child in widget.winfo_children():
+            self._disable_widget_tree(child)
 
     def _do_destroy(self):
         if self._instance_sock:
