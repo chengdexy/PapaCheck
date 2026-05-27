@@ -668,7 +668,6 @@ class PapaCheckApp:
                 text='http://' + self.ip + ':' + str(PORT) + '/api/download')
 
         self._append_log('服务器启动成功 (端口 ' + str(PORT) + ', 局域网 IP: ' + self.ip + ')')
-        self._append_log('数据库位置: ' + os.path.join(_DB_DIR, 'data.db'))
 
         self.root.after(2000, self._check_still_running)
 
@@ -771,7 +770,7 @@ class PapaCheckApp:
         succ_kw = ('成功', '完成', '已复制', '已添加', '已保存', '已清除')
         if any(k in text for k in succ_kw):
             return 'success'
-        high_kw = ('服务器启动成功', '数据库位置', '下载了')
+        high_kw = ('服务器启动成功', '下载了')
         if any(k in text for k in high_kw):
             return 'highlight'
         return 'info'
