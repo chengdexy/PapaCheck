@@ -922,12 +922,13 @@ input[type="number"] {
   align-items: center;
   gap: 12px;
   margin-bottom: 8px;
+  justify-content: flex-start;
 }
 
 .settings-row label {
   color: var(--text-secondary);
   font-size: 14px;
-  min-width: 120px;
+  white-space: nowrap;
 }
 
 .settings-input {
@@ -1510,8 +1511,8 @@ input[type="number"] {
   }
 
   .settings-row label {
-    min-width: 80px;
     font-size: 14px;
+    white-space: nowrap;
   }
 
   .settings-input {
@@ -1549,9 +1550,9 @@ input[type="number"] {
     font-size: 16px;
   }
 
-  /* Larger charts, hide endpoint labels */
+  /* Show max/min labels on larger charts */
   .chart-value-label {
-    display: none;
+    display: inline;
   }
 
   .chart-container {
@@ -1655,8 +1656,8 @@ input[type="number"] {
   }
 
   .settings-row label {
-    min-width: 70px;
     font-size: 13px;
+    white-space: nowrap;
   }
 
   /* 作业默认值 & 积分与商品 section: title 占全宽, rows 放一行 */
