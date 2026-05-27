@@ -15,6 +15,9 @@ let adminHomeworks = [];
 let adminShopItems = [];
 let adminRedemptions = [];
 let adminRewardBox = [];
+let adminBountyTasks = [];
+let adminBountySubmissions = {};
+let adminBountyCompletions = {};
 let adminCurrentTab = 'homework';
 let adminEditingId = null;
 let adminSettings = {};
@@ -116,6 +119,9 @@ async function refreshAllData() {
       adminShopItems = data.shopItems || [];
       adminRedemptions = data.redemptions || [];
       adminRewardBox = data.rewardBox || [];
+      adminBountyTasks = data.bountyTasks || [];
+      adminBountySubmissions = data.bountySubmissions || {};
+      adminBountyCompletions = data.bountyCompletions || {};
       adminSettings = data.settings || {};
     }
   } catch (e) {
@@ -142,6 +148,7 @@ function renderCurrentTab() {
     case 'shop': renderShopTab(); break;
     case 'redeem': renderRedeemTab(); break;
     case 'rewardBox': renderRewardBoxTab(); break;
+    case 'bounty': renderBountyTab(); break;
     case 'stats': renderStatsTab(); break;
     case 'settings': renderSettingsTab(); break;
   }
@@ -881,6 +888,196 @@ async function deleteRewardBoxItem(id) {
   await refreshAllData();
   renderRewardBoxTab();
   showToast('已删除');
+}
+
+// ========== Bounty Tasks ==========
+function renderBountyTab() {
+  const container = document.getElementById('adminContent');
+  const dateKey = AdminUtil.dateKey(adminDate);
+  const submissions = adminBountySubmissions[dateKey] || [];
+  const pendingSubmissions = submissions.filter(s => s.status === 'submitted');
+
+  const sorted = [...adminBountyTasks].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+  let reviewHtml = '';
+  if (pendingSubmissions.length > 0) {
+    reviewHtml = `
+      <div style="margin-bottom:16px;">
+        <div class="redeem-section-title">📋 待审核 (${pendingSubmissions.length})</div>
+        ${pendingSubmissions.map(s => {
+      const task = adminBountyTasks.find(t => t.id === s.taskId);
+      const name = task ? task.name : '（已删除）';
+      const time = s.submittedAt ? new Date(s.submittedAt).toLocaleString('zh-CN') : '';
+      return `<div class="redeem-item">
+            <div class="redeem-info">
+              <div class="redeem-name">${escapeHtml(name)}${task ? ' <span style="font-size:13px;color:var(--accent);">+' + (task.points || 0) + '分</span>' : ''}</div>
+              <div class="redeem-time">${time}</div>
+            </div>
+            <span class="redeem-status pending">待审核</span>
+            <button class="btn-fulfill" style="background:var(--success);margin-right:4px;" onclick="approveBountySubmission('${dateKey}', '${s.taskId}')">通过</button>
+            <button class="btn-fulfill" style="background:var(--danger);" onclick="rejectBountySubmission('${dateKey}', '${s.taskId}')">拒绝</button>
+          </div>`;
+    }).join('')}
+      </div>`;
+  }
+
+  container.innerHTML = `
+    <div class="admin-card">
+      <div class="admin-card-title">💰 赏金任务管理</div>
+      ${reviewHtml}
+      <div id="adminBountyList">
+        ${adminBountyTasks.length === 0
+      ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无赏金任务</div>'
+      : sorted.map(item => `
+            <div class="shop-admin-item">
+              <div class="shop-admin-icon">💰</div>
+              <div class="shop-admin-info">
+                <div class="shop-admin-name">${escapeHtml(item.name)}</div>
+                <div class="shop-admin-meta">+${item.points || 0}分 · ${item.type === 'once' ? '一次性' : '常驻'}${item.completedAt ? ' · 已完成' : ''} · ${item.enabled !== false ? '已启用' : '已禁用'}</div>
+              </div>
+              <div class="hw-admin-actions">
+                <button class="btn-sm btn-edit" onclick="openBountyModal('edit', '${item.id}')">编辑</button>
+                <button class="btn-sm btn-delete" onclick="deleteBountyTask('${item.id}')">删除</button>
+              </div>
+            </div>
+          `).join('')}
+      </div>
+      <button class="btn-add" onclick="openBountyModal('add')">+ 添加赏金任务</button>
+    </div>`;
+}
+
+function openBountyModal(mode, itemId) {
+  adminEditingId = mode === 'edit' ? itemId : null;
+  const item = adminEditingId ? adminBountyTasks.find(i => i.id === adminEditingId) : null;
+
+  const modal = document.getElementById('adminModalContent');
+  modal.innerHTML = `
+    <h3>${adminEditingId ? '编辑赏金任务' : '添加赏金任务'}</h3>
+    <div class="form-group">
+      <label>任务名称</label>
+      <input type="text" id="adminBountyName" value="${item?.name || ''}" placeholder="例如：帮妈妈洗一次碗" maxlength="20">
+    </div>
+    <div class="form-group">
+      <label>奖励分数</label>
+      <input type="number" id="adminBountyPoints" value="${item?.points || 5}" min="1" max="100">
+    </div>
+    <div class="form-group">
+      <label>任务类型</label>
+      <div class="mode-selector" id="adminBountyTypeSelector">
+        <button class="mode-option ${(item?.type || 'recurring') === 'recurring' ? 'selected' : ''}"
+          onclick="selectBountyType('recurring')">🔄 常驻</button>
+        <button class="mode-option ${(item?.type || 'recurring') === 'once' ? 'selected' : ''}"
+          onclick="selectBountyType('once')">⚡ 一次性</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeAdminModal()">取消</button>
+      <button class="btn-primary" onclick="saveBountyTask()">保存</button>
+    </div>
+  `;
+
+  window._bountyType = item?.type || 'recurring';
+
+  document.getElementById('adminModal').classList.add('show');
+}
+
+function selectBountyType(type) {
+  window._bountyType = type;
+  document.querySelectorAll('#adminBountyTypeSelector .mode-option').forEach(btn => {
+    const isRecurring = btn.textContent.includes('🔄');
+    const isOnce = btn.textContent.includes('⚡');
+    btn.classList.toggle('selected', (type === 'recurring' && isRecurring) || (type === 'once' && isOnce));
+  });
+}
+
+async function saveBountyTask() {
+  const name = document.getElementById('adminBountyName').value.trim();
+  const points = parseInt(document.getElementById('adminBountyPoints').value) || 5;
+  const type = window._bountyType || 'recurring';
+  if (!name) { showToast('请输入任务名称'); return; }
+
+  if (adminEditingId) {
+    const item = adminBountyTasks.find(i => i.id === adminEditingId);
+    if (item) {
+      item.name = name;
+      item.points = points;
+      item.type = type;
+    }
+  } else {
+    adminBountyTasks.push({
+      id: Date.now().toString(36) + Math.random().toString(36).substring(2, 7),
+      name,
+      points,
+      type,
+      enabled: true,
+      createdAt: Date.now(),
+    });
+  }
+
+  await API.saveBountyTasks(adminBountyTasks);
+  closeAdminModal();
+  await refreshAllData();
+  renderBountyTab();
+  showToast(adminEditingId ? '赏金任务已更新' : '赏金任务已添加');
+}
+
+async function deleteBountyTask(id) {
+  adminBountyTasks = adminBountyTasks.filter(i => i.id !== id);
+  await API.saveBountyTasks(adminBountyTasks);
+  await refreshAllData();
+  renderBountyTab();
+  showToast('赏金任务已删除');
+}
+
+let _approvingBounty = false;
+
+async function approveBountySubmission(dateKey, taskId) {
+  if (_approvingBounty) return;
+  _approvingBounty = true;
+  try {
+    const submissions = adminBountySubmissions[dateKey] || [];
+    const idx = submissions.findIndex(s => s.taskId === taskId);
+    if (idx === -1) return;
+    submissions.splice(idx, 1);
+    await API.saveBountySubmissions(dateKey, submissions);
+
+    const completions = adminBountyCompletions[dateKey] || {};
+    completions[taskId] = true;
+    await API.saveBountyCompletions(dateKey, completions);
+
+    const task = adminBountyTasks.find(t => t.id === taskId);
+    if (task && task.points > 0) {
+      await API.updatePoints('earn', task.points, '赏金任务：' + task.name);
+    }
+
+    if (task && task.type === 'once') {
+      task.completedAt = new Date().toISOString();
+      await API.saveBountyTasks(adminBountyTasks);
+    }
+
+    pregenSpeech(['赏金任务通过！', '赏金任务' + (task ? task.name : '') + '已通过']);
+    await refreshAllData();
+    renderBountyTab();
+    showToast('赏金任务已通过' + (task ? '：' + task.name : ''));
+  } finally {
+    _approvingBounty = false;
+  }
+}
+
+async function rejectBountySubmission(dateKey, taskId) {
+  const submissions = adminBountySubmissions[dateKey] || [];
+  const submission = submissions.find(s => s.taskId === taskId);
+  if (!submission || submission.status !== 'submitted') return;
+
+  submission.status = 'doing';
+  submission.submittedAt = null;
+  await API.saveBountySubmissions(dateKey, submissions);
+
+  const task = adminBountyTasks.find(t => t.id === taskId);
+  pregenSpeech(['赏金任务未通过，再试试吧']);
+  await refreshAllData();
+  renderBountyTab();
+  showToast('赏金任务已退回' + (task ? '：' + task.name : ''));
 }
 
 // ========== Tab 4: Redemptions ==========
