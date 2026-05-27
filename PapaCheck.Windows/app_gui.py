@@ -811,7 +811,7 @@ class PapaCheckApp:
                         self._restore_window, default=True
                     ),
                     pystray.MenuItem(
-                        '停止服务器' if self.running else '启动服务器',
+                        lambda: '停止服务器' if self.running else '启动服务器',
                         self._tray_toggle_server
                     ),
                     pystray.MenuItem(
