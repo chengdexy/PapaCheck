@@ -1063,7 +1063,9 @@ function renderSvgLineChart(data, options) {
   for (let k = 0; k < maxLabels; k++) labelIndices.push(Math.min(Math.round(k * labelStep), points.length - 1));
   const labels = labelIndices.map(i => `<text x="${points[i].x}" y="${height - 5}" text-anchor="middle" font-size="10" fill="var(--text-secondary)">${points[i].label}</text>`).join('');
   const showValues = data.length <= 10;
-  const valuesTxt = showValues ? points.map(p => `<text class="chart-value-label" x="${p.x}" y="${p.y - 8}" text-anchor="middle" font-size="10" fill="${color}">${p.value}${unit}</text>`).join('') : '';
+  const dataMax = Math.max(...values);
+  const dataMin = Math.min(...values);
+  const valuesTxt = showValues ? points.filter(p => p.value === dataMax || p.value === dataMin).map(p => `<text class="chart-value-label" x="${p.x}" y="${p.y - 8}" text-anchor="middle" font-size="10" fill="${color}">${p.value}</text>`).join('') : '';
   const yLabels = [];
   const ySteps = 4;
   for (let i = 0; i <= ySteps; i++) {
