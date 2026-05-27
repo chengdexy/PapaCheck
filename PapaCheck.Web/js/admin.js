@@ -30,14 +30,11 @@ let _calendarYear = null;
 let _calendarMonth = null;
 
 const SETTINGS_DEFAULTS = {
-  homeworkDefaultBasePoints: 10,
+  dailyBasePoints: 50,
+  homeworkBonusPerTask: 10,
   homeworkDefaultSuggestedDuration: 20,
-  ratingMultipliers: {
-    challenge: { '优': 2.0, '良': 1.5, '可': 1.2, '差': 0 },
-    timer: { '优': 1.5, '良': 1.2, '可': 1.0, '差': 0 }
-  },
-  challengeEfficiencyBonus: 5,
-  shopDefaultPoints: 15,
+  ratingMultipliers: { '优': 2.0, '良': 1.5, '可': 1.2, '差': 0 },
+  shopDefaultPoints: 50,
 };
 
 function getSetting(key) {
@@ -47,9 +44,7 @@ function getSetting(key) {
 }
 
 function getSettingsRatingMultipliers() {
-  const stored = adminSettings.ratingMultipliers;
-  if (stored && stored.challenge && stored.timer) return stored;
-  return SETTINGS_DEFAULTS.ratingMultipliers;
+  return adminSettings.ratingMultipliers || SETTINGS_DEFAULTS.ratingMultipliers;
 }
 
 const ADMIN_SUBJECTS = [
@@ -224,13 +219,12 @@ function renderHomeworkTab() {
       }).map(hw => {
         const subject = ADMIN_SUBJECTS.find(s => s.id === hw.subject) || ADMIN_SUBJECTS[4];
         const modeText = '⚔️ ' + hw.suggestedDuration + '分钟';
-        const bpText = ' · ' + (hw.basePoints ?? 10) + '分';
+        const bpText = ' · ' + (hw.basePoints ?? 10) + '奖励分';
         let elapsedText = '';
         if (hw.status === 'doing' && hw.startedAt) {
           const elapsed = Math.round((Date.now() - new Date(hw.startedAt)) / 60000);
           elapsedText = ' · 已用' + elapsed + '分钟';
         }
-        const statusText = hw.status === 'done' ? ' ✅' : hw.status === 'doing' ? ' 📝' : '';
         const isDeferPending = hw.deferRequest && hw.deferRequest.status === 'pending';
         const deferBadge = isDeferPending
           ? ' <span style="background:var(--warning);color:var(--bg);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">⏭️ 申请延后</span>'
@@ -239,13 +233,28 @@ function renderHomeworkTab() {
           ? `<button class="btn-sm" style="background:var(--success);color:#fff;margin-right:4px;" onclick="approveDeferHomework('${hw.id}', '${hw.deferRequest.requestedAt || ''}')">批准</button>
              <button class="btn-sm" style="background:var(--danger);color:#fff;" onclick="rejectDeferHomework('${hw.id}')">拒绝</button>`
           : '';
+        let statusHtml = '';
+        if (isDeferPending) {
+          statusHtml = '<span class="hw-status-emoji">⏭️</span><span class="hw-status-text">待确认</span>';
+        } else if (hw.status === 'doing') {
+          statusHtml = '<span class="hw-status-emoji">📝</span><span class="hw-status-text">进行中</span>';
+        } else if (hw.status === 'done' && hw.mode === 'challenge') {
+          statusHtml = '<span class="hw-status-emoji">⚡</span><span class="hw-status-text">挑战成功</span>';
+        } else if (hw.status === 'done') {
+          statusHtml = '<span class="hw-status-emoji">✅</span><span class="hw-status-text">已完成</span>';
+        } else if (hw.rejected) {
+          statusHtml = '<span class="hw-status-emoji">↩️</span><span class="hw-status-text">已驳回</span>';
+        } else {
+          statusHtml = '<span class="hw-status-emoji">📋</span><span class="hw-status-text">未开始</span>';
+        }
         return `
               <div class="hw-admin-item">
                 <div class="hw-admin-icon">${subject.icon}</div>
                 <div class="hw-admin-info">
-                  <div class="hw-admin-subject">${escapeHtml(hw.subject)} - ${escapeHtml(hw.content)}${statusText}${deferBadge}</div>
+                  <div class="hw-admin-subject">${escapeHtml(hw.subject)} - ${escapeHtml(hw.content)}${deferBadge}</div>
                   <div class="hw-admin-meta">${modeText}${bpText}${hw.actualDuration !== null ? ' · 实际' + hw.actualDuration + '分钟' : ''}${elapsedText}</div>
                 </div>
+                <div class="hw-admin-status">${statusHtml}</div>
                 <div class="hw-admin-actions">
                   ${deferActions}
                   ${hw.status === 'pending' && !isDeferPending ? `<button class="btn-sm btn-edit" onclick="openHwModal('edit', '${hw.id}')">编辑</button>` : ''}
@@ -285,8 +294,8 @@ function openHwModal(mode, hwId) {
       <input type="number" id="adminHwDuration" value="${hw?.suggestedDuration || getSetting('homeworkDefaultSuggestedDuration')}" min="5" max="180" step="5">
     </div>
     <div class="form-group">
-      <label>基础分</label>
-      <input type="number" id="adminHwBasePoints" value="${hw?.basePoints ?? getSetting('homeworkDefaultBasePoints')}" min="1" max="100">
+      <label>奖励分</label>
+      <input type="number" id="adminHwBasePoints" value="${hw?.basePoints ?? getSetting('homeworkBonusPerTask')}" min="1" max="100">
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeAdminModal()">取消</button>
@@ -438,9 +447,9 @@ function openRatingModal(dateKey) {
   }).join('')}
     </div>
     <div class="rating-summary">
-      基础积分: ${settlement.basePoints}<br>
-      效率奖励: +${settlement.efficiencyBonus}<br>
-      待结算: ${settlement.basePoints + settlement.efficiencyBonus}
+      每日基础分: ${settlement.dailyBase}<br>
+      作业奖励: +${settlement.homeworkBonus}<br>
+      待结算: ${settlement.totalBeforeRating}
     </div>
     <div style="font-size:14px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">请评级：</div>
     <div class="rating-buttons">
@@ -469,21 +478,10 @@ async function submitRating(dateKey, rating) {
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-    let multiplier = 1.0;
-    const hwList = cachedData?.homeworks?.[dateKey] || [];
-    const modes = [...new Set(hwList.filter(h => h.status === 'done').map(h => h.mode))];
-    if (modes.length === 1 && modes[0] === 'timer') {
-      multiplier = multipliers.timer[rating];
-    } else if (modes.length === 1 && modes[0] === 'challenge') {
-      multiplier = multipliers.challenge[rating];
-    } else {
-      const challengeMult = multipliers.challenge[rating];
-      const timerMult = multipliers.timer[rating];
-      multiplier = (challengeMult + timerMult) / 2;
-    }
+    const multiplier = multipliers[rating];
 
     const finalPoints = rating === '差' ? 0
-      : Math.round((settlement.basePoints + settlement.efficiencyBonus) * multiplier);
+      : Math.round(settlement.totalBeforeRating * multiplier);
 
     settlement.rating = rating;
     settlement.multiplier = multiplier;
@@ -1144,7 +1142,7 @@ function formatWeekLabel(key) {
   const d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
   const end = new Date(d);
   end.setDate(d.getDate() + 6);
-  return `${d.getMonth()+1}/${d.getDate()}-${end.getMonth()+1}/${end.getDate()}`;
+  return `${d.getMonth() + 1}/${d.getDate()}-${end.getMonth() + 1}/${end.getDate()}`;
 }
 
 function aggregateDaily(data, groupMode, mode) {
@@ -1256,15 +1254,15 @@ function renderStatsTab() {
     <div class="chart-container">
       <div class="chart-title">📈 ${groupLabels[groupMode]}总用时（分钟）</div>
       ${totalMinutes.length === 0
-        ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'
-        : renderSvgLineChart(totalMinutes, { color: 'var(--success)', avgColor: 'var(--accent)', unit: '分钟' })}
+      ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'
+      : renderSvgLineChart(totalMinutes, { color: 'var(--success)', avgColor: 'var(--accent)', unit: '分钟' })}
     </div>
 
     <div class="chart-container">
       <div class="chart-title">📊 ${groupLabels[groupMode]}效率比（实际/参考）</div>
       ${efficiencyRatios.length === 0 || efficiencyRatios.every(d => d.value === 0)
-        ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'
-        : renderSvgLineChart(efficiencyRatios, { color: 'var(--warning)', avgColor: 'var(--accent)', unit: '%' })}
+      ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'
+      : renderSvgLineChart(efficiencyRatios, { color: 'var(--warning)', avgColor: 'var(--accent)', unit: '%' })}
     </div>
 
     <div class="chart-container">
@@ -1274,25 +1272,25 @@ function renderStatsTab() {
         ${ratingTotal > 0 ? renderSvgPieChart(ratingPieData, ratingTotal) : ''}
         <div style="display:flex;flex-direction:column;gap:4px;">
           ${ratingPieData.map(d =>
-            `<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+        `<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
               <span style="width:10px;height:10px;border-radius:2px;background:${ratingColors[d.rating] || 'var(--text-secondary)'};display:inline-block;"></span>
               ${d.rating}: ${d.count}次 (${Math.round(d.count / ratingTotal * 100)}%)
             </div>`
-          ).join('')}
+      ).join('')}
         </div>
       </div>
       </div>
       <div class="chart-list-section">
       ${ratingsList.length === 0
-        ? '<div style="text-align:center;color:var(--text-secondary);padding:12px;font-size:14px;">暂无评级记录</div>'
-        : shownRatings.map(d => {
-          const s = cachedData?.dailySettlement?.[d];
-          return `<div class="rating-history-item">
+      ? '<div style="text-align:center;color:var(--text-secondary);padding:12px;font-size:14px;">暂无评级记录</div>'
+      : shownRatings.map(d => {
+        const s = cachedData?.dailySettlement?.[d];
+        return `<div class="rating-history-item">
               <span>${d}</span>
-              <span>${s.basePoints + s.efficiencyBonus}×${s.multiplier}=${s.finalPoints}分</span>
+              <span>${s.totalBeforeRating}×${s.multiplier}=${s.finalPoints}分</span>
               <span class="rating-grade ${s.rating}">${s.rating}</span>
             </div>`;
-        }).join('')}
+      }).join('')}
       ${hasMoreRatings || _ratingShowCount > 5 ? `<div style="text-align:center;padding:12px;display:flex;gap:8px;justify-content:center;">
         ${hasMoreRatings ? `<button class="btn-cancel" style="border:1px solid var(--text-secondary);padding:8px 24px;border-radius:8px;font-size:14px;"
           onclick="_ratingShowCount += 10; renderStatsTab();">查看更多 (剩余${ratingsList.length - _ratingShowCount}条)</button>` : ''}
@@ -1388,12 +1386,12 @@ function renderSettingsTab() {
       <div class="settings-section">
         <div class="settings-section-title">📝 作业默认值</div>
         <div class="settings-row">
-          <label>基础分</label>
-          <input id="cfg_hwBasePoints" onfocus="_editingSettings=true" onblur="_editingSettings=false" class="settings-input" type="number" min="1" max="100" value="${getSetting('homeworkDefaultBasePoints')}">
-        </div>
-        <div class="settings-row">
           <label>建议时长（分钟）</label>
           <input id="cfg_hwDuration" onfocus="_editingSettings=true" onblur="_editingSettings=false" class="settings-input" type="number" min="5" max="180" step="5" value="${getSetting('homeworkDefaultSuggestedDuration')}">
+        </div>
+        <div class="settings-row">
+          <label>每项作业奖励分</label>
+          <input id="cfg_hwBonusPerTask" onfocus="_editingSettings=true" onblur="_editingSettings=false" class="settings-input" type="number" min="1" max="100" value="${getSetting('homeworkBonusPerTask')}">
         </div>
       </div>
 
@@ -1401,37 +1399,29 @@ function renderSettingsTab() {
         <div class="settings-section-title">⭐ 评级倍率</div>
         ${(() => {
       const m = getSettingsRatingMultipliers();
-      const ch = m.challenge;
-      const ti = m.timer;
       const inputHtml = (id, val) => `<input id="${id}" onfocus="_editingSettings=true" onblur="_editingSettings=false" class="settings-input" type="number" step="0.1" min="0" max="10" value="${val}">`;
       return `
             <div class="rating-section">
-              <div class="rating-section-label">⚔️ 挑战</div>
               <div class="rating-row">
-                <div class="rating-col"><span class="rating-header">优</span>${inputHtml('cfg_ch_you', ch['优'])}</div>
-                <div class="rating-col"><span class="rating-header">良</span>${inputHtml('cfg_ch_liang', ch['良'])}</div>
-                <div class="rating-col"><span class="rating-header">可</span>${inputHtml('cfg_ch_ke', ch['可'])}</div>
-                <div class="rating-col"><span class="rating-header">差</span>${inputHtml('cfg_ch_cha', ch['差'])}</div>
-              </div>
-            </div>
-            <div class="rating-section">
-              <div class="rating-section-label">⏱️ 计时</div>
-              <div class="rating-row">
-                <div class="rating-col"><span class="rating-header">优</span>${inputHtml('cfg_ti_you', ti['优'])}</div>
-                <div class="rating-col"><span class="rating-header">良</span>${inputHtml('cfg_ti_liang', ti['良'])}</div>
-                <div class="rating-col"><span class="rating-header">可</span>${inputHtml('cfg_ti_ke', ti['可'])}</div>
-                <div class="rating-col"><span class="rating-header">差</span>${inputHtml('cfg_ti_cha', ti['差'])}</div>
+                <div class="rating-col"><span class="rating-header">优</span>${inputHtml('cfg_ch_you', m['优'])}</div>
+                <div class="rating-col"><span class="rating-header">良</span>${inputHtml('cfg_ch_liang', m['良'])}</div>
+                <div class="rating-col"><span class="rating-header">可</span>${inputHtml('cfg_ch_ke', m['可'])}</div>
+                <div class="rating-col"><span class="rating-header">差</span>${inputHtml('cfg_ch_cha', m['差'])}</div>
               </div>
             </div>`;
     })()}
       </div>
 
       <div class="settings-section">
-        <div class="settings-section-title">🎯 积分与商品</div>
+        <div class="settings-section-title">🎯 积分</div>
         <div class="settings-row">
-          <label>挑战效率奖励</label>
-          <input id="cfg_effBonus" onfocus="_editingSettings=true" onblur="_editingSettings=false" class="settings-input" type="number" min="0" max="100" value="${getSetting('challengeEfficiencyBonus')}">
+          <label>每日基础分</label>
+          <input id="cfg_dailyBasePoints" onfocus="_editingSettings=true" onblur="_editingSettings=false" class="settings-input" type="number" min="1" max="999" value="${getSetting('dailyBasePoints')}">
         </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">🏪 商品</div>
         <div class="settings-row">
           <label>新商品默认积分</label>
           <input id="cfg_shopPoints" onfocus="_editingSettings=true" onblur="_editingSettings=false" class="settings-input" type="number" min="1" max="999" value="${getSetting('shopDefaultPoints')}">
@@ -1524,36 +1514,28 @@ async function saveAllSettings() {
     const v = parseFn(el.value);
     return isNaN(v) ? null : v;
   };
-  const basePoints = val('cfg_hwBasePoints', parseFloat);
+  const dailyBasePoints = val('cfg_dailyBasePoints', parseFloat);
+  const homeworkBonusPerTask = val('cfg_hwBonusPerTask', parseFloat);
   const duration = val('cfg_hwDuration', parseFloat);
-  const effBonus = val('cfg_effBonus', parseFloat);
   const shopPoints = val('cfg_shopPoints', parseFloat);
 
   const chYou = val('cfg_ch_you', parseFloat);
   const chLiang = val('cfg_ch_liang', parseFloat);
   const chKe = val('cfg_ch_ke', parseFloat);
   const chCha = val('cfg_ch_cha', parseFloat);
-  const tiYou = val('cfg_ti_you', parseFloat);
-  const tiLiang = val('cfg_ti_liang', parseFloat);
-  const tiKe = val('cfg_ti_ke', parseFloat);
-  const tiCha = val('cfg_ti_cha', parseFloat);
 
-  if (basePoints === null || duration === null || effBonus === null || shopPoints === null ||
-    chYou === null || chLiang === null || chKe === null || chCha === null ||
-    tiYou === null || tiLiang === null || tiKe === null || tiCha === null) {
+  if (dailyBasePoints === null || homeworkBonusPerTask === null || duration === null || shopPoints === null ||
+    chYou === null || chLiang === null || chKe === null || chCha === null) {
     showToast('请填写所有数值');
     return;
   }
 
   const newSettings = {
     ...adminSettings,
-    homeworkDefaultBasePoints: basePoints,
+    dailyBasePoints,
+    homeworkBonusPerTask,
     homeworkDefaultSuggestedDuration: duration,
-    ratingMultipliers: {
-      challenge: { '优': chYou, '良': chLiang, '可': chKe, '差': chCha },
-      timer: { '优': tiYou, '良': tiLiang, '可': tiKe, '差': tiCha }
-    },
-    challengeEfficiencyBonus: effBonus,
+    ratingMultipliers: { '优': chYou, '良': chLiang, '可': chKe, '差': chCha },
     shopDefaultPoints: shopPoints,
   };
 

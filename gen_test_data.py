@@ -40,10 +40,7 @@ RATINGS = [
     {'rating': '差', 'weight': 15},
 ]
 
-RATING_MULTIPLIERS = {
-    'challenge': {'优': 2.0, '良': 1.5, '可': 1.2, '差': 0},
-    'timer': {'优': 1.5, '良': 1.2, '可': 1.0, '差': 0},
-}
+RATING_MULTIPLIERS = { '优': 2.0, '良': 1.5, '可': 1.2, '差': 0 }
 
 SHOP_TEMPLATES = [
     {'name': '游戏时间', 'type': 'time', 'points': 30, 'durationMinutes': 30},
@@ -200,18 +197,17 @@ def generate_test_data(days):
             hw_list.append(hw)
 
         done_hw = [h for h in hw_list if h['status'] == 'done' and not h.get('rejected')]
-        challenge_done = [h for h in done_hw if h['mode'] == 'challenge']
+        challenge_success = [h for h in done_hw if h['mode'] == 'challenge']
 
-        base_points = sum(h.get('basePoints', 10) for h in done_hw)
-        bonus_per_task = 5
-        efficiency_bonus = 0
+        daily_base = 50
+        homework_bonus = sum(h.get('basePoints', 10) for h in challenge_success)
+        total_before_rating = daily_base + homework_bonus
+
         ratios = []
-        for h in challenge_done:
+        for h in challenge_success:
             if h['actualDuration'] is not None and h['suggestedDuration'] > 0:
                 r = h['actualDuration'] / h['suggestedDuration']
                 ratios.append(r)
-                if r <= 0.8:
-                    efficiency_bonus += bonus_per_task
 
         avg_ratio = round(sum(ratios) / len(ratios), 2) if ratios else 0
 
@@ -219,22 +215,15 @@ def generate_test_data(days):
         if has_settlement and done_hw:
             rating = weighted_choice(RATINGS)
 
-            modes = list(set(h['mode'] for h in done_hw))
-            if len(modes) == 1:
-                mult = RATING_MULTIPLIERS[modes[0]][rating]
-            else:
-                cm = RATING_MULTIPLIERS['challenge'][rating]
-                tm = RATING_MULTIPLIERS['timer'][rating]
-                mult = round((cm + tm) / 2, 2)
+            mult = RATING_MULTIPLIERS[rating]
 
-            final_points = 0 if rating == '差' else round((base_points + efficiency_bonus) * mult)
+            final_points = 0 if rating == '差' else round(total_before_rating * mult)
 
             settlement = {
-                'basePoints': base_points,
-                'efficiencyBonus': efficiency_bonus,
-                'totalBeforeRating': base_points + efficiency_bonus,
-                'challengeCount': len(challenge_done),
-                'timerCount': len([h for h in done_hw if h['mode'] == 'timer']),
+                'dailyBase': daily_base,
+                'homeworkBonus': homework_bonus,
+                'totalBeforeRating': total_before_rating,
+                'doneCount': len(done_hw),
                 'rating': rating,
                 'multiplier': mult,
                 'finalPoints': final_points,
@@ -270,11 +259,10 @@ def generate_test_data(days):
                 point_id += 1
         else:
             settlement = {
-                'basePoints': base_points,
-                'efficiencyBonus': efficiency_bonus,
-                'totalBeforeRating': base_points + efficiency_bonus,
-                'challengeCount': len(challenge_done),
-                'timerCount': len([h for h in done_hw if h['mode'] == 'timer']),
+                'dailyBase': daily_base,
+                'homeworkBonus': homework_bonus,
+                'totalBeforeRating': total_before_rating,
+                'doneCount': len(done_hw),
                 'rating': None,
                 'multiplier': None,
                 'finalPoints': None,
@@ -337,11 +325,11 @@ def generate_test_data(days):
         })
 
     settings = {
-        'homeworkDefaultBasePoints': 10,
+        'dailyBasePoints': 100,
+        'homeworkBonusPerTask': 10,
         'homeworkDefaultSuggestedDuration': 20,
         'ratingMultipliers': RATING_MULTIPLIERS,
-        'challengeEfficiencyBonus': 5,
-        'shopDefaultPoints': 15,
+        'shopDefaultPoints': 50,
         'theme': 'dark',
         'bgmEnabled': True,
         'ttsEnabled': True,

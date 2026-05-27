@@ -231,7 +231,7 @@ function updateBigScreen() {
     updateSettlementPage();
     return;
   }
-  if (!forceMainPage && settlement && settlement.basePoints !== undefined && !settlement.submittedAt && !settlement.rating) {
+  if (!forceMainPage && settlement && settlement.dailyBase !== undefined && !settlement.submittedAt && !settlement.rating) {
     window._settlement = settlement;
     updateSettlementPage();
     return;
@@ -240,6 +240,7 @@ function updateBigScreen() {
   updateMainPage();
   updateStats();
   needsFullRender = false;
+  forceMainPage = false;
 }
 
 function getSettlementData() {
@@ -563,7 +564,7 @@ function updateHomeworkGrid() {
       }
     }
 
-    const bpText = ' · ' + (hw.basePoints ?? 10) + '分';
+    const bpText = ' · ' + (hw.basePoints ?? 10) + '奖励分';
     const modeLabel = hw.rejected ? '⏱️ 不计时' + bpText : ('⚔️ ' + (hw.suggestedDuration || 0) + '分钟' + bpText);
     const clickAction = isDone ? '' : isActive ? '' : (hw.deferRequest && hw.deferRequest.status === 'pending') ? '' : `onclick="confirmStartTask('${hw.id}')"`;
 
@@ -697,12 +698,12 @@ function updateSettlementPage() {
       <div class="settlement-title">全部作业完成！</div>
       <div class="settlement-summary">
         <div class="settlement-item">
-          <span>基础积分</span>
-          <span class="settlement-val">+${settlement.basePoints}</span>
+          <span>每日基础分</span>
+          <span class="settlement-val">+${settlement.dailyBase}</span>
         </div>
         <div class="settlement-item">
-          <span>效率奖励</span>
-          <span class="settlement-val">+${settlement.efficiencyBonus}</span>
+          <span>挑战奖励 (${settlement.doneCount}项作业)</span>
+          <span class="settlement-val">+${settlement.homeworkBonus}</span>
         </div>
         <div class="settlement-item total">
           <span>待结算</span>
@@ -760,8 +761,8 @@ function updateRatedPage() {
       <div class="rated-multiplier">倍率 x${settlement.multiplier}</div>
       <div class="settlement-summary">
         <div class="settlement-item">
-          <span>基础积分 + 效率奖励</span>
-          <span class="settlement-val">${settlement.basePoints + settlement.efficiencyBonus}</span>
+          <span>每日基础分 + 挑战奖励</span>
+          <span class="settlement-val">${settlement.totalBeforeRating}</span>
         </div>
         <div class="settlement-item">
           <span>评级倍率</span>
