@@ -1,6 +1,6 @@
-# PapaCheck — 爸~检查！
+# PapaCheck — 爸\~检查！
 
-<img src="PapaCheck_ban.png" alt="PapaCheck Banner" width="100%" />
+<img src="PapaCheck_ban.jpg" alt="PapaCheck Banner" width="100%" />
 
 PapaCheck 是一个家长辅助工具，帮助管理和跟踪孩子的作业完成情况。老师通过邮件布置作业，AI 自动解析并添加到清单；孩子可以自主开始/暂停/完成作业并获得积分；家长远程评级并管理积分商店。
 
@@ -21,77 +21,58 @@ PapaCheck/
 ## ✨ 核心功能
 
 - **📋 作业管理**：添加、开始、暂停、完成作业，支持计时器和挑战模式
-- **📧 邮件同步**：自动拉取老师布置的作业邮件，AI（DeepSeek）解析内容并入库
-- **📎 附件下载**：邮件附件自动保存到本地
+- **🔊 语音提醒**：任务超时、评级结果、商店上新等重要环节的 TTS 语音播报
 - **⭐ 积分&评级**：家长评级（优/良/可/差），结合效率加成计算积分
+- **📊 数据统计**：管理端折线图/饼图展示作业用时、效率比、评级分布
 - **🏪 积分商店**：孩子用积分兑换游戏时间或奖励物品，支持 Buff 系统
 - **🎁 奖励箱**：家长发放奖励，孩子自主兑换
-- **🔊 语音提醒**：任务超时、评级结果、商店上新等重要环节的 TTS 语音播报
-- **📊 数据统计**：管理端折线图/饼图展示作业用时、效率比、评级分布
-- **📱 全平台**：电脑 Web 端、Android APK、iOS Safari PWA 均可使用
+- **📧 邮件同步**：微信群多选老师作业信息，转发指定邮箱，AI 自动拉取邮件，解析作业并发布给孩子端
+- **📎 附件下载**：微信转发到邮箱的图片、文件等，自动下载保存到本地
 
 ## 🚀 快速开始
 
-### 1. 启动服务端
+### 1. 启动桌面端（推荐）
 
-```bash
-cd PapaCheck.Server
-python server.py
-```
+运行 `PapaCheck.exe`，GUI 界面会自动启动内置服务器，同时提供系统托盘、开机自启动、配置管理和日志查看功能。
 
-服务启动在 `8080` 端口，默认读取 `data.db` 文件。首次运行会自动创建数据库和 TTS 语音缓存。
+服务默认启动在 `8080` 端口，首次运行会自动创建数据库和 TTS 语音缓存。
 
-### 2. 访问 Web 端
+### 2. 访问客户端
 
-- **孩子大屏端**：`http://localhost:8080`
-- **管理端**：`http://localhost:8080/admin.html`
+**浏览器**（孩子端 / 管理端）
 
-其他设备通过局域网 IP 访问，例如 `http://192.168.1.x:8080`。
+在其他设备的浏览器中访问 `http://192.x.x.x:8080` 即可。
 
-### 3. Windows 桌面版（可选）
+- 孩子端：`http://192.x.x.x:8080/`
+- 管理端：`http://192.x.x.x:8080/admin.html`
 
-```bash
-cd PapaCheck.Windows
-python app_gui.py
-```
+**Android 设备**：访问 `http://192.x.x.x:8080/api/download` 下载安装 APK。
 
-提供 GUI 界面，可在系统托盘运行，支持开机自启动、配置管理、邮件同步和日志查看。
+（地址可在 EXE 主界面上找到）
 
-### 4. 邮件同步
+### 3. 邮件同步
 
-配置 `PapaCheck.Email/config.json`（或通过 Windows 端配置界面），填写 IMAP 邮箱信息、发件人地址和 AI API Key。
+在 Windows 端菜单栏选择 **服务配置**，填写 IMAP 邮箱信息、用于接收作业邮件的邮箱地址和 AI API Key 即可启用。\
+点击主界面 **邮件作业同步** 按钮，AI 会自动拉取邮件、解析作业并发布到孩子端。
 
-```json
-{
-  "email": "xxx@qq.com",
-  "password": "授权码",
-  "imap_server": "imap.qq.com",
-  "port": 993,
-  "sender": "老师邮箱",
-  "ai_base_url": "https://api.deepseek.com",
-  "ai_model": "deepseek-chat",
-  "ai_api_key": "sk-xxx"
-}
-```
-
-### 5. 生成测试数据
+### 4. 生成测试数据
 
 ```bash
 python gen_test_data.py -d 90
 ```
 
-向数据库写入 90 天的模拟数据，方便验证管理端图表功能。
+向数据库写入 90 天的模拟数据，方便验证管理端图表功能。（不带任何参数时，默认生成60天数据）
 
 ## 🛠 技术栈
 
-| 模块 | 技术 |
-|------|------|
-| Server | Python 3, `http.server`, SQLite, edge-tts |
-| Web | 原生 HTML/CSS/JS, SVG 图表 |
-| Windows | tkinter, Windows Credential Manager |
-| Email | IMAP4_SSL, DeepSeek API |
-| Android | Flutter, `webview_flutter` |
+| 模块      | 技术                                        |
+| ------- | ----------------------------------------- |
+| Server  | Python 3, `http.server`, SQLite, edge-tts |
+| Web     | 原生 HTML/CSS/JS, SVG 图表                    |
+| Windows | tkinter, Windows Credential Manager       |
+| Email   | IMAP4\_SSL, DeepSeek API                  |
+| Android | Flutter, `webview_flutter`                |
 
 ## 📄 License
 
-MIT
+GNU Affero General Public License v3.0 (AGPL-3.0)

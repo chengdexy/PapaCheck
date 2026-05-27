@@ -247,8 +247,15 @@ body {
 .hero-desc {
     font-size: 1.15rem;
     color: var(--text-dim);
-    margin-bottom: 40px;
+    margin-bottom: 12px;
     line-height: 1.8;
+}
+
+.hero-subtitle {
+    font-size: .95rem;
+    color: var(--text-muted);
+    margin-bottom: 36px;
+    opacity: .8;
 }
 
 .hero-actions {
@@ -807,6 +814,79 @@ body {
 .footer-sep {
     margin: 0 8px;
     opacity: .5;
+}
+
+/* ========== Screenshot Placeholders ========== */
+.screenshots-section {
+    position: relative;
+    z-index: 1;
+    padding: 40px 24px 60px;
+    max-width: var(--max-width);
+    margin: 0 auto;
+}
+
+.screenshot-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.screenshot-wide {
+    max-width: 1200px;
+    margin: 0 auto 32px;
+    padding: 0 24px;
+}
+
+.screenshot-placeholder {
+    background: var(--bg-card);
+    border: 2px dashed rgba(255, 255, 255, .1);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    min-height: 220px;
+    transition: border-color .3s;
+}
+
+.screenshot-placeholder:hover {
+    border-color: var(--accent);
+}
+
+.screenshot-placeholder.banner-placeholder {
+    min-height: 300px;
+    border-color: rgba(56, 189, 248, .15);
+}
+
+.screenshot-placeholder.wide-placeholder {
+    min-height: 180px;
+    padding: 36px 24px;
+}
+
+.placeholder-icon {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
+    opacity: .8;
+}
+
+.placeholder-text {
+    font-size: .95rem;
+    color: var(--text-dim);
+    font-weight: 600;
+}
+
+.placeholder-hint {
+    font-size: .8rem;
+    color: var(--text-muted);
+    margin-top: 8px;
+    opacity: .7;
+}
+
+@media (max-width: 900px) {
+    .screenshot-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 900px) {

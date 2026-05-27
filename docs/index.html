@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="PapaCheck — 爸~检查！AI 自动收作业，游戏化激励，让孩子主动完成作业。免费下载 Windows 和 Android 客户端。">
+    <meta name="description" content="PapaCheck — 爸~检查！家庭自托管作业管理系统。AI 自动收作业，游戏化激励让孩子主动完成作业。免费下载 Windows 客户端。">
     <meta name="theme-color" content="#0f172a">
     <meta property="og:title" content="PapaCheck — 爸~检查！">
-    <meta property="og:description" content="让写作业变成一场闯关游戏。AI 自动收作业，孩子自主赚积分，家长远程做管理。">
-    <meta property="og:image" content="assets/PapaCheck_ban.png">
+    <meta property="og:description" content="局域网自托管 · 数据不上云 · 全家零门槛。AI 自动收作业，孩子自主赚积分，家长远程做管理。">
+    <meta property="og:image" content="assets/PapaCheck_ban.jpg">
     <title>PapaCheck — 爸~检查！让写作业变成闯关游戏</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,7 +37,7 @@
     <section class="hero">
         <div class="hero-grid"></div>
         <div class="hero-content">
-            <div class="hero-badge reveal">🎮 v1.0 预览版</div>
+            <div class="hero-badge reveal">🎮 家庭自托管 · 免费使用</div>
             <h1 class="hero-title reveal">
                 <span class="hero-title-sub">爸~检查！</span>
                 <span class="hero-title-main">PapaCheck</span>
@@ -47,6 +47,7 @@
                 <span class="text-accent">AI 自动收</span> · <span class="text-accent">孩子主动做</span> · <span
                     class="text-accent">家长远程管</span>
             </p>
+            <p class="hero-subtitle reveal">局域网自托管 · 数据不上云 · 全家零门槛</p>
             <div class="hero-actions reveal">
                 <a href="#download" class="btn btn-primary">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -68,7 +69,11 @@
 
     <section class="banner-section">
         <div class="banner-wrapper reveal">
-            <img src="assets/PapaCheck_ban.png" alt="PapaCheck 产品截图" class="banner-img" loading="lazy">
+            <!-- TODO: 替换为真实产品截图（800×500 JPG） -->
+            <div class="screenshot-placeholder banner-placeholder">
+                <span class="placeholder-icon">📸</span>
+                <span class="placeholder-text">产品主界面截图（800×500）</span>
+            </div>
         </div>
     </section>
 
@@ -109,6 +114,28 @@
                 <h3 class="feature-title">语音提醒陪伴</h3>
                 <p class="feature-desc">TTS 中文语音全程陪伴：任务提醒、超时预警、评级播报、整点报时，覆盖近 20 个场景</p>
             </div>
+            <div class="feature-card reveal" data-delay="600">
+                <div class="feature-icon" style="--card-accent: #a78bfa">📊</div>
+                <h3 class="feature-title">管理端数据看板</h3>
+                <p class="feature-desc">SVG 折线图和饼图展示作业用时趋势、效率比、评级分布，所有数据本地存储不泄露</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="screenshots-section">
+        <div class="screenshot-grid reveal">
+            <!-- TODO: 替换为真实管理端图表截图 -->
+            <div class="screenshot-placeholder">
+                <span class="placeholder-icon">📊</span>
+                <span class="placeholder-text">效率折线图截图</span>
+                <span class="placeholder-hint">管理端 → 统计 Tab → 用时 / 效率比</span>
+            </div>
+            <!-- TODO: 替换为真实管理端图表截图 -->
+            <div class="screenshot-placeholder">
+                <span class="placeholder-icon">🥧</span>
+                <span class="placeholder-text">评级分布饼图截图</span>
+                <span class="placeholder-hint">管理端 → 统计 Tab → 评级历史</span>
+            </div>
         </div>
     </section>
 
@@ -118,16 +145,23 @@
             <h2 class="section-title">选择你的平台<span class="text-gradient">开始使用</span></h2>
             <p class="section-desc">Windows 版和 Android 版均可免费下载使用，在家庭局域网内自托管</p>
         </div>
+        <!-- TODO: 替换为真实多设备展示截图 -->
+        <div class="screenshot-wide reveal">
+            <div class="screenshot-placeholder wide-placeholder">
+                <span class="placeholder-icon">🖥️📱📲</span>
+                <span class="placeholder-text">电脑 / 手机 / 平板多设备展示（1200×400）</span>
+            </div>
+        </div>
         <div class="download-cards reveal">
             <div class="download-card">
                 <div class="download-icon">🪟</div>
                 <h3 class="download-title">Windows 桌面版</h3>
-                <p class="download-desc">系统托盘运行，支持开机自启动、配置管理、邮件同步和日志查看</p>
+                <p class="download-desc">运行 PapaCheck.exe 即可启动内置服务器，支持系统托盘、开机自启、邮件同步和配置管理</p>
                 <div class="download-meta">
-                    <span>v1.0 预览版</span>
-                    <span>约 46 MB</span>
+                    <span>免费使用</span>
+                    <span>系统托盘运行</span>
                 </div>
-                <a href="https://github.com/chengdexy/PapaCheck/releases/download/v1.0.0/PapaCheck-1.0.0.zip"
+                <a href="https://github.com/chengdexy/PapaCheck/releases/latest"
                     class="btn btn-primary download-btn" target="_blank" rel="noopener">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -141,12 +175,12 @@
             <div class="download-card">
                 <div class="download-icon">📱</div>
                 <h3 class="download-title">Android 版</h3>
-                <p class="download-desc">Flutter WebView 混合应用，在手机/平板上运行，适配大屏儿童模式</p>
+                <p class="download-desc">从桌面端 OTA 安装，或在浏览器访问 /api/download 下载 APK，适配手机和平板大屏模式</p>
                 <div class="download-meta">
-                    <span>v1.0 预览版</span>
-                    <span>约 23 MB</span>
+                    <span>通过桌面端安装</span>
+                    <span>WebView 混合应用</span>
                 </div>
-                <a href="https://github.com/chengdexy/PapaCheck/releases/download/v1.0.0/PapaCheck-1.0.0.apk"
+                <a href="https://github.com/chengdexy/PapaCheck/releases/latest"
                     class="btn btn-primary download-btn" target="_blank" rel="noopener">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -159,15 +193,15 @@
             </div>
             <div class="download-card">
                 <div class="download-icon">🌐</div>
-                <h3 class="download-title">Web 版（无需安装）</h3>
-                <p class="download-desc">电脑、平板、手机浏览器直接访问，无需安装即可使用</p>
+                <h3 class="download-title">源码获取</h3>
+                <p class="download-desc">完整源码在 GitHub 开源（AGPL-3.0），自行部署或二次开发</p>
                 <div class="download-meta">
-                    <span>全平台支持</span>
-                    <span>无需下载</span>
+                    <span>AGPL-3.0</span>
+                    <span>开源可审计</span>
                 </div>
                 <a href="https://github.com/chengdexy/PapaCheck" class="btn btn-ghost download-btn" target="_blank"
                     rel="noopener">
-                    查看部署方式
+                    查看源码
                 </a>
             </div>
         </div>
@@ -183,22 +217,22 @@
             <div class="guide-step">
                 <div class="guide-step-num">1</div>
                 <div class="guide-step-body">
-                    <h3>下载并启动服务端</h3>
-                    <p>在家庭电脑上下载 Windows 版（或运行 Python 服务端），启动后自动创建数据库，零配置即可运行</p>
+                    <h3>运行 PapaCheck.exe</h3>
+                    <p>在家庭电脑上下载并运行 Windows 桌面版，GUI 自动启动内置服务器，首次运行自动创建数据库，零配置即可使用</p>
                 </div>
             </div>
             <div class="guide-step">
                 <div class="guide-step-num">2</div>
                 <div class="guide-step-body">
-                    <h3>配置邮件同步（可选）</h3>
-                    <p>在管理端填入老师和自己的邮箱信息，AI 自动拉取作业邮件并解析入库，以后都不用手动添加作业</p>
+                    <h3>其他设备浏览器访问</h3>
+                    <p>在手机/平板浏览器输入 EXE 主界面上显示的局域网地址（192.x.x.x:8080），孩子端和管理端均可从同一入口访问</p>
                 </div>
             </div>
             <div class="guide-step">
                 <div class="guide-step-num">3</div>
                 <div class="guide-step-body">
-                    <h3>孩子用手机打开大屏端</h3>
-                    <p>孩子在手机/平板浏览器上打开链接，即可看到作业清单，开始挑战模式赚积分，在商店兑换奖励</p>
+                    <h3>Android 设备安装 APK</h3>
+                    <p>在 Android 设备浏览器访问 /api/download 下载安装 APK，或从管理端页面扫码安装，即可获得原生应用体验</p>
                 </div>
             </div>
         </div>
@@ -248,7 +282,7 @@
             </div>
         </div>
         <div class="footer-bottom">
-            <span>Released under the MIT License</span>
+            <span>Released under the AGPL-3.0 License</span>
             <span class="footer-sep">·</span>
             <span>免费 · 开源 · 无需注册</span>
         </div>
