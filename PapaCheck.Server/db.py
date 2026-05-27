@@ -196,6 +196,21 @@ def init_db():
                 data TEXT NOT NULL DEFAULT '[]'
             );
 
+            CREATE TABLE IF NOT EXISTS bounty_tasks (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                data TEXT NOT NULL DEFAULT '[]'
+            );
+
+            CREATE TABLE IF NOT EXISTS bounty_submissions (
+                date_key TEXT PRIMARY KEY,
+                data TEXT NOT NULL DEFAULT '[]'
+            );
+
+            CREATE TABLE IF NOT EXISTS bounty_completions (
+                date_key TEXT PRIMARY KEY,
+                data TEXT NOT NULL DEFAULT '{}'
+            );
+
             INSERT OR IGNORE INTO points (id, balance) VALUES (1, 0);
             INSERT OR IGNORE INTO shop_items (id, data) VALUES (1, '[]');
             INSERT OR IGNORE INTO redemptions (id, data) VALUES (1, '[]');
@@ -203,6 +218,7 @@ def init_db():
             INSERT OR IGNORE INTO reward_box (id, data) VALUES (1, '[]');
             INSERT OR IGNORE INTO settings (id, data) VALUES (1, '{}');
             INSERT OR IGNORE INTO active_buffs (id, data) VALUES (1, '[]');
+            INSERT OR IGNORE INTO bounty_tasks (id, data) VALUES (1, '[]');
         """)
         conn.commit()
 
@@ -243,6 +259,16 @@ def get_full_data():
 
         for row in conn.execute("SELECT date_key, data FROM free_time_tasks"):
             data['freeTimeTasks'][row['date_key']] = json.loads(row['data'])
+
+        data['bountyTasks'] = json.loads(conn.execute("SELECT data FROM bounty_tasks WHERE id = 1").fetchone()['data'])
+
+        data['bountySubmissions'] = {}
+        for row in conn.execute("SELECT date_key, data FROM bounty_submissions"):
+            data['bountySubmissions'][row['date_key']] = json.loads(row['data'])
+
+        data['bountyCompletions'] = {}
+        for row in conn.execute("SELECT date_key, data FROM bounty_completions"):
+            data['bountyCompletions'][row['date_key']] = json.loads(row['data'])
 
         return data
 
@@ -393,6 +419,41 @@ def save_settings(data):
         conn.commit()
 
 
+# ==================== Bounty Tasks ====================
+
+def get_bounty_tasks():
+    with _db() as conn:
+        return _get_json(conn, 'bounty_tasks')
+
+
+def save_bounty_tasks(items):
+    with _db() as conn:
+        _set_json(conn, 'bounty_tasks', items)
+        conn.commit()
+
+
+def get_bounty_submissions(date_key):
+    with _db() as conn:
+        return _get_date_data(conn, 'bounty_submissions', date_key, [])
+
+
+def save_bounty_submissions(date_key, data):
+    with _db() as conn:
+        _set_date_data(conn, 'bounty_submissions', date_key, data)
+        conn.commit()
+
+
+def get_bounty_completions(date_key):
+    with _db() as conn:
+        return _get_date_data(conn, 'bounty_completions', date_key, {})
+
+
+def save_bounty_completions(date_key, data):
+    with _db() as conn:
+        _set_date_data(conn, 'bounty_completions', date_key, data)
+        conn.commit()
+
+
 # ==================== Active Buffs ====================
 
 def get_active_buffs():
@@ -443,6 +504,14 @@ def import_full_data(data):
         for dk, v in data.get('freeTimeTasks', {}).items():
             conn.execute("INSERT OR REPLACE INTO free_time_tasks (date_key, data) VALUES (?, ?)",
                          (dk, json.dumps(v, ensure_ascii=False)))
+        conn.execute("UPDATE bounty_tasks SET data = ? WHERE id = 1",
+                     (json.dumps(data.get('bountyTasks', []), ensure_ascii=False),))
+        for dk, v in data.get('bountySubmissions', {}).items():
+            conn.execute("INSERT OR REPLACE INTO bounty_submissions (date_key, data) VALUES (?, ?)",
+                         (dk, json.dumps(v, ensure_ascii=False)))
+        for dk, v in data.get('bountyCompletions', {}).items():
+            conn.execute("INSERT OR REPLACE INTO bounty_completions (date_key, data) VALUES (?, ?)",
+                         (dk, json.dumps(v, ensure_ascii=False)))
         conn.commit()
 
 
@@ -452,6 +521,8 @@ def reset_date(date_key):
         conn.execute("DELETE FROM daily_settlement WHERE date_key = ?", (date_key,))
         conn.execute("DELETE FROM efficiency_history WHERE date_key = ?", (date_key,))
         conn.execute("DELETE FROM free_time_tasks WHERE date_key = ?", (date_key,))
+        conn.execute("DELETE FROM bounty_submissions WHERE date_key = ?", (date_key,))
+        conn.execute("DELETE FROM bounty_completions WHERE date_key = ?", (date_key,))
 
         buffs = json.loads(conn.execute("SELECT data FROM active_buffs WHERE id = 1").fetchone()['data'])
         before_count = len(buffs)

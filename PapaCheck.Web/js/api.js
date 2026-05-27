@@ -158,6 +158,42 @@ const API = {
     });
   },
 
+  async getBountyTasks() {
+    return await this._fetch('/api/bounty-tasks');
+  },
+
+  async saveBountyTasks(items) {
+    await this._fetch('/api/bounty-tasks', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    });
+    return true;
+  },
+
+  async getBountySubmissions(dateKey) {
+    return await this._fetch(`/api/bounty-submissions/${dateKey}`);
+  },
+
+  async saveBountySubmissions(dateKey, submissions) {
+    await this._fetch(`/api/bounty-submissions/${dateKey}`, {
+      method: 'POST',
+      body: JSON.stringify({ submissions }),
+    });
+    return true;
+  },
+
+  async getBountyCompletions(dateKey) {
+    return await this._fetch(`/api/bounty-completions/${dateKey}`);
+  },
+
+  async saveBountyCompletions(dateKey, completions) {
+    await this._fetch(`/api/bounty-completions/${dateKey}`, {
+      method: 'POST',
+      body: JSON.stringify({ completions }),
+    });
+    return true;
+  },
+
   async resetDate(date) {
     return await this._fetch('/api/reset-date', {
       method: 'POST',

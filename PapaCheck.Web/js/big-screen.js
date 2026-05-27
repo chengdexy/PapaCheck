@@ -18,6 +18,7 @@ let forceMainPage = false;
 let _redeemingItem = false;
 let _redeemingRewardBox = false;
 let _requestingDefer = false;
+let _startingBounty = false;
 
 function isTomorrowHoliday() {
   const tomorrow = new Date();
@@ -262,6 +263,7 @@ function updateMainPage() {
   updateCurrentTask();
   updateHomeworkGrid();
   updateFreeTimeGrid();
+  updateBountyGrid();
 
   document.getElementById('settlementContainer').style.display = 'none';
   document.getElementById('ratedContainer').style.display = 'none';
@@ -669,6 +671,149 @@ function updateFreeTimeGrid() {
       </div>
     `;
   }).join('');
+}
+
+// ========== Bounty Tasks ==========
+function updateBountyGrid() {
+  const card = document.getElementById('bountyCard');
+  const grid = document.getElementById('bountyGrid');
+
+  const allDone = homeworks.length > 0 && homeworks.every(h => h.status === 'done');
+  if (!allDone) {
+    card.style.display = 'none';
+    return;
+  }
+
+  const dateKey = Util.dateKey(currentDate);
+  const bountyTasks = cachedData?.bountyTasks || [];
+  const submissions = cachedData?.bountySubmissions?.[dateKey] || [];
+  const completions = cachedData?.bountyCompletions?.[dateKey] || {};
+
+  const available = bountyTasks.filter(task => {
+    if (task.enabled === false) return false;
+    if (task.type === 'once' && task.completedAt) return false;
+    if (task.type !== 'once' && completions[task.id]) return false;
+    return true;
+  });
+
+  const doingSubmissions = submissions.filter(s => s.status === 'doing');
+  const submittedSubmissions = submissions.filter(s => s.status === 'submitted');
+
+  const addAvailableCard = (task) => {
+    const clickAction = `onclick="startBountyTask('${task.id}')"`;
+    return `
+      <div class="homework-card" ${clickAction} style="cursor:pointer;">
+        <div class="homework-card-row">
+          <span style="font-size:28px;flex-shrink:0;">💰</span>
+          <div class="homework-card-info">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:18px;font-weight:600;">${escapeHtml(task.name)}</span>
+              <span style="font-size:14px;color:var(--accent);font-weight:600;">+${task.points || 0}分</span>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  };
+
+  const addDoingCard = (sub) => {
+    const task = bountyTasks.find(t => t.id === sub.taskId);
+    if (!task) return '';
+    return `
+      <div class="homework-card" style="border-left:3px solid var(--accent);">
+        <div class="homework-card-row">
+          <span style="font-size:28px;flex-shrink:0;">⏳</span>
+          <div class="homework-card-info">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:18px;font-weight:600;">${escapeHtml(task.name)}</span>
+              <span style="font-size:14px;color:var(--accent);font-weight:600;">+${task.points || 0}分</span>
+            </div>
+            <div style="font-size:13px;color:var(--text-secondary);margin-top:2px;">进行中</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button onclick="event.stopPropagation();abandonBountyTask('${task.id}')" style="flex:1;padding:8px;border:1px solid var(--danger);border-radius:8px;background:transparent;color:var(--danger);font-size:14px;font-weight:600;cursor:pointer;">放弃</button>
+          <button onclick="event.stopPropagation();submitBountyTask('${task.id}')" style="flex:1;padding:8px;border:none;border-radius:8px;background:var(--accent);color:var(--bg);font-size:14px;font-weight:600;cursor:pointer;">提交审核</button>
+        </div>
+      </div>`;
+  };
+
+  const addSubmittedCard = (sub) => {
+    const task = bountyTasks.find(t => t.id === sub.taskId);
+    if (!task) return '';
+    return `
+      <div class="homework-card" style="border-left:3px solid var(--warning);opacity:0.8;">
+        <div class="homework-card-row">
+          <span style="font-size:28px;flex-shrink:0;">⏳</span>
+          <div class="homework-card-info">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:18px;font-weight:600;">${escapeHtml(task.name)}</span>
+              <span style="font-size:14px;color:var(--text-secondary);">+${task.points || 0}分</span>
+            </div>
+            <div style="font-size:13px;color:var(--warning);margin-top:2px;">等待爸爸审核中...</div>
+          </div>
+        </div>
+      </div>`;
+  };
+
+  const availableCards = available
+    .filter(t => !doingSubmissions.some(s => s.taskId === t.id) && !submittedSubmissions.some(s => s.taskId === t.id))
+    .map(addAvailableCard);
+
+  if (availableCards.length === 0 && doingSubmissions.length === 0 && submittedSubmissions.length === 0) {
+    card.style.display = 'none';
+    return;
+  }
+
+  card.style.display = 'block';
+  grid.innerHTML = [
+    ...submittedSubmissions.map(s => addSubmittedCard(s)),
+    ...doingSubmissions.map(s => addDoingCard(s)),
+    ...availableCards,
+  ].join('');
+}
+
+async function startBountyTask(taskId) {
+  if (_startingBounty) return;
+  _startingBounty = true;
+  try {
+    const dateKey = Util.dateKey(currentDate);
+    const submissions = await API.getBountySubmissions(dateKey) || [];
+    if (submissions.some(s => s.taskId === taskId)) return;
+    submissions.push({ taskId, status: 'doing', startedAt: new Date().toISOString(), submittedAt: null });
+    await API.saveBountySubmissions(dateKey, submissions);
+    if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
+    cachedData.bountySubmissions[dateKey] = submissions;
+    needsFullRender = true;
+    updateBigScreen();
+  } finally {
+    _startingBounty = false;
+  }
+}
+
+async function abandonBountyTask(taskId) {
+  const dateKey = Util.dateKey(currentDate);
+  let submissions = await API.getBountySubmissions(dateKey) || [];
+  submissions = submissions.filter(s => s.taskId !== taskId);
+  await API.saveBountySubmissions(dateKey, submissions);
+  if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
+  cachedData.bountySubmissions[dateKey] = submissions;
+  needsFullRender = true;
+  updateBigScreen();
+}
+
+async function submitBountyTask(taskId) {
+  const dateKey = Util.dateKey(currentDate);
+  const submissions = await API.getBountySubmissions(dateKey) || [];
+  const sub = submissions.find(s => s.taskId === taskId);
+  if (!sub || sub.status !== 'doing') return;
+  sub.status = 'submitted';
+  sub.submittedAt = new Date().toISOString();
+  await API.saveBountySubmissions(dateKey, submissions);
+  if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
+  cachedData.bountySubmissions[dateKey] = submissions;
+  needsFullRender = true;
+  updateBigScreen();
+  showToast('赏金任务已提交审核');
 }
 
 // ========== Settlement Page ==========

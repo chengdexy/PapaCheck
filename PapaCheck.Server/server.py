@@ -190,6 +190,20 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
             self.send_json(db.get_free_time(date_key))
             return
 
+        if path == '/api/bounty-tasks':
+            self.send_json(db.get_bounty_tasks())
+            return
+
+        if path.startswith('/api/bounty-submissions/'):
+            date_key = path[len('/api/bounty-submissions/'):]
+            self.send_json(db.get_bounty_submissions(date_key))
+            return
+
+        if path.startswith('/api/bounty-completions/'):
+            date_key = path[len('/api/bounty-completions/'):]
+            self.send_json(db.get_bounty_completions(date_key))
+            return
+
         super().do_GET()
 
     def do_POST(self):
@@ -271,6 +285,23 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
         if path.startswith('/api/freetime/'):
             date_key = path[len('/api/freetime/'):]
             db.save_free_time(date_key, payload.get('tasks', []))
+            self.send_json({'ok': True})
+            return
+
+        if path == '/api/bounty-tasks':
+            db.save_bounty_tasks(payload.get('items', []))
+            self.send_json({'ok': True})
+            return
+
+        if path.startswith('/api/bounty-submissions/'):
+            date_key = path[len('/api/bounty-submissions/'):]
+            db.save_bounty_submissions(date_key, payload.get('submissions', []))
+            self.send_json({'ok': True})
+            return
+
+        if path.startswith('/api/bounty-completions/'):
+            date_key = path[len('/api/bounty-completions/'):]
+            db.save_bounty_completions(date_key, payload.get('completions', {}))
             self.send_json({'ok': True})
             return
 
