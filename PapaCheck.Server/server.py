@@ -449,6 +449,7 @@ def main():
     except KeyboardInterrupt:
         print('\n  服务器已停止')
         server.server_close()
+        db.close_connection()
 
 
 if __name__ == '__main__':
