@@ -59,6 +59,9 @@ const Voice = {
     this._queue.push(text);
     if (!this._playing) this._playNext();
   },
+  clear() {
+    this._queue = [];
+  },
   async _playNext() {
     if (this._queue.length === 0) { this._playing = false; return; }
     if (!this._unlocked) {
@@ -163,6 +166,7 @@ async function requestDeferHomework(hwId) {
 }
 
 async function startHomework(id, mode) {
+  if (_startingHomework) return;
   if (isAnyTaskActive()) {
     showToast('请先完成当前任务');
     return;
@@ -171,23 +175,31 @@ async function startHomework(id, mode) {
   const hw = homeworks.find(h => h.id === id);
   if (!hw || hw.status !== 'pending') return;
 
-  hw.mode = hw.rejected ? 'timer' : (mode || 'timer');
-  hw.status = 'doing';
-  hw.startedAt = new Date().toISOString();
-  await saveHomeworksSilent();
+  _startingHomework = true;
+  try {
+    Voice.clear();
 
-  if (mode === 'challenge') {
-    Voice.speak('开始' + hw.content + '，挑战' + hw.suggestedDuration + '分钟');
-  } else {
-    Voice.speak('开始' + hw.content);
+    hw.mode = hw.rejected ? 'timer' : (mode || 'timer');
+    hw.status = 'doing';
+    hw.startedAt = new Date().toISOString();
+    await saveHomeworksSilent();
+
+    if (mode === 'challenge') {
+      Voice.speak('开始' + hw.content + '，挑战' + hw.suggestedDuration + '分钟');
+    } else {
+      Voice.speak('开始' + hw.content);
+    }
+
+    startTickTimer();
+    needsFullRender = true;
+    updateBigScreen();
+  } finally {
+    _startingHomework = false;
   }
-
-  startTickTimer();
-  needsFullRender = true;
-  updateBigScreen();
 }
 
 let _completingHomework = false;
+let _startingHomework = false;
 
 async function completeHomework(id) {
   if (_completingHomework) return;
@@ -204,6 +216,8 @@ async function completeHomework(id) {
     hw.status = 'done';
     hw.completedAt = completedAt.toISOString();
     hw.actualDuration = actualDuration;
+
+    Voice.clear();
 
     let toastMsg;
     if (hw.mode === 'challenge' && hw.suggestedDuration > 0 && actualDuration > hw.suggestedDuration) {
@@ -248,6 +262,8 @@ function startFreeTime(id) {
 
   const ft = freeTimeTasks.find(t => t.id === id);
   if (!ft || ft.status !== 'pending') return;
+
+  Voice.clear();
 
   ft.status = 'doing';
   ft.startedAt = new Date().toISOString();
@@ -424,32 +440,18 @@ async function checkAllDone() {
 }
 
 async function calculateSettlement() {
-  const challengeHw = homeworks.filter(h => h.mode === 'challenge' && h.status === 'done' && !h.rejected);
-
   const doneHw = homeworks.filter(h => h.status === 'done');
-  const basePoints = doneHw.reduce((sum, h) => sum + (h.basePoints ?? cachedData?.settings?.homeworkDefaultBasePoints ?? 10), 0);
-  let efficiencyBonus = 0;
-  const ratios = [];
-  const bonusPerTask = cachedData?.settings?.challengeEfficiencyBonus ?? 5;
-
-  challengeHw.forEach(hw => {
-    if (hw.actualDuration !== null && hw.suggestedDuration > 0) {
-      const ratio = hw.actualDuration / hw.suggestedDuration;
-      ratios.push(ratio);
-      if (ratio <= 0.8) efficiencyBonus += bonusPerTask;
-    }
-  });
-
-  const averageRatio = ratios.length > 0
-    ? ratios.reduce((a, b) => a + b, 0) / ratios.length
-    : 0;
+  const challengeSuccess = doneHw.filter(h => h.mode === 'challenge' && !h.rejected);
+  const dailyBase = cachedData?.settings?.dailyBasePoints ?? 50;
+  const homeworkBonus = challengeSuccess.reduce(
+    (sum, h) => sum + (h.basePoints ?? cachedData?.settings?.homeworkBonusPerTask ?? 10), 0
+  );
 
   const settlementData = {
-    basePoints,
-    efficiencyBonus,
-    totalBeforeRating: basePoints + efficiencyBonus,
-    challengeCount: challengeHw.length,
-    timerCount: doneHw.filter(h => h.mode === 'timer').length,
+    dailyBase,
+    homeworkBonus,
+    totalBeforeRating: dailyBase + homeworkBonus,
+    doneCount: doneHw.length,
   };
 
   window._settlement = settlementData;
@@ -468,6 +470,16 @@ async function calculateSettlement() {
   if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
   cachedData.dailySettlement[dateKey] = settlementToSave;
 
+  const ratios = [];
+  challengeSuccess.forEach(hw => {
+    if (hw.actualDuration !== null && hw.suggestedDuration > 0) {
+      ratios.push(hw.actualDuration / hw.suggestedDuration);
+    }
+  });
+  const averageRatio = ratios.length > 0
+    ? ratios.reduce((a, b) => a + b, 0) / ratios.length
+    : 0;
+
   await API.saveEfficiency(dateKey, { averageRatio, ratios });
 
   needsFullRender = true;
@@ -485,8 +497,10 @@ async function submitForRating() {
   try {
     const dateKey = Util.dateKey(currentDate);
     const settlementData = {
-      basePoints: settlement.basePoints,
-      efficiencyBonus: settlement.efficiencyBonus,
+      dailyBase: settlement.dailyBase,
+      homeworkBonus: settlement.homeworkBonus,
+      totalBeforeRating: settlement.totalBeforeRating,
+      doneCount: settlement.doneCount,
       rating: null,
       multiplier: null,
       finalPoints: null,
@@ -630,7 +644,7 @@ function startPoll(intervalMs) {
           Voice.speak('作业被驳回，请查看');
         }
 
-        if (!_completingHomework) {
+        if (!_completingHomework && !_startingHomework) {
           homeworks = newHw;
           needsFullRender = true;
           const settlement = getSettlementData();
