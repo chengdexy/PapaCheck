@@ -7,6 +7,7 @@ __pycache__/
 # 数据库（本地数据，不提交）
 data.db
 data.db.*
+data.db-*
 
 # 编辑器
 .vscode/
