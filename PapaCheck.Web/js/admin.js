@@ -216,9 +216,10 @@ function renderHomeworkTab() {
 
         const totalRewardScore = adminHomeworks.reduce((sum, h) => sum + (h.basePoints || 0), 0);
 
-        const earnedScore = settlement?.homeworkBonus ??
+        const earnedScore = settlement?.homeworkBonus != null ? settlement.homeworkBonus :
           adminHomeworks.filter(h => h.status === 'done' && h.mode === 'challenge' && !h.rejected)
             .reduce((sum, h) => sum + (h.basePoints || 0), 0);
+        const isRated = settlement?.homeworkBonus != null;
 
         let progressText = `完成进度: ${doneCount}/${totalCount}`;
         if (doneCount === totalCount) progressText += ' ✅ 全部完成';
@@ -231,7 +232,7 @@ function renderHomeworkTab() {
           <span style="color:var(--text-secondary);margin:0 2px;">·</span>
           <span>🏆 总奖励分: ${totalRewardScore}分</span>
           <span style="color:var(--text-secondary);margin:0 2px;">·</span>
-          <span>💰 已获得积分: ${earnedScore}分</span>
+          <span>💰 ${isRated ? '已获得积分' : '预估积分'}: ${earnedScore}分</span>
         </div>`;
       }
       return '';
@@ -984,9 +985,9 @@ function openBountyModal(mode, itemId) {
       <label>任务类型</label>
       <div class="mode-selector" id="adminBountyTypeSelector">
         <button class="mode-option ${(item?.type || 'recurring') === 'recurring' ? 'selected' : ''}"
-          onclick="selectBountyType('recurring')">🔄 常驻</button>
+          data-type="recurring" onclick="selectBountyType('recurring')">🔄 常驻</button>
         <button class="mode-option ${(item?.type || 'recurring') === 'once' ? 'selected' : ''}"
-          onclick="selectBountyType('once')">⚡ 一次性</button>
+          data-type="once" onclick="selectBountyType('once')">⚡ 一次性</button>
       </div>
     </div>
     <div class="modal-actions">
@@ -1003,9 +1004,7 @@ function openBountyModal(mode, itemId) {
 function selectBountyType(type) {
   window._bountyType = type;
   document.querySelectorAll('#adminBountyTypeSelector .mode-option').forEach(btn => {
-    const isRecurring = btn.textContent.includes('🔄');
-    const isOnce = btn.textContent.includes('⚡');
-    btn.classList.toggle('selected', (type === 'recurring' && isRecurring) || (type === 'once' && isOnce));
+    btn.classList.toggle('selected', btn.dataset.type === type);
   });
 }
 

@@ -26,6 +26,7 @@ if not os.path.isdir(_WEB_ROOT):
 _TTS_CACHE_DIR = os.path.join(os.environ.get('PAPACHECK_DB_DIR', os.path.dirname(os.path.abspath(__file__))), 'tts_cache')
 _tts_cache = {}
 _show_polling_log = False
+_server = None
 
 os.makedirs(_TTS_CACHE_DIR, exist_ok=True)
 
@@ -367,7 +368,8 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
         self.send_error(404, 'Not Found')
 
     def end_headers(self):
-        self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        if self.path.endswith(('.js', '.html', '.css', '.json', '.png', '.ico', '.svg')):
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
         super().end_headers()
 
     def do_OPTIONS(self):
@@ -486,6 +488,8 @@ def init_server(quiet=False):
 def main():
     """命令行入口（保持兼容）"""
     server, ip = init_server()
+    global _server
+    _server = server
     try:
         server.serve_forever()
     except KeyboardInterrupt:

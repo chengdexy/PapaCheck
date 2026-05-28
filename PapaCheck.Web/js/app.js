@@ -762,16 +762,9 @@ function startPoll(intervalMs) {
       if (cachedData.bountyCompletions?._total) {
         _lastBountyCompletions._total = { ...cachedData.bountyCompletions._total };
       }
-      if (_lastBountySubmissions === null) {
-        _lastBountySubmissions = {};
-        for (const dk of Object.keys(cachedData.bountySubmissions || {})) {
-          _lastBountySubmissions[dk] = (cachedData.bountySubmissions[dk] || []).map(s => ({ ...s }));
-        }
-      } else {
-        _lastBountySubmissions = {};
-        for (const dk of Object.keys(cachedData.bountySubmissions || {})) {
-          _lastBountySubmissions[dk] = (cachedData.bountySubmissions[dk] || []).map(s => ({ ...s }));
-        }
+      _lastBountySubmissions = {};
+      for (const dk of Object.keys(cachedData.bountySubmissions || {})) {
+        _lastBountySubmissions[dk] = (cachedData.bountySubmissions[dk] || []).map(s => ({ ...s }));
       }
 
       if (needsFullRender) {
