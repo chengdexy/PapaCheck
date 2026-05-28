@@ -5,27 +5,45 @@ import pytest
 
 
 class TestInitDB:
-    def test_init_db_creates_all_tables(self, db):
+    ALL_TABLES = [
+        'active_buffs', 'badges', 'bounty_completions',
+        'bounty_submissions', 'bounty_tasks', 'daily_settlement',
+        'efficiency_history', 'free_time_tasks', 'homeworks',
+        'meta', 'points', 'points_history', 'redemptions',
+        'reward_box', 'settings', 'shop_items',
+    ]
+
+    @pytest.mark.parametrize('table_name', ALL_TABLES)
+    def test_table_exists(self, db, table_name):
         conn = db._mgr.get()
         tables = [r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+            "SELECT name FROM sqlite_master WHERE type='table'"
         ).fetchall()]
-        expected = [
-            'active_buffs', 'badges', 'bounty_completions',
-            'bounty_submissions', 'bounty_tasks', 'daily_settlement',
-            'efficiency_history', 'free_time_tasks', 'homeworks',
-            'meta', 'points', 'points_history', 'redemptions',
-            'reward_box', 'settings', 'shop_items',
-        ]
-        for t in expected:
-            assert t in tables, f'table {t} should exist'
+        assert table_name in tables, f'table {table_name} should exist'
 
-    def test_init_db_inserts_default_rows(self, db):
+    def test_default_points_balance_zero(self, db):
         conn = db._mgr.get()
-        assert conn.execute("SELECT balance FROM points WHERE id = 1").fetchone()['balance'] == 0
-        assert json.loads(conn.execute("SELECT data FROM shop_items WHERE id = 1").fetchone()['data']) == []
-        assert json.loads(conn.execute("SELECT data FROM settings WHERE id = 1").fetchone()['data']) == {}
-        assert json.loads(conn.execute("SELECT data FROM bounty_tasks WHERE id = 1").fetchone()['data']) == []
+        assert conn.execute(
+            "SELECT balance FROM points WHERE id = 1"
+        ).fetchone()['balance'] == 0
+
+    def test_default_shop_items_empty(self, db):
+        conn = db._mgr.get()
+        assert json.loads(conn.execute(
+            "SELECT data FROM shop_items WHERE id = 1"
+        ).fetchone()['data']) == []
+
+    def test_default_settings_empty(self, db):
+        conn = db._mgr.get()
+        assert json.loads(conn.execute(
+            "SELECT data FROM settings WHERE id = 1"
+        ).fetchone()['data']) == {}
+
+    def test_default_bounty_tasks_empty(self, db):
+        conn = db._mgr.get()
+        assert json.loads(conn.execute(
+            "SELECT data FROM bounty_tasks WHERE id = 1"
+        ).fetchone()['data']) == []
 
     def test_init_db_idempotent(self, db):
         db.init_db()
@@ -90,6 +108,10 @@ class TestPoints:
         db.update_points('earn', 15, '第二次')
         db.update_points('spend', 5, '消费')
         assert db.get_points_balance() == 20
+
+    def test_update_points_zero_amount_no_effect(self, db):
+        db.update_points('earn', 0, '零值加分')
+        assert db.get_points_balance() == 0
 
     def test_update_points_history(self, db):
         db.update_points('earn', 10, '完成作业')
@@ -239,26 +261,41 @@ class TestFullDataImportExport:
         assert data['homeworks'] == {}
         assert data['bountyTasks'] == []
 
-    def test_get_full_data_with_data(self, db, test_date, sample_homeworks):
+    def test_full_data_includes_homeworks(self, db, test_date, sample_homeworks):
         db.save_homeworks(test_date, sample_homeworks)
-        db.update_points('earn', 20, '测试')
         data = db.get_full_data()
         assert len(data['homeworks'][test_date]) == 2
+
+    def test_full_data_includes_points_balance(self, db):
+        db.update_points('earn', 20, '测试')
+        data = db.get_full_data()
         assert data['points']['balance'] == 20
 
-    def test_import_full_data_roundtrip(self, db, test_date, sample_homeworks):
-        db.save_homeworks(test_date, sample_homeworks)
+    def test_import_roundtrip_points(self, db):
         db.update_points('earn', 50, '测试积分')
-        db.save_settings({'dailyBasePoints': 80})
         exported = db.get_full_data()
 
         db.reset_points()
-        db.save_homeworks(test_date, [])
-        db.save_settings({})
         db.import_full_data(exported)
 
         assert db.get_points_balance() == 50
+
+    def test_import_roundtrip_homeworks(self, db, test_date, sample_homeworks):
+        db.save_homeworks(test_date, sample_homeworks)
+        exported = db.get_full_data()
+
+        db.save_homeworks(test_date, [])
+        db.import_full_data(exported)
+
         assert len(db.get_homeworks(test_date)) == 2
+
+    def test_import_roundtrip_settings(self, db):
+        db.save_settings({'dailyBasePoints': 80})
+        exported = db.get_full_data()
+
+        db.save_settings({})
+        db.import_full_data(exported)
+
         assert db.get_settings()['dailyBasePoints'] == 80
 
     def test_import_full_data_preserves_bounty_total(self, db, sample_bounty_tasks):
