@@ -162,21 +162,6 @@ def run_step(desc, cmd, cwd=None, shell=False):
 def build_steps(args):
     steps = []
 
-    if args.exe_only or (not args.apk_only):
-        if args.bump_exe:
-            cmd = [sys.executable, BUMP_VERSION_SCRIPT,
-                   '--target', 'exe', args.bump_exe]
-        elif args.set_exe_ver:
-            cmd = [sys.executable, BUMP_VERSION_SCRIPT,
-                   '--target', 'exe', '--set', args.set_exe_ver]
-        else:
-            cmd = None
-
-        if cmd:
-            steps.append(('递增 EXE 版本号', cmd, ROOT, False))
-        steps.append(('打包 Windows EXE',
-                      [sys.executable, BUILD_EXE_SCRIPT], ROOT, False))
-
     if args.apk_only or (not args.exe_only):
         if args.bump_apk:
             cmd = [sys.executable, BUMP_VERSION_SCRIPT,
@@ -192,6 +177,21 @@ def build_steps(args):
 
         apk_cmd_str = 'flutter build apk --release'
         steps.append(('构建 Android APK', apk_cmd_str, ANDROID_DIR, True))
+
+    if args.exe_only or (not args.apk_only):
+        if args.bump_exe:
+            cmd = [sys.executable, BUMP_VERSION_SCRIPT,
+                   '--target', 'exe', args.bump_exe]
+        elif args.set_exe_ver:
+            cmd = [sys.executable, BUMP_VERSION_SCRIPT,
+                   '--target', 'exe', '--set', args.set_exe_ver]
+        else:
+            cmd = None
+
+        if cmd:
+            steps.append(('递增 EXE 版本号', cmd, ROOT, False))
+        steps.append(('打包 Windows EXE',
+                      [sys.executable, BUILD_EXE_SCRIPT], ROOT, False))
 
     return steps
 
@@ -496,6 +496,10 @@ def main():
         if os.path.isdir(pyinstaller_work_dir):
             print('[清理] 删除旧的 dist/PapaCheck/ ...\n')
             shutil.rmtree(pyinstaller_work_dir)
+
+    if need_apk and os.path.exists(APK_BUILD_OUTPUT):
+        print('[清理] 删除旧的 app-release.apk ...\n')
+        os.remove(APK_BUILD_OUTPUT)
 
     steps = build_steps(args)
     for i, (desc, cmd, cwd, shell) in enumerate(steps, 1):

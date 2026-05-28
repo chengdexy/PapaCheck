@@ -38,6 +38,14 @@ WEB_APK_DST = os.path.join(WEB_APK_DIR, f'PapaCheck-{apk_version}.apk')
 
 apk_add_data = []
 if os.path.exists(APK_SRC):
+    apk_mtime = os.path.getmtime(APK_SRC)
+    pubspec_mtime = os.path.getmtime(pubspec_path) if os.path.exists(pubspec_path) else 0
+    if pubspec_mtime > apk_mtime:
+        print(f'[警告] pubspec.yaml 比 APK 构建产物更新，APK 可能版本不一致！')
+        print(f'  pubspec.yaml 修改时间: {pubspec_mtime}')
+        print(f'  app-release.apk 修改时间: {apk_mtime}')
+        print(f'  建议先执行 flutter build apk --release 重新构建 APK')
+
     os.makedirs(APK_DIR, exist_ok=True)
     shutil.copy2(APK_SRC, APK_DST)
     os.makedirs(WEB_APK_DIR, exist_ok=True)
@@ -51,13 +59,10 @@ if os.path.exists(APK_SRC):
     apk_add_data = ['--add-data', f'{WEB_APK_DIR};Web{os.sep}apk']
     print(f'APK 已准备: PapaCheck-{apk_version}.apk')
 else:
-    print('APK 文件不存在')
-    print('  1. bump_version.py  更新版本号')
+    print('[警告] APK 文件不存在，EXE 将不包含 APK 分发')
+    print('  请先构建 APK 后再运行 build_exe.py:')
+    print('  1. bump_version.py --target apk patch')
     print('  2. cd PapaCheck.Android && flutter build apk --release')
-    print('  3. 重新运行 build_exe.py')
-    ans = input('  是否跳过 APK 继续打包？[y/N] ').strip().lower()
-    if ans != 'y':
-        sys.exit(0)
 
 exe_version_tuple = tuple(int(x) for x in exe_version.split('.'))
 if len(exe_version_tuple) < 4:
