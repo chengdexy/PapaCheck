@@ -59,6 +59,10 @@ class TestGuessIMAPServer:
         ec = _import_email_client()
         assert ec.guess_imap_server('user@unknown-example.xyz') is None
 
+    def test_guess_imap_server_case_insensitive(self):
+        ec = _import_email_client()
+        assert ec.guess_imap_server('User@QQ.COM') == 'imap.qq.com'
+
 
 class TestBuildEmailText:
     def test_build_email_text_single(self):

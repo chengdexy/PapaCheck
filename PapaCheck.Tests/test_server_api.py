@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import shutil
 import socket
 import threading
 import time
@@ -37,6 +38,18 @@ def _request(port, method, path, data=None):
                 return resp.status, json.loads(content)
             except json.JSONDecodeError:
                 return resp.status, content
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode('utf-8')
+
+
+def _request_raw(port, method, path, body, content_type='application/json'):
+    url = f'http://localhost:{port}{path}'
+    data = body.encode('utf-8') if isinstance(body, str) else body
+    req = urllib.request.Request(url, data=data, method=method)
+    req.add_header('Content-Type', content_type)
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return resp.status, resp.read().decode('utf-8')
     except urllib.error.HTTPError as e:
         return e.code, e.read().decode('utf-8')
 
@@ -122,38 +135,62 @@ class TestPointsAPI:
         assert status == 200
         assert result.get('balance') == 10
 
-    def test_update_points_spend(self, test_server):
-        status, before = _request(test_server, 'GET', '/api/data')
-        initial = before['points']['balance']
+    def test_spend_points_reduces_balance(self, test_server):
+        _, before = _request(test_server, 'GET', '/api/data')
+        before_balance = before['points']['balance']
         _request(test_server, 'POST', '/api/points', {
-            'action': 'earn', 'amount': 30, 'detail': '先加'
+            'action': 'earn', 'amount': 10, 'detail': '确保有余额'
         })
+        _, after_earn = _request(test_server, 'GET', '/api/data')
+        balance_after_earn = after_earn['points']['balance']
         status, result = _request(test_server, 'POST', '/api/points', {
-            'action': 'spend', 'amount': 10, 'detail': '再减'
+            'action': 'spend', 'amount': 10, 'detail': '消费'
         })
         assert status == 200
-        assert result.get('balance') == initial + 20
+        assert result.get('balance') == balance_after_earn - 10
+
+    def test_spend_exceeds_balance_allowed(self, test_server):
+        status, result = _request(test_server, 'POST', '/api/points', {
+            'action': 'spend', 'amount': 100, 'detail': '超额消费'
+        })
+        assert status == 200
+        assert 'balance' in result
+
+    def test_post_invalid_json_returns_error(self, test_server):
+        code, content = _request_raw(test_server, 'POST', '/api/points',
+                                      'this is not json')
+        assert code in (400, 500)
 
 
 class TestSettingsAPI:
-    def test_settings_roundtrip(self, test_server):
+    def test_save_settings(self, test_server):
         settings = {'dailyBasePoints': 80, 'ratingMultipliers': {'优': 1.2}}
         status, _ = _request(test_server, 'POST', '/api/settings', {'settings': settings})
         assert status == 200
 
+    def test_get_saved_settings(self, test_server):
+        settings = {'dailyBasePoints': 80}
+        _request(test_server, 'POST', '/api/settings', {'settings': settings})
         status, data = _request(test_server, 'GET', '/api/settings')
         assert status == 200
         assert data['dailyBasePoints'] == 80
 
 
 class TestBountyAPI:
-    def test_bounty_workflow(self, test_server):
+    def test_save_bounty_tasks(self, test_server):
         tasks = [{
             'id': 'bt1', 'name': '帮妈妈洗碗', 'points': 5,
             'type': 'recurring', 'enabled': True, 'createdAt': 1700000000000,
         }]
-        _request(test_server, 'POST', '/api/bounty-tasks', {'items': tasks})
+        status, _ = _request(test_server, 'POST', '/api/bounty-tasks', {'items': tasks})
+        assert status == 200
 
+    def test_get_saved_bounty_tasks(self, test_server):
+        tasks = [{
+            'id': 'bt2', 'name': '整理书架', 'points': 10,
+            'type': 'once', 'enabled': True, 'createdAt': 1700000000100,
+        }]
+        _request(test_server, 'POST', '/api/bounty-tasks', {'items': tasks})
         status, data = _request(test_server, 'GET', '/api/bounty-tasks')
         assert status == 200
         assert len(data) == 1
@@ -191,3 +228,85 @@ class TestStaticFiles:
     def test_404_for_nonexistent(self, test_server):
         status, _ = _request(test_server, 'GET', '/nonexistent-path-xyz')
         assert status == 404
+
+
+def _inject_apk_dir(server_mod, with_apk=True):
+    tmpdir = tempfile.mkdtemp()
+    apk_dir = os.path.join(tmpdir, 'apk')
+    os.makedirs(apk_dir, exist_ok=True)
+    original = server_mod._WEB_ROOT
+    server_mod._WEB_ROOT = tmpdir
+    if with_apk:
+        return tmpdir, original, apk_dir
+    else:
+        os.rmdir(apk_dir)
+        return tmpdir, original
+
+
+def _restore_web_root(server_mod, tmpdir, original):
+    server_mod._WEB_ROOT = original
+    shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+class TestVersionAPI:
+
+    def test_version_without_apk_returns_default(self, test_server):
+        import server as server_mod
+        tmpdir, original = _inject_apk_dir(server_mod, with_apk=False)
+        try:
+            status, data = _request(test_server, 'GET', '/api/version')
+            assert status == 200
+            assert data == {'clientVersion': '1.0.0'}
+        finally:
+            _restore_web_root(server_mod, tmpdir, original)
+
+    def test_version_with_single_apk(self, test_server):
+        import server as server_mod
+        tmpdir, original, apk_dir = _inject_apk_dir(server_mod)
+        try:
+            apk_path = os.path.join(apk_dir, 'PapaCheck-2.1.0.apk')
+            with open(apk_path, 'wb') as f:
+                f.write(b'dummy apk')
+            status, data = _request(test_server, 'GET', '/api/version')
+            assert status == 200
+            assert data == {'clientVersion': '2.1.0'}
+        finally:
+            _restore_web_root(server_mod, tmpdir, original)
+
+    def test_version_with_multiple_apks_returns_latest(self, test_server):
+        import server as server_mod
+        tmpdir, original, apk_dir = _inject_apk_dir(server_mod)
+        try:
+            for ver in ['1.0.0', '1.9.0', '2.0.1', '1.5.0']:
+                apk_path = os.path.join(apk_dir, f'PapaCheck-{ver}.apk')
+                with open(apk_path, 'wb') as f:
+                    f.write(b'dummy apk ' + ver.encode())
+            status, data = _request(test_server, 'GET', '/api/version')
+            assert status == 200
+            assert data == {'clientVersion': '2.0.1'}
+        finally:
+            _restore_web_root(server_mod, tmpdir, original)
+
+    def test_download_without_apk_returns_404(self, test_server):
+        import server as server_mod
+        tmpdir, original = _inject_apk_dir(server_mod, with_apk=False)
+        try:
+            status, _ = _request(test_server, 'GET', '/api/download')
+            assert status == 404
+        finally:
+            _restore_web_root(server_mod, tmpdir, original)
+
+    def test_download_with_apk_returns_file(self, test_server):
+        import server as server_mod
+        tmpdir, original, apk_dir = _inject_apk_dir(server_mod)
+        try:
+            apk_content = b'dummy apk content for testing'
+            apk_path = os.path.join(apk_dir, 'PapaCheck-3.0.0.apk')
+            with open(apk_path, 'wb') as f:
+                f.write(apk_content)
+            status, content = _request(test_server, 'GET', '/api/download')
+            assert status == 200
+            assert isinstance(content, str)
+            assert 'dummy apk content' in content
+        finally:
+            _restore_web_root(server_mod, tmpdir, original)
