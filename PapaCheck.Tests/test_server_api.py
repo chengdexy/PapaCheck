@@ -105,7 +105,7 @@ class TestHomeworksAPI:
     def test_save_and_get_homeworks(self, test_server):
         date_key = '2025-06-15'
         hw = [{'id': 'hw1', 'subject': 'math', 'content': '练习册', 'status': 'pending'}]
-        status, _ = _request(test_server, 'POST', f'/api/homeworks/{date_key}', hw)
+        status, _ = _request(test_server, 'POST', f'/api/homeworks/{date_key}', {'homeworks': hw})
         assert status == 200
 
         status, data = _request(test_server, 'GET', f'/api/homeworks/{date_key}')
@@ -138,7 +138,7 @@ class TestPointsAPI:
 class TestSettingsAPI:
     def test_settings_roundtrip(self, test_server):
         settings = {'dailyBasePoints': 80, 'ratingMultipliers': {'优': 1.2}}
-        status, _ = _request(test_server, 'POST', '/api/settings', settings)
+        status, _ = _request(test_server, 'POST', '/api/settings', {'settings': settings})
         assert status == 200
 
         status, data = _request(test_server, 'GET', '/api/settings')
@@ -173,8 +173,7 @@ class TestResetDateAPI:
     def test_reset_date(self, test_server):
         date_key = '2025-06-16'
         hw = [{'id': 'hw_reset', 'subject': 'test', 'content': 'reset me', 'status': 'pending'}]
-        _request(test_server, 'POST', f'/api/homeworks/{date_key}', hw)
-
+        _request(test_server, 'POST', f'/api/homeworks/{date_key}', {'homeworks': hw})
         status, _ = _request(test_server, 'POST', '/api/reset-date', {'date': date_key})
         assert status == 200
 
