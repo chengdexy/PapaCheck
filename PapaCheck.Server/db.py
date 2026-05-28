@@ -52,7 +52,10 @@ _mgr = _ConnectionManager()
 
 @contextmanager
 def _db():
-    """数据库连接上下文管理器，自动处理异常回滚。"""
+    """数据库连接上下文管理器，自动处理异常回滚。
+
+    注意：不会自动 commit，调用方需要在 with 块内手动调用 conn.commit()。
+    """
     conn = _mgr.get()
     try:
         yield conn
@@ -206,6 +209,9 @@ def init_db():
                 data TEXT NOT NULL DEFAULT '[]'
             );
 
+            -- bounty_completions 存储每日完成记录，
+            -- 客户端通过 _total 键（作为特殊 date_key）存储全局累加计数器。
+            -- _total 不会被 reset_date() 清除，用于跨天累计计数。
             CREATE TABLE IF NOT EXISTS bounty_completions (
                 date_key TEXT PRIMARY KEY,
                 data TEXT NOT NULL DEFAULT '{}'
