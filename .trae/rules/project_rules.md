@@ -1,42 +1,66 @@
-# 项目规范 (Project Rules)
+## TDD 测试驱动开发规则（RED-GREEN-REFACTOR）
 
-## 1. 核心架构
+本项目采用严格的 TDD（Test-Driven Development）测试驱动开发模式。AI 在进行任何代码操作时必须遵循 RED → GREEN → REFACTOR 循环。
 
-- **后端**: Python Flask (`PapaCheck.Server/`)
-- **前端**: 原生 JavaScript + IndexedDB + Service Worker (`PapaCheck.Web/`)
-- **测试**: PyTest (后端) + Playwright (前端 E2E)
+### 铁律
 
-## 2. TDD 铁律
+**没有失败的测试，不准写生产代码。**
+**如果先写了代码再补测试，必须删除代码重来。**
 
-1. **没有失败的测试，不准写生产代码。** 如果先写了代码再补测试，必须删除代码重来。
-2. **每次 bug 修复**：RED → GREEN → REFACTOR
-3. **提交前**：跑全部测试（后端 + E2E），零失败才能 commit
+### RED 阶段：写一个失败的测试
 
-## 3. E2E 测试规范
+- 新功能：先写测试用例描述预期行为，运行并确认测试失败
+- Bug修复：先写能复现Bug的测试用例，运行并确认测试失败
+- 重构：确保已有测试通过后再重构
 
-- **浏览器**: Playwright + Chromium (Edge channel), headless
-- **定位器**: 使用 `page.wait_for_selector` / `page.wait_for_function` 等精确等待，**不用 `wait_for_timeout` 作为协议信号**
-- **隔离**: `browser` fixture 用 `scope='function'`，每个测试独立浏览器实例
-- **数据库**: `test_server` 用 `scope='class'`，同类共享临时 SQLite
-- **命名**: `test_<场景描述>`, 类 `Test<模块>`, 中文 docstring
+**关键要求：必须亲眼看到测试失败。** 如果测试直接通过了，说明你在测试已有行为，需要修改测试用例。如果测试报错（语法错误等），先修复错误直到测试正确地"失败"。
 
-## 4. 后端测试规范
+### GREEN 阶段：写最简代码让测试通过
 
-- **数据库**: tempfile + 内存隔离，无需 mock
-- **命名**: `test_<函数>_<场景>`, 类 `Test<功能>`
-- **断言**: 中文错误消息，`assert x == y, f'描述: 实际={x}'`
+- 只写让测试通过的最少代码，不要添加额外功能
+- 不要顺便重构其他代码，不要"顺手优化"
+- 验证：运行全部测试，确认全部通过（不只是刚写的那个）
 
-## 5. 离线同步架构
+### REFACTOR 阶段：在测试保护下重构
 
-- `sw.js`: Service Worker (Cache First 静态 + Network First API, /api/data /api/ping 直连)
-- `db.js`: IndexedDB 数据层 (14 张表)
-- `change-log.js`: 离线变更队列
-- `sync.js`: 同步引擎 (push → pull → LWW → clear)
-- `api.js`: 在线优先 + 离线降级
-- `app.js`: SW 注册 + 轮询 + 离线检测 (ping → fullSync → refresh)
+- 消除重复代码、改善命名、提取辅助函数
+- 每次重构后立即运行测试，保持全绿
+- 不要添加新行为，只改进结构
 
-## 6. Git 规范
+### 测试质量标准
 
-- **必须 commit 的文件**: 所有 `.py`, `.js`, `.html`, `.css`, `sw.js`, 测试文件, `.trae/rules/project_rules.md`
-- **不允许暂存/commit**: `.dbg/`, `__pycache__/`, `.pytest_cache/`, 临时文件
-- **commit message**: 中文描述
+- **单一行为**：一个测试只测一件事
+- **清晰命名**：测试名描述行为
+- **展示意图**：说明代码应该做什么，而不是怎么做的
+
+### 每次修改后必须运行测试
+每次代码修改完成后，必须运行测试套件验证：
+```bash
+python -m pytest PapaCheck.Tests/ -v
+```
+所有测试必须通过，才算任务完成。**完成任务时必须贴出测试通过的证据（输出摘要）。**
+
+### 禁止提交未通过测试的代码
+git commit 之前必须确保：
+- 所有已有测试通过
+- 新增的测试通过
+- 没有跳过或忽略的测试
+
+### 常见违规借口（必须拒绝）
+
+| 借口 | 为什么不对 |
+|------|-----------|
+| "这个很简单，不需要测试" | 简单代码也会出错，而且简单测试只需30秒 |
+| "我先写代码，再补测试" | 后补的测试只验证已有实现，等于没测 |
+| "我手动测过了" | 手动测试不可重复，下次改动后就没了 |
+| "花了X小时写代码，删了太浪费" | 沉没成本谬误，保留不可信的代码才是真正的浪费 |
+| "TDD 太死板了" | TDD 恰恰是为了提高效率：提前发现 bug、防止回归、支持安全重构 |
+| "测试都通过了还查什么" | 如果没亲眼看到失败，你不知道测试到底测了什么 |
+
+**违反铁律的处理：删除代码，从 RED 阶段重新开始。** 不要"保留当参考"，不要"边改边补测试"。删就是删，这是唯一正确的修复方式。
+
+<｜end▁of▁thinking｜>现在更新 rules：
+
+<｜｜DSML｜｜tool_calls>
+<｜｜DSML｜｜invoke name="SearchReplace">
+<｜｜DSML｜｜parameter name="file_path" string="true">e:\trae_projects\PapaCheck\.trae\rules\project_rules.md
