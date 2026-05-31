@@ -105,7 +105,7 @@ def get_modified_since(timestamp):
             if table == 'points':
                 row_data = conn.execute("SELECT balance FROM points WHERE id = 1").fetchone()
                 if row_data:
-                    changes.append({
+                    result.append({
                         'table_name': table,
                         'record_key': record_key,
                         'data': {'balance': row_data['balance']},
@@ -131,6 +131,8 @@ def get_modified_since(timestamp):
 
 
 def _classify_change(data):
+    if '_table' in data:
+        return data['_table']
     if 'subject' in data:
         return 'homeworks'
     if 'dailyBase' in data and 'rating' in data:
@@ -164,7 +166,7 @@ def _classify_change(data):
 
 def _find_by_uuid(items, uuid):
     for i, item in enumerate(items):
-        if isinstance(item, dict) and (item.get('uuid') == uuid or item.get('id') == uuid):
+        if isinstance(item, dict) and (item.get('uuid') == uuid or item.get('id') == uuid or item.get('taskId') == uuid):
             return i, item
     return -1, None
 
@@ -196,12 +198,17 @@ def push_merge(changes):
                     idx, existing_item = _find_by_uuid(existing, uuid)
                     if existing_item is None and data.get('id'):
                         idx, existing_item = _find_by_uuid(existing, data['id'])
+                    if existing_item is None and data.get('taskId'):
+                        idx, existing_item = _find_by_uuid(existing, data['taskId'])
                     if existing_item:
                         old_last = existing_item.get('lastModified', '0')
                         if change_type == 'delete':
                             existing[idx]['isDeleted'] = True
                             existing[idx]['lastModified'] = new_last_modified
-                        elif new_last_modified > old_last:
+                        # 使用 >= 而非 > 作为安全网：当两次变更的 lastModified
+                        # 相同时（旧客户端 ensureSyncFields 未刷新时间戳的离线场景），
+                        # 后到达的变更应覆盖先到达的。主保险在 ensureSyncFields 每次都刷时间戳。
+                        elif new_last_modified >= old_last:
                             existing[idx] = data
                     else:
                         existing.append(data)
@@ -213,7 +220,7 @@ def push_merge(changes):
                     if change_type == 'delete':
                         data['isDeleted'] = True
                         existing = data
-                    elif new_last_modified > old_last:
+                    elif new_last_modified >= old_last:
                         existing = data
                     _set_date_data(conn, table, record_key, existing)
                     record_modification(table, record_key, timestamp)
@@ -224,12 +231,14 @@ def push_merge(changes):
                     idx, existing_item = _find_by_uuid(existing, uuid)
                     if existing_item is None and data.get('id'):
                         idx, existing_item = _find_by_uuid(existing, data['id'])
+                    if existing_item is None and data.get('taskId'):
+                        idx, existing_item = _find_by_uuid(existing, data['taskId'])
                     if existing_item:
                         old_last = existing_item.get('lastModified', '0')
                         if change_type == 'delete':
                             existing[idx]['isDeleted'] = True
                             existing[idx]['lastModified'] = new_last_modified
-                        elif new_last_modified > old_last:
+                        elif new_last_modified >= old_last:  # >= 安全网，同上
                             existing[idx] = data
                     else:
                         existing.append(data)
@@ -240,7 +249,7 @@ def push_merge(changes):
                     old_last = existing.get('lastModified', '0')
                     if change_type == 'delete':
                         data['isDeleted'] = True
-                    if change_type == 'delete' or new_last_modified > old_last:
+                    if change_type == 'delete' or new_last_modified >= old_last:
                         existing = data
                     _set_json(conn, table, existing, 1)
                     record_modification(table, '1', timestamp)
@@ -274,7 +283,10 @@ def _set_json(conn, table, data, id_value=1):
 def _get_date_data(conn, table, date_key, default=None):
     row = conn.execute(f"SELECT data FROM {table} WHERE date_key = ?", (date_key,)).fetchone()
     if row:
-        return json.loads(row['data'])
+        data = json.loads(row['data'])
+        if isinstance(data, list):
+            data = [item for item in data if not item.get('isDeleted')]
+        return data
     return default
 
 

@@ -7,6 +7,20 @@
 let isServerMode = false;
 let cachedData = null;
 
+function updateConnStatus() {
+  const el = document.getElementById('connStatus');
+  if (!el) return;
+  if (isServerMode) {
+    el.textContent = '🟢';
+    el.className = 'conn-status online';
+    el.title = '已连接服务器 · 数据实时同步';
+  } else {
+    el.textContent = '🟡';
+    el.className = 'conn-status offline';
+    el.title = '离线缓存模式 · 使用本地缓存数据';
+  }
+}
+
 const API = {
   async _fetch(url, options = {}) {
     const resp = await fetch(url, {

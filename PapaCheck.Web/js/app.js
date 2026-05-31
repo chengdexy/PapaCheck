@@ -13,6 +13,23 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// ========== Transition Mask ==========
+function showTransitionMask(text) {
+  var mask = document.getElementById('transitionMask');
+  if (!mask) return;
+  if (mask.style.display === 'flex') return;
+  document.getElementById('transitionText').textContent = text;
+  mask.style.display = 'flex';
+  clearTimeout(mask._timeout);
+  mask._timeout = setTimeout(function() { mask.style.display = 'none'; }, 5000);
+}
+function hideTransitionMask() {
+  var mask = document.getElementById('transitionMask');
+  if (!mask) return;
+  clearTimeout(mask._timeout);
+  mask.style.display = 'none';
+}
+
 // ========== State ==========
 let currentDate = new Date();
 let homeworks = [];
@@ -572,14 +589,21 @@ function startPoll(intervalMs) {
       try { pendingCount = await ChangeLog.count(); } catch (e) { }
       var online = await SyncEngine.checkOnline();
       if (!online) return;
+      showTransitionMask('正在同步数据…');
       isServerMode = true;
       updateConnStatus();
       if (pendingCount > 0) {
         try { await SyncEngine.fullSync(); } catch (e) { }
       }
+      hideTransitionMask();
     }
     try {
+      var wasOnline = isServerMode;
       cachedData = await API.getData();
+      if (wasOnline && !isServerMode) {
+        updateConnStatus();
+        showToast('已进入离线模式');
+      }
 
       API.migrateBountyCompletionsToTotal(cachedData);
       const key = Util.dateKey(currentDate);
@@ -754,7 +778,7 @@ function startPoll(intervalMs) {
       }
       _lastSettings = settings;
 
-      const newBountySubs = cachedData.bountySubmissions?.[key] || [];
+      const newBountySubs = (cachedData.bountySubmissions?.[key] || []).filter(s => !s.isDeleted);
       const prevBountySubs = _lastBountySubmissions?.[key] || [];
       const newBountyComps = cachedData.bountyCompletions?._total || {};
       const prevBountyComps = _lastBountyCompletions?._total || {};
@@ -798,7 +822,19 @@ function startPoll(intervalMs) {
         updateBigScreen();
       }
     } catch (e) {
-      // Server unreachable — silently retry next cycle
+      if (isServerMode) {
+        isServerMode = false;
+        updateConnStatus();
+        showTransitionMask('正在切换到离线模式…');
+        try {
+          var localData = await DB.getFullData();
+          if (localData && Object.keys(localData).length > 0) {
+            cachedData = localData;
+          }
+        } catch (dbErr) { }
+        hideTransitionMask();
+        showToast('已进入离线模式');
+      }
     }
   };
   pollInterval = setInterval(() => pollServer(), intervalMs);
@@ -855,24 +891,12 @@ function updateSaverTime() {
 }
 
 // ========== Connection Status ==========
-function updateConnStatus() {
-  const el = document.getElementById('connStatus');
-  if (isServerMode) {
-    el.textContent = '🟢';
-    el.className = 'conn-status online';
-    el.title = '已连接服务器 · 数据实时同步';
-  } else {
-    // OFFLINE-FIRST: detect cached vs pure offline after IndexedDB is wired in Task 7
-    el.textContent = '🟡';
-    el.className = 'conn-status offline';
-    el.title = '离线缓存模式 · 使用本地缓存数据';
-  }
-}
-
 // ========== Init ==========
 async function init() {
+  showTransitionMask('正在加载数据…');
   try {
     cachedData = await API.getData();
+    hideTransitionMask();
   } catch (e) {
     try {
       var localData = await DB.getFullData();
@@ -881,7 +905,9 @@ async function init() {
         cachedData = localData;
         cachedData._loadedOffline = true;
         showToast('已进入离线模式，数据将在连接后自动同步');
+        hideTransitionMask();
       } else {
+        hideTransitionMask();
         document.getElementById('bigMode').innerHTML = `
           <div style="display:flex;align-items:center;justify-content:center;height:100%;text-align:center;">
             <div>
@@ -894,6 +920,7 @@ async function init() {
         return;
       }
     } catch (dbErr) {
+      hideTransitionMask();
       document.getElementById('bigMode').innerHTML = `
         <div style="display:flex;align-items:center;justify-content:center;height:100%;text-align:center;">
           <div>

@@ -3,6 +3,33 @@
  * 负责作业管理、商店管理、兑换管理、评级、统计、设置
  */
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/sw.js').then(function (reg) {
+      console.log('SW registered:', reg.scope);
+    }).catch(function (err) {
+      console.log('SW registration failed:', err);
+    });
+  });
+}
+
+// ========== Transition Mask ==========
+function showTransitionMask(text) {
+  var mask = document.getElementById('transitionMask');
+  if (!mask) return;
+  if (mask.style.display === 'flex') return;
+  document.getElementById('transitionText').textContent = text;
+  mask.style.display = 'flex';
+  clearTimeout(mask._timeout);
+  mask._timeout = setTimeout(function() { mask.style.display = 'none'; }, 5000);
+}
+function hideTransitionMask() {
+  var mask = document.getElementById('transitionMask');
+  if (!mask) return;
+  clearTimeout(mask._timeout);
+  mask.style.display = 'none';
+}
+
 function escapeHtml(str) {
   if (!str) return '';
   const div = document.createElement('div');
@@ -90,6 +117,7 @@ const AdminUtil = {
 
 // ========== Init ==========
 async function initAdmin() {
+  showTransitionMask('正在加载数据…');
   document.getElementById('adminDate').textContent = AdminUtil.formatDate(new Date());
 
   document.getElementById('adminModal').addEventListener('click', (e) => {
@@ -100,6 +128,7 @@ async function initAdmin() {
   });
 
   await refreshAllData();
+  hideTransitionMask();
   switchTab('homework');
 
   setInterval(async () => {
@@ -111,6 +140,22 @@ async function initAdmin() {
 }
 
 async function refreshAllData() {
+  // 从离线恢复到在线时，先推送本地变更再拉取服务端数据，
+  // 防止第一轮 poll 用服务端旧数据覆盖本地离线期间的修改
+  if (!isServerMode) {
+    var online = false;
+    try { online = await SyncEngine.checkOnline(); } catch (e) { }
+    if (online) {
+      showTransitionMask('正在同步数据…');
+      var pendingCount = 0;
+      try { pendingCount = await ChangeLog.count(); } catch (e) { }
+      if (pendingCount > 0) {
+        try { await SyncEngine.pushChanges(); } catch (e) { }
+      }
+      hideTransitionMask();
+    }
+  }
+
   try {
     const data = await API.getData();
     if (data) {
@@ -126,19 +171,35 @@ async function refreshAllData() {
         }
       }
       cachedData = data;
-      API.migrateBountyCompletionsToTotal(cachedData);
-      adminHomeworks = data.homeworks?.[AdminUtil.dateKey(adminDate)] || [];
-      adminShopItems = data.shopItems || [];
-      adminRedemptions = data.redemptions || [];
-      adminRewardBox = data.rewardBox || [];
-      adminBountyTasks = data.bountyTasks || [];
-      adminBountySubmissions = data.bountySubmissions || {};
-      adminBountyCompletions = data.bountyCompletions || {};
-      adminSettings = data.settings || {};
+      isServerMode = true;
+      _applyCachedData();
     }
   } catch (e) {
-    // Server unreachable
+    // Server unreachable — 尝试从 IndexedDB 加载离线缓存
+    try {
+      const localData = await DB.getFullData();
+      if (localData && Object.keys(localData).length > 0) {
+        isServerMode = false;
+        cachedData = localData;
+        _applyCachedData();
+        showToast('已进入离线模式，数据将在连接后自动同步');
+      }
+    } catch (dbErr) {
+      // IndexedDB 也不可用，保持当前数据
+    }
   }
+}
+
+function _applyCachedData() {
+  API.migrateBountyCompletionsToTotal(cachedData);
+  adminHomeworks = cachedData.homeworks?.[AdminUtil.dateKey(adminDate)] || [];
+  adminShopItems = cachedData.shopItems || [];
+  adminRedemptions = cachedData.redemptions || [];
+  adminRewardBox = cachedData.rewardBox || [];
+  adminBountyTasks = cachedData.bountyTasks || [];
+  adminBountySubmissions = cachedData.bountySubmissions || {};
+  adminBountyCompletions = cachedData.bountyCompletions || {};
+  adminSettings = cachedData.settings || {};
 }
 
 // ========== Tab Switching ==========
@@ -915,7 +976,7 @@ function debugBounty() {
 function renderBountyTab() {
   const container = document.getElementById('adminContent');
   const dateKey = AdminUtil.dateKey(adminDate);
-  const submissions = adminBountySubmissions[dateKey] || [];
+  const submissions = (adminBountySubmissions[dateKey] || []).filter(s => !s.isDeleted);
   const pendingSubmissions = submissions.filter(s => s.status === 'submitted');
   const pendingTaskIds = new Set(pendingSubmissions.map(s => s.taskId));
   const doingTaskIds = new Set(submissions.filter(s => s.status === 'doing').map(s => s.taskId));

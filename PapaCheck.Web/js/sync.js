@@ -133,7 +133,7 @@ var SyncEngine = (function() {
       return;
     }
     var localTime = localVal.lastModified || '1970-01-01T00:00:00.000Z';
-    if (remoteTime > localTime) {
+    if (remoteTime >= localTime) {
       targetObj[key] = remoteData;
     }
   }
@@ -182,7 +182,7 @@ var SyncEngine = (function() {
       localArray.push(remoteItem);
     } else {
       var localTime = localArray[existingIdx].lastModified || '1970-01-01T00:00:00.000Z';
-      if (remoteTime > localTime) {
+      if (remoteTime >= localTime) {
         localArray[existingIdx] = remoteItem;
       }
     }
@@ -200,6 +200,7 @@ var SyncEngine = (function() {
       await ChangeLog.clear();
 
       _lastSyncTime = serverTime || new Date().toISOString();
+      await _saveLastSyncTime(_lastSyncTime);
 
       try {
         var url = _getBaseUrl() + '/api/data';
