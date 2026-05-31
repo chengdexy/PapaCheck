@@ -546,6 +546,60 @@ class TestOfflineBehavior:
         finally:
             context.close()
 
+    def test_network_first_empty_cache_returns_503(self, test_server, browser):
+        """离线时 networkFirst 缓存为空应返回 503 而非 TypeError"""
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_selector('#bigDate', timeout=15000)
+            page.evaluate('''() => {
+              return caches.open("papacheck-v1").then(function(c) {
+                return c.delete(new Request("/api/settings"));
+              });
+            }''')
+            page.wait_for_timeout(500)
+            context.set_offline(True)
+            page.wait_for_timeout(500)
+            resp_status = page.evaluate('''() => {
+              return fetch("/api/settings").then(function(r) {
+                return r.status;
+              }).catch(function(e) {
+                return "error:" + e.message;
+              });
+            }''')
+            assert resp_status == 503, f'networkFirst 空缓存离线应返回 503, 实际: {resp_status}'
+        finally:
+            context.close()
+
+    def test_change_log_crud_cycle(self, test_server, browser):
+        """ChangeLog 基本操作: add → count → getPending → clear"""
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_selector('#bigDate', timeout=15000)
+
+            page.evaluate('ChangeLog.clear()')
+            cnt = page.evaluate('ChangeLog.count()')
+            assert cnt == 0, f'清空后 count 应为 0, 实际: {cnt}'
+
+            page.evaluate('ChangeLog.add("update", "uuid-1", {status: "done"})')
+            page.evaluate('ChangeLog.add("update", "uuid-2", {status: "pending"})')
+            cnt = page.evaluate('ChangeLog.count()')
+            assert cnt == 2, f'添加 2 条后 count 应为 2, 实际: {cnt}'
+
+            pending = page.evaluate('ChangeLog.getPending()')
+            assert len(pending) == 2, f'getPending 应返回 2 条, 实际: {len(pending)}'
+            assert pending[0]['uuid'] == 'uuid-1'
+            assert pending[1]['uuid'] == 'uuid-2'
+
+            page.evaluate('ChangeLog.clear()')
+            cnt = page.evaluate('ChangeLog.count()')
+            assert cnt == 0, f'再次清空后 count 应为 0, 实际: {cnt}'
+        finally:
+            context.close()
+
     def test_offline_shop_accessible(self, test_server, browser):
         context = browser.new_context(viewport={'width': 1280, 'height': 720})
         page = context.new_page()
