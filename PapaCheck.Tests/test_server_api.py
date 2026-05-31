@@ -310,3 +310,67 @@ class TestVersionAPI:
             assert 'dummy apk content' in content
         finally:
             _restore_web_root(server_mod, tmpdir, original)
+
+
+class TestPingAPI:
+    def test_ping_returns_ok_and_server_time(self, test_server):
+        status, data = _request(test_server, 'GET', '/api/ping')
+        assert status == 200
+        assert data.get('ok') is True
+        assert 'serverTime' in data
+        assert 'T' in data['serverTime']
+
+
+class TestSyncAPI:
+    def test_push_accepts_changes(self, test_server):
+        changes = [{
+            'type': 'upsert',
+            'uuid': 'test-id-001',
+            'data': {'id': 'test-id-001', 'subject': 'math', 'content': 'test', 'status': 'pending'},
+            'timestamp': '2025-06-15T10:00:00+00:00',
+        }]
+        status, data = _request(test_server, 'POST', '/api/sync/push', {'changes': changes})
+        assert status == 200
+        assert data.get('ok') is True
+
+    def test_push_empty_changes(self, test_server):
+        status, data = _request(test_server, 'POST', '/api/sync/push', {'changes': []})
+        assert status == 200
+        assert data.get('ok') is True
+
+    def test_pull_with_last_sync(self, test_server):
+        status, data = _request(test_server, 'GET', '/api/sync/pull?lastSync=2025-01-01T00:00:00+00:00')
+        assert status == 200
+        assert 'changes' in data
+        assert 'serverTime' in data
+        assert isinstance(data['changes'], list)
+
+    def test_pull_without_last_sync_returns_all(self, test_server):
+        status, data = _request(test_server, 'GET', '/api/sync/pull')
+        assert status == 200
+        assert 'changes' in data
+        assert isinstance(data['changes'], list)
+        assert 'serverTime' in data
+
+    def test_pull_response_format(self, test_server):
+        import server as server_mod
+
+        changes = [{
+            'type': 'upsert',
+            'uuid': 'fmt-test-001',
+            'data': {
+                'id': 'fmt-test-001', 'subject': 'math', 'content': 'format test',
+                'status': 'pending', 'lastModified': '2025-06-15T10:00:00+00:00',
+            },
+            'timestamp': '2025-06-15T10:00:00+00:00',
+        }]
+        server_mod.db.push_merge(changes)
+
+        status, data = _request(test_server, 'GET', '/api/sync/pull?lastSync=2025-06-15T09:00:00+00:00')
+        assert status == 200
+        assert 'changes' in data
+        for change in data['changes']:
+            assert 'table_name' in change
+            assert 'record_key' in change
+            assert 'data' in change
+            assert 'last_modified' in change

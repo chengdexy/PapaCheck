@@ -738,7 +738,7 @@ function updateFreeTimeGrid() {
         '</div>';
     }
 
-    const clickAction = isDone ? '' : isActive ? '' : `onclick="startFreeTime('${ft.id}')"`;
+    const clickAction = isDone ? '' : isActive ? '' : `onclick="confirmStartFreeTime('${ft.id}')"`;
 
     return `
       <div class="homework-card ${statusClass}" data-ft-id="${ft.id}" ${clickAction}>
@@ -1169,7 +1169,9 @@ async function backToMain() {
     if (settlement && settlement.rating && !settlement.viewedAt) {
       settlement.viewedAt = Util.nowTimeStr();
       const dateKey = Util.dateKey(currentDate);
-      await API.saveSettlement(dateKey, settlement);
+      if (isServerMode) {
+        await API.saveSettlement(dateKey, settlement);
+      }
     }
   }
 
@@ -1233,6 +1235,25 @@ function confirmStartBounty(taskId) {
     <div class="modal-actions">
       <button onclick="closeStartConfirm()" style="padding:10px 16px;border:2px solid var(--text-secondary);border-radius:12px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">✕ 取消</button>
       <button onclick="closeStartConfirm(); startBountyTask('${taskId}')" style="padding:10px 16px;background:var(--success);color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">💰 开始</button>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function confirmStartFreeTime(ftId) {
+  const ft = freeTimeTasks.find(t => t.id === ftId);
+  if (!ft) return;
+
+  const modal = document.getElementById('startConfirmModal');
+  const content = document.getElementById('startConfirmModalContent');
+
+  content.innerHTML = `
+    <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">🎮 奖励时间</h3>
+    <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;font-size:20px;">${ft.name}</p>
+    <p style="text-align:center;color:var(--accent);font-size:20px;margin-bottom:16px;">${ft.durationMinutes} 分钟</p>
+    <div class="modal-actions">
+      <button onclick="closeStartConfirm()" style="padding:10px 16px;border:2px solid var(--text-secondary);border-radius:12px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">✕ 取消</button>
+      <button onclick="closeStartConfirm(); startFreeTime('${ftId}')" style="padding:10px 16px;background:var(--accent);color:var(--bg);border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">🎮 开始</button>
     </div>
   `;
   modal.classList.add('show');

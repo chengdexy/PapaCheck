@@ -192,8 +192,8 @@ from server import init_server
 
 AUTORUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 APP_NAME = "PapaCheckServer"
-PORT = 8080
-_SINGLE_INSTANCE_PORT = 58080
+_PORT = int(os.environ.get('PAPACHECK_PORT', 8080))
+_SINGLE_INSTANCE_PORT = _PORT + 50000
 
 # --- Unicode symbols for UI ---
 SYMBOL_STOP = '\u23f9'      # ⏹
@@ -399,11 +399,11 @@ class PapaCheckApp:
 
         self._url_row(urls_frame,
                       f'{SYMBOL_PHONE} 孩子端',
-                      PORT, '', 'child_url', green, border)
+                      _PORT, '', 'child_url', green, border)
 
         self._url_row(urls_frame,
                       f'{SYMBOL_MAN} 爸爸管理端',
-                      PORT, '/admin.html', 'parent_url', '#38bdf8', None)
+                      _PORT, '/admin.html', 'parent_url', '#38bdf8', None)
 
         # --- APK 下载提示 ---
         cfg_hint = _load_config()
@@ -559,10 +559,10 @@ class PapaCheckApp:
         self._append_log('已复制: ' + url)
 
     def _open_child(self):
-        webbrowser.open('http://localhost:' + str(PORT))
+        webbrowser.open('http://localhost:' + str(_PORT))
 
     def _open_parent(self):
-        webbrowser.open('http://localhost:' + str(PORT) + '/admin.html')
+        webbrowser.open('http://localhost:' + str(_PORT) + '/admin.html')
 
     # ===== 菜单栏 =====
 
@@ -636,14 +636,14 @@ class PapaCheckApp:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         in_use = False
         try:
-            sock.bind(('0.0.0.0', PORT))
+            sock.bind(('0.0.0.0', _PORT))
         except OSError:
             in_use = True
         finally:
             sock.close()
 
         if in_use:
-            self._append_log('端口 ' + str(PORT) + ' 已被占用（可能已有服务器在运行）')
+            self._append_log('端口 ' + str(_PORT) + ' 已被占用（可能已有服务器在运行）')
             self._append_log('请先停止其他 PapaCheck 服务器后再启动')
             self._handle_server_exit()
             return
@@ -663,14 +663,14 @@ class PapaCheckApp:
         self.running = True
         self._set_status(True)
 
-        self._child_url_var.set('http://' + self.ip + ':' + str(PORT))
-        self._parent_url_var.set('http://' + self.ip + ':' + str(PORT) + '/admin.html')
+        self._child_url_var.set('http://' + self.ip + ':' + str(_PORT))
+        self._parent_url_var.set('http://' + self.ip + ':' + str(_PORT) + '/admin.html')
         self.ip_label.config(text='局域网 IP: ' + self.ip)
         if self._apk_hint_visible:
             self._apk_url_label.config(
-                text='http://' + self.ip + ':' + str(PORT) + '/api/download')
+                text='http://' + self.ip + ':' + str(_PORT) + '/api/download')
 
-        self._append_log('服务器启动成功 (端口 ' + str(PORT) + ', 局域网 IP: ' + self.ip + ')')
+        self._append_log('服务器启动成功 (端口 ' + str(_PORT) + ', 局域网 IP: ' + self.ip + ')')
 
         self.root.after(2000, self._check_still_running)
 

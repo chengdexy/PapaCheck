@@ -69,6 +69,161 @@ def close_connection():
     _mgr.close()
 
 
+# ==================== Sync ====================
+
+def record_modification(table_name, record_key, timestamp):
+    with _db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO last_modified (table_name, record_key, last_modified) VALUES (?, ?, ?)",
+            (table_name, record_key, timestamp)
+        )
+        conn.commit()
+
+
+_DATE_KEY_TABLES = {
+    'homeworks', 'daily_settlement', 'efficiency_history',
+    'free_time_tasks', 'bounty_submissions', 'bounty_completions',
+}
+_SINGLE_ROW_TABLES = {
+    'shop_items', 'redemptions', 'reward_box', 'settings',
+    'active_buffs', 'bounty_tasks', 'badges',
+}
+
+
+def get_modified_since(timestamp):
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT table_name, record_key, last_modified FROM last_modified WHERE last_modified > ?",
+            (timestamp,)
+        ).fetchall()
+
+        result = []
+        for row in rows:
+            table = row['table_name']
+            record_key = row['record_key']
+
+            if table in _DATE_KEY_TABLES:
+                data = _get_date_data(conn, table, record_key)
+            elif table in _SINGLE_ROW_TABLES:
+                data = _get_json(conn, table, int(record_key))
+            else:
+                continue
+
+            result.append({
+                'table_name': table,
+                'record_key': record_key,
+                'data': data,
+                'last_modified': row['last_modified'],
+            })
+
+        return result
+
+
+def _classify_change(data):
+    if 'subject' in data:
+        return 'homeworks'
+    if 'dailyBase' in data and 'rating' in data:
+        return 'daily_settlement'
+    if 'cost' in data or 'baseQuantity' in data:
+        return 'shop_items'
+    if 'itemId' in data and 'status' in data:
+        return 'redemptions'
+    if 'quantity' in data and 'name' in data:
+        return 'reward_box'
+    if 'dailyBasePoints' in data or 'ratingMultipliers' in data:
+        return 'settings'
+    if 'duration' in data and 'unit' in data:
+        return 'active_buffs'
+    if 'createdAt' in data and 'points' in data:
+        return 'bounty_tasks'
+    if 'startedAt' in data:
+        return 'bounty_submissions'
+    if 'taskId' in data:
+        return 'bounty_completions'
+    if 'efficiencyRatio' in data:
+        return 'efficiency_history'
+    return None
+
+
+def _find_by_uuid(items, uuid):
+    for i, item in enumerate(items):
+        if isinstance(item, dict) and item.get('id') == uuid:
+            return i, item
+    return -1, None
+
+
+def push_merge(changes):
+    with _db() as conn:
+        for change in changes:
+            change_type = change.get('type')
+            uuid = change.get('uuid')
+            data = change.get('data', {})
+            timestamp = change.get('timestamp', '')
+            new_last_modified = data.get('lastModified', timestamp)
+
+            table = _classify_change(data)
+            if table is None:
+                continue
+
+            if table in _DATE_KEY_TABLES:
+                record_key = data.get('date', '')
+                if not record_key:
+                    continue
+
+                existing = _get_date_data(conn, table, record_key, [])
+                if isinstance(existing, list):
+                    idx, existing_item = _find_by_uuid(existing, uuid)
+                    if existing_item:
+                        old_last = existing_item.get('lastModified', '0')
+                        if change_type == 'delete':
+                            existing[idx]['isDeleted'] = True
+                            existing[idx]['lastModified'] = new_last_modified
+                        elif new_last_modified > old_last:
+                            existing[idx] = data
+                    else:
+                        existing.append(data)
+
+                    _set_date_data(conn, table, record_key, existing)
+                    record_modification(table, record_key, timestamp)
+                elif isinstance(existing, dict):
+                    old_last = existing.get('lastModified', '0')
+                    if change_type == 'delete':
+                        data['isDeleted'] = True
+                        existing = data
+                    elif new_last_modified > old_last:
+                        existing = data
+                    _set_date_data(conn, table, record_key, existing)
+                    record_modification(table, record_key, timestamp)
+
+            elif table in _SINGLE_ROW_TABLES:
+                existing = _get_json(conn, table, 1)
+                if isinstance(existing, list):
+                    idx, existing_item = _find_by_uuid(existing, uuid)
+                    if existing_item:
+                        old_last = existing_item.get('lastModified', '0')
+                        if change_type == 'delete':
+                            existing[idx]['isDeleted'] = True
+                            existing[idx]['lastModified'] = new_last_modified
+                        elif new_last_modified > old_last:
+                            existing[idx] = data
+                    else:
+                        existing.append(data)
+
+                    _set_json(conn, table, existing, 1)
+                    record_modification(table, '1', timestamp)
+                elif isinstance(existing, dict):
+                    old_last = existing.get('lastModified', '0')
+                    if change_type == 'delete':
+                        data['isDeleted'] = True
+                    if change_type == 'delete' or new_last_modified > old_last:
+                        existing = data
+                    _set_json(conn, table, existing, 1)
+                    record_modification(table, '1', timestamp)
+
+        conn.commit()
+        return {'ok': True}
+
+
 # ==================== Helpers ====================
 
 def _row_to_dict(row):
@@ -217,6 +372,13 @@ def init_db():
                 data TEXT NOT NULL DEFAULT '{}'
             );
 
+            CREATE TABLE IF NOT EXISTS last_modified (
+                table_name TEXT NOT NULL,
+                record_key TEXT NOT NULL,
+                last_modified TEXT NOT NULL,
+                PRIMARY KEY (table_name, record_key)
+            );
+
             INSERT OR IGNORE INTO points (id, balance) VALUES (1, 0);
             INSERT OR IGNORE INTO shop_items (id, data) VALUES (1, '[]');
             INSERT OR IGNORE INTO redemptions (id, data) VALUES (1, '[]');
@@ -290,6 +452,7 @@ def save_homeworks(date_key, items):
     with _db() as conn:
         _set_date_data(conn, 'homeworks', date_key, items)
         conn.commit()
+    record_modification('homeworks', date_key, datetime.datetime.now().isoformat())
 
 
 def move_homework(from_date, to_date, hw_id):
@@ -322,6 +485,7 @@ def save_settlement(date_key, data):
     with _db() as conn:
         _set_date_data(conn, 'daily_settlement', date_key, data)
         conn.commit()
+    record_modification('daily_settlement', date_key, datetime.datetime.now().isoformat())
 
 
 # ==================== Points ====================
@@ -371,6 +535,7 @@ def save_shop_items(items):
     with _db() as conn:
         _set_json(conn, 'shop_items', items)
         conn.commit()
+    record_modification('shop_items', '1', datetime.datetime.now().isoformat())
 
 
 # ==================== Redemptions ====================
@@ -384,6 +549,7 @@ def save_redemptions(items):
     with _db() as conn:
         _set_json(conn, 'redemptions', items)
         conn.commit()
+    record_modification('redemptions', '1', datetime.datetime.now().isoformat())
 
 
 # ==================== Efficiency ====================
@@ -397,6 +563,7 @@ def save_efficiency(date_key, data):
     with _db() as conn:
         _set_date_data(conn, 'efficiency_history', date_key, data)
         conn.commit()
+    record_modification('efficiency_history', date_key, datetime.datetime.now().isoformat())
 
 
 # ==================== FreeTime ====================
@@ -410,6 +577,7 @@ def save_free_time(date_key, tasks):
     with _db() as conn:
         _set_date_data(conn, 'free_time_tasks', date_key, tasks)
         conn.commit()
+    record_modification('free_time_tasks', date_key, datetime.datetime.now().isoformat())
 
 
 # ==================== Settings ====================
@@ -423,6 +591,7 @@ def save_settings(data):
     with _db() as conn:
         _set_json(conn, 'settings', data)
         conn.commit()
+    record_modification('settings', '1', datetime.datetime.now().isoformat())
 
 
 # ==================== Bounty Tasks ====================
@@ -436,6 +605,7 @@ def save_bounty_tasks(items):
     with _db() as conn:
         _set_json(conn, 'bounty_tasks', items)
         conn.commit()
+    record_modification('bounty_tasks', '1', datetime.datetime.now().isoformat())
 
 
 def get_bounty_submissions(date_key):
@@ -447,6 +617,7 @@ def save_bounty_submissions(date_key, data):
     with _db() as conn:
         _set_date_data(conn, 'bounty_submissions', date_key, data)
         conn.commit()
+    record_modification('bounty_submissions', date_key, datetime.datetime.now().isoformat())
 
 
 def get_bounty_completions(date_key):
@@ -458,6 +629,7 @@ def save_bounty_completions(date_key, data):
     with _db() as conn:
         _set_date_data(conn, 'bounty_completions', date_key, data)
         conn.commit()
+    record_modification('bounty_completions', date_key, datetime.datetime.now().isoformat())
 
 
 # ==================== Active Buffs ====================
@@ -471,6 +643,7 @@ def save_active_buffs(items):
     with _db() as conn:
         _set_json(conn, 'active_buffs', items)
         conn.commit()
+    record_modification('active_buffs', '1', datetime.datetime.now().isoformat())
 
 
 # ==================== Import / Export ====================
@@ -553,3 +726,4 @@ def save_reward_box(items):
     with _db() as conn:
         _set_json(conn, 'reward_box', items)
         conn.commit()
+    record_modification('reward_box', '1', datetime.datetime.now().isoformat())

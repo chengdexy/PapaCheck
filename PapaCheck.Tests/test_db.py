@@ -9,8 +9,8 @@ class TestInitDB:
         'active_buffs', 'badges', 'bounty_completions',
         'bounty_submissions', 'bounty_tasks', 'daily_settlement',
         'efficiency_history', 'free_time_tasks', 'homeworks',
-        'meta', 'points', 'points_history', 'redemptions',
-        'reward_box', 'settings', 'shop_items',
+        'last_modified', 'meta', 'points', 'points_history',
+        'redemptions', 'reward_box', 'settings', 'shop_items',
     ]
 
     @pytest.mark.parametrize('table_name', ALL_TABLES)
@@ -345,3 +345,374 @@ class TestResetDate:
 class TestCloseConnection:
     def test_close_connection(self, db):
         db.close_connection()
+
+
+class TestRecordModification:
+    def test_record_modification_inserts_timestamp(self, db):
+        import time
+        timestamp = '2025-06-15T10:30:00'
+        db.record_modification('homeworks', '2025-06-15', timestamp)
+
+        conn = db._mgr.get()
+        row = conn.execute(
+            "SELECT * FROM last_modified WHERE table_name = ? AND record_key = ?",
+            ('homeworks', '2025-06-15')
+        ).fetchone()
+        assert row is not None
+        assert row['table_name'] == 'homeworks'
+        assert row['record_key'] == '2025-06-15'
+        assert row['last_modified'] == timestamp
+
+    def test_record_modification_overwrites_existing(self, db):
+        timestamp1 = '2025-06-15T10:00:00'
+        timestamp2 = '2025-06-15T10:30:00'
+        db.record_modification('shop_items', '1', timestamp1)
+        db.record_modification('shop_items', '1', timestamp2)
+
+        conn = db._mgr.get()
+        row = conn.execute(
+            "SELECT * FROM last_modified WHERE table_name = ? AND record_key = ?",
+            ('shop_items', '1')
+        ).fetchone()
+        assert row['last_modified'] == timestamp2
+
+
+class TestGetModifiedSince:
+    def test_returns_only_newer_records(self, db):
+        db.save_homeworks('2025-06-15', [{'id': 'hw1', 'subject': 'math'}])
+        db.record_modification('homeworks', '2025-06-15', '2025-06-15T08:00:00')
+        db.save_homeworks('2025-06-16', [{'id': 'hw2', 'subject': 'english'}])
+        db.record_modification('homeworks', '2025-06-16', '2025-06-16T10:00:00')
+
+        result = db.get_modified_since('2025-06-16T00:00:00')
+
+        assert len(result) == 1
+        assert result[0]['table_name'] == 'homeworks'
+        assert result[0]['record_key'] == '2025-06-16'
+        assert result[0]['last_modified'] == '2025-06-16T10:00:00'
+        assert result[0]['data'] == [{'id': 'hw2', 'subject': 'english'}]
+
+    def test_returns_all_when_none_newer(self, db):
+        db.save_homeworks('2025-06-15', [{'id': 'hw1', 'subject': 'math'}])
+        db.record_modification('homeworks', '2025-06-15', '2025-06-15T08:00:00')
+
+        result = db.get_modified_since('2025-06-16T00:00:00')
+
+        assert result == []
+
+    def test_handles_boundary_correctly(self, db):
+        db.save_shop_items([{'id': 's1', 'name': 'item1'}])
+        db.record_modification('shop_items', '1', '2025-06-15T10:00:00')
+
+        result_exact = db.get_modified_since('2025-06-15T10:00:00')
+
+        assert len(result_exact) == 0
+
+    def test_returns_multiple_tables(self, db):
+        db.save_homeworks('2025-06-15', [{'id': 'hw1', 'subject': 'math'}])
+        db.record_modification('homeworks', '2025-06-15', '2025-06-15T10:00:00')
+        db.save_settings({'dailyBasePoints': 80})
+        db.record_modification('settings', '1', '2025-06-15T10:30:00')
+
+        result = db.get_modified_since('2025-06-14T00:00:00')
+
+        assert len(result) == 2
+        table_names = {r['table_name'] for r in result}
+        assert table_names == {'homeworks', 'settings'}
+
+
+class TestPushMerge:
+    def test_push_merge_creates_new_homework(self, db):
+        changes = [{
+            'type': 'create',
+            'uuid': 'hw-new-1',
+            'data': {
+                'id': 'hw-new-1',
+                'subject': 'math',
+                'content': '新作业',
+                'mode': 'timer',
+                'suggestedDuration': 20,
+                'basePoints': 10,
+                'status': 'pending',
+                'date': '2025-06-15',
+                'lastModified': '2025-06-15T10:00:00',
+                'isDeleted': False,
+            },
+            'timestamp': '2025-06-15T10:00:00',
+        }]
+
+        result = db.push_merge(changes)
+
+        assert result == {'ok': True}
+        homeworks = db.get_homeworks('2025-06-15')
+        assert len(homeworks) == 1
+        assert homeworks[0]['id'] == 'hw-new-1'
+
+    def test_push_merge_lww_newer_wins(self, db):
+        db.save_homeworks('2025-06-15', [{
+            'id': 'hw-existing',
+            'subject': 'math',
+            'content': '旧内容',
+            'mode': 'timer',
+            'suggestedDuration': 10,
+            'basePoints': 5,
+            'status': 'pending',
+            'date': '2025-06-15',
+            'lastModified': '2025-06-14T10:00:00',
+            'isDeleted': False,
+        }])
+        db.record_modification('homeworks', '2025-06-15', '2025-06-14T10:00:00')
+
+        changes = [{
+            'type': 'update',
+            'uuid': 'hw-existing',
+            'data': {
+                'id': 'hw-existing',
+                'subject': 'math',
+                'content': '新内容',
+                'mode': 'timer',
+                'suggestedDuration': 20,
+                'basePoints': 10,
+                'status': 'done',
+                'date': '2025-06-15',
+                'lastModified': '2025-06-15T10:00:00',
+                'isDeleted': False,
+            },
+            'timestamp': '2025-06-15T10:00:00',
+        }]
+
+        result = db.push_merge(changes)
+
+        assert result == {'ok': True}
+        homeworks = db.get_homeworks('2025-06-15')
+        assert len(homeworks) == 1
+        assert homeworks[0]['content'] == '新内容'
+        assert homeworks[0]['lastModified'] == '2025-06-15T10:00:00'
+
+    def test_push_merge_lww_older_ignored(self, db):
+        db.save_homeworks('2025-06-15', [{
+            'id': 'hw-existing',
+            'subject': 'math',
+            'content': '较新内容',
+            'mode': 'timer',
+            'suggestedDuration': 20,
+            'basePoints': 10,
+            'status': 'done',
+            'date': '2025-06-15',
+            'lastModified': '2025-06-15T12:00:00',
+            'isDeleted': False,
+        }])
+
+        changes = [{
+            'type': 'update',
+            'uuid': 'hw-existing',
+            'data': {
+                'id': 'hw-existing',
+                'subject': 'math',
+                'content': '较旧内容',
+                'mode': 'timer',
+                'suggestedDuration': 10,
+                'basePoints': 5,
+                'status': 'pending',
+                'date': '2025-06-15',
+                'lastModified': '2025-06-14T10:00:00',
+                'isDeleted': False,
+            },
+            'timestamp': '2025-06-14T10:00:00',
+        }]
+
+        result = db.push_merge(changes)
+
+        assert result == {'ok': True}
+        homeworks = db.get_homeworks('2025-06-15')
+        assert homeworks[0]['content'] == '较新内容'
+        assert homeworks[0]['lastModified'] == '2025-06-15T12:00:00'
+
+    def test_push_merge_soft_delete(self, db):
+        db.save_homeworks('2025-06-15', [{
+            'id': 'hw-to-delete',
+            'subject': 'math',
+            'content': '要删除的作业',
+            'mode': 'timer',
+            'suggestedDuration': 10,
+            'basePoints': 5,
+            'status': 'pending',
+            'date': '2025-06-15',
+            'lastModified': '2025-06-14T10:00:00',
+            'isDeleted': False,
+        }])
+
+        changes = [{
+            'type': 'delete',
+            'uuid': 'hw-to-delete',
+            'data': {
+                'id': 'hw-to-delete',
+                'subject': 'math',
+                'content': '要删除的作业',
+                'mode': 'timer',
+                'suggestedDuration': 10,
+                'basePoints': 5,
+                'status': 'pending',
+                'date': '2025-06-15',
+                'lastModified': '2025-06-15T10:00:00',
+                'isDeleted': True,
+            },
+            'timestamp': '2025-06-15T10:00:00',
+        }]
+
+        result = db.push_merge(changes)
+
+        assert result == {'ok': True}
+        homeworks = db.get_homeworks('2025-06-15')
+        assert len(homeworks) == 1
+        assert homeworks[0]['isDeleted'] is True
+
+    def test_push_merge_single_row_table(self, db):
+        changes = [{
+            'type': 'create',
+            'uuid': 's-new-1',
+            'data': {
+                'id': 's-new-1',
+                'name': '新商品',
+                'cost': 10,
+                'type': 'time',
+                'baseQuantity': 3,
+                'remainingQuantity': 3,
+                'lastModified': '2025-06-15T10:00:00',
+                'isDeleted': False,
+            },
+            'timestamp': '2025-06-15T10:00:00',
+        }]
+
+        result = db.push_merge(changes)
+
+        assert result == {'ok': True}
+        items = db.get_shop_items()
+        assert len(items) == 1
+        assert items[0]['id'] == 's-new-1'
+
+
+class TestSaveFunctionsTriggerRecordModification:
+    def test_save_homeworks_triggers_record_modification(self, db):
+        db.save_homeworks('2025-06-15', [{'id': 'hw1', 'subject': 'math'}])
+
+        conn = db._mgr.get()
+        row = conn.execute(
+            "SELECT * FROM last_modified WHERE table_name = ? AND record_key = ?",
+            ('homeworks', '2025-06-15')
+        ).fetchone()
+        assert row is not None
+        assert row['table_name'] == 'homeworks'
+        assert row['record_key'] == '2025-06-15'
+        assert row['last_modified'] is not None
+
+    def test_save_settlement_triggers_record_modification(self, db):
+        db.save_settlement('2025-06-15', {'dailyBase': 50, 'rating': '优'})
+
+        conn = db._mgr.get()
+        row = conn.execute(
+            "SELECT * FROM last_modified WHERE table_name = ? AND record_key = ?",
+            ('daily_settlement', '2025-06-15')
+        ).fetchone()
+        assert row is not None
+        assert row['last_modified'] is not None
+
+    def test_save_free_time_triggers_record_modification(self, db):
+        db.save_free_time('2025-06-15', [{'id': 'ft1', 'name': '玩游戏'}])
+
+        conn = db._mgr.get()
+        row = conn.execute(
+            "SELECT * FROM last_modified WHERE table_name = ? AND record_key = ?",
+            ('free_time_tasks', '2025-06-15')
+        ).fetchone()
+        assert row is not None
+
+    def test_save_shop_items_triggers_record_modification(self, db):
+        db.save_shop_items([{'id': 's1', 'name': '奖品', 'cost': 10}])
+
+        conn = db._mgr.get()
+        row = conn.execute(
+            "SELECT * FROM last_modified WHERE table_name = ? AND record_key = ?",
+            ('shop_items', '1')
+        ).fetchone()
+        assert row is not None
+
+    def test_save_redemptions_triggers_record_modification(self, db):
+        db.save_redemptions([{'id': 'r1', 'itemId': 's1', 'status': 'pending'}])
+
+        conn = db._mgr.get()
+        row = conn.execute(
+            "SELECT * FROM last_modified WHERE table_name = ? AND record_key = ?",
+            ('redemptions', '1')
+        ).fetchone()
+        assert row is not None
+
+    def test_save_reward_box_triggers_record_modification(self, db):
+        db.save_reward_box([{'id': 'rb1', 'name': '神秘奖励', 'quantity': 1}])
+
+        conn = db._mgr.get()
+        row = conn.execute(
+            "SELECT * FROM last_modified WHERE table_name = ? AND record_key = ?",
+            ('reward_box', '1')
+        ).fetchone()
+        assert row is not None
+
+    def test_save_settings_triggers_record_modification(self, db):
+        db.save_settings({'dailyBasePoints': 80})
+
+        conn = db._mgr.get()
+        row = conn.execute(
+            "SELECT * FROM last_modified WHERE table_name = ? AND record_key = ?",
+            ('settings', '1')
+        ).fetchone()
+        assert row is not None
+
+    def test_save_active_buffs_triggers_record_modification(self, db):
+        db.save_active_buffs([{'id': 'b1', 'name': '双倍', 'duration': 30, 'unit': 'minutes'}])
+
+        conn = db._mgr.get()
+        row = conn.execute(
+            "SELECT * FROM last_modified WHERE table_name = ? AND record_key = ?",
+            ('active_buffs', '1')
+        ).fetchone()
+        assert row is not None
+
+    def test_save_bounty_tasks_triggers_record_modification(self, db):
+        db.save_bounty_tasks([{'id': 'bt1', 'name': '任务', 'points': 5}])
+
+        conn = db._mgr.get()
+        row = conn.execute(
+            "SELECT * FROM last_modified WHERE table_name = ? AND record_key = ?",
+            ('bounty_tasks', '1')
+        ).fetchone()
+        assert row is not None
+
+    def test_save_bounty_submissions_triggers_record_modification(self, db):
+        db.save_bounty_submissions('2025-06-15', [{'taskId': 'bt1', 'status': 'doing'}])
+
+        conn = db._mgr.get()
+        row = conn.execute(
+            "SELECT * FROM last_modified WHERE table_name = ? AND record_key = ?",
+            ('bounty_submissions', '2025-06-15')
+        ).fetchone()
+        assert row is not None
+
+    def test_save_bounty_completions_triggers_record_modification(self, db):
+        db.save_bounty_completions('2025-06-15', {'bt1': True})
+
+        conn = db._mgr.get()
+        row = conn.execute(
+            "SELECT * FROM last_modified WHERE table_name = ? AND record_key = ?",
+            ('bounty_completions', '2025-06-15')
+        ).fetchone()
+        assert row is not None
+
+    def test_save_efficiency_triggers_record_modification(self, db):
+        db.save_efficiency('2025-06-15', {'efficiencyRatio': 0.85})
+
+        conn = db._mgr.get()
+        row = conn.execute(
+            "SELECT * FROM last_modified WHERE table_name = ? AND record_key = ?",
+            ('efficiency_history', '2025-06-15')
+        ).fetchone()
+        assert row is not None
