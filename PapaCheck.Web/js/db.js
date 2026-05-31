@@ -121,7 +121,9 @@ var DB = {
     await this._save();
     if (list && list.length > 0) {
       for (var i = 0; i < list.length; i++) {
-        await ChangeLog.add('update', list[i].uuid, list[i]);
+        var logItem = JSON.parse(JSON.stringify(list[i]));
+        logItem.date = dateKey;
+        await ChangeLog.add('update', list[i].uuid, logItem);
       }
     }
   },
@@ -141,7 +143,9 @@ var DB = {
     await this._save();
     if (list && list.length > 0) {
       for (var i = 0; i < list.length; i++) {
-        await ChangeLog.add('update', list[i].uuid, list[i]);
+        var logItem2 = JSON.parse(JSON.stringify(list[i]));
+        logItem2.date = dateKey;
+        await ChangeLog.add('update', list[i].uuid, logItem2);
       }
     }
   },

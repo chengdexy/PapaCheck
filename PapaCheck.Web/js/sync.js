@@ -50,21 +50,29 @@ var SyncEngine = (function() {
   async function pullChanges(lastSync) {
     var ts = lastSync || _lastSyncTime || '1970-01-01T00:00:00.000Z';
     var url = _getBaseUrl() + '/api/sync/pull?lastSync=' + encodeURIComponent(ts);
-    var resp = await fetch(url, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    if (!resp.ok) throw new Error('Pull failed: ' + resp.status);
-    var result = await resp.json();
 
-    var remoteChanges = result.changes || [];
-    var serverTime = result.serverTime;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        var resp = await fetch(url, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (!resp.ok) throw new Error('Pull failed: ' + resp.status);
+        var result = await resp.json();
 
-    if (remoteChanges.length > 0) {
-      await _applyRemoteChanges(remoteChanges);
+        var remoteChanges = result.changes || [];
+        var serverTime = result.serverTime;
+
+        if (remoteChanges.length > 0) {
+          await _applyRemoteChanges(remoteChanges);
+        }
+
+        return serverTime;
+      } catch (e) {
+        if (attempt === 2) throw e;
+        await new Promise(function(r) { setTimeout(r, 1000); });
+      }
     }
-
-    return serverTime;
   }
 
   async function _applyRemoteChanges(changes) {
@@ -156,14 +164,15 @@ var SyncEngine = (function() {
   }
 
   function _mergeSingleItemIntoArray(localArray, remoteItem, remoteTime) {
-    if (!remoteItem || !remoteItem.uuid) {
+    if (!remoteItem || (!remoteItem.uuid && !remoteItem.id)) {
       localArray.push(remoteItem);
       return;
     }
 
+    var matchId = remoteItem.uuid || remoteItem.id;
     var existingIdx = -1;
     for (var i = 0; i < localArray.length; i++) {
-      if (localArray[i].uuid === remoteItem.uuid) {
+      if (localArray[i].uuid === matchId || localArray[i].id === matchId) {
         existingIdx = i;
         break;
       }

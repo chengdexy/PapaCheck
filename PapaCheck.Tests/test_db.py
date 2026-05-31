@@ -591,6 +591,112 @@ class TestPushMerge:
         assert len(items) == 1
         assert items[0]['id'] == 's-new-1'
 
+    def test_push_merge_redemption_not_misclassified_as_bounty(self, db):
+        """兑换记录不应被误判为赏金任务（兑换有 createdAt + points，赏金任务也有）"""
+        redemption_change = {
+            'type': 'create',
+            'uuid': 'red-001',
+            'data': {
+                'id': 'red-001',
+                'itemName': '游戏时间',
+                'itemType': 'time',
+                'durationMinutes': 30,
+                'points': 50,
+                'status': 'pending',
+                'createdAt': 1700000000000,
+                'lastModified': '2025-06-15T10:00:00',
+                'isDeleted': False,
+            },
+            'timestamp': '2025-06-15T10:00:00',
+        }
+
+        result = db.push_merge([redemption_change])
+        assert result == {'ok': True}
+
+        redemptions = db.get_redemptions()
+        bounty_tasks = db.get_bounty_tasks()
+
+        assert len(redemptions) == 1, '兑换记录应写入 redemptions 表'
+        assert redemptions[0]['id'] == 'red-001'
+        assert len(bounty_tasks) == 0, '兑换记录不应被误判为赏金任务'
+
+    def test_push_merge_old_item_without_uuid_matched_by_id(self, db):
+        """旧数据无uuid字段时，push_merge 应通过 id 匹配而非追加为新条目"""
+        db.save_bounty_tasks([{
+            'id': 'bt-old',
+            'name': '旧版赏金任务',
+            'points': 5,
+            'type': 'recurring',
+            'enabled': True,
+        }])
+
+        assert len(db.get_bounty_tasks()) == 1
+
+        db.push_merge([{
+            'type': 'update',
+            'uuid': 'uuid-from-client-xxxx',
+            'data': {
+                'id': 'bt-old',
+                'uuid': 'uuid-from-client-xxxx',
+                'name': '旧版赏金任务',
+                'points': 10,
+                'type': 'recurring',
+                'enabled': True,
+                'createdAt': 1700000000000,
+                'lastModified': '2025-06-16T10:00:00',
+            },
+            'timestamp': '2025-06-16T10:00:00',
+        }])
+
+        after = db.get_bounty_tasks()
+        assert len(after) == 1, f'旧数据被重复追加: {len(after)} 条'
+        assert after[0]['points'] == 10, '旧数据应被更新为新值'
+
+    def test_push_merge_free_time_not_misclassified(self, db):
+        """自由时间变更不应被误判为 bounty_submissions"""
+        db.save_free_time('2025-06-15', [{
+            'id': 'ft_test',
+            'name': '测试自由时间',
+            'durationMinutes': 10,
+            'status': 'pending',
+        }])
+        db.push_merge([{
+            'type': 'update',
+            'uuid': 'ft_test',
+            'data': {
+                'id': 'ft_test',
+                'date': '2025-06-15',
+                'name': '测试自由时间',
+                'durationMinutes': 10,
+                'status': 'done',
+                'startedAt': '2025-06-15T10:00:00',
+                'completedAt': '2025-06-15T10:10:00',
+                'lastModified': '2025-06-15T10:10:00',
+                'isDeleted': False,
+            },
+            'timestamp': '2025-06-15T10:10:00',
+        }])
+        ft_list = db.get_free_time('2025-06-15')
+        assert len(ft_list) == 1, f'自由时间变更丢失或翻倍: {len(ft_list)} 条'
+        assert ft_list[0]['status'] == 'done'
+
+    def test_push_merge_points_change(self, db):
+        """积分变更应被 push_merge 正确处理"""
+        db.update_points('earn', 100, '初始积分')
+        db.push_merge([{
+            'type': 'update',
+            'uuid': 'pts-001',
+            'data': {
+                'balance': 50,
+                'uuid': 'pts-001',
+                'lastModified': '2025-06-15T10:10:00',
+                'isDeleted': False,
+            },
+            'timestamp': '2025-06-15T10:10:00',
+        }])
+        bal = db.get_points_balance()
+        assert bal == 50, f'积分变更未生效: balance={bal}'
+
 
 class TestSaveFunctionsTriggerRecordModification:
     def test_save_homeworks_triggers_record_modification(self, db):
