@@ -570,21 +570,16 @@ function startPoll(intervalMs) {
     var pendingCount = 0;
     if (wasOffline) {
       try { pendingCount = await ChangeLog.count(); } catch (e) { }
+      var online = await SyncEngine.checkOnline();
+      if (!online) return;
+      isServerMode = true;
+      updateConnStatus();
+      if (pendingCount > 0) {
+        try { await SyncEngine.fullSync(); } catch (e) { }
+      }
     }
     try {
       cachedData = await API.getData();
-
-      if (wasOffline && isServerMode) {
-        updateConnStatus();
-        if (pendingCount > 0) {
-          SyncEngine.fullSync().then(function () {
-            return API.getData().then(function (freshData) {
-              cachedData = freshData;
-              updateConnStatus();
-            });
-          }).catch(function () { });
-        }
-      }
 
       API.migrateBountyCompletionsToTotal(cachedData);
       const key = Util.dateKey(currentDate);

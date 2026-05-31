@@ -22,7 +22,7 @@ const API = {
       const result = await this._fetch('/api/data');
       isServerMode = true;
       cachedData = result;
-      try { await DB.cacheFullData(result); } catch(e) {}
+      try { await DB.cacheFullData(result); } catch (e) { }
       return result;
     } catch (e) {
       try {
@@ -32,7 +32,7 @@ const API = {
           cachedData = localData;
           return localData;
         }
-      } catch (dbErr) {}
+      } catch (dbErr) { }
       throw e;
     }
   },
@@ -66,7 +66,7 @@ const API = {
           method: 'POST',
           body: JSON.stringify({ homeworks: list }),
         });
-        try { await DB.saveHomeworks(dateKey, list); } catch(e) {}
+        try { await DB.saveHomeworks(dateKey, list); } catch (e) { }
         return true;
       } catch (e) {
         isServerMode = false;
@@ -92,7 +92,7 @@ const API = {
           method: 'POST',
           body: JSON.stringify({ settlement: settlementData }),
         });
-        try { await DB.saveSettlement(dateKey, settlementData); } catch(e) {}
+        try { await DB.saveSettlement(dateKey, settlementData); } catch (e) { }
         return true;
       } catch (e) {
         isServerMode = false;
@@ -114,7 +114,7 @@ const API = {
           var pts = await DB.getPoints();
           pts.balance = result.balance;
           await DB.savePoints(pts);
-        } catch(e) {}
+        } catch (e) { }
         return result.balance;
       } catch (e) {
         isServerMode = false;
@@ -146,7 +146,7 @@ const API = {
           method: 'POST',
           body: JSON.stringify({ redemptions: list }),
         });
-        try { await DB.saveRedemptions(list); } catch(e) {}
+        try { await DB.saveRedemptions(list); } catch (e) { }
         return true;
       } catch (e) {
         isServerMode = false;
@@ -172,7 +172,7 @@ const API = {
           method: 'POST',
           body: JSON.stringify({ items }),
         });
-        try { await DB.saveRewardBox(items); } catch(e) {}
+        try { await DB.saveRewardBox(items); } catch (e) { }
         return true;
       } catch (e) {
         isServerMode = false;
@@ -198,7 +198,7 @@ const API = {
           method: 'POST',
           body: JSON.stringify({ settings }),
         });
-        try { await DB.saveSettings(settings); } catch(e) {}
+        try { await DB.saveSettings(settings); } catch (e) { }
         return true;
       } catch (e) {
         isServerMode = false;
@@ -224,7 +224,7 @@ const API = {
           method: 'POST',
           body: JSON.stringify({ buffs }),
         });
-        try { await DB.saveActiveBuffs(buffs); } catch(e) {}
+        try { await DB.saveActiveBuffs(buffs); } catch (e) { }
         return true;
       } catch (e) {
         isServerMode = false;
@@ -250,7 +250,7 @@ const API = {
           method: 'POST',
           body: JSON.stringify({ items }),
         });
-        try { await DB.saveShopItems(items); } catch(e) {}
+        try { await DB.saveShopItems(items); } catch (e) { }
         return true;
       } catch (e) {
         isServerMode = false;
@@ -276,7 +276,7 @@ const API = {
           method: 'POST',
           body: JSON.stringify({ efficiency: efficiencyData }),
         });
-        try { await DB.saveEfficiency(dateKey, efficiencyData); } catch(e) {}
+        try { await DB.saveEfficiency(dateKey, efficiencyData); } catch (e) { }
         return true;
       } catch (e) {
         isServerMode = false;
@@ -302,7 +302,7 @@ const API = {
           method: 'POST',
           body: JSON.stringify({ tasks }),
         });
-        try { await DB.saveFreeTime(dateKey, tasks); } catch(e) {}
+        try { await DB.saveFreeTime(dateKey, tasks); } catch (e) { }
         return true;
       } catch (e) {
         isServerMode = false;
@@ -349,7 +349,7 @@ const API = {
           method: 'POST',
           body: JSON.stringify({ items }),
         });
-        try { await DB.saveBountyTasks(items); } catch(e) {}
+        try { await DB.saveBountyTasks(items); } catch (e) { }
         return true;
       } catch (e) {
         isServerMode = false;
@@ -375,7 +375,7 @@ const API = {
           method: 'POST',
           body: JSON.stringify({ submissions }),
         });
-        try { await DB.saveBountySubmissions(dateKey, submissions); } catch(e) {}
+        try { await DB.saveBountySubmissions(dateKey, submissions); } catch (e) { }
         return true;
       } catch (e) {
         isServerMode = false;
@@ -401,7 +401,7 @@ const API = {
           method: 'POST',
           body: JSON.stringify({ completions }),
         });
-        try { await DB.saveBountyCompletions(dateKey, completions); } catch(e) {}
+        try { await DB.saveBountyCompletions(dateKey, completions); } catch (e) { }
         return true;
       } catch (e) {
         isServerMode = false;
@@ -439,7 +439,7 @@ const API = {
     }
     comps._total = total;
     if (Object.keys(total).length > 0) {
-      this.saveBountyCompletions('_total', total).catch(function() {});
+      this.saveBountyCompletions('_total', total).catch(function () { });
     }
     return data;
   },

@@ -86,7 +86,7 @@ _DATE_KEY_TABLES = {
 }
 _SINGLE_ROW_TABLES = {
     'shop_items', 'redemptions', 'reward_box', 'settings',
-    'active_buffs', 'bounty_tasks', 'badges',
+    'active_buffs', 'bounty_tasks', 'badges', 'points',
 }
 
 
@@ -101,6 +101,17 @@ def get_modified_since(timestamp):
         for row in rows:
             table = row['table_name']
             record_key = row['record_key']
+
+            if table == 'points':
+                row_data = conn.execute("SELECT balance FROM points WHERE id = 1").fetchone()
+                if row_data:
+                    changes.append({
+                        'table_name': table,
+                        'record_key': record_key,
+                        'data': {'balance': row_data['balance']},
+                        'last_modified': row['last_modified']
+                    })
+                continue
 
             if table in _DATE_KEY_TABLES:
                 data = _get_date_data(conn, table, record_key)
@@ -128,26 +139,32 @@ def _classify_change(data):
         return 'shop_items'
     if 'itemId' in data and 'status' in data:
         return 'redemptions'
+    if 'itemName' in data and 'status' in data:
+        return 'redemptions'
     if 'quantity' in data and 'name' in data:
         return 'reward_box'
     if 'dailyBasePoints' in data or 'ratingMultipliers' in data:
         return 'settings'
     if 'duration' in data and 'unit' in data:
         return 'active_buffs'
+    if 'name' in data and 'durationMinutes' in data:
+        return 'free_time_tasks'
+    if 'balance' in data:
+        return 'points'
     if 'createdAt' in data and 'points' in data:
         return 'bounty_tasks'
     if 'startedAt' in data:
         return 'bounty_submissions'
     if 'taskId' in data:
         return 'bounty_completions'
-    if 'efficiencyRatio' in data:
+    if 'averageRatio' in data or 'efficiencyRatio' in data:
         return 'efficiency_history'
     return None
 
 
 def _find_by_uuid(items, uuid):
     for i, item in enumerate(items):
-        if isinstance(item, dict) and item.get('id') == uuid:
+        if isinstance(item, dict) and (item.get('uuid') == uuid or item.get('id') == uuid):
             return i, item
     return -1, None
 
@@ -165,6 +182,10 @@ def push_merge(changes):
             if table is None:
                 continue
 
+            if table == 'points':
+                _apply_points_change(conn, data, timestamp)
+                continue
+
             if table in _DATE_KEY_TABLES:
                 record_key = data.get('date', '')
                 if not record_key:
@@ -173,6 +194,8 @@ def push_merge(changes):
                 existing = _get_date_data(conn, table, record_key, [])
                 if isinstance(existing, list):
                     idx, existing_item = _find_by_uuid(existing, uuid)
+                    if existing_item is None and data.get('id'):
+                        idx, existing_item = _find_by_uuid(existing, data['id'])
                     if existing_item:
                         old_last = existing_item.get('lastModified', '0')
                         if change_type == 'delete':
@@ -199,6 +222,8 @@ def push_merge(changes):
                 existing = _get_json(conn, table, 1)
                 if isinstance(existing, list):
                     idx, existing_item = _find_by_uuid(existing, uuid)
+                    if existing_item is None and data.get('id'):
+                        idx, existing_item = _find_by_uuid(existing, data['id'])
                     if existing_item:
                         old_last = existing_item.get('lastModified', '0')
                         if change_type == 'delete':
@@ -222,6 +247,12 @@ def push_merge(changes):
 
         conn.commit()
         return {'ok': True}
+
+
+def _apply_points_change(conn, data, timestamp):
+    new_balance = data.get('balance', 0)
+    conn.execute("UPDATE points SET balance = ? WHERE id = 1", (new_balance,))
+    record_modification('points', '1', timestamp)
 
 
 # ==================== Helpers ====================
