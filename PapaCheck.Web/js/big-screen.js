@@ -328,7 +328,7 @@ function updateCurrentTask() {
 
   {
     const dateKey = Util.dateKey(currentDate);
-    const submissions = cachedData?.bountySubmissions?.[dateKey] || [];
+    const submissions = (cachedData?.bountySubmissions?.[dateKey] || []).filter(s => !s.isDeleted);
     const submittedBounty = submissions.find(s => s.status === 'submitted');
     if (submittedBounty) {
       const task = (cachedData?.bountyTasks || []).find(t => t.id === submittedBounty.taskId);
@@ -492,7 +492,7 @@ function updateHomeworkGrid() {
 
     const dateKey = Util.dateKey(currentDate);
     const bountyTasks = cachedData?.bountyTasks || [];
-    const submissions = cachedData?.bountySubmissions?.[dateKey] || [];
+    const submissions = (cachedData?.bountySubmissions?.[dateKey] || []).filter(s => !s.isDeleted);
     const allCompletions = cachedData?.bountyCompletions || {};
 
     const historyCounts = {};

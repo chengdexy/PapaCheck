@@ -129,11 +129,13 @@ class TestHomeworksAPI:
 
 class TestPointsAPI:
     def test_update_points_earn(self, test_server):
+        _, before = _request(test_server, 'GET', '/api/data')
+        before_balance = before['points']['balance']
         status, result = _request(test_server, 'POST', '/api/points', {
             'action': 'earn', 'amount': 10, 'detail': '测试加分'
         })
         assert status == 200
-        assert result.get('balance') == 10
+        assert result.get('balance') == before_balance + 10
 
     def test_spend_points_reduces_balance(self, test_server):
         _, before = _request(test_server, 'GET', '/api/data')

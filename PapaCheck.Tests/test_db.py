@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from unittest.mock import patch
 
 import pytest
 
@@ -213,6 +214,20 @@ class TestBountyTasks:
 
     def test_bounty_submissions_empty_default(self, db, test_date):
         assert db.get_bounty_submissions(test_date) == []
+
+    def test_get_bounty_submissions_filters_isDeleted(self, db, test_date):
+        """get_bounty_submissions 应过滤 isDeleted 条目，否则孩子端无法重新开始赏金"""
+        db.save_bounty_submissions(test_date, [
+            {'id': 'bs1', 'taskId': 'bt1', 'status': 'submitted',
+             'startedAt': '2025-06-15T10:00:00', 'submittedAt': '2025-06-15T11:00:00',
+             'isDeleted': True},
+            {'id': 'bs2', 'taskId': 'bt2', 'status': 'doing',
+             'startedAt': '2025-06-15T10:00:00', 'submittedAt': None,
+             'isDeleted': False},
+        ])
+        result = db.get_bounty_submissions(test_date)
+        assert len(result) == 1, f'应过滤 isDeleted 条目，实际: {len(result)} 条'
+        assert result[0]['id'] == 'bs2'
 
     def test_bounty_completions_crud(self, db, test_date):
         completions = {'bt1': True}
@@ -564,8 +579,14 @@ class TestPushMerge:
 
         assert result == {'ok': True}
         homeworks = db.get_homeworks('2025-06-15')
-        assert len(homeworks) == 1
-        assert homeworks[0]['isDeleted'] is True
+        assert len(homeworks) == 0, 'get 过滤 isDeleted，应返回 0 条'
+
+        conn = db._mgr.get()
+        raw = json.loads(conn.execute(
+            "SELECT data FROM homeworks WHERE date_key = ?", ('2025-06-15',)
+        ).fetchone()['data'])
+        assert len(raw) == 1
+        assert raw[0]['isDeleted'] is True
 
     def test_push_merge_single_row_table(self, db):
         changes = [{
@@ -696,6 +717,323 @@ class TestPushMerge:
         }])
         bal = db.get_points_balance()
         assert bal == 50, f'积分变更未生效: balance={bal}'
+
+    def test_push_merge_bounty_submission_without_date_skipped(self, db):
+        """离线赏金任务：ChangeLog 缺 date 字段时被静默跳过（bug 复现）
+
+        saveBountySubmissions 写 ChangeLog 时未给条目添加 date 字段，
+        导致 push_merge 在 DATE_KEY_TABLES 分支中 record_key 为空，
+        continue 静默跳过，赏金任务提交从未同步到服务端。"""
+        db.save_bounty_submissions('2025-06-15', [])
+
+        changes = [{
+            'type': 'update',
+            'uuid': 'bs-uuid-1',
+            'data': {
+                'taskId': 'bt1',
+                'status': 'submitted',
+                'startedAt': '2025-06-15T10:00:00',
+                'submittedAt': '2025-06-15T10:05:00',
+                'uuid': 'bs-uuid-1',
+                'lastModified': '2025-06-15T10:05:00',
+                'isDeleted': False,
+            },
+            'timestamp': '2025-06-15T10:05:00',
+        }]
+
+        db.push_merge(changes)
+
+        submissions = db.get_bounty_submissions('2025-06-15')
+        assert len(submissions) == 0, \
+            f'缺 date 时 change 应被跳过，submissions 仍为空，实际: {len(submissions)}'
+
+    def test_push_merge_bounty_submission_with_date_works(self, db):
+        """离线赏金任务修复后：ChangeLog 带 date 字段，push_merge 正确写入"""
+        db.save_bounty_submissions('2025-06-15', [])
+
+        changes = [{
+            'type': 'update',
+            'uuid': 'bs-uuid-2',
+            'data': {
+                'taskId': 'bt2',
+                'status': 'submitted',
+                'startedAt': '2025-06-15T10:00:00',
+                'submittedAt': '2025-06-15T10:05:00',
+                'date': '2025-06-15',
+                'uuid': 'bs-uuid-2',
+                'lastModified': '2025-06-15T10:05:00',
+                'isDeleted': False,
+            },
+            'timestamp': '2025-06-15T10:05:00',
+        }]
+
+        db.push_merge(changes)
+
+        submissions = db.get_bounty_submissions('2025-06-15')
+        assert len(submissions) == 1, \
+            f'带 date 时应写入 1 条，实际: {len(submissions)}'
+        assert submissions[0]['status'] == 'submitted'
+        assert submissions[0]['taskId'] == 'bt2'
+
+    def test_push_merge_partial_list_leaves_stale_items_on_server(self, db):
+        """push 部分列表时（条目被移除但无 delete），服务端残留旧条目（bug 复现）
+
+        管理员离线通过赏金时从列表中移除了任务，但 ChangeLog 只包含剩余条目。
+        push_merge 只能新增/更新，不能删除 —— 服务端旧条目残留。"""
+        db.save_bounty_submissions('2025-06-15', [
+            {'id': 'bs-a', 'taskId': 'bt_a', 'status': 'submitted',
+             'startedAt': '2025-06-15T10:00:00', 'submittedAt': '2025-06-15T11:00:00',
+             'uuid': 'bs-a', 'lastModified': '2025-06-15T11:00:00', 'isDeleted': False},
+            {'id': 'bs-b', 'taskId': 'bt_b', 'status': 'submitted',
+             'startedAt': '2025-06-15T10:00:00', 'submittedAt': '2025-06-15T11:00:00',
+             'uuid': 'bs-b', 'lastModified': '2025-06-15T11:00:00', 'isDeleted': False},
+        ])
+
+        changes = [{
+            'type': 'update',
+            'uuid': 'bs-a',
+            'data': {
+                'id': 'bs-a', 'taskId': 'bt_a', 'status': 'submitted',
+                'startedAt': '2025-06-15T10:00:00', 'submittedAt': '2025-06-15T11:00:00',
+                'date': '2025-06-15', 'uuid': 'bs-a',
+                'lastModified': '2025-06-15T12:00:00', 'isDeleted': False,
+            },
+            'timestamp': '2025-06-15T12:00:00',
+        }]
+
+        db.push_merge(changes)
+
+        submissions = db.get_bounty_submissions('2025-06-15')
+        assert len(submissions) == 2, \
+            f'bs-b 无 delete 条目，仍残留在服务端，实际: {len(submissions)} 条'
+
+    def test_push_merge_delete_removes_item_from_date_keyed_list(self, db):
+        """push_merge 收到 delete 条目后应正确移除 DATE_KEY_TABLES 列表项"""
+        db.save_bounty_submissions('2025-06-15', [
+            {'id': 'bs-c', 'taskId': 'bt_c', 'status': 'submitted',
+             'startedAt': '2025-06-15T10:00:00', 'submittedAt': '2025-06-15T11:00:00',
+             'uuid': 'bs-c', 'lastModified': '2025-06-15T11:00:00', 'isDeleted': False},
+            {'id': 'bs-d', 'taskId': 'bt_d', 'status': 'submitted',
+             'startedAt': '2025-06-15T10:00:00', 'submittedAt': '2025-06-15T11:00:00',
+             'uuid': 'bs-d', 'lastModified': '2025-06-15T11:00:00', 'isDeleted': False},
+        ])
+
+        changes = [
+            {
+                'type': 'update',
+                'uuid': 'bs-c',
+                'data': {
+                    'id': 'bs-c', 'taskId': 'bt_c', 'status': 'submitted',
+                    'startedAt': '2025-06-15T10:00:00', 'submittedAt': '2025-06-15T11:00:00',
+                    'date': '2025-06-15', 'uuid': 'bs-c',
+                    'lastModified': '2025-06-15T12:00:00', 'isDeleted': False,
+                },
+                'timestamp': '2025-06-15T12:00:00',
+            },
+            {
+                'type': 'delete',
+                'uuid': 'bs-d',
+                'data': {
+                    'id': 'bs-d', 'taskId': 'bt_d', 'status': 'submitted',
+                    'startedAt': '2025-06-15T10:00:00', 'submittedAt': '2025-06-15T11:00:00',
+                    'date': '2025-06-15', 'uuid': 'bs-d',
+                    'lastModified': '2025-06-15T13:00:00', 'isDeleted': True,
+                },
+                'timestamp': '2025-06-15T13:00:00',
+            },
+        ]
+
+        db.push_merge(changes)
+
+        submissions = db.get_bounty_submissions('2025-06-15')
+        assert len(submissions) == 1, f'get 过滤 isDeleted，应只剩 1 条，实际: {len(submissions)}'
+        assert submissions[0]['id'] == 'bs-c'
+
+    def test_push_merge_match_by_taskId_when_no_uuid_on_server(self, db):
+        """旧数据无 uuid 时，push_merge 应通过 taskId 匹配而非重复追加
+
+        服务端旧数据可能没有 uuid（ensureSyncFields 旧版未生成）。
+        _find_by_uuid 只匹配 uuid/id，taskId 匹配不上 → append 重复条目。"""
+        db.save_bounty_submissions('2025-06-15', [
+            {'taskId': 'bt_old', 'status': 'doing',
+             'startedAt': '2025-06-15T10:00:00', 'submittedAt': None},
+        ])
+
+        changes = [{
+            'type': 'update',
+            'uuid': 'uuid-from-new-client',
+            'data': {
+                'taskId': 'bt_old', 'status': 'submitted',
+                'startedAt': '2025-06-15T10:00:00', 'submittedAt': '2025-06-15T11:00:00',
+                'date': '2025-06-15', 'uuid': 'uuid-from-new-client',
+                'lastModified': '2025-06-15T11:00:00', 'isDeleted': False,
+            },
+            'timestamp': '2025-06-15T11:00:00',
+        }]
+
+        db.push_merge(changes)
+
+        submissions = db.get_bounty_submissions('2025-06-15')
+        assert len(submissions) == 1, \
+            f'应通过 taskId 匹配更新而非重复追加，实际: {len(submissions)} 条'
+        assert submissions[0]['status'] == 'submitted'
+        assert submissions[0].get('uuid') == 'uuid-from-new-client'
+
+    def test_push_merge_bounty_completions_not_classified(self, db):
+        """bounty_completions 数据（task ID 做 key）未被 _classify_change 识别（bug 复现）
+
+        completions 格式为 {bt1: 3, uuid, lastModified, ...}，没有字面量 key 'taskId'。
+        _classify_change 中 'taskId' in data 永远不匹配 → 分类为 None → 静默丢弃。"""
+        db.save_bounty_completions('_total', {'bt_test': 1})
+
+        changes = [{
+            'type': 'update',
+            'uuid': 'comp-uuid-1',
+            'data': {
+                'bt_test': 2,
+                'uuid': 'comp-uuid-1',
+                'date': '_total',
+                'lastModified': '2025-06-15T10:00:00',
+                'isDeleted': False,
+            },
+            'timestamp': '2025-06-15T10:00:00',
+        }]
+
+        db.push_merge(changes)
+
+        completions = db.get_bounty_completions('_total')
+        assert completions.get('bt_test') == 1, \
+            f'completions 未被分类，增量更新被丢弃，bt_test 应仍为 1，实际: {completions.get("bt_test")}'
+
+    def test_push_merge_bounty_completions_with_marker_works(self, db):
+        """修复后：带 _table 标记的 completions 数据应被正确分类并合并"""
+        db.save_bounty_completions('_total', {'bt_fix': 1})
+
+        changes = [{
+            'type': 'update',
+            'uuid': 'comp-uuid-2',
+            'data': {
+                'bt_fix': 5,
+                'uuid': 'comp-uuid-2',
+                'date': '_total',
+                '_table': 'bounty_completions',
+                'lastModified': '2025-06-15T10:00:00',
+                'isDeleted': False,
+            },
+            'timestamp': '2025-06-15T10:00:00',
+        }]
+
+        db.push_merge(changes)
+
+        completions = db.get_bounty_completions('_total')
+        assert completions.get('bt_fix') == 5, \
+            f'completions 应被正确合并，bt_fix 应为 5，实际: {completions.get("bt_fix")}'
+
+    def test_push_merge_sequential_changes_same_item(self, db):
+        """多次离线修改同一条目：ensureSyncFields 已刷新 lastModified 的正常路径"""
+        with patch.object(db, '_reset_daily_shop_quantity', return_value=None):
+            db.save_shop_items([{
+                'id': 'item_x',
+                'name': '测试商品',
+                'cost': 10,
+                'baseQuantity': 5,
+                'remainingQuantity': 5,
+                'lastModified': '2025-06-15T08:00:00',
+                'isDeleted': False,
+            }])
+
+            changes = [
+                {
+                    'type': 'update',
+                    'uuid': 'item_x',
+                    'data': {
+                        'id': 'item_x',
+                        'name': '测试商品',
+                        'cost': 10,
+                        'baseQuantity': 5,
+                        'remainingQuantity': 4,
+                        'lastModified': '2025-06-15T09:00:00',
+                        'isDeleted': False,
+                    },
+                    'timestamp': '2025-06-15T09:00:00',
+                },
+                {
+                    'type': 'update',
+                    'uuid': 'item_x',
+                    'data': {
+                        'id': 'item_x',
+                        'name': '测试商品',
+                        'cost': 10,
+                        'baseQuantity': 5,
+                        'remainingQuantity': 3,
+                        'lastModified': '2025-06-15T10:00:00',
+                        'isDeleted': False,
+                    },
+                    'timestamp': '2025-06-15T10:00:00',
+                },
+            ]
+
+            db.push_merge(changes)
+
+            items = db.get_shop_items()
+            assert len(items) == 1
+            assert items[0]['remainingQuantity'] == 3, \
+                f'两次修改后剩余数量应为 3，实际为 {items[0]["remainingQuantity"]}'
+
+    def test_push_merge_safety_net_for_old_client_stale_timestamps(self, db):
+        """安全网：旧客户端 lastModified 未刷新时，>= 保证后到达的变更生效
+
+        模拟旧版 ensureSyncFields（只在缺失时设 lastModified）产生的数据：
+        两次离线变更带着相同的时间戳进入 push_merge。
+        主保险在 ensureSyncFields 每次都刷时间戳，此处 >= 作为安全网兜底。"""
+        with patch.object(db, '_reset_daily_shop_quantity', return_value=None):
+            db.save_shop_items([{
+                'id': 'item_y',
+                'name': '测试商品B',
+                'cost': 10,
+                'baseQuantity': 5,
+                'remainingQuantity': 5,
+                'lastModified': '2025-06-15T08:00:00',
+                'isDeleted': False,
+            }])
+
+            changes = [
+                {
+                    'type': 'update',
+                    'uuid': 'item_y',
+                    'data': {
+                        'id': 'item_y',
+                        'name': '测试商品B',
+                        'cost': 10,
+                        'baseQuantity': 5,
+                        'remainingQuantity': 4,
+                        'lastModified': '2025-06-15T08:00:00',
+                        'isDeleted': False,
+                    },
+                    'timestamp': '2025-06-15T10:00:00',
+                },
+                {
+                    'type': 'update',
+                    'uuid': 'item_y',
+                    'data': {
+                        'id': 'item_y',
+                        'name': '测试商品B',
+                        'cost': 10,
+                        'baseQuantity': 5,
+                        'remainingQuantity': 3,
+                        'lastModified': '2025-06-15T08:00:00',
+                        'isDeleted': False,
+                    },
+                    'timestamp': '2025-06-15T10:05:00',
+                },
+            ]
+
+            db.push_merge(changes)
+
+            items = db.get_shop_items()
+            assert len(items) == 1
+            assert items[0]['remainingQuantity'] == 3, \
+                f'旧客户端两次购买（相同 lastModified）后剩余数量应为 3，实际为 {items[0]["remainingQuantity"]}'
 
 
 class TestSaveFunctionsTriggerRecordModification:
