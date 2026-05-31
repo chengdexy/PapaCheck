@@ -1,0 +1,252 @@
+/**
+ * sync.js - 同步引擎
+ * 负责检测服务端在线状态，上传本地变更，拉取远程变更，LWW 冲突解决
+ */
+var SyncEngine = (function() {
+  var _syncInProgress = false;
+  var _lastSyncTime = null;
+  var _baseUrl = '';
+
+  function _getBaseUrl() {
+    if (_baseUrl) return _baseUrl;
+    if (window._serverBaseUrl) {
+      _baseUrl = window._serverBaseUrl;
+    } else {
+      _baseUrl = window.location.origin;
+    }
+    return _baseUrl;
+  }
+
+  async function checkServerOnline() {
+    try {
+      var url = _getBaseUrl() + '/api/ping';
+      var resp = await fetch(url, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!resp.ok) return false;
+      var data = await resp.json();
+      return data.ok === true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async function pushChanges() {
+    var pending = await ChangeLog.getPending();
+    if (pending.length === 0) return true;
+
+    var url = _getBaseUrl() + '/api/sync/push';
+    var resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ changes: pending })
+    });
+    if (!resp.ok) throw new Error('Push failed: ' + resp.status);
+    var result = await resp.json();
+    return result.ok === true;
+  }
+
+  async function pullChanges(lastSync) {
+    var ts = lastSync || _lastSyncTime || '1970-01-01T00:00:00.000Z';
+    var url = _getBaseUrl() + '/api/sync/pull?lastSync=' + encodeURIComponent(ts);
+    var resp = await fetch(url, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!resp.ok) throw new Error('Pull failed: ' + resp.status);
+    var result = await resp.json();
+
+    var remoteChanges = result.changes || [];
+    var serverTime = result.serverTime;
+
+    if (remoteChanges.length > 0) {
+      await _applyRemoteChanges(remoteChanges);
+    }
+
+    return serverTime;
+  }
+
+  async function _applyRemoteChanges(changes) {
+    var localData = await DB.getFullData();
+
+    for (var i = 0; i < changes.length; i++) {
+      var change = changes[i];
+      var tableName = change.table_name;
+      var recordKey = change.record_key;
+      var remoteData = change.data;
+      var remoteTime = change.last_modified;
+
+      _mergeIntoLocal(localData, tableName, recordKey, remoteData, remoteTime);
+    }
+
+    await DB.cacheFullData(localData);
+  }
+
+  function _mergeIntoLocal(localData, tableName, recordKey, remoteData, remoteTime) {
+    if (tableName === 'homeworks') {
+      _mergeArrayByUuid(localData, 'homeworks', recordKey, remoteData, remoteTime);
+    } else if (tableName === 'free_time_tasks') {
+      _mergeArrayByUuid(localData, 'freeTimeTasks', recordKey, remoteData, remoteTime);
+    } else if (tableName === 'bounty_submissions') {
+      _mergeArrayByUuid(localData, 'bountySubmissions', recordKey, remoteData, remoteTime);
+    } else if (tableName === 'bounty_completions') {
+      if (!localData.bountyCompletions) localData.bountyCompletions = {};
+      localData.bountyCompletions[recordKey] = remoteData;
+    } else if (tableName === 'daily_settlement') {
+      if (!localData.dailySettlement) localData.dailySettlement = {};
+      _mergeByUuidOrReplace(localData.dailySettlement, recordKey, remoteData, remoteTime);
+    } else if (tableName === 'efficiency_history') {
+      if (!localData.efficiencyHistory) localData.efficiencyHistory = {};
+      localData.efficiencyHistory[recordKey] = remoteData;
+    } else if (tableName === 'shop_items') {
+      _mergeArrayByUuid(localData, 'shopItems', null, remoteData, remoteTime);
+    } else if (tableName === 'redemptions') {
+      _mergeArrayByUuid(localData, 'redemptions', null, remoteData, remoteTime);
+    } else if (tableName === 'reward_box') {
+      _mergeArrayByUuid(localData, 'rewardBox', null, remoteData, remoteTime);
+    } else if (tableName === 'active_buffs') {
+      _mergeArrayByUuid(localData, 'activeBuffs', null, remoteData, remoteTime);
+    } else if (tableName === 'bounty_tasks') {
+      _mergeArrayByUuid(localData, 'bountyTasks', null, remoteData, remoteTime);
+    } else if (tableName === 'settings') {
+      localData.settings = remoteData;
+    } else if (tableName === 'badges') {
+      localData.badges = remoteData;
+    } else if (tableName === 'points') {
+      localData.points = remoteData;
+    }
+  }
+
+  function _mergeByUuidOrReplace(targetObj, key, remoteData, remoteTime) {
+    var localVal = targetObj[key];
+    if (!localVal) {
+      targetObj[key] = remoteData;
+      return;
+    }
+    var localTime = localVal.lastModified || '1970-01-01T00:00:00.000Z';
+    if (remoteTime > localTime) {
+      targetObj[key] = remoteData;
+    }
+  }
+
+  function _mergeArrayByUuid(localData, localKey, recordKey, remoteData, remoteTime) {
+    if (!localData[localKey]) localData[localKey] = {};
+
+    var localArray;
+    if (recordKey) {
+      if (!localData[localKey][recordKey]) localData[localKey][recordKey] = [];
+      localArray = localData[localKey][recordKey];
+    } else {
+      localArray = localData[localKey];
+      if (!Array.isArray(localArray)) localArray = [];
+    }
+
+    if (!Array.isArray(remoteData)) {
+      _mergeSingleItemIntoArray(localArray, remoteData, remoteTime);
+    } else {
+      for (var i = 0; i < remoteData.length; i++) {
+        _mergeSingleItemIntoArray(localArray, remoteData[i], remoteTime);
+      }
+    }
+
+    if (!recordKey) {
+      localData[localKey] = localArray;
+    }
+  }
+
+  function _mergeSingleItemIntoArray(localArray, remoteItem, remoteTime) {
+    if (!remoteItem || !remoteItem.uuid) {
+      localArray.push(remoteItem);
+      return;
+    }
+
+    var existingIdx = -1;
+    for (var i = 0; i < localArray.length; i++) {
+      if (localArray[i].uuid === remoteItem.uuid) {
+        existingIdx = i;
+        break;
+      }
+    }
+
+    if (existingIdx === -1) {
+      localArray.push(remoteItem);
+    } else {
+      var localTime = localArray[existingIdx].lastModified || '1970-01-01T00:00:00.000Z';
+      if (remoteTime > localTime) {
+        localArray[existingIdx] = remoteItem;
+      }
+    }
+  }
+
+  async function fullSync() {
+    if (_syncInProgress) return false;
+    _syncInProgress = true;
+
+    try {
+      await pushChanges();
+
+      var serverTime = await pullChanges(_lastSyncTime);
+
+      await ChangeLog.clear();
+
+      _lastSyncTime = serverTime || new Date().toISOString();
+
+      try {
+        var url = _getBaseUrl() + '/api/data';
+        var resp = await fetch(url, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (resp.ok) {
+          var serverData = await resp.json();
+          await DB.cacheFullData(serverData);
+        }
+      } catch (e) {
+        // Server data fetch is best-effort after sync
+      }
+
+      return true;
+    } catch (e) {
+      console.error('Sync failed:', e);
+      return false;
+    } finally {
+      _syncInProgress = false;
+    }
+  }
+
+  async function getLastSyncTime() {
+    if (!_lastSyncTime) {
+      try {
+        var store = localforage.createInstance({ name: 'papacheck_sync' });
+        _lastSyncTime = await store.getItem('lastSyncTime');
+      } catch (e) {
+        _lastSyncTime = null;
+      }
+    }
+    return _lastSyncTime;
+  }
+
+  async function _saveLastSyncTime(time) {
+    _lastSyncTime = time;
+    try {
+      var store = localforage.createInstance({ name: 'papacheck_sync' });
+      await store.setItem('lastSyncTime', time);
+    } catch (e) {
+      // non-critical
+    }
+  }
+
+  function isSyncing() {
+    return _syncInProgress;
+  }
+
+  return {
+    checkOnline: checkServerOnline,
+    pushChanges: pushChanges,
+    pullChanges: pullChanges,
+    fullSync: fullSync,
+    getLastSyncTime: getLastSyncTime,
+    isSyncing: isSyncing
+  };
+})();

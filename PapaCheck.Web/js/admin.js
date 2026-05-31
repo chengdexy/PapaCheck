@@ -114,6 +114,17 @@ async function refreshAllData() {
   try {
     const data = await API.getData();
     if (data) {
+      // 保留本地已修改但服务器尚未同步的结算数据，防止数据被冲掉
+      const oldSettlements = cachedData?.dailySettlement || {};
+      const newSettlements = data.dailySettlement || {};
+      for (const dk of Object.keys(oldSettlements)) {
+        const oldS = oldSettlements[dk];
+        const newS = newSettlements[dk];
+        if (oldS && oldS.rating && !(newS && newS.rating)) {
+          if (!data.dailySettlement) data.dailySettlement = {};
+          data.dailySettlement[dk] = oldS;
+        }
+      }
       cachedData = data;
       API.migrateBountyCompletionsToTotal(cachedData);
       adminHomeworks = data.homeworks?.[AdminUtil.dateKey(adminDate)] || [];
@@ -291,7 +302,7 @@ function renderHomeworkTab() {
                   ${deferActions}
                   ${hw.status === 'pending' && !isDeferPending ? `<button class="btn-sm btn-edit" onclick="openHwModal('edit', '${hw.id}')">编辑</button>` : ''}
                   ${hw.status === 'pending' && !isDeferPending ? `<button class="btn-sm btn-delete" onclick="deleteAdminHw('${hw.id}')">删除</button>` : ''}
-                  ${hw.status === 'done' && !hw.rejected ? `<button class="btn-sm" style="background:var(--warning);color:var(--bg);" onclick="rejectHomework('${hw.id}')">驳回</button>` : ''}
+                  ${hw.status === 'done' && !hw.rejected && !(cachedData?.dailySettlement?.[submittedDate]?.rating) ? `<button class="btn-sm" style="background:var(--warning);color:var(--bg);" onclick="rejectHomework('${hw.id}')">驳回</button>` : ''}
                   ${hw.status === 'done' ? `<button class="btn-sm btn-delete" onclick="deleteAdminHw('${hw.id}')">删除</button>` : ''}
                 </div>
               </div>`;
@@ -408,6 +419,10 @@ async function rejectHomework(hwId) {
   const hw = adminHomeworks.find(h => h.id === hwId);
   if (!hw || hw.status !== 'done' || hw.rejected) return;
 
+  const dateKey = AdminUtil.dateKey(adminDate);
+  const settlement = cachedData?.dailySettlement?.[dateKey];
+  if (settlement && settlement.rating) return;
+
   hw.status = 'pending';
   hw.rejected = true;
   hw.startedAt = null;
@@ -415,7 +430,6 @@ async function rejectHomework(hwId) {
   hw.actualDuration = null;
   hw.mode = 'pending';
 
-  const dateKey = AdminUtil.dateKey(adminDate);
   await API.saveHomeworks(dateKey, adminHomeworks);
 
   await API.saveSettlement(dateKey, {});
@@ -1301,10 +1315,9 @@ function renderSvgLineChart(data, options) {
   const labelIndices = [];
   for (let k = 0; k < maxLabels; k++) labelIndices.push(Math.min(Math.round(k * labelStep), points.length - 1));
   const labels = labelIndices.map(i => `<text x="${points[i].x}" y="${height - 5}" text-anchor="middle" font-size="10" fill="var(--text-secondary)">${points[i].label}</text>`).join('');
-  const showValues = data.length <= 10;
   const dataMax = Math.max(...values);
   const dataMin = Math.min(...values);
-  const valuesTxt = showValues ? points.filter(p => p.value === dataMax || p.value === dataMin).map(p => `<text class="chart-value-label" x="${p.x}" y="${p.y - 8}" text-anchor="middle" font-size="10" fill="${color}">${p.value}</text>`).join('') : '';
+  const valuesTxt = points.filter(p => p.value === dataMax || p.value === dataMin).map(p => `<text class="chart-value-label" x="${p.x}" y="${p.y - 8}" text-anchor="middle" font-size="10" fill="${color}">${p.value}</text>`).join('');
   const yLabels = [];
   const ySteps = 4;
   for (let i = 0; i <= ySteps; i++) {
@@ -1709,6 +1722,10 @@ function selectCalendarDate(year, month, day) {
 }
 
 async function switchToSelectedDate() {
+  if (!isServerMode) {
+    showToast('离线模式暂不可用，请连接服务器后操作');
+    return;
+  }
   if (!_selectedCalendarDate) return;
   const parts = _selectedCalendarDate.split('-');
   adminDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));

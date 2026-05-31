@@ -16,9 +16,10 @@ import asyncio
 import io
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, unquote
+import datetime
 import db
 
-PORT = 8080
+PORT = int(os.environ.get('PAPACHECK_PORT', 8080))
 _BASE = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 _WEB_ROOT = os.path.join(_BASE, 'PapaCheck.Web')
 if not os.path.isdir(_WEB_ROOT):
@@ -84,6 +85,13 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
+
+        if path == '/api/ping':
+            self.send_json({
+                'ok': True,
+                'serverTime': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            })
+            return
 
         if path == '/api/speak':
             qs = parse_qs(parsed.query)
@@ -152,6 +160,18 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
             except Exception as e:
                 print(f'  [/api/version 错误] {e}', flush=True)
                 self.send_json({'clientVersion': '1.0.0'})
+            return
+
+        if path == '/api/sync/pull':
+            qs = parse_qs(parsed.query)
+            last_sync = qs.get('lastSync', [''])[0]
+            if not last_sync:
+                last_sync = '1970-01-01T00:00:00+00:00'
+            changes = db.get_modified_since(last_sync)
+            self.send_json({
+                'changes': changes,
+                'serverTime': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            })
             return
 
         if path == '/api/download':
@@ -362,6 +382,12 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
             date_key = payload.get('date', '')
             if date_key:
                 db.reset_date(date_key)
+            self.send_json({'ok': True})
+            return
+
+        if path == '/api/sync/push':
+            changes = payload.get('changes', [])
+            db.push_merge(changes)
             self.send_json({'ok': True})
             return
 

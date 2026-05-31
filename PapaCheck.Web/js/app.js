@@ -3,6 +3,16 @@
  * 负责初始化、作业计时、屏保、语音、Toast、积分结算
  */
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/sw.js').then(function (reg) {
+      console.log('SW registered:', reg.scope);
+    }).catch(function (err) {
+      console.log('SW registration failed:', err);
+    });
+  });
+}
+
 // ========== State ==========
 let currentDate = new Date();
 let homeworks = [];
@@ -80,6 +90,10 @@ const Voice = {
     this._playing = true;
     const text = this._queue.shift();
     try {
+      if (!isServerMode) {
+        this._playNext();
+        return;
+      }
       let audio;
       if (this._cache.has(text)) {
         audio = new Audio(this._cache.get(text));
@@ -372,17 +386,17 @@ function checkReminders(hw) {
   const key = hw.id;
   if (!lastReminderTrigger[key]) lastReminderTrigger[key] = {};
 
-  if (!lastReminderTrigger[key].half && elapsedSeconds >= totalSeconds * 0.5) {
+  if (!lastReminderTrigger[key].half && totalSeconds > 60 && elapsedSeconds >= totalSeconds * 0.5) {
     lastReminderTrigger[key].half = true;
     Voice.speak('已用' + hw.suggestedDuration / 2 + '分钟，继续加油');
   }
 
-  if (!lastReminderTrigger[key].fiveMin && totalSeconds - elapsedSeconds <= 300 && elapsedSeconds < totalSeconds) {
+  if (!lastReminderTrigger[key].fiveMin && totalSeconds > 300 && totalSeconds - elapsedSeconds <= 300 && elapsedSeconds < totalSeconds) {
     lastReminderTrigger[key].fiveMin = true;
     Voice.speak('还剩5分钟');
   }
 
-  if (!lastReminderTrigger[key].oneMin && totalSeconds - elapsedSeconds <= 60 && elapsedSeconds < totalSeconds) {
+  if (!lastReminderTrigger[key].oneMin && totalSeconds > 60 && totalSeconds - elapsedSeconds <= 60 && elapsedSeconds < totalSeconds) {
     lastReminderTrigger[key].oneMin = true;
     Voice.speak('还剩1分钟');
   }
@@ -416,17 +430,17 @@ function checkFreeTimeReminders(ft) {
   const key = ft.id;
   if (!lastFtReminderTrigger[key]) lastFtReminderTrigger[key] = {};
 
-  if (!lastFtReminderTrigger[key].half && elapsedSeconds >= totalSeconds * 0.5) {
+  if (!lastFtReminderTrigger[key].half && totalSeconds > 60 && elapsedSeconds >= totalSeconds * 0.5) {
     lastFtReminderTrigger[key].half = true;
     Voice.speak(ft.name + '已进行' + Math.floor(ft.durationMinutes / 2) + '分钟');
   }
 
-  if (!lastFtReminderTrigger[key].fiveMin && totalSeconds - elapsedSeconds <= 300 && elapsedSeconds < totalSeconds) {
+  if (!lastFtReminderTrigger[key].fiveMin && totalSeconds > 300 && totalSeconds - elapsedSeconds <= 300 && elapsedSeconds < totalSeconds) {
     lastFtReminderTrigger[key].fiveMin = true;
     Voice.speak(ft.name + '还剩5分钟');
   }
 
-  if (!lastFtReminderTrigger[key].oneMin && totalSeconds - elapsedSeconds <= 60 && elapsedSeconds < totalSeconds) {
+  if (!lastFtReminderTrigger[key].oneMin && totalSeconds > 60 && totalSeconds - elapsedSeconds <= 60 && elapsedSeconds < totalSeconds) {
     lastFtReminderTrigger[key].oneMin = true;
     Voice.speak(ft.name + '还剩1分钟');
   }
@@ -552,8 +566,26 @@ let pollServer = null;
 function startPoll(intervalMs) {
   stopPoll();
   pollServer = async () => {
+    var wasOffline = !isServerMode;
+    var pendingCount = 0;
+    if (wasOffline) {
+      try { pendingCount = await ChangeLog.count(); } catch (e) { }
+    }
     try {
       cachedData = await API.getData();
+
+      if (wasOffline && isServerMode) {
+        updateConnStatus();
+        if (pendingCount > 0) {
+          SyncEngine.fullSync().then(function () {
+            return API.getData().then(function (freshData) {
+              cachedData = freshData;
+              updateConnStatus();
+            });
+          }).catch(function () { });
+        }
+      }
+
       API.migrateBountyCompletionsToTotal(cachedData);
       const key = Util.dateKey(currentDate);
 
@@ -835,9 +867,10 @@ function updateConnStatus() {
     el.className = 'conn-status online';
     el.title = '已连接服务器 · 数据实时同步';
   } else {
+    // OFFLINE-FIRST: detect cached vs pure offline after IndexedDB is wired in Task 7
     el.textContent = '🟡';
     el.className = 'conn-status offline';
-    el.title = '本地模式 · 数据仅保存在本设备';
+    el.title = '离线缓存模式 · 使用本地缓存数据';
   }
 }
 
@@ -846,16 +879,37 @@ async function init() {
   try {
     cachedData = await API.getData();
   } catch (e) {
-    document.getElementById('bigMode').innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:center;height:100%;text-align:center;">
-        <div>
-          <div style="font-size:80px;margin-bottom:20px;">🔌</div>
-          <div style="font-size:32px;font-weight:700;margin-bottom:12px;">未连接服务器</div>
-          <div style="font-size:20px;color:var(--text-secondary);">请先运行 python server.py</div>
-        </div>
-      </div>`;
-    updateConnStatus();
-    return;
+    try {
+      var localData = await DB.getFullData();
+      if (localData && Object.keys(localData).length > 0) {
+        isServerMode = false;
+        cachedData = localData;
+        cachedData._loadedOffline = true;
+        showToast('已进入离线模式，数据将在连接后自动同步');
+      } else {
+        document.getElementById('bigMode').innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:center;height:100%;text-align:center;">
+            <div>
+              <div style="font-size:80px;margin-bottom:20px;">🔌</div>
+              <div style="font-size:32px;font-weight:700;margin-bottom:12px;">未连接服务器</div>
+              <div style="font-size:20px;color:var(--text-secondary);">请先确保 PC 端服务已启动</div>
+            </div>
+          </div>`;
+        updateConnStatus();
+        return;
+      }
+    } catch (dbErr) {
+      document.getElementById('bigMode').innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:center;height:100%;text-align:center;">
+          <div>
+            <div style="font-size:80px;margin-bottom:20px;">🔌</div>
+            <div style="font-size:32px;font-weight:700;margin-bottom:12px;">未连接服务器</div>
+            <div style="font-size:20px;color:var(--text-secondary);">请先运行 python server.py</div>
+          </div>
+        </div>`;
+      updateConnStatus();
+      return;
+    }
   }
   API.migrateBountyCompletionsToTotal(cachedData);
   const key = Util.dateKey(currentDate);
