@@ -358,7 +358,13 @@ var DB = {
       completionData = completionData[0] || {};
     }
     if (completionData) {
-      ensureSyncFields(completionData);
+      if (!completionData.uuid) {
+        try {
+          completionData.uuid = crypto.randomUUID();
+        } catch (e) {
+          completionData.uuid = Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+        }
+      }
     }
     data.bountyCompletions[dateKey] = completionData;
     await this._save();

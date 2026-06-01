@@ -408,6 +408,7 @@ const API = {
       const entry = comps[dk];
       if (entry && typeof entry === 'object') {
         for (const tid of Object.keys(entry)) {
+          if (tid === 'uuid' || tid === 'lastModified' || tid === 'isDeleted' || tid === '_table' || tid === 'date') continue;
           const v = entry[tid];
           const delta = typeof v === 'number' ? v : (v ? 1 : 0);
           total[tid] = (total[tid] || 0) + delta;

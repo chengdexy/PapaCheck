@@ -3,6 +3,8 @@ var ConnectionManager = (function() {
   var _pingTimer = null;
   var _pingIntervalMs = 3000;
   var _failCount = 0;
+  var _syncing = false;
+  var _wasOnline = false;
 
   function getMode() {
     return _mode;
@@ -12,6 +14,7 @@ var ConnectionManager = (function() {
     try {
       var resp = await fetch('/api/ping', {
         method: 'GET',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json' }
       });
       if (!resp.ok) throw new Error('ping failed');
@@ -24,11 +27,43 @@ var ConnectionManager = (function() {
     }
   }
 
+  async function _doReconnect() {
+    if (_syncing) return;
+    _syncing = true;
+    _mode = 'reconnecting';
+    showReconnectMask();
+    updateConnStatus();
+    try {
+      if (typeof SyncEngine !== 'undefined' && SyncEngine.fullSync) {
+        await SyncEngine.fullSync();
+      }
+      if (typeof API !== 'undefined' && API.getData) {
+        var serverData = await API.getData();
+        if (typeof cachedData !== 'undefined') {
+          cachedData = serverData;
+        }
+      }
+      _mode = 'online';
+      _wasOnline = true;
+    } catch (syncErr) {
+      _mode = 'offline';
+      if (typeof showToast === 'function') {
+        showToast('同步失败，继续使用离线模式');
+      }
+    } finally {
+      hideReconnectMask();
+      updateConnStatus();
+      _syncing = false;
+    }
+  }
+
   function start() {
     var initialPingDone = new Promise(function(resolve) {
       _ping().then(function(ok) {
         if (ok) {
           _mode = 'online';
+          _wasOnline = true;
+          hideReconnectMask();
           updateConnStatus();
         }
         resolve();
@@ -38,32 +73,40 @@ var ConnectionManager = (function() {
     _pingTimer = setInterval(async function() {
       var ok = await _ping();
       if (ok) {
-        if (_mode === 'offline') {
-          _mode = 'reconnecting';
-          showReconnectMask();
-          try {
-            if (typeof SyncEngine !== 'undefined' && SyncEngine.fullSync) {
-              await SyncEngine.fullSync();
-            }
-            if (typeof API !== 'undefined' && API.getData) {
-              await API.getData();
-            }
+        if (_mode === 'offline' && !_syncing) {
+          if (_wasOnline) {
+            await _doReconnect();
+          } else {
+            _syncing = true;
             _mode = 'online';
+            _wasOnline = true;
             hideReconnectMask();
-          } catch (syncErr) {
-            _mode = 'offline';
-            hideReconnectMask();
-            if (typeof showToast === 'function') {
-              showToast('同步失败，继续使用离线模式');
+            updateConnStatus();
+            try {
+              if (typeof SyncEngine !== 'undefined' && SyncEngine.fullSync) {
+                await SyncEngine.fullSync();
+              }
+              if (typeof API !== 'undefined' && API.getData) {
+                var serverData = await API.getData();
+                if (typeof cachedData !== 'undefined') {
+                  cachedData = serverData;
+                }
+              }
+            } catch (syncErr) {
+              _mode = 'offline';
+            } finally {
+              updateConnStatus();
+              _syncing = false;
             }
           }
         } else if (_mode === 'reconnecting') {
           _mode = 'online';
           hideReconnectMask();
+          updateConnStatus();
         } else {
           _mode = 'online';
+          updateConnStatus();
         }
-        updateConnStatus();
       } else {
         _mode = 'offline';
         updateConnStatus();

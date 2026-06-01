@@ -4,6 +4,7 @@ import threading
 import time
 import socket
 import tempfile
+import json
 from datetime import date
 
 import pytest
@@ -554,6 +555,7 @@ class TestOfflineBehavior:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             page.wait_for_selector('#bigDate', timeout=15000)
             page.evaluate('ConnectionManager.stop()')
+            page.wait_for_timeout(500)
             page.evaluate('''() => {
               return caches.open("papacheck-v1").then(function(c) {
                 return c.delete(new Request("/api/settings"));
@@ -580,6 +582,7 @@ class TestOfflineBehavior:
         try:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             page.wait_for_selector('#bigDate', timeout=15000)
+            page.evaluate('ConnectionManager.stop()')
 
             page.evaluate('ChangeLog.clear()')
             cnt = page.evaluate('ChangeLog.count()')
@@ -885,5 +888,164 @@ class TestAPIRoutingByConnectionMode:
             assert isinstance(result, list), f'getHomeworks 应返回 list, 实际: {type(result)}'
             assert len(result) == 1, f'应返回 1 条作业, 实际: {len(result)}'
             assert result[0]['id'] == 'hw_test_2', f'作业 ID 应为 hw_test_2, 实际: {result[0].get("id")}'
+        finally:
+            context.close()
+
+
+class TestOfflineDBOperations:
+    def test_points_roundtrip(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(3000)
+            page.evaluate('ConnectionManager.stop()')
+
+            page.evaluate('''async () => {
+                await DB.savePoints({balance: 250, history: [{action: "earn", amount: 100, detail: "测试加分"}]});
+            }''')
+            page.wait_for_timeout(500)
+
+            pts = page.evaluate('''async () => { return await DB.getPoints(); }''')
+            assert pts['balance'] == 250, f'积分余额应为 250, 实际: {pts.get("balance")}'
+            assert len(pts['history']) == 1, f'历史记录应为 1 条, 实际: {len(pts.get("history", []))}'
+            assert pts['history'][0]['action'] == 'earn'
+        finally:
+            context.close()
+
+    def test_points_save_triggers_changelog(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(3000)
+            page.evaluate('ConnectionManager.stop()')
+            page.evaluate('ChangeLog.clear()')
+
+            page.evaluate('''async () => {
+                await DB.savePoints({balance: 500, history: []});
+            }''')
+            page.wait_for_timeout(500)
+
+            cnt = page.evaluate('ChangeLog.count()')
+            assert cnt >= 1, f'savePoints 应触发至少 1 条 ChangeLog, 实际: {cnt}'
+        finally:
+            context.close()
+
+    def test_settings_roundtrip(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(3000)
+            page.evaluate('ConnectionManager.stop()')
+
+            page.evaluate('''async () => {
+                await DB.saveSettings({theme: "dark", language: "zh-CN", autoStart: true});
+            }''')
+            page.wait_for_timeout(500)
+
+            settings = page.evaluate('''async () => { return await DB.getSettings(); }''')
+            assert settings['theme'] == 'dark', f'theme 应为 dark, 实际: {settings.get("theme")}'
+            assert settings['autoStart'] is True, f'autoStart 应为 True'
+        finally:
+            context.close()
+
+    def test_shop_items_roundtrip(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(3000)
+            page.evaluate('ConnectionManager.stop()')
+
+            items = [
+                {'id': 's1', 'name': '额外屏幕时间', 'cost': 50, 'baseQuantity': 1},
+                {'id': 's2', 'name': '免作业券', 'cost': 100, 'baseQuantity': 1},
+            ]
+            page.evaluate(f'''async () => {{
+                await DB.saveShopItems({json.dumps(items)});
+            }}''')
+            page.wait_for_timeout(500)
+
+            result = page.evaluate('''async () => { return await DB.getShopItems(); }''')
+            assert isinstance(result, list), f'getShopItems 应返回 list, 实际: {type(result)}'
+            assert len(result) == 2, f'应返回 2 条, 实际: {len(result)}'
+            assert result[0]['name'] == '额外屏幕时间'
+        finally:
+            context.close()
+
+    def test_full_data_cache_roundtrip(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(3000)
+            page.evaluate('ConnectionManager.stop()')
+
+            test_data = {
+                'settings': {'theme': 'light'},
+                'points': {'balance': 999, 'history': []},
+                'shopItems': [{'id': 'x1', 'name': '测试商品'}],
+            }
+            page.evaluate(f'''async () => {{
+                await DB.cacheFullData({json.dumps(test_data)});
+            }}''')
+            page.wait_for_timeout(500)
+
+            result = page.evaluate('''async () => { return await DB.getFullData(); }''')
+            assert result is not None
+            assert result['settings']['theme'] == 'light'
+            assert result['points']['balance'] == 999
+            assert result['shopItems'][0]['name'] == '测试商品'
+        finally:
+            context.close()
+
+    def test_bounty_completions_roundtrip(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(3000)
+            page.evaluate('ConnectionManager.stop()')
+
+            date_key = '2025-06-15'
+            comp_data = {'bt1': 3, 'bt2': 5}
+            page.evaluate(f'''async () => {{
+                await DB.saveBountyCompletions("{date_key}", {json.dumps(comp_data)});
+            }}''')
+            page.wait_for_timeout(500)
+
+            result = page.evaluate(f'''async () => {{
+                return await DB.getBountyCompletions("{date_key}");
+            }}''')
+            assert result is not None
+            assert result.get('bt1') == 3, f'bt1 应为 3, 实际: {result.get("bt1")}'
+            assert result.get('bt2') == 5, f'bt2 应为 5, 实际: {result.get("bt2")}'
+            assert 'uuid' not in result or result.get('uuid') is not None, '应有 uuid'
+        finally:
+            context.close()
+
+    def test_bounty_tasks_roundtrip(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(3000)
+            page.evaluate('ConnectionManager.stop()')
+
+            tasks = [
+                {'id': 'b1', 'name': '读绘本', 'points': 10, 'type': 'daily', 'enabled': True},
+                {'id': 'b2', 'name': '做家务', 'points': 5, 'type': 'daily', 'enabled': False},
+            ]
+            page.evaluate(f'''async () => {{
+                await DB.saveBountyTasks({json.dumps(tasks)});
+            }}''')
+            page.wait_for_timeout(500)
+
+            result = page.evaluate('''async () => { return await DB.getBountyTasks(); }''')
+            assert len(result) == 2
+            assert result[0]['name'] == '读绘本'
+            assert result[1]['enabled'] is False
         finally:
             context.close()

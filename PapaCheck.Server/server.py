@@ -61,6 +61,7 @@ def _gen_mp3(text):
         mp3_data = b''
     if mp3_data:
         _tts_cache[text] = mp3_data
+        os.makedirs(_TTS_CACHE_DIR, exist_ok=True)
         with open(cache_path, 'wb') as f:
             f.write(mp3_data)
     return mp3_data
@@ -411,6 +412,7 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', len(body))
         self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Cache-Control', 'no-store')
         self.end_headers()
         try:
             self.wfile.write(body)
@@ -423,6 +425,8 @@ class ScheduleHandler(SimpleHTTPRequestHandler):
         except TypeError:
             msg = str(args[0])
         if not _show_polling_log and 'GET /api/data' in msg:
+            return
+        if 'GET /api/ping' in msg or 'POST /api/ping' in msg:
             return
         print(f"  [{self.log_date_time_string()}] {msg}", flush=True)
 
