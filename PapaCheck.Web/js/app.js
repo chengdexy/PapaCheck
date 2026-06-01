@@ -583,27 +583,11 @@ let pollServer = null;
 function startPoll(intervalMs) {
   stopPoll();
   pollServer = async () => {
-    var wasOffline = !isServerMode;
-    var pendingCount = 0;
-    if (wasOffline) {
-      try { pendingCount = await ChangeLog.count(); } catch (e) { }
-      var online = await SyncEngine.checkOnline();
-      if (!online) return;
-      showTransitionMask('正在同步数据…');
-      isServerMode = true;
-      updateConnStatus();
-      if (pendingCount > 0) {
-        try { await SyncEngine.fullSync(); } catch (e) { }
-      }
-      hideTransitionMask();
-    }
+    var mode = ConnectionManager.getMode();
+    if (mode === 'offline' || mode === 'reconnecting') return;
+
     try {
-      var wasOnline = isServerMode;
       cachedData = await API.getData();
-      if (wasOnline && !isServerMode) {
-        updateConnStatus();
-        showToast('已进入离线模式');
-      }
 
       API.migrateBountyCompletionsToTotal(cachedData);
       const key = Util.dateKey(currentDate);
@@ -822,19 +806,6 @@ function startPoll(intervalMs) {
         updateBigScreen();
       }
     } catch (e) {
-      if (isServerMode) {
-        isServerMode = false;
-        updateConnStatus();
-        showTransitionMask('正在切换到离线模式…');
-        try {
-          var localData = await DB.getFullData();
-          if (localData && Object.keys(localData).length > 0) {
-            cachedData = localData;
-          }
-        } catch (dbErr) { }
-        hideTransitionMask();
-        showToast('已进入离线模式');
-      }
     }
   };
   pollInterval = setInterval(() => pollServer(), intervalMs);
@@ -890,12 +861,12 @@ function updateSaverTime() {
   }
 }
 
-// ========== Connection Status ==========
 // ========== Init ==========
 async function init() {
   showTransitionMask('正在加载数据…');
   try {
     cachedData = await API.getData();
+    isServerMode = true;
     hideTransitionMask();
   } catch (e) {
     try {
@@ -917,6 +888,7 @@ async function init() {
             </div>
           </div>`;
         updateConnStatus();
+        ConnectionManager.start();
         return;
       }
     } catch (dbErr) {
@@ -930,6 +902,7 @@ async function init() {
           </div>
         </div>`;
       updateConnStatus();
+      ConnectionManager.start();
       return;
     }
   }
@@ -954,10 +927,11 @@ async function init() {
   document.addEventListener('click', startScreenSaverTimer);
   document.addEventListener('touchstart', startScreenSaverTimer);
 
-  // Every 5s sync from server, full render only if data changed
   startPoll(5000);
 
   updateConnStatus();
+
+  ConnectionManager.start();
 }
 
 init();

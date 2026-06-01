@@ -131,6 +131,8 @@ async function initAdmin() {
   hideTransitionMask();
   switchTab('homework');
 
+  ConnectionManager.start();
+
   setInterval(async () => {
     await refreshAllData();
     const modal = document.getElementById('adminModal');
@@ -140,52 +142,38 @@ async function initAdmin() {
 }
 
 async function refreshAllData() {
-  // 从离线恢复到在线时，先推送本地变更再拉取服务端数据，
-  // 防止第一轮 poll 用服务端旧数据覆盖本地离线期间的修改
-  if (!isServerMode) {
-    var online = false;
-    try { online = await SyncEngine.checkOnline(); } catch (e) { }
-    if (online) {
-      showTransitionMask('正在同步数据…');
-      var pendingCount = 0;
-      try { pendingCount = await ChangeLog.count(); } catch (e) { }
-      if (pendingCount > 0) {
-        try { await SyncEngine.pushChanges(); } catch (e) { }
-      }
-      hideTransitionMask();
-    }
-  }
+  var mode = ConnectionManager.getMode();
 
-  try {
-    const data = await API.getData();
-    if (data) {
-      // 保留本地已修改但服务器尚未同步的结算数据，防止数据被冲掉
-      const oldSettlements = cachedData?.dailySettlement || {};
-      const newSettlements = data.dailySettlement || {};
-      for (const dk of Object.keys(oldSettlements)) {
-        const oldS = oldSettlements[dk];
-        const newS = newSettlements[dk];
-        if (oldS && oldS.rating && !(newS && newS.rating)) {
-          if (!data.dailySettlement) data.dailySettlement = {};
-          data.dailySettlement[dk] = oldS;
-        }
-      }
-      cachedData = data;
-      isServerMode = true;
-      _applyCachedData();
-    }
-  } catch (e) {
-    // Server unreachable — 尝试从 IndexedDB 加载离线缓存
+  if (mode === 'online') {
     try {
-      const localData = await DB.getFullData();
+      var data = await API.getData();
+      if (data) {
+        var oldSettlements = cachedData?.dailySettlement || {};
+        var newSettlements = data.dailySettlement || {};
+        for (var dk of Object.keys(oldSettlements)) {
+          var oldS = oldSettlements[dk];
+          var newS = newSettlements[dk];
+          if (oldS && oldS.rating && !(newS && newS.rating)) {
+            if (!data.dailySettlement) data.dailySettlement = {};
+            data.dailySettlement[dk] = oldS;
+          }
+        }
+        cachedData = data;
+        try { await DB.cacheFullData(data); } catch (e) { }
+        _applyCachedData();
+      }
+    } catch (e) {
+      var localData = await DB.getFullData();
       if (localData && Object.keys(localData).length > 0) {
-        isServerMode = false;
         cachedData = localData;
         _applyCachedData();
-        showToast('已进入离线模式，数据将在连接后自动同步');
       }
-    } catch (dbErr) {
-      // IndexedDB 也不可用，保持当前数据
+    }
+  } else {
+    var localData = await DB.getFullData();
+    if (localData && Object.keys(localData).length > 0) {
+      cachedData = localData;
+      _applyCachedData();
     }
   }
 }
@@ -1128,7 +1116,7 @@ async function approveBountySubmission(dateKey, taskId) {
   if (_approvingBounty) return;
   _approvingBounty = true;
   try {
-    const submissions = adminBountySubmissions[dateKey] || [];
+    const submissions = (adminBountySubmissions[dateKey] || []).slice();
     const idx = submissions.findIndex(s => s.taskId === taskId);
     if (idx === -1) return;
     submissions.splice(idx, 1);
@@ -1783,7 +1771,7 @@ function selectCalendarDate(year, month, day) {
 }
 
 async function switchToSelectedDate() {
-  if (!isServerMode) {
+  if (ConnectionManager.getMode() === 'offline') {
     showToast('离线模式暂不可用，请连接服务器后操作');
     return;
   }

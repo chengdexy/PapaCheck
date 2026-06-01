@@ -553,6 +553,7 @@ class TestOfflineBehavior:
         try:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             page.wait_for_selector('#bigDate', timeout=15000)
+            page.evaluate('ConnectionManager.stop()')
             page.evaluate('''() => {
               return caches.open("papacheck-v1").then(function(c) {
                 return c.delete(new Request("/api/settings"));
@@ -636,5 +637,253 @@ class TestOfflineBehavior:
                 assert text != '--'
             except Exception:
                 pass
+        finally:
+            context.close()
+
+    def test_offline_approve_bounty_then_reconnect(self, test_server, browser):
+        """离线审核赏金任务 → 重连后提交不应再出现"""
+        import server as server_mod
+        date_key = _today_key()
+        task_id = 'bt_e2e_offline'
+        server_mod.db.save_bounty_tasks([{
+            'id': task_id,
+            'name': '离线测试任务',
+            'points': 5,
+            'type': 'recurring',
+            'enabled': True,
+            'createdAt': 1700000000000,
+        }])
+        server_mod.db.save_bounty_submissions(date_key, [{
+            'taskId': task_id,
+            'status': 'submitted',
+            'startedAt': '2026-06-01T10:00:00',
+            'submittedAt': '2026-06-01T11:00:00',
+        }])
+
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(f'{test_server}/admin.html', wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(4000)
+
+            bounty_tab = page.locator('.tab-btn').filter(has_text='赏金').first
+            expect(bounty_tab).to_be_visible(timeout=5000)
+            bounty_tab.click()
+            page.wait_for_timeout(1500)
+
+            approve_btn = page.locator('button').filter(has_text='通过').first
+            expect(approve_btn).to_be_visible(timeout=5000)
+
+            context.set_offline(True)
+            page.wait_for_timeout(500)
+
+            approve_btn.click()
+            page.wait_for_timeout(2000)
+
+            entry_count = page.evaluate('ChangeLog.count()')
+            assert entry_count > 0, f'离线审核后 ChangeLog 应有条目，实际: {entry_count}'
+
+            entries = page.evaluate('''() => {
+              return ChangeLog.getPending().then(function(e) {
+                return e.map(function(x) { return {type: x.type, dataType: Array.isArray(x.data) ? "Array" : typeof x.data}; });
+              });
+            }''')
+            has_delete = any(e['type'] == 'delete' for e in entries)
+            assert has_delete, f'ChangeLog 应包含 delete 条目，实际: {entries}'
+
+            context.set_offline(False)
+            expect(page.locator('button').filter(has_text='通过')).to_have_count(0, timeout=20000)
+        finally:
+            context.close()
+
+
+class TestConnectionManager:
+    def test_connection_manager_loaded_and_has_api(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(2000)
+
+            has_cm = page.evaluate('typeof ConnectionManager !== "undefined"')
+            assert has_cm, 'ConnectionManager 未加载'
+
+            api_methods = ['start', 'getMode', 'stop']
+            for m in api_methods:
+                has_method = page.evaluate(f'typeof ConnectionManager.{m} === "function"')
+                assert has_method, f'ConnectionManager.{m} 缺失'
+        finally:
+            context.close()
+
+    def test_start_goes_online_when_server_reachable(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(2000)
+
+            page.evaluate('''() => {
+                return new Promise(function(resolve) {
+                    ConnectionManager.start();
+                    setTimeout(function() { resolve(ConnectionManager.getMode()); }, 2000);
+                });
+            }''')
+
+            mode = page.evaluate('ConnectionManager.getMode()')
+            assert mode == 'online', f'ping 成功后 getMode() 应返回 online, 实际: {mode}'
+        finally:
+            context.close()
+
+    def test_ping_failure_switches_to_offline(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(2000)
+
+            page.evaluate('ConnectionManager.start()')
+            page.wait_for_timeout(2000)
+            mode_before = page.evaluate('ConnectionManager.getMode()')
+            assert mode_before == 'online', f'服务器在线时 getMode() 应为 online, 实际: {mode_before}'
+
+            page.evaluate('''() => {
+                var realFetch = window.fetch;
+                window.fetch = function() {
+                    return Promise.reject(new Error("mock offline"));
+                };
+            }''')
+            page.wait_for_timeout(4000)
+
+            mode_after = page.evaluate('ConnectionManager.getMode()')
+            assert mode_after == 'offline', f'ping 失败后 getMode() 应返回 offline, 实际: {mode_after}'
+        finally:
+            context.close()
+
+    def test_reconnect_shows_mask_then_syncs(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(2000)
+
+            page.evaluate('ConnectionManager.start()')
+            page.wait_for_timeout(2000)
+
+            page.evaluate('''() => {
+                window._realFetch = window.fetch;
+                window.fetch = function() {
+                    return Promise.reject(new Error("mock offline"));
+                };
+            }''')
+            page.wait_for_timeout(4000)
+            mode_offline = page.evaluate('ConnectionManager.getMode()')
+            assert mode_offline == 'offline', f'应进入离线模式, 实际: {mode_offline}'
+
+            page.evaluate('''() => {
+                window.fetch = window._realFetch;
+            }''')
+            page.wait_for_timeout(4000)
+
+            mode_final = page.evaluate('ConnectionManager.getMode()')
+            assert mode_final == 'online', f'恢复在线后 getMode() 应为 online, 实际: {mode_final}'
+        finally:
+            context.close()
+
+    def test_conn_status_ui_updates(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(2000)
+
+            page.evaluate('ConnectionManager.start()')
+            page.wait_for_timeout(2000)
+
+            has_conn_status = page.evaluate('document.getElementById("connStatus") !== null')
+            if has_conn_status:
+                css_class = page.evaluate('document.getElementById("connStatus").className')
+                assert 'online' in css_class, f'在线时 connStatus 应包含 online class, 实际: {css_class}'
+
+                title = page.evaluate('document.getElementById("connStatus").title')
+                assert '已连接服务器' in title, f'在线时 title 应包含已连接服务器, 实际: {title}'
+        finally:
+            context.close()
+
+
+class TestAPIRoutingByConnectionMode:
+    def test_get_homeworks_uses_db_when_offline(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(3000)
+
+            page.evaluate('ConnectionManager.stop()')
+
+            test_date = '2025-06-15'
+            page.evaluate(f'''async (dateKey) => {{
+                await DB.saveHomeworks(dateKey, [
+                    {{id: "hw_test_1", subject: "math", content: "离线测试作业", status: "pending"}}
+                ]);
+            }}''', test_date)
+            page.wait_for_timeout(500)
+
+            page.evaluate('''() => {
+                window._realFetch = window.fetch;
+                window.fetch = function() {
+                    return Promise.reject(new Error("offline"));
+                };
+            }''')
+            page.evaluate('ConnectionManager.start()')
+            page.wait_for_timeout(4000)
+            mode = page.evaluate('ConnectionManager.getMode()')
+            assert mode == 'offline', f'应进入离线模式, 实际: {mode}'
+
+            result = page.evaluate(f'''async (dateKey) => {{
+                return await API.getHomeworks(dateKey);
+            }}''', test_date)
+            page.wait_for_timeout(500)
+
+            assert isinstance(result, list), f'getHomeworks 应返回 list, 实际: {type(result)}'
+            assert len(result) == 1, f'应返回 1 条作业, 实际: {len(result)}'
+            assert result[0]['id'] == 'hw_test_1', f'作业 ID 应为 hw_test_1, 实际: {result[0].get("id")}'
+        finally:
+            context.close()
+
+    def test_api_routes_to_db_when_offline(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(3000)
+
+            page.evaluate('ConnectionManager.stop()')
+
+            page.evaluate('''async () => {
+                await DB.saveHomeworks("2025-06-15", [
+                    {id: "hw_test_2", subject: "reading", content: "离线读取", status: "done"}
+                ]);
+            }''')
+            page.wait_for_timeout(500)
+
+            page.evaluate('''() => {
+                window._realFetch = window.fetch;
+                window.fetch = function() {
+                    return Promise.reject(new Error("offline"));
+                };
+            }''')
+            page.evaluate('ConnectionManager.start()')
+            page.wait_for_timeout(4000)
+            mode = page.evaluate('ConnectionManager.getMode()')
+            assert mode == 'offline', f'应进入离线模式, 实际: {mode}'
+
+            result = page.evaluate('''async () => {
+                return await API.getHomeworks("2025-06-15");
+            }''')
+            page.wait_for_timeout(500)
+
+            assert isinstance(result, list), f'getHomeworks 应返回 list, 实际: {type(result)}'
+            assert len(result) == 1, f'应返回 1 条作业, 实际: {len(result)}'
+            assert result[0]['id'] == 'hw_test_2', f'作业 ID 应为 hw_test_2, 实际: {result[0].get("id")}'
         finally:
             context.close()

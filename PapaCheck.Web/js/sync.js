@@ -17,21 +17,6 @@ var SyncEngine = (function() {
     return _baseUrl;
   }
 
-  async function checkServerOnline() {
-    try {
-      var url = _getBaseUrl() + '/api/ping';
-      var resp = await fetch(url, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      if (!resp.ok) return false;
-      var data = await resp.json();
-      return data.ok === true;
-    } catch (e) {
-      return false;
-    }
-  }
-
   async function pushChanges() {
     var pending = await ChangeLog.getPending();
     if (pending.length === 0) return true;
@@ -252,7 +237,6 @@ var SyncEngine = (function() {
   }
 
   return {
-    checkOnline: checkServerOnline,
     pushChanges: pushChanges,
     pullChanges: pullChanges,
     fullSync: fullSync,

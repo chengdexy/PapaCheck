@@ -1,9 +1,3 @@
-/**
- * api.js - 数据层（支持离线优先）
- * 在线时通过后端 API 通信，离线时通过 localForage + IndexedDB 读写本地数据
- * 离线数据通过 sync.js 在上线后自动同步
- */
-
 let isServerMode = false;
 let cachedData = null;
 
@@ -40,7 +34,7 @@ const API = {
       return result;
     } catch (e) {
       try {
-        const localData = await DB.getFullData();
+        var localData = await DB.getFullData();
         if (localData && Object.keys(localData).length > 0) {
           isServerMode = false;
           cachedData = localData;
@@ -52,20 +46,22 @@ const API = {
   },
 
   async getTasks(dateKey) {
+    if (ConnectionManager.getMode() === 'offline') {
+      var data = await DB.getFullData();
+      return (data.homeworks && data.homeworks[dateKey]) ? data.homeworks[dateKey] : [];
+    }
     try {
       return await this._fetch(`/api/tasks/${dateKey}`);
     } catch (e) {
-      try {
-        var data = await DB.getFullData();
-        var key = dateKey;
-        return (data.homeworks && data.homeworks[key]) ? data.homeworks[key] : [];
-      } catch (dbErr) {
-        throw e;
-      }
+      var data = await DB.getFullData();
+      return (data.homeworks && data.homeworks[dateKey]) ? data.homeworks[dateKey] : [];
     }
   },
 
   async getHomeworks(dateKey) {
+    if (ConnectionManager.getMode() === 'offline') {
+      return await DB.getHomeworks(dateKey);
+    }
     try {
       return await this._fetch(`/api/homeworks/${dateKey}`);
     } catch (e) {
@@ -74,24 +70,22 @@ const API = {
   },
 
   async saveHomeworks(dateKey, list) {
-    if (isServerMode) {
+    if (ConnectionManager.getMode() === 'online') {
       try {
         await this._fetch(`/api/homeworks/${dateKey}`, {
           method: 'POST',
           body: JSON.stringify({ homeworks: list }),
         });
-        try { await DB.saveHomeworks(dateKey, list); } catch (e) { }
-        return true;
-      } catch (e) {
-        isServerMode = false;
-        updateConnStatus();
-      }
+      } catch (e) { }
     }
     await DB.saveHomeworks(dateKey, list);
     return true;
   },
 
   async getSettlement(dateKey) {
+    if (ConnectionManager.getMode() === 'offline') {
+      return await DB.getSettlement(dateKey);
+    }
     try {
       return await this._fetch(`/api/settlement/${dateKey}`);
     } catch (e) {
@@ -100,25 +94,20 @@ const API = {
   },
 
   async saveSettlement(dateKey, settlementData) {
-    if (isServerMode) {
+    if (ConnectionManager.getMode() === 'online') {
       try {
         await this._fetch(`/api/settlement/${dateKey}`, {
           method: 'POST',
           body: JSON.stringify({ settlement: settlementData }),
         });
-        try { await DB.saveSettlement(dateKey, settlementData); } catch (e) { }
-        return true;
-      } catch (e) {
-        isServerMode = false;
-        updateConnStatus();
-      }
+      } catch (e) { }
     }
     await DB.saveSettlement(dateKey, settlementData);
     return true;
   },
 
   async updatePoints(action, amount, detail) {
-    if (isServerMode) {
+    if (ConnectionManager.getMode() === 'online') {
       try {
         const result = await this._fetch('/api/points', {
           method: 'POST',
@@ -130,10 +119,7 @@ const API = {
           await DB.savePoints(pts);
         } catch (e) { }
         return result.balance;
-      } catch (e) {
-        isServerMode = false;
-        updateConnStatus();
-      }
+      } catch (e) { }
     }
     var localPts = await DB.getPoints() || { balance: 0, history: [] };
     if (action === 'spend') {
@@ -146,6 +132,9 @@ const API = {
   },
 
   async getRedemptions() {
+    if (ConnectionManager.getMode() === 'offline') {
+      return await DB.getRedemptions();
+    }
     try {
       return await this._fetch('/api/redemptions');
     } catch (e) {
@@ -154,24 +143,22 @@ const API = {
   },
 
   async saveRedemptions(list) {
-    if (isServerMode) {
+    if (ConnectionManager.getMode() === 'online') {
       try {
         await this._fetch('/api/redemptions', {
           method: 'POST',
           body: JSON.stringify({ redemptions: list }),
         });
-        try { await DB.saveRedemptions(list); } catch (e) { }
-        return true;
-      } catch (e) {
-        isServerMode = false;
-        updateConnStatus();
-      }
+      } catch (e) { }
     }
     await DB.saveRedemptions(list);
     return true;
   },
 
   async getRewardBox() {
+    if (ConnectionManager.getMode() === 'offline') {
+      return await DB.getRewardBox();
+    }
     try {
       return await this._fetch('/api/reward-box');
     } catch (e) {
@@ -180,24 +167,22 @@ const API = {
   },
 
   async saveRewardBox(items) {
-    if (isServerMode) {
+    if (ConnectionManager.getMode() === 'online') {
       try {
         await this._fetch('/api/reward-box', {
           method: 'POST',
           body: JSON.stringify({ items }),
         });
-        try { await DB.saveRewardBox(items); } catch (e) { }
-        return true;
-      } catch (e) {
-        isServerMode = false;
-        updateConnStatus();
-      }
+      } catch (e) { }
     }
     await DB.saveRewardBox(items);
     return true;
   },
 
   async getSettings() {
+    if (ConnectionManager.getMode() === 'offline') {
+      return await DB.getSettings();
+    }
     try {
       return await this._fetch('/api/settings');
     } catch (e) {
@@ -206,24 +191,22 @@ const API = {
   },
 
   async saveSettings(settings) {
-    if (isServerMode) {
+    if (ConnectionManager.getMode() === 'online') {
       try {
         await this._fetch('/api/settings', {
           method: 'POST',
           body: JSON.stringify({ settings }),
         });
-        try { await DB.saveSettings(settings); } catch (e) { }
-        return true;
-      } catch (e) {
-        isServerMode = false;
-        updateConnStatus();
-      }
+      } catch (e) { }
     }
     await DB.saveSettings(settings);
     return true;
   },
 
   async getActiveBuffs() {
+    if (ConnectionManager.getMode() === 'offline') {
+      return await DB.getActiveBuffs();
+    }
     try {
       return await this._fetch('/api/active-buffs');
     } catch (e) {
@@ -232,24 +215,22 @@ const API = {
   },
 
   async saveActiveBuffs(buffs) {
-    if (isServerMode) {
+    if (ConnectionManager.getMode() === 'online') {
       try {
         await this._fetch('/api/active-buffs', {
           method: 'POST',
           body: JSON.stringify({ buffs }),
         });
-        try { await DB.saveActiveBuffs(buffs); } catch (e) { }
-        return true;
-      } catch (e) {
-        isServerMode = false;
-        updateConnStatus();
-      }
+      } catch (e) { }
     }
     await DB.saveActiveBuffs(buffs);
     return true;
   },
 
   async getShopItems() {
+    if (ConnectionManager.getMode() === 'offline') {
+      return await DB.getShopItems();
+    }
     try {
       return await this._fetch('/api/shop');
     } catch (e) {
@@ -258,24 +239,22 @@ const API = {
   },
 
   async saveShopItems(items) {
-    if (isServerMode) {
+    if (ConnectionManager.getMode() === 'online') {
       try {
         await this._fetch('/api/shop', {
           method: 'POST',
           body: JSON.stringify({ items }),
         });
-        try { await DB.saveShopItems(items); } catch (e) { }
-        return true;
-      } catch (e) {
-        isServerMode = false;
-        updateConnStatus();
-      }
+      } catch (e) { }
     }
     await DB.saveShopItems(items);
     return true;
   },
 
   async getEfficiency(dateKey) {
+    if (ConnectionManager.getMode() === 'offline') {
+      return await DB.getEfficiency(dateKey);
+    }
     try {
       return await this._fetch(`/api/efficiency/${dateKey}`);
     } catch (e) {
@@ -284,24 +263,22 @@ const API = {
   },
 
   async saveEfficiency(dateKey, efficiencyData) {
-    if (isServerMode) {
+    if (ConnectionManager.getMode() === 'online') {
       try {
         await this._fetch(`/api/efficiency/${dateKey}`, {
           method: 'POST',
           body: JSON.stringify({ efficiency: efficiencyData }),
         });
-        try { await DB.saveEfficiency(dateKey, efficiencyData); } catch (e) { }
-        return true;
-      } catch (e) {
-        isServerMode = false;
-        updateConnStatus();
-      }
+      } catch (e) { }
     }
     await DB.saveEfficiency(dateKey, efficiencyData);
     return true;
   },
 
   async getFreeTime(dateKey) {
+    if (ConnectionManager.getMode() === 'offline') {
+      return await DB.getFreeTime(dateKey);
+    }
     try {
       return await this._fetch(`/api/freetime/${dateKey}`);
     } catch (e) {
@@ -310,34 +287,26 @@ const API = {
   },
 
   async saveFreeTime(dateKey, tasks) {
-    if (isServerMode) {
+    if (ConnectionManager.getMode() === 'online') {
       try {
         await this._fetch(`/api/freetime/${dateKey}`, {
           method: 'POST',
           body: JSON.stringify({ tasks }),
         });
-        try { await DB.saveFreeTime(dateKey, tasks); } catch (e) { }
-        return true;
-      } catch (e) {
-        isServerMode = false;
-        updateConnStatus();
-      }
+      } catch (e) { }
     }
     await DB.saveFreeTime(dateKey, tasks);
     return true;
   },
 
   async deferHomework(dateKey, hwId, action, requestedAt) {
-    if (isServerMode) {
+    if (ConnectionManager.getMode() === 'online') {
       try {
         return await this._fetch('/api/defer-homework', {
           method: 'POST',
           body: JSON.stringify({ date: dateKey, hwId, action, requestedAt }),
         });
-      } catch (e) {
-        isServerMode = false;
-        updateConnStatus();
-      }
+      } catch (e) { }
     }
     var homeworks = await DB.getHomeworks(dateKey);
     var hw = homeworks.find(h => h.id === hwId);
@@ -349,6 +318,9 @@ const API = {
   },
 
   async getBountyTasks() {
+    if (ConnectionManager.getMode() === 'offline') {
+      return await DB.getBountyTasks();
+    }
     try {
       return await this._fetch('/api/bounty-tasks');
     } catch (e) {
@@ -357,24 +329,22 @@ const API = {
   },
 
   async saveBountyTasks(items) {
-    if (isServerMode) {
+    if (ConnectionManager.getMode() === 'online') {
       try {
         await this._fetch('/api/bounty-tasks', {
           method: 'POST',
           body: JSON.stringify({ items }),
         });
-        try { await DB.saveBountyTasks(items); } catch (e) { }
-        return true;
-      } catch (e) {
-        isServerMode = false;
-        updateConnStatus();
-      }
+      } catch (e) { }
     }
     await DB.saveBountyTasks(items);
     return true;
   },
 
   async getBountySubmissions(dateKey) {
+    if (ConnectionManager.getMode() === 'offline') {
+      return await DB.getBountySubmissions(dateKey);
+    }
     try {
       return await this._fetch(`/api/bounty-submissions/${dateKey}`);
     } catch (e) {
@@ -383,24 +353,22 @@ const API = {
   },
 
   async saveBountySubmissions(dateKey, submissions) {
-    if (isServerMode) {
+    try { await DB.saveBountySubmissions(dateKey, submissions); } catch (e) { }
+    if (ConnectionManager.getMode() === 'online') {
       try {
         await this._fetch(`/api/bounty-submissions/${dateKey}`, {
           method: 'POST',
           body: JSON.stringify({ submissions }),
         });
-        try { await DB.saveBountySubmissions(dateKey, submissions); } catch (e) { }
-        return true;
-      } catch (e) {
-        isServerMode = false;
-        updateConnStatus();
-      }
+      } catch (e) { }
     }
-    await DB.saveBountySubmissions(dateKey, submissions);
     return true;
   },
 
   async getBountyCompletions(dateKey) {
+    if (ConnectionManager.getMode() === 'offline') {
+      return await DB.getBountyCompletions(dateKey);
+    }
     try {
       return await this._fetch(`/api/bounty-completions/${dateKey}`);
     } catch (e) {
@@ -409,25 +377,20 @@ const API = {
   },
 
   async saveBountyCompletions(dateKey, completions) {
-    if (isServerMode) {
+    try { await DB.saveBountyCompletions(dateKey, completions); } catch (e) { }
+    if (ConnectionManager.getMode() === 'online') {
       try {
         await this._fetch(`/api/bounty-completions/${dateKey}`, {
           method: 'POST',
           body: JSON.stringify({ completions }),
         });
-        try { await DB.saveBountyCompletions(dateKey, completions); } catch (e) { }
-        return true;
-      } catch (e) {
-        isServerMode = false;
-        updateConnStatus();
-      }
+      } catch (e) { }
     }
-    await DB.saveBountyCompletions(dateKey, completions);
     return true;
   },
 
   async resetDate(date) {
-    if (!isServerMode) {
+    if (ConnectionManager.getMode() !== 'online') {
       throw new Error('离线模式不支持重置日期');
     }
     return await this._fetch('/api/reset-date', {
