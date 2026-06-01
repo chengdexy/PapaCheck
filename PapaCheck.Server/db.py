@@ -204,7 +204,10 @@ def push_merge(changes):
                 if not record_key:
                     continue
 
-                existing = _get_date_data_raw(conn, table, record_key, [])
+                if table == 'bounty_completions':
+                    existing = _get_date_data_raw(conn, table, record_key, {})
+                else:
+                    existing = _get_date_data_raw(conn, table, record_key, [])
                 if isinstance(existing, list):
                     idx, existing_item = _find_by_uuid(existing, uuid)
                     if existing_item is None and data.get('id'):
