@@ -171,6 +171,13 @@ def _find_by_uuid(items, uuid):
     return -1, None
 
 
+def _get_date_data_raw(conn, table, date_key, default=None):
+    row = conn.execute(f"SELECT data FROM {table} WHERE date_key = ?", (date_key,)).fetchone()
+    if row:
+        return json.loads(row['data'])
+    return default
+
+
 def push_merge(changes):
     with _db() as conn:
         for change in changes:
@@ -178,6 +185,10 @@ def push_merge(changes):
             uuid = change.get('uuid')
             data = change.get('data', {})
             timestamp = change.get('timestamp', '')
+
+            if not isinstance(data, dict):
+                continue
+
             new_last_modified = data.get('lastModified', timestamp)
 
             table = _classify_change(data)
@@ -193,7 +204,7 @@ def push_merge(changes):
                 if not record_key:
                     continue
 
-                existing = _get_date_data(conn, table, record_key, [])
+                existing = _get_date_data_raw(conn, table, record_key, [])
                 if isinstance(existing, list):
                     idx, existing_item = _find_by_uuid(existing, uuid)
                     if existing_item is None and data.get('id'):

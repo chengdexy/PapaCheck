@@ -112,12 +112,18 @@
   </div>
 
   <!-- Scripts: localForage → api → big-screen → app → db → change-log → sync -->
+  <div id="reconnectMask" class="reconnect-mask">
+    <div class="transition-spinner"></div>
+    <div class="transition-text">正在同步数据…</div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
   <script src="js/big-screen.js"></script>
   <script src="js/db.js"></script>
   <script src="js/change-log.js"></script>
+  <script src="js/connection.js"></script>
   <script src="js/sync.js"></script>
 </body>
 

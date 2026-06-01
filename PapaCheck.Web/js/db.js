@@ -315,6 +315,10 @@ var DB = {
     var data = await this._load();
     if (!data.bountySubmissions) data.bountySubmissions = {};
     var oldList = (data.bountySubmissions[dateKey] || []).slice();
+    if (oldList.length === 0 && typeof cachedData !== 'undefined' && cachedData && cachedData.bountySubmissions && cachedData.bountySubmissions[dateKey]) {
+      data.bountySubmissions[dateKey] = JSON.parse(JSON.stringify(cachedData.bountySubmissions[dateKey]));
+      oldList = data.bountySubmissions[dateKey].slice();
+    }
     if (list && list.length > 0) {
       list.forEach(ensureSyncFields);
     }
@@ -328,6 +332,7 @@ var DB = {
       }
     }
     var newIds = new Set((list || []).map(function(item) { return item.uuid || item.id; }));
+    var pending = await ChangeLog.count();
     for (var j = 0; j < oldList.length; j++) {
       var oldItem = oldList[j];
       var oldId = oldItem.uuid || oldItem.id;
@@ -349,6 +354,9 @@ var DB = {
   saveBountyCompletions: async function (dateKey, completionData) {
     var data = await this._load();
     if (!data.bountyCompletions) data.bountyCompletions = {};
+    if (Array.isArray(completionData)) {
+      completionData = completionData[0] || {};
+    }
     if (completionData) {
       ensureSyncFields(completionData);
     }
@@ -356,6 +364,9 @@ var DB = {
     await this._save();
     if (completionData) {
       var logItem = JSON.parse(JSON.stringify(completionData));
+      if (Array.isArray(logItem)) {
+        logItem = logItem[0] || {};
+      }
       logItem.date = dateKey;
       logItem._table = 'bounty_completions';
       await ChangeLog.add('update', completionData.uuid, logItem);

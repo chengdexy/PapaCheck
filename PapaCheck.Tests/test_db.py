@@ -1035,6 +1035,103 @@ class TestPushMerge:
             assert items[0]['remainingQuantity'] == 3, \
                 f'旧客户端两次购买（相同 lastModified）后剩余数量应为 3，实际为 {items[0]["remainingQuantity"]}'
 
+    def test_push_merge_delete_bounty_submission_no_uuid_on_server(self, db):
+        """离线审核后连线：服务端旧数据无 uuid，delete ChangeLog 应通过 taskId 匹配并标记 isDeleted
+
+        复现 Bug：在线提交赏金任务时服务端存储的提交没有 uuid 字段，
+        离线审核生成 delete ChangeLog（带本地 uuid），连线后 push_merge
+        无法通过 uuid 匹配，但应通过 taskId 回退匹配并标记删除。"""
+        db.save_bounty_submissions('2025-06-15', [
+            {'taskId': 'bt_to_delete', 'status': 'submitted',
+             'startedAt': '2025-06-15T10:00:00', 'submittedAt': '2025-06-15T11:00:00'},
+            {'taskId': 'bt_keep', 'status': 'submitted',
+             'startedAt': '2025-06-15T10:00:00', 'submittedAt': '2025-06-15T11:00:00'},
+        ])
+
+        changes = [
+            {
+                'type': 'update',
+                'uuid': 'local-uuid-keep',
+                'data': {
+                    'taskId': 'bt_keep', 'status': 'submitted',
+                    'startedAt': '2025-06-15T10:00:00', 'submittedAt': '2025-06-15T11:00:00',
+                    'date': '2025-06-15', 'uuid': 'local-uuid-keep',
+                    'lastModified': '2025-06-15T12:00:00', 'isDeleted': False,
+                },
+                'timestamp': '2025-06-15T12:00:00',
+            },
+            {
+                'type': 'delete',
+                'uuid': 'local-uuid-delete',
+                'data': {
+                    'taskId': 'bt_to_delete', 'status': 'submitted',
+                    'startedAt': '2025-06-15T10:00:00', 'submittedAt': '2025-06-15T11:00:00',
+                    'date': '2025-06-15', 'uuid': 'local-uuid-delete',
+                    'lastModified': '2025-06-15T12:00:00', 'isDeleted': True,
+                },
+                'timestamp': '2025-06-15T12:00:00',
+            },
+        ]
+
+        db.push_merge(changes)
+
+        submissions = db.get_bounty_submissions('2025-06-15')
+        assert len(submissions) == 1, \
+            f'bt_to_delete 应被标记 isDeleted，只剩 1 条，实际: {len(submissions)}'
+        assert submissions[0]['taskId'] == 'bt_keep'
+
+        conn = db._mgr.get()
+        raw = json.loads(conn.execute(
+            "SELECT data FROM bounty_submissions WHERE date_key = ?", ('2025-06-15',)
+        ).fetchone()['data'])
+        assert len(raw) == 2
+        deleted = [i for i in raw if i.get('taskId') == 'bt_to_delete']
+        assert len(deleted) == 1
+        assert deleted[0].get('isDeleted') is True
+
+    def test_push_merge_non_dict_data_skipped(self, db):
+        """push_merge 遇到 data 为 list 等非 dict 类型时静默跳过，不崩溃
+
+        复现 Bug：ChangeLog 的 data 字段为 Array(1)（bounty_completions 常见），
+        'list' object has no attribute 'get' 导致 push_merge 崩溃。"""
+        db.save_bounty_submissions('2025-06-15', [
+            {'taskId': 'bt_survivor', 'status': 'submitted',
+             'startedAt': '2025-06-15T10:00:00', 'submittedAt': '2025-06-15T11:00:00'},
+        ])
+
+        changes = [
+            {
+                'type': 'update',
+                'uuid': 'completions-uuid',
+                'data': [{
+                    'mptyexsoaspz8': 1,
+                    'uuid': 'some-uuid',
+                    'lastModified': '2025-06-15T10:00:00',
+                    'isDeleted': False,
+                    'date': '_total',
+                    '_table': 'bounty_completions',
+                }],
+                'timestamp': '2025-06-15T12:00:00',
+            },
+            {
+                'type': 'delete',
+                'uuid': 'local-uuid-delete',
+                'data': {
+                    'taskId': 'bt_survivor', 'status': 'submitted',
+                    'startedAt': '2025-06-15T10:00:00', 'submittedAt': '2025-06-15T11:00:00',
+                    'date': '2025-06-15', 'uuid': 'local-uuid-delete',
+                    'lastModified': '2025-06-15T12:00:00', 'isDeleted': True,
+                },
+                'timestamp': '2025-06-15T12:00:00',
+            },
+        ]
+
+        db.push_merge(changes)
+
+        submissions = db.get_bounty_submissions('2025-06-15')
+        assert len(submissions) == 0, \
+            f'data:Array(1) 条目被跳过不应影响 delete，bt_survivor 应被删除，实际: {len(submissions)}'
+
 
 class TestSaveFunctionsTriggerRecordModification:
     def test_save_homeworks_triggers_record_modification(self, db):
