@@ -71,13 +71,19 @@ def close_connection():
 
 # ==================== Sync ====================
 
-def record_modification(table_name, record_key, timestamp):
-    with _db() as conn:
+def record_modification(table_name, record_key, timestamp, conn=None):
+    if conn is not None:
         conn.execute(
             "INSERT OR REPLACE INTO last_modified (table_name, record_key, last_modified) VALUES (?, ?, ?)",
             (table_name, record_key, timestamp)
         )
-        conn.commit()
+    else:
+        with _db() as new_conn:
+            new_conn.execute(
+                "INSERT OR REPLACE INTO last_modified (table_name, record_key, last_modified) VALUES (?, ?, ?)",
+                (table_name, record_key, timestamp)
+            )
+            new_conn.commit()
 
 
 _DATE_KEY_TABLES = {
@@ -228,7 +234,7 @@ def push_merge(changes):
                         existing.append(data)
 
                     _set_date_data(conn, table, record_key, existing)
-                    record_modification(table, record_key, timestamp)
+                    record_modification(table, record_key, timestamp, conn=conn)
                 elif isinstance(existing, dict):
                     old_last = existing.get('lastModified', '0')
                     if change_type == 'delete':
@@ -237,7 +243,7 @@ def push_merge(changes):
                     elif new_last_modified >= old_last:
                         existing = data
                     _set_date_data(conn, table, record_key, existing)
-                    record_modification(table, record_key, timestamp)
+                    record_modification(table, record_key, timestamp, conn=conn)
 
             elif table in _SINGLE_ROW_TABLES:
                 existing = _get_json(conn, table, 1)
@@ -258,7 +264,7 @@ def push_merge(changes):
                         existing.append(data)
 
                     _set_json(conn, table, existing, 1)
-                    record_modification(table, '1', timestamp)
+                    record_modification(table, '1', timestamp, conn=conn)
                 elif isinstance(existing, dict):
                     old_last = existing.get('lastModified', '0')
                     if change_type == 'delete':
@@ -266,7 +272,7 @@ def push_merge(changes):
                     if change_type == 'delete' or new_last_modified >= old_last:
                         existing = data
                     _set_json(conn, table, existing, 1)
-                    record_modification(table, '1', timestamp)
+                    record_modification(table, '1', timestamp, conn=conn)
 
         conn.commit()
         return {'ok': True}
@@ -275,7 +281,7 @@ def push_merge(changes):
 def _apply_points_change(conn, data, timestamp):
     new_balance = data.get('balance', 0)
     conn.execute("UPDATE points SET balance = ? WHERE id = 1", (new_balance,))
-    record_modification('points', '1', timestamp)
+    record_modification('points', '1', timestamp, conn=conn)
 
 
 # ==================== Helpers ====================
@@ -302,6 +308,12 @@ def _get_date_data(conn, table, date_key, default=None):
             data = [item for item in data if not item.get('isDeleted')]
         return data
     return default
+
+
+def _filter_deleted(data):
+    if isinstance(data, list):
+        return [item for item in data if not item.get('isDeleted')]
+    return data
 
 
 def _set_date_data(conn, table, date_key, data):
@@ -464,17 +476,18 @@ def get_full_data():
             'tasks': {},
             'homeworks': {},
             'dailySettlement': {},
-            'shopItems': json.loads(conn.execute("SELECT data FROM shop_items WHERE id = 1").fetchone()['data']),
-            'redemptions': json.loads(conn.execute("SELECT data FROM redemptions WHERE id = 1").fetchone()['data']),
-            'rewardBox': json.loads(conn.execute("SELECT data FROM reward_box WHERE id = 1").fetchone()['data']),
+            'shopItems': _filter_deleted(json.loads(conn.execute("SELECT data FROM shop_items WHERE id = 1").fetchone()['data'])),
+            'redemptions': _filter_deleted(json.loads(conn.execute("SELECT data FROM redemptions WHERE id = 1").fetchone()['data'])),
+            'rewardBox': _filter_deleted(json.loads(conn.execute("SELECT data FROM reward_box WHERE id = 1").fetchone()['data'])),
             'settings': json.loads(conn.execute("SELECT data FROM settings WHERE id = 1").fetchone()['data']),
-            'activeBuffs': json.loads(conn.execute("SELECT data FROM active_buffs WHERE id = 1").fetchone()['data']),
+            'activeBuffs': _filter_deleted(json.loads(conn.execute("SELECT data FROM active_buffs WHERE id = 1").fetchone()['data'])),
             'efficiencyHistory': {},
             'freeTimeTasks': {},
         }
 
         for row in conn.execute("SELECT date_key, data FROM homeworks"):
-            data['homeworks'][row['date_key']] = json.loads(row['data'])
+            items = json.loads(row['data'])
+            data['homeworks'][row['date_key']] = [h for h in items if not h.get('isDeleted')]
 
         for row in conn.execute("SELECT date_key, data FROM daily_settlement"):
             data['dailySettlement'][row['date_key']] = json.loads(row['data'])
@@ -483,13 +496,13 @@ def get_full_data():
             data['efficiencyHistory'][row['date_key']] = json.loads(row['data'])
 
         for row in conn.execute("SELECT date_key, data FROM free_time_tasks"):
-            data['freeTimeTasks'][row['date_key']] = json.loads(row['data'])
+            data['freeTimeTasks'][row['date_key']] = _filter_deleted(json.loads(row['data']))
 
-        data['bountyTasks'] = json.loads(conn.execute("SELECT data FROM bounty_tasks WHERE id = 1").fetchone()['data'])
+        data['bountyTasks'] = _filter_deleted(json.loads(conn.execute("SELECT data FROM bounty_tasks WHERE id = 1").fetchone()['data']))
 
         data['bountySubmissions'] = {}
         for row in conn.execute("SELECT date_key, data FROM bounty_submissions"):
-            data['bountySubmissions'][row['date_key']] = json.loads(row['data'])
+            data['bountySubmissions'][row['date_key']] = _filter_deleted(json.loads(row['data']))
 
         data['bountyCompletions'] = {}
         for row in conn.execute("SELECT date_key, data FROM bounty_completions"):
