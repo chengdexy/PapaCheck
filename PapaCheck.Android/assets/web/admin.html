@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>PapaCheck 爸~检查！管理端</title>
+  <link rel="icon" href="favicon.png">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+
+    <!-- Sidebar Tabs (wide screens) -->
+    <div class="sidebar-tabs">
+      <div class="sidebar-brand">PapaCheck</div>
+      <button class="tab-btn active" onclick="switchTab('homework')" data-tab="homework"><span class="tab-icon">📋</span><span class="tab-label">作业</span></button>
+      <button class="tab-btn" onclick="switchTab('shop')" data-tab="shop"><span class="tab-icon">🏪</span><span class="tab-label">商店</span></button>
+      <button class="tab-btn" onclick="switchTab('rewardBox')" data-tab="rewardBox"><span class="tab-icon">🎁</span><span class="tab-label">奖励箱</span></button>
+      <button class="tab-btn" onclick="switchTab('bounty')" data-tab="bounty"><span class="tab-icon">💰</span><span class="tab-label">赏金</span></button>
+      <button class="tab-btn" onclick="switchTab('redeem')" data-tab="redeem"><span class="tab-icon">📋</span><span class="tab-label">兑换</span></button>
+      <button class="tab-btn" onclick="switchTab('stats')" data-tab="stats"><span class="tab-icon">📊</span><span class="tab-label">统计</span></button>
+      <button class="tab-btn" onclick="switchTab('settings')" data-tab="settings"><span class="tab-icon">⚙️</span><span class="tab-label">设置</span></button>
+    </div>
+
+    <!-- Main Area -->
+    <div class="main-area">
+      <div class="admin-header">
+        <span class="conn-status" id="connStatus" title="数据同步状态">⚪</span>
+        <h1>PapaCheck 爸~检查！管理端</h1>
+        <span class="admin-date" id="adminDate">--</span>
+        <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleMobileNav()" title="菜单">☰</button>
+      </div>
+
+      <div class="admin-content" id="adminContent"></div>
+    </div>
+
+    <!-- Bottom Tab Navigation (narrow screens) -->
+    <div class="admin-tabs">
+      <button class="tab-btn active" onclick="switchTab('homework')" data-tab="homework"><span class="tab-icon">📋</span><span class="tab-label">作业</span></button>
+      <button class="tab-btn" onclick="switchTab('shop')" data-tab="shop"><span class="tab-icon">🏪</span><span class="tab-label">商店</span></button>
+      <button class="tab-btn" onclick="switchTab('rewardBox')" data-tab="rewardBox"><span class="tab-icon">🎁</span><span class="tab-label">奖励箱</span></button>
+      <button class="tab-btn" onclick="switchTab('bounty')" data-tab="bounty"><span class="tab-icon">💰</span><span class="tab-label">赏金</span></button>
+      <button class="tab-btn" onclick="switchTab('redeem')" data-tab="redeem"><span class="tab-icon">📋</span><span class="tab-label">兑换</span></button>
+      <button class="tab-btn" onclick="switchTab('stats')" data-tab="stats"><span class="tab-icon">📊</span><span class="tab-label">统计</span></button>
+      <button class="tab-btn" onclick="switchTab('settings')" data-tab="settings"><span class="tab-icon">⚙️</span><span class="tab-label">设置</span></button>
+    </div>
+
+    <!-- Mobile Navigation Overlay -->
+  <div class="mobile-nav-overlay" id="mobileNavOverlay" onclick="toggleMobileNav()"></div>
+  <div class="mobile-nav" id="mobileNav">
+    <div class="mobile-nav-header">
+      <span>PapaCheck</span>
+      <button onclick="toggleMobileNav()">✕</button>
+    </div>
+    <button class="tab-btn active" onclick="switchTab('homework'); closeMobileNav()" data-tab="homework"><span class="tab-icon">📋</span><span class="tab-label">作业</span></button>
+    <button class="tab-btn" onclick="switchTab('shop'); closeMobileNav()" data-tab="shop"><span class="tab-icon">🏪</span><span class="tab-label">商店</span></button>
+    <button class="tab-btn" onclick="switchTab('rewardBox'); closeMobileNav()" data-tab="rewardBox"><span class="tab-icon">🎁</span><span class="tab-label">奖励箱</span></button>
+    <button class="tab-btn" onclick="switchTab('bounty'); closeMobileNav()" data-tab="bounty"><span class="tab-icon">💰</span><span class="tab-label">赏金</span></button>
+    <button class="tab-btn" onclick="switchTab('redeem'); closeMobileNav()" data-tab="redeem"><span class="tab-icon">📋</span><span class="tab-label">兑换</span></button>
+    <button class="tab-btn" onclick="switchTab('stats'); closeMobileNav()" data-tab="stats"><span class="tab-icon">📊</span><span class="tab-label">统计</span></button>
+    <button class="tab-btn" onclick="switchTab('settings'); closeMobileNav()" data-tab="settings"><span class="tab-icon">⚙️</span><span class="tab-label">设置</span></button>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="adminModal">
+    <div class="modal-content" id="adminModalContent"></div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Transition Mask -->
+  <div id="transitionMask" class="transition-mask" style="display:none;">
+    <div class="transition-spinner"></div>
+    <div class="transition-text" id="transitionText"></div>
+  </div>
+
+  <div id="reconnectMask" class="reconnect-mask" style="display:none">
+    <div class="transition-spinner"></div>
+    <div class="transition-text">正在同步数据…</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/change-log.js"></script>
+  <script src="js/connection.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>
