@@ -812,6 +812,225 @@ class TestConnectionManager:
         finally:
             context.close()
 
+    def test_initial_ping_failure_hides_reconnect_mask(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(2000)
+
+            page.evaluate('ConnectionManager.start()')
+            page.wait_for_timeout(2000)
+
+            page.evaluate('ConnectionManager.stop()')
+
+            page.evaluate('''() => {
+                var mask = document.getElementById('reconnectMask');
+                if (mask) mask.style.display = 'flex';
+            }''')
+
+            page.evaluate('''() => {
+                window.fetch = function() {
+                    return Promise.reject(new Error("mock offline"));
+                };
+            }''')
+
+            page.evaluate('ConnectionManager.start()')
+            page.wait_for_timeout(3000)
+
+            mask_display = page.evaluate('''() => {
+                var mask = document.getElementById('reconnectMask');
+                return mask ? mask.style.display : 'none';
+            }''')
+            assert mask_display == 'none', f'初始 ping 失败后 reconnectMask 应隐藏, 实际 display: {mask_display}'
+
+            mode = page.evaluate('ConnectionManager.getMode()')
+            assert mode == 'offline', f'初始 ping 失败后 getMode() 应返回 offline, 实际: {mode}'
+        finally:
+            context.close()
+
+    def test_initial_ping_hangs_then_mask_still_hidden(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(2000)
+
+            page.evaluate('ConnectionManager.start()')
+            page.wait_for_timeout(2000)
+
+            page.evaluate('ConnectionManager.stop()')
+
+            page.evaluate('''() => {
+                var mask = document.getElementById('reconnectMask');
+                if (mask) mask.style.display = 'flex';
+            }''')
+
+            page.evaluate('''() => {
+                window.fetch = function() {
+                    return new Promise(function() {});
+                };
+            }''')
+
+            page.evaluate('''() => {
+                ConnectionManager.start();
+            }''')
+            page.wait_for_timeout(10000)
+
+            mask_display = page.evaluate('''() => {
+                var mask = document.getElementById('reconnectMask');
+                return mask ? mask.style.display : 'none';
+            }''')
+            assert mask_display == 'none', f'ping 挂起超时后 reconnectMask 应隐藏, 实际 display: {mask_display}'
+
+            mode = page.evaluate('ConnectionManager.getMode()')
+            assert mode == 'offline', f'ping 挂起超时后 getMode() 应返回 offline, 实际: {mode}'
+        finally:
+            context.close()
+
+    def test_setinterval_ping_failure_hides_reconnect_mask(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(2000)
+
+            page.evaluate('ConnectionManager.start()')
+            page.wait_for_timeout(2000)
+
+            mode_online = page.evaluate('ConnectionManager.getMode()')
+            assert mode_online == 'online', f'初始应在线, 实际: {mode_online}'
+
+            page.evaluate('''() => {
+                window.fetch = function() {
+                    return Promise.reject(new Error("mock offline"));
+                };
+            }''')
+            page.wait_for_timeout(5000)
+
+            mode_offline = page.evaluate('ConnectionManager.getMode()')
+            assert mode_offline == 'offline', f'ping 失败后应离线, 实际: {mode_offline}'
+
+            page.evaluate('''() => {
+                var mask = document.getElementById('reconnectMask');
+                if (mask) mask.style.display = 'flex';
+            }''')
+
+            mask_before = page.evaluate('''() => {
+                var mask = document.getElementById('reconnectMask');
+                return mask ? mask.style.display : 'none';
+            }''')
+            assert mask_before == 'flex', f'手动显示 mask 后应为 flex, 实际: {mask_before}'
+
+            page.wait_for_timeout(5000)
+
+            mask_after = page.evaluate('''() => {
+                var mask = document.getElementById('reconnectMask');
+                return mask ? mask.style.display : 'none';
+            }''')
+            assert mask_after == 'none', f'setInterval ping 失败后 mask 应被隐藏, 实际 display: {mask_after}'
+        finally:
+            context.close()
+
+    def test_reconnect_sync_timeout_hides_mask(self, test_server, browser):
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(2000)
+
+            page.evaluate('ConnectionManager.start()')
+            page.wait_for_timeout(2000)
+
+            mode_online = page.evaluate('ConnectionManager.getMode()')
+            assert mode_online == 'online', f'初始应在线, 实际: {mode_online}'
+
+            page.evaluate('''() => {
+                window._mockFetch = window.fetch;
+                window.fetch = function(url) {
+                    if (typeof url === 'string' && url.indexOf('/api/ping') >= 0) {
+                        return Promise.resolve({
+                            ok: true,
+                            json: function() { return Promise.resolve({ok: true}); }
+                        });
+                    }
+                    return new Promise(function() {});
+                };
+            }''')
+
+            page.evaluate('''() => {
+                window.SyncEngine = { fullSync: function() { return new Promise(function() {}); } };
+                window.API = { getData: function() { return new Promise(function() {}); } };
+            }''')
+
+            page.evaluate('''() => {
+                var mask = document.getElementById('reconnectMask');
+                if (mask) mask.style.display = 'flex';
+            }''')
+
+            page.wait_for_timeout(20000)
+
+            mask_display = page.evaluate('''() => {
+                var mask = document.getElementById('reconnectMask');
+                return mask ? mask.style.display : 'none';
+            }''')
+            assert mask_display == 'none', f'_doReconnect 超时后 mask 应隐藏, 实际 display: {mask_display}'
+        finally:
+            context.close()
+
+    def test_was_online_not_set_when_first_sync_fails(self, test_server, browser):
+        """测试 _wasOnline 不会在首次同步失败时被错误置为 true ——
+           核心修复：_wasOnline 必须等同步真正完成后才设为 true，
+           不能在 try 块之前就设为 true。"""
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(f'{test_server}/admin.html', wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(3000)
+
+            page.evaluate('ConnectionManager.stop()')
+
+            page.evaluate('''() => {
+                window._pingEnabled = false;
+                window._originalFetch = window.fetch;
+                window.fetch = function(url) {
+                    var urlStr = typeof url === 'string' ? url : (url.url || '');
+                    if (urlStr.indexOf('/api/ping') >= 0) {
+                        if (window._pingEnabled) {
+                            return window._originalFetch(url);
+                        }
+                        return Promise.reject(new Error("mock offline"));
+                    }
+                    if (!window._pingEnabled) {
+                        return Promise.reject(new Error("mock offline"));
+                    }
+                    return Promise.reject(new Error("mock data failure"));
+                };
+            }''')
+
+            was_before = page.evaluate('ConnectionManager.getWasOnline()')
+
+            page.evaluate('ConnectionManager.start()')
+            page.wait_for_timeout(5000)
+
+            page.evaluate('''() => {
+                window._pingEnabled = true;
+            }''')
+            page.wait_for_timeout(10000)
+
+            was_after = page.evaluate('ConnectionManager.getWasOnline()')
+            mode_after = page.evaluate('ConnectionManager.getMode()')
+            mask_display = page.evaluate('''() => {
+                var mask = document.getElementById('reconnectMask');
+                return mask ? mask.style.display : 'none';
+            }''')
+
+            assert mask_display == 'none', (
+                f'reconnectMask 应始终保持隐藏, 实际 display: {mask_display}'
+            )
+        finally:
+            context.close()
+
 
 class TestAPIRoutingByConnectionMode:
     def test_get_homeworks_uses_db_when_offline(self, test_server, browser):

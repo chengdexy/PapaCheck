@@ -10,7 +10,11 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'services/asset_bundle_loader.dart';
 import 'services/config_service.dart';
+import 'services/html_resource_inliner.dart';
+import 'services/offline_snapshot_service.dart';
+import 'widgets/connect_failed_dialog.dart';
 import 'widgets/ip_config_dialog.dart';
 
 void main() {
@@ -62,11 +66,19 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   String? _url;
   DeviceRole? _role;
   WebViewController? _controller;
+  bool _isPageReady = false;
+  Timer? _readyCheckTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _startup());
+  }
+
+  @override
+  void dispose() {
+    _readyCheckTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _startup() async {
@@ -85,7 +97,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
           _url = fullUrl;
           _role = result.role;
         });
-        _initController(fullUrl, clearCache: true);
+        _initController(fullUrl);
       }
       return;
     }
@@ -94,53 +106,97 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     _applyOrientation(storedRole);
     final fullUrl = _buildFullUrl(storedUrl, storedRole);
 
-    final ok = await _tryConnect(fullUrl);
+    String? html = await OfflineSnapshotService.load(fullUrl);
 
-    if (!mounted) return;
+    if (html == null) {
+      html = await _loadFromAssets(storedRole);
+    }
 
-    if (ok) {
+    if (html != null && mounted) {
       setState(() => _url = fullUrl);
-      _initController(fullUrl, clearCache: true);
+      await _initControllerOffline(fullUrl, html);
+    } else if (mounted) {
+      setState(() => _url = fullUrl);
+      _initController(fullUrl);
+    }
+
+    if (mounted) {
+      _trySaveOfflineSnapshot(fullUrl).then((saved) {
+        if (saved && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('\u2705 离线快照已更新'),
+              duration: Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      });
+    }
+
+    if (mounted) {
       await _checkVersion(storedUrl);
-    } else {
-      String? action = await _showConnectFailedDialog(fullUrl);
-
-      while (action == 'retry' && mounted) {
-        final ok = await _tryConnect(fullUrl);
-        if (!mounted) return;
-        if (ok) {
-          setState(() => _url = fullUrl);
-          _initController(fullUrl, clearCache: true);
-          await _checkVersion(storedUrl);
-          return;
-        }
-        action = await _showConnectFailedDialog(fullUrl);
-      }
-
-      if (!mounted) return;
-
-      if (action == 'config') {
-        final result = await IpConfigDialog.show(
-          context,
-          initialUrl: storedUrl,
-          initialRole: storedRole,
-        );
-        if (result != null && mounted) {
-          await ConfigService.setUrl(result.url);
-          await ConfigService.setRole(result.role);
-          _applyOrientation(result.role);
-          final newFullUrl = _buildFullUrl(result.url, result.role);
-          setState(() {
-            _url = newFullUrl;
-            _role = result.role;
-          });
-          _initController(newFullUrl, clearCache: true);
-        }
-      }
     }
   }
 
-  Future<void> _initController(String url, {bool clearCache = false}) async {
+  Future<String?> _loadFromAssets(DeviceRole role) async {
+    final assetPath = role == DeviceRole.parent
+        ? 'assets/web/admin.html'
+        : 'assets/web/index.html';
+    try {
+      return await AssetBundleLoader.loadAndInline(assetPath);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<bool> _trySaveOfflineSnapshot(String fullUrl) async {
+    try {
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 5);
+      final request = await client.getUrl(Uri.parse(fullUrl));
+      final response = await request.close().timeout(
+            const Duration(seconds: 5),
+          );
+      if (response.statusCode >= 500) return false;
+
+      final html = await response.transform(utf8.decoder).join();
+
+      final baseUrl = _getBaseUrl(fullUrl);
+      final inlined = await HtmlResourceInliner.inlineResources(
+        html,
+        baseUrl,
+        _fetchResource,
+      );
+      await OfflineSnapshotService.save(fullUrl, inlined);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _initController(String url) async {
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.white)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onWebResourceError: (error) {
+            _handlePageLoadError(url);
+          },
+        ),
+      );
+
+    if (_controller!.platform is AndroidWebViewController) {
+      (_controller!.platform as AndroidWebViewController)
+          .setMediaPlaybackRequiresUserGesture(false);
+    }
+
+    _controller!.loadRequest(Uri.parse(url));
+    _waitForPageReady();
+  }
+
+  Future<void> _initControllerOffline(String baseUrl, String html) async {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.white);
@@ -150,53 +206,60 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
           .setMediaPlaybackRequiresUserGesture(false);
     }
 
-    if (clearCache) {
-      await _controller!.clearCache();
-    }
-
-    _controller!.loadRequest(Uri.parse(url));
+    await _controller!.loadHtmlString(html, baseUrl: baseUrl);
+    _waitForPageReady();
   }
 
-  Future<bool> _tryConnect(String url) async {
-    try {
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 5);
-      final request = await client.getUrl(Uri.parse(url));
-      final response = await request.close().timeout(
-            const Duration(seconds: 5),
+  void _waitForPageReady() {
+    _readyCheckTimer?.cancel();
+    var ticks = 0;
+    _readyCheckTimer = Timer.periodic(
+      const Duration(milliseconds: 500),
+      (_) async {
+        ticks++;
+        if (_controller == null || !mounted) return;
+        try {
+          final result = await _controller!.runJavaScriptReturningResult(
+            "document.getElementById('connStatus') ? document.getElementById('connStatus').className : 'missing'",
           );
-      return response.statusCode < 500;
-    } catch (_) {
-      return false;
+          final className = result.toString();
+          final isReady = className.contains('online') || className.contains('offline');
+          final isTimedOut = ticks >= 30;
+          if (isReady || isTimedOut) {
+            _readyCheckTimer?.cancel();
+            if (mounted) {
+              setState(() => _isPageReady = true);
+            }
+          }
+        } catch (_) {
+          if (ticks >= 30 && mounted) {
+            _readyCheckTimer?.cancel();
+            setState(() => _isPageReady = true);
+          }
+        }
+      },
+    );
+  }
+
+  void _handlePageLoadError(String url) async {
+    if (!mounted) return;
+
+    String? html = await OfflineSnapshotService.load(url);
+    html ??= await _loadFromAssets(_role!);
+
+    if (html != null && mounted) {
+      await _initControllerOffline(url, html);
     }
   }
 
-  Future<String?> _showConnectFailedDialog(String url) async {
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('连接失败'),
-        content: Text('无法连接到 $url\n请确认服务器已启动'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              SystemNavigator.pop();
-            },
-            child: const Text('退出'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop('config'),
-            child: const Text('重新配置'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop('retry'),
-            child: const Text('重试'),
-          ),
-        ],
-      ),
-    );
+  Future<String> _fetchResource(String url) async {
+    final client = HttpClient();
+    client.connectionTimeout = const Duration(seconds: 5);
+    final request = await client.getUrl(Uri.parse(url));
+    final response = await request.close().timeout(
+          const Duration(seconds: 5),
+        );
+    return response.transform(utf8.decoder).join();
   }
 
   Future<void> _openConfig() async {
@@ -333,9 +396,20 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
       );
     }
 
-    return BrowserPage(
-      controller: _controller!,
-      onConfigRequested: _openConfig,
+    return Stack(
+      children: [
+        BrowserPage(
+          controller: _controller!,
+          onConfigRequested: _openConfig,
+        ),
+        if (!_isPageReady)
+          Container(
+            color: Colors.black54,
+            child: const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+          ),
+      ],
     );
   }
 }

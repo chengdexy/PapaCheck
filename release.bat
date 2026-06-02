@@ -13,19 +13,26 @@ echo  版本递增: %BUMP%
 echo ========================================
 echo.
 
-echo [1/3] 递增版本号...
+echo [1/4] 递增版本号...
 python PapaCheck.Windows/bump_version.py %BUMP%
 if %errorlevel% neq 0 exit /b %errorlevel%
 echo.
 
-echo [2/3] 构建 Android APK...
+echo [2/4] 同步 Web 资源到 APK...
+cd /d PapaCheck.Android
+powershell -ExecutionPolicy Bypass -File copy_web_assets.ps1
+if %errorlevel% neq 0 exit /b %errorlevel%
+cd /d %~dp0
+echo.
+
+echo [3/4] 构建 Android APK...
 cd /d PapaCheck.Android
 call flutter build apk --release
 if %errorlevel% neq 0 exit /b %errorlevel%
 cd /d %~dp0
 echo.
 
-echo [3/3] 打包 Windows EXE...
+echo [4/4] 打包 Windows EXE...
 python PapaCheck.Windows/build_exe.py
 echo.
 
