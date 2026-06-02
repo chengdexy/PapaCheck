@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -105,6 +106,15 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     _role = storedRole;
     _applyOrientation(storedRole);
     final fullUrl = _buildFullUrl(storedUrl, storedRole);
+
+    if (kDebugMode) {
+      setState(() => _url = fullUrl);
+      _initController(fullUrl);
+      if (mounted) {
+        await _checkVersion(storedUrl);
+      }
+      return;
+    }
 
     String? html = await OfflineSnapshotService.load(fullUrl);
 

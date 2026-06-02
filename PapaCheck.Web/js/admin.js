@@ -127,11 +127,10 @@ async function initAdmin() {
     }
   });
 
+  await ConnectionManager.start();
   await refreshAllData();
   hideTransitionMask();
   switchTab('homework');
-
-  ConnectionManager.start();
 
   setInterval(async () => {
     await refreshAllData();
