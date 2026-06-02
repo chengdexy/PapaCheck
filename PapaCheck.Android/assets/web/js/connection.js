@@ -10,7 +10,7 @@ var ConnectionManager = (function () {
     return _mode;
   }
 
-  var _pingTimeoutMs = 5000;
+  var _pingTimeoutMs = 3000;
   var _reconnectTimeoutMs = 10000;
 
   async function _ping() {
