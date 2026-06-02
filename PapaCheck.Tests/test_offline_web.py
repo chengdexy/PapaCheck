@@ -1268,3 +1268,59 @@ class TestOfflineDBOperations:
             assert result[1]['enabled'] is False
         finally:
             context.close()
+
+    def test_offline_delete_homework_not_reappear_after_reconnect(self, test_server, browser):
+        """离线删除作业 → 重连后作业不应复活"""
+        import server as server_mod
+        date_key = _today_key()
+        hw_id = 'hw_offline_del_test'
+        server_mod.db.save_homeworks(date_key, [{
+            'id': hw_id,
+            'subject': '语文',
+            'content': '离线删除测试作业',
+            'mode': 'pending',
+            'suggestedDuration': 20,
+            'basePoints': 10,
+            'status': 'pending',
+        }])
+
+        context = browser.new_context(viewport={'width': 1280, 'height': 720})
+        page = context.new_page()
+        try:
+            page.goto(f'{test_server}/admin.html', wait_until='domcontentloaded', timeout=15000)
+            page.wait_for_timeout(4000)
+
+            hw_text = page.locator('#adminContent').text_content() or ''
+            assert '离线删除测试作业' in hw_text, f'作业应出现在页面上, 实际: {hw_text[:200]}'
+
+            context.set_offline(True)
+            page.wait_for_timeout(1000)
+
+            delete_btn = page.locator('button').filter(has_text='删除').first
+            expect(delete_btn).to_be_visible(timeout=5000)
+            delete_btn.click()
+            page.wait_for_timeout(2000)
+
+            hw_text_after = page.locator('#adminContent').text_content() or ''
+            assert '离线删除测试作业' not in hw_text_after, (
+                f'离线删除后作业应消失, 实际: {hw_text_after[:200]}')
+
+            entry_count = page.evaluate('ChangeLog.count()')
+            assert entry_count >= 1, f'离线删除后 ChangeLog 应有条目, 实际: {entry_count}'
+
+            context.set_offline(False)
+            page.wait_for_timeout(5000)
+
+            conn_status = page.evaluate('''() => {
+                var el = document.getElementById('connStatus');
+                return el ? el.className : 'missing';
+            }''')
+            assert 'online' in conn_status, f'重连后应为 online, 实际: {conn_status}'
+
+            page.wait_for_timeout(3000)
+
+            hw_text_final = page.locator('#adminContent').text_content() or ''
+            assert '离线删除测试作业' not in hw_text_final, (
+                f'重连后作业不应复活, 实际: {hw_text_final[:200]}')
+        finally:
+            context.close()
