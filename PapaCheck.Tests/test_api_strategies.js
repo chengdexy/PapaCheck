@@ -2,14 +2,12 @@
  * test_api_strategies.js - API 请求策略单元测试
  *
  * 测试 PapaCheck.Web/js/api.js 中 _requestWithStrategy 统一请求策略处理器
- * 使用 Node.js 内置 test runner，无需额外依赖
  */
 
-const { describe, test } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
+import { describe, test, assert, expect } from 'vitest';
+import fs from 'fs';
+import path from 'path';
+import vm from 'vm';
 
 // ========== 加载 api.js 并注入 mock ==========
 
@@ -135,17 +133,14 @@ describe('online-first 策略', () => {
     //   Then 抛出 onlineFn 的异常
     test('在线模式下在线请求失败且不允许降级时抛出异常', async () => {
         const ctx = createTestContext('online');
-        await assert.rejects(
-            async () => {
-                await ctx.API._requestWithStrategy(
-                    'online-first',
-                    async () => { throw new Error('network error'); },
-                    async () => 'offline-result',
-                    { allowFallback: false }
-                );
-            },
-            { message: 'network error' }
-        );
+        await expect(
+            ctx.API._requestWithStrategy(
+                'online-first',
+                async () => { throw new Error('network error'); },
+                async () => 'offline-result',
+                { allowFallback: false }
+            )
+        ).rejects.toThrow('network error');
     });
 
     // Scenario: 离线模式下直接调用离线函数
@@ -230,17 +225,14 @@ describe('online-only 策略', () => {
     //   Then 抛出错误"当前为离线模式，无法完成此操作"
     test('离线模式下抛出错误', async () => {
         const ctx = createTestContext('offline');
-        await assert.rejects(
-            async () => {
-                await ctx.API._requestWithStrategy(
-                    'online-only',
-                    async () => 'online-result',
-                    async () => 'offline-result',
-                    {}
-                );
-            },
-            { message: '当前为离线模式，无法完成此操作' }
-        );
+        await expect(
+            ctx.API._requestWithStrategy(
+                'online-only',
+                async () => 'online-result',
+                async () => 'offline-result',
+                {}
+            )
+        ).rejects.toThrow('当前为离线模式，无法完成此操作');
     });
 });
 
@@ -332,10 +324,7 @@ describe('_fetch 封装', () => {
             statusText: 'Internal Server Error',
             json: async () => ({ error: 'fail' }),
         });
-        await assert.rejects(
-            async () => { await ctx.API._fetch('/api/error'); },
-            { message: 'Internal Server Error' }
-        );
+        await expect(ctx.API._fetch('/api/error')).rejects.toThrow('Internal Server Error');
     });
 });
 
@@ -384,10 +373,7 @@ describe('getData 初始化函数', () => {
         const ctx = createTestContext('offline');
         ctx.fetch = async () => { throw new Error('network error'); };
         ctx.DB.getFullData = async () => ({});
-        await assert.rejects(
-            async () => { await ctx.API.getData(); },
-            { message: 'network error' }
-        );
+        await expect(ctx.API.getData()).rejects.toThrow('network error');
     });
 });
 
@@ -400,10 +386,7 @@ describe('resetDate', () => {
     //   Then 抛出错误"当前为离线模式，无法完成此操作"
     test('离线模式下 resetDate 抛出错误', async () => {
         const ctx = createTestContext('offline');
-        await assert.rejects(
-            async () => { await ctx.API.resetDate('2026-06-03'); },
-            { message: '当前为离线模式，无法完成此操作' }
-        );
+        await expect(ctx.API.resetDate('2026-06-03')).rejects.toThrow('当前为离线模式，无法完成此操作');
     });
 });
 

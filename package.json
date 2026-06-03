@@ -1,0 +1,27 @@
+{
+  "name": "papacheck",
+  "version": "1.0.0",
+  "description": "<img src=\"PapaCheck_ban.jpg\" alt=\"PapaCheck Banner\" width=\"100%\" />",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chengdexy/PapaCheck.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/chengdexy/PapaCheck/issues"
+  },
+  "homepage": "https://github.com/chengdexy/PapaCheck#readme",
+  "devDependencies": {
+    "vitest": "^4.1.8"
+  }
+}
