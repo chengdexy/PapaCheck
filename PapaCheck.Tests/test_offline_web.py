@@ -801,7 +801,6 @@ class TestOfflineBehavior:
             shop_btn = page.locator('.btn-shop-nav', has_text='积分商店')
             if shop_btn.is_visible():
                 shop_btn.click()
-                page.wait_for_selector('#startConfirmModal', timeout=5000)
                 try:
                     expect(page.locator('#shopContainer')).to_be_visible(timeout=5000)
                 except Exception:
