@@ -175,9 +175,9 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   }
 
   Future<bool> _trySaveOfflineSnapshot(String fullUrl) async {
+    final client = HttpClient();
+    client.connectionTimeout = const Duration(seconds: 5);
     try {
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 5);
       final request = await client.getUrl(Uri.parse(fullUrl));
       final response = await request.close().timeout(
             const Duration(seconds: 5),
@@ -196,6 +196,8 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
       return true;
     } catch (_) {
       return false;
+    } finally {
+      client.close();
     }
   }
 
@@ -292,17 +294,21 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   Future<String> _fetchResource(String url) async {
     final client = HttpClient();
     client.connectionTimeout = const Duration(seconds: 5);
-    final request = await client.getUrl(Uri.parse(url));
-    final response = await request.close().timeout(
-          const Duration(seconds: 5),
-        );
-    return response.transform(utf8.decoder).join();
+    try {
+      final request = await client.getUrl(Uri.parse(url));
+      final response = await request.close().timeout(
+            const Duration(seconds: 5),
+          );
+      return response.transform(utf8.decoder).join();
+    } finally {
+      client.close();
+    }
   }
 
   Future<bool> _isServerReachable(String url) async {
+    final client = HttpClient();
+    client.connectionTimeout = const Duration(seconds: 3);
     try {
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 3);
       final request = await client.getUrl(Uri.parse(url));
       final response = await request.close().timeout(
             const Duration(seconds: 3),
@@ -310,6 +316,8 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
       return response.statusCode < 500;
     } catch (_) {
       return false;
+    } finally {
+      client.close();
     }
   }
 
@@ -334,9 +342,9 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   }
 
   Future<Map<String, dynamic>?> _fetchServerVersion(String baseUrl) async {
+    final client = HttpClient();
+    client.connectionTimeout = const Duration(seconds: 5);
     try {
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 5);
       final request = await client.getUrl(Uri.parse('$baseUrl/api/version'));
       final response =
           await request.close().timeout(const Duration(seconds: 5));
@@ -345,6 +353,9 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         return jsonDecode(body) as Map<String, dynamic>;
       }
     } catch (_) {}
+    finally {
+      client.close();
+    }
     return null;
   }
 
@@ -397,8 +408,8 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
       ),
     );
 
+    final client = HttpClient();
     try {
-      final client = HttpClient();
       final request = await client.getUrl(Uri.parse(url));
       final response = await request.close();
       final file = File('${Directory.systemTemp.path}/PapaCheck.apk');
@@ -408,6 +419,8 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
       await OpenFilex.open(file.path);
     } catch (e) {
       if (mounted) Navigator.of(context).pop();
+    } finally {
+      client.close();
     }
   }
 
