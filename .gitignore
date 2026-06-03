@@ -58,3 +58,7 @@ PapaCheck.Windows/Download/
 
 # PyInstaller version file（构建时自动生成）
 PapaCheck.Windows/version_info.txt
+
+# Node.js
+node_modules/
+package-lock.json

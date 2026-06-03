@@ -248,6 +248,13 @@ async function startHomework(id, mode) {
 let _completingHomework = false;
 let _startingHomework = false;
 
+function clampActualDuration(actualDuration, suggestedDuration) {
+  if (suggestedDuration > 0 && actualDuration <= suggestedDuration * 0.2 && actualDuration <= 1) {
+    return suggestedDuration;
+  }
+  return actualDuration;
+}
+
 async function completeHomework(id) {
   if (_completingHomework) return;
   _completingHomework = true;
@@ -258,7 +265,8 @@ async function completeHomework(id) {
 
     const completedAt = new Date();
     const startedAt = new Date(hw.startedAt);
-    const actualDuration = Math.max(1, Math.round((completedAt - startedAt) / 60000));
+    const rawDuration = Math.max(1, Math.round((completedAt - startedAt) / 60000));
+    const actualDuration = clampActualDuration(rawDuration, hw.suggestedDuration || 0);
 
     hw.status = 'done';
     hw.completedAt = completedAt.toISOString();
