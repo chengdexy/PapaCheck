@@ -108,9 +108,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
 
     String? html = await OfflineSnapshotService.load(fullUrl);
 
-    if (html == null) {
-      html = await _loadFromAssets(storedRole);
-    }
+    html ??= await _loadFromAssets(storedRole);
 
     if (html != null && mounted) {
       setState(() {
@@ -248,7 +246,8 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
             "document.getElementById('connStatus') ? document.getElementById('connStatus').className : 'missing'",
           );
           final className = result.toString();
-          final isReady = className.contains('online') || className.contains('offline');
+          final isReady =
+              className.contains('online') || className.contains('offline');
           final isTimedOut = ticks >= 30;
           if (isReady || isTimedOut) {
             _readyCheckTimer?.cancel();
@@ -352,8 +351,8 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         final body = await response.transform(utf8.decoder).join();
         return jsonDecode(body) as Map<String, dynamic>;
       }
-    } catch (_) {}
-    finally {
+    } catch (_) {
+    } finally {
       client.close();
     }
     return null;
