@@ -16,8 +16,52 @@ function updateConnStatus() {
 }
 
 const API = {
-  async _fetch(url, options = {}) {
-    const resp = await fetch(url, {
+  // ========== 统一请求策略处理器 ==========
+
+  _strategies: {
+    // 优先在线，失败降级到本地
+    'online-first': async function (onlineFn, offlineFn, options) {
+      var mode = ConnectionManager.getMode();
+      if (mode === 'offline') {
+        return await offlineFn();
+      }
+      try {
+        var result = await onlineFn();
+        if (options.syncToLocal && offlineFn) {
+          try { await offlineFn(); } catch (e) { }
+        }
+        return result;
+      } catch (err) {
+        if (!options.allowFallback) throw err;
+        if (options.onOnlineError) options.onOnlineError(err);
+        return await offlineFn();
+      }
+    },
+
+    // 仅在线模式，不允许降级
+    'online-only': async function (onlineFn, offlineFn, options) {
+      var mode = ConnectionManager.getMode();
+      if (mode === 'offline') {
+        throw new Error('当前为离线模式，无法完成此操作');
+      }
+      return await onlineFn();
+    },
+
+    // 仅离线模式
+    'offline-only': async function (onlineFn, offlineFn, options) {
+      return await offlineFn();
+    },
+  },
+
+  async _requestWithStrategy(strategy, onlineFn, offlineFn, options) {
+    if (!options) options = {};
+    var strategyFn = this._strategies[strategy] || this._strategies['online-first'];
+    return await strategyFn(onlineFn, offlineFn, options);
+  },
+
+  async _fetch(url, options) {
+    if (!options) options = {};
+    var resp = await fetch(url, {
       headers: { 'Content-Type': 'application/json' },
       ...options,
     });
@@ -25,91 +69,99 @@ const API = {
     return await resp.json();
   },
 
+  // ========== 数据获取 ==========
+
   async getData() {
+    // getData 是初始化函数，在 ConnectionManager.start() 之前调用，
+    // 此时 CM 模式为 offline，但服务器可能在线，因此不依赖 CM 模式判断
     try {
-      const result = await this._fetch('/api/data');
+      var result = await this._fetch('/api/data');
       isServerMode = true;
       cachedData = result;
       try { await DB.cacheFullData(result); } catch (e) { }
       return result;
     } catch (e) {
-      try {
-        var localData = await DB.getFullData();
-        if (localData && Object.keys(localData).length > 0) {
-          isServerMode = false;
-          cachedData = localData;
-          return localData;
-        }
-      } catch (dbErr) { }
+      var localData = await DB.getFullData();
+      if (localData && Object.keys(localData).length > 0) {
+        isServerMode = false;
+        cachedData = localData;
+        return localData;
+      }
       throw e;
     }
   },
 
   async getTasks(dateKey) {
-    if (ConnectionManager.getMode() === 'offline') {
-      var data = await DB.getFullData();
-      return (data.homeworks && data.homeworks[dateKey]) ? data.homeworks[dateKey] : [];
-    }
-    try {
-      return await this._fetch(`/api/tasks/${dateKey}`);
-    } catch (e) {
-      var data = await DB.getFullData();
-      return (data.homeworks && data.homeworks[dateKey]) ? data.homeworks[dateKey] : [];
-    }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => await this._fetch('/api/tasks/' + dateKey),
+      async () => {
+        var data = await DB.getFullData();
+        return (data.homeworks && data.homeworks[dateKey]) ? data.homeworks[dateKey] : [];
+      },
+      { allowFallback: true }
+    );
   },
 
   async getHomeworks(dateKey) {
-    if (ConnectionManager.getMode() === 'offline') {
-      return await DB.getHomeworks(dateKey);
-    }
-    try {
-      return await this._fetch(`/api/homeworks/${dateKey}`);
-    } catch (e) {
-      return await DB.getHomeworks(dateKey);
-    }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => await this._fetch('/api/homeworks/' + dateKey),
+      async () => await DB.getHomeworks(dateKey),
+      { allowFallback: true }
+    );
   },
 
   async saveHomeworks(dateKey, list) {
-    if (ConnectionManager.getMode() === 'online') {
-      try {
-        await this._fetch(`/api/homeworks/${dateKey}`, {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/homeworks/' + dateKey, {
           method: 'POST',
           body: JSON.stringify({ homeworks: list }),
         });
-      } catch (e) { }
-    }
-    await DB.saveHomeworks(dateKey, list);
-    return true;
+        return true;
+      },
+      async () => {
+        await DB.saveHomeworks(dateKey, list);
+        return true;
+      },
+      { syncToLocal: true, allowFallback: true }
+    );
   },
 
   async getSettlement(dateKey) {
-    if (ConnectionManager.getMode() === 'offline') {
-      return await DB.getSettlement(dateKey);
-    }
-    try {
-      return await this._fetch(`/api/settlement/${dateKey}`);
-    } catch (e) {
-      return await DB.getSettlement(dateKey);
-    }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => await this._fetch('/api/settlement/' + dateKey),
+      async () => await DB.getSettlement(dateKey),
+      { allowFallback: true }
+    );
   },
 
   async saveSettlement(dateKey, settlementData) {
-    if (ConnectionManager.getMode() === 'online') {
-      try {
-        await this._fetch(`/api/settlement/${dateKey}`, {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/settlement/' + dateKey, {
           method: 'POST',
           body: JSON.stringify({ settlement: settlementData }),
         });
-      } catch (e) { }
-    }
-    await DB.saveSettlement(dateKey, settlementData);
-    return true;
+        return true;
+      },
+      async () => {
+        await DB.saveSettlement(dateKey, settlementData);
+        return true;
+      },
+      { syncToLocal: true, allowFallback: true }
+    );
   },
 
   async updatePoints(action, amount, detail) {
-    if (ConnectionManager.getMode() === 'online') {
-      try {
-        const result = await this._fetch('/api/points', {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        var result = await this._fetch('/api/points', {
           method: 'POST',
           body: JSON.stringify({ action, amount, detail }),
         });
@@ -119,298 +171,339 @@ const API = {
           await DB.savePoints(pts);
         } catch (e) { }
         return result.balance;
-      } catch (e) { }
-    }
-    var localPts = await DB.getPoints() || { balance: 0, history: [] };
-    if (action === 'spend') {
-      localPts.balance -= amount;
-    } else {
-      localPts.balance += amount;
-    }
-    await DB.savePoints(localPts);
-    return localPts.balance;
+      },
+      async () => {
+        var localPts = await DB.getPoints() || { balance: 0, history: [] };
+        if (action === 'spend') {
+          localPts.balance -= amount;
+        } else {
+          localPts.balance += amount;
+        }
+        await DB.savePoints(localPts);
+        return localPts.balance;
+      },
+      { allowFallback: true }
+    );
   },
 
   async getRedemptions() {
-    if (ConnectionManager.getMode() === 'offline') {
-      return await DB.getRedemptions();
-    }
-    try {
-      return await this._fetch('/api/redemptions');
-    } catch (e) {
-      return await DB.getRedemptions();
-    }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => await this._fetch('/api/redemptions'),
+      async () => await DB.getRedemptions(),
+      { allowFallback: true }
+    );
   },
 
   async saveRedemptions(list) {
-    if (ConnectionManager.getMode() === 'online') {
-      try {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
         await this._fetch('/api/redemptions', {
           method: 'POST',
           body: JSON.stringify({ redemptions: list }),
         });
-      } catch (e) { }
-    }
-    await DB.saveRedemptions(list);
-    return true;
+        return true;
+      },
+      async () => {
+        await DB.saveRedemptions(list);
+        return true;
+      },
+      { syncToLocal: true, allowFallback: true }
+    );
   },
 
   async getRewardBox() {
-    if (ConnectionManager.getMode() === 'offline') {
-      return await DB.getRewardBox();
-    }
-    try {
-      return await this._fetch('/api/reward-box');
-    } catch (e) {
-      return await DB.getRewardBox();
-    }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => await this._fetch('/api/reward-box'),
+      async () => await DB.getRewardBox(),
+      { allowFallback: true }
+    );
   },
 
   async saveRewardBox(items) {
-    if (ConnectionManager.getMode() === 'online') {
-      try {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
         await this._fetch('/api/reward-box', {
           method: 'POST',
           body: JSON.stringify({ items }),
         });
-      } catch (e) { }
-    }
-    await DB.saveRewardBox(items);
-    return true;
+        return true;
+      },
+      async () => {
+        await DB.saveRewardBox(items);
+        return true;
+      },
+      { syncToLocal: true, allowFallback: true }
+    );
   },
 
   async getSettings() {
-    if (ConnectionManager.getMode() === 'offline') {
-      return await DB.getSettings();
-    }
-    try {
-      return await this._fetch('/api/settings');
-    } catch (e) {
-      return await DB.getSettings();
-    }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => await this._fetch('/api/settings'),
+      async () => await DB.getSettings(),
+      { allowFallback: true }
+    );
   },
 
   async saveSettings(settings) {
-    if (ConnectionManager.getMode() === 'online') {
-      try {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
         await this._fetch('/api/settings', {
           method: 'POST',
           body: JSON.stringify({ settings }),
         });
-      } catch (e) { }
-    }
-    await DB.saveSettings(settings);
-    return true;
+        return true;
+      },
+      async () => {
+        await DB.saveSettings(settings);
+        return true;
+      },
+      { syncToLocal: true, allowFallback: true }
+    );
   },
 
   async getActiveBuffs() {
-    if (ConnectionManager.getMode() === 'offline') {
-      return await DB.getActiveBuffs();
-    }
-    try {
-      return await this._fetch('/api/active-buffs');
-    } catch (e) {
-      return await DB.getActiveBuffs();
-    }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => await this._fetch('/api/active-buffs'),
+      async () => await DB.getActiveBuffs(),
+      { allowFallback: true }
+    );
   },
 
   async saveActiveBuffs(buffs) {
-    if (ConnectionManager.getMode() === 'online') {
-      try {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
         await this._fetch('/api/active-buffs', {
           method: 'POST',
           body: JSON.stringify({ buffs }),
         });
-      } catch (e) { }
-    }
-    await DB.saveActiveBuffs(buffs);
-    return true;
+        return true;
+      },
+      async () => {
+        await DB.saveActiveBuffs(buffs);
+        return true;
+      },
+      { syncToLocal: true, allowFallback: true }
+    );
   },
 
   async getShopItems() {
-    if (ConnectionManager.getMode() === 'offline') {
-      return await DB.getShopItems();
-    }
-    try {
-      return await this._fetch('/api/shop');
-    } catch (e) {
-      return await DB.getShopItems();
-    }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => await this._fetch('/api/shop'),
+      async () => await DB.getShopItems(),
+      { allowFallback: true }
+    );
   },
 
   async saveShopItems(items) {
-    if (ConnectionManager.getMode() === 'online') {
-      try {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
         await this._fetch('/api/shop', {
           method: 'POST',
           body: JSON.stringify({ items }),
         });
-      } catch (e) { }
-    }
-    await DB.saveShopItems(items);
-    return true;
+        return true;
+      },
+      async () => {
+        await DB.saveShopItems(items);
+        return true;
+      },
+      { syncToLocal: true, allowFallback: true }
+    );
   },
 
   async getEfficiency(dateKey) {
-    if (ConnectionManager.getMode() === 'offline') {
-      return await DB.getEfficiency(dateKey);
-    }
-    try {
-      return await this._fetch(`/api/efficiency/${dateKey}`);
-    } catch (e) {
-      return await DB.getEfficiency(dateKey);
-    }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => await this._fetch('/api/efficiency/' + dateKey),
+      async () => await DB.getEfficiency(dateKey),
+      { allowFallback: true }
+    );
   },
 
   async saveEfficiency(dateKey, efficiencyData) {
-    if (ConnectionManager.getMode() === 'online') {
-      try {
-        await this._fetch(`/api/efficiency/${dateKey}`, {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/efficiency/' + dateKey, {
           method: 'POST',
           body: JSON.stringify({ efficiency: efficiencyData }),
         });
-      } catch (e) { }
-    }
-    await DB.saveEfficiency(dateKey, efficiencyData);
-    return true;
+        return true;
+      },
+      async () => {
+        await DB.saveEfficiency(dateKey, efficiencyData);
+        return true;
+      },
+      { syncToLocal: true, allowFallback: true }
+    );
   },
 
   async getFreeTime(dateKey) {
-    if (ConnectionManager.getMode() === 'offline') {
-      return await DB.getFreeTime(dateKey);
-    }
-    try {
-      return await this._fetch(`/api/freetime/${dateKey}`);
-    } catch (e) {
-      return await DB.getFreeTime(dateKey);
-    }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => await this._fetch('/api/freetime/' + dateKey),
+      async () => await DB.getFreeTime(dateKey),
+      { allowFallback: true }
+    );
   },
 
   async saveFreeTime(dateKey, tasks) {
-    if (ConnectionManager.getMode() === 'online') {
-      try {
-        await this._fetch(`/api/freetime/${dateKey}`, {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/freetime/' + dateKey, {
           method: 'POST',
           body: JSON.stringify({ tasks }),
         });
-      } catch (e) { }
-    }
-    await DB.saveFreeTime(dateKey, tasks);
-    return true;
+        return true;
+      },
+      async () => {
+        await DB.saveFreeTime(dateKey, tasks);
+        return true;
+      },
+      { syncToLocal: true, allowFallback: true }
+    );
   },
 
   async deferHomework(dateKey, hwId, action, requestedAt) {
-    if (ConnectionManager.getMode() === 'online') {
-      try {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
         return await this._fetch('/api/defer-homework', {
           method: 'POST',
           body: JSON.stringify({ date: dateKey, hwId, action, requestedAt }),
         });
-      } catch (e) { }
-    }
-    var homeworks = await DB.getHomeworks(dateKey);
-    var hw = homeworks.find(h => h.id === hwId);
-    if (hw && action === 'request') {
-      hw.deferRequest = { requestedAt: requestedAt, status: 'pending' };
-      await DB.saveHomeworks(dateKey, homeworks);
-    }
-    return { ok: true };
+      },
+      async () => {
+        var homeworks = await DB.getHomeworks(dateKey);
+        var hw = homeworks.find(function (h) { return h.id === hwId; });
+        if (hw && action === 'request') {
+          hw.deferRequest = { requestedAt: requestedAt, status: 'pending' };
+          await DB.saveHomeworks(dateKey, homeworks);
+        }
+        return { ok: true };
+      },
+      { allowFallback: true }
+    );
   },
 
   async getBountyTasks() {
-    if (ConnectionManager.getMode() === 'offline') {
-      return await DB.getBountyTasks();
-    }
-    try {
-      return await this._fetch('/api/bounty-tasks');
-    } catch (e) {
-      return await DB.getBountyTasks();
-    }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => await this._fetch('/api/bounty-tasks'),
+      async () => await DB.getBountyTasks(),
+      { allowFallback: true }
+    );
   },
 
   async saveBountyTasks(items) {
-    if (ConnectionManager.getMode() === 'online') {
-      try {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
         await this._fetch('/api/bounty-tasks', {
           method: 'POST',
           body: JSON.stringify({ items }),
         });
-      } catch (e) { }
-    }
-    await DB.saveBountyTasks(items);
-    return true;
+        return true;
+      },
+      async () => {
+        await DB.saveBountyTasks(items);
+        return true;
+      },
+      { syncToLocal: true, allowFallback: true }
+    );
   },
 
   async getBountySubmissions(dateKey) {
-    if (ConnectionManager.getMode() === 'offline') {
-      return await DB.getBountySubmissions(dateKey);
-    }
-    try {
-      return await this._fetch(`/api/bounty-submissions/${dateKey}`);
-    } catch (e) {
-      return await DB.getBountySubmissions(dateKey);
-    }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => await this._fetch('/api/bounty-submissions/' + dateKey),
+      async () => await DB.getBountySubmissions(dateKey),
+      { allowFallback: true }
+    );
   },
 
   async saveBountySubmissions(dateKey, submissions) {
-    try { await DB.saveBountySubmissions(dateKey, submissions); } catch (e) { }
-    if (ConnectionManager.getMode() === 'online') {
-      try {
-        await this._fetch(`/api/bounty-submissions/${dateKey}`, {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/bounty-submissions/' + dateKey, {
           method: 'POST',
           body: JSON.stringify({ submissions }),
         });
-      } catch (e) { }
-    }
-    return true;
+        return true;
+      },
+      async () => {
+        await DB.saveBountySubmissions(dateKey, submissions);
+        return true;
+      },
+      { syncToLocal: true, allowFallback: true }
+    );
   },
 
   async getBountyCompletions(dateKey) {
-    if (ConnectionManager.getMode() === 'offline') {
-      return await DB.getBountyCompletions(dateKey);
-    }
-    try {
-      return await this._fetch(`/api/bounty-completions/${dateKey}`);
-    } catch (e) {
-      return await DB.getBountyCompletions(dateKey);
-    }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => await this._fetch('/api/bounty-completions/' + dateKey),
+      async () => await DB.getBountyCompletions(dateKey),
+      { allowFallback: true }
+    );
   },
 
   async saveBountyCompletions(dateKey, completions) {
-    try { await DB.saveBountyCompletions(dateKey, completions); } catch (e) { }
-    if (ConnectionManager.getMode() === 'online') {
-      try {
-        await this._fetch(`/api/bounty-completions/${dateKey}`, {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/bounty-completions/' + dateKey, {
           method: 'POST',
           body: JSON.stringify({ completions }),
         });
-      } catch (e) { }
-    }
-    return true;
+        return true;
+      },
+      async () => {
+        await DB.saveBountyCompletions(dateKey, completions);
+        return true;
+      },
+      { syncToLocal: true, allowFallback: true }
+    );
   },
 
   async resetDate(date) {
-    if (ConnectionManager.getMode() !== 'online') {
-      throw new Error('离线模式不支持重置日期');
-    }
-    return await this._fetch('/api/reset-date', {
-      method: 'POST',
-      body: JSON.stringify({ date: date })
-    });
+    return await this._requestWithStrategy(
+      'online-only',
+      async () => {
+        return await this._fetch('/api/reset-date', {
+          method: 'POST',
+          body: JSON.stringify({ date: date }),
+        });
+      },
+      null,
+      {}
+    );
   },
 
   migrateBountyCompletionsToTotal(data) {
     if (!data || !data.bountyCompletions) return data;
-    const comps = data.bountyCompletions;
+    var comps = data.bountyCompletions;
     if (comps._total) return data;
-    const total = {};
-    for (const dk of Object.keys(comps)) {
-      const entry = comps[dk];
+    var total = {};
+    for (var dk of Object.keys(comps)) {
+      var entry = comps[dk];
       if (entry && typeof entry === 'object') {
-        for (const tid of Object.keys(entry)) {
+        for (var tid of Object.keys(entry)) {
           if (tid === 'uuid' || tid === 'lastModified' || tid === 'isDeleted' || tid === '_table' || tid === 'date') continue;
-          const v = entry[tid];
-          const delta = typeof v === 'number' ? v : (v ? 1 : 0);
+          var v = entry[tid];
+          var delta = typeof v === 'number' ? v : (v ? 1 : 0);
           total[tid] = (total[tid] || 0) + delta;
         }
       }
