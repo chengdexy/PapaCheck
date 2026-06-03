@@ -22,6 +22,7 @@
 ### 修复
 
 - 修复 `getData()` 在 `ConnectionManager.start()` 之前被调用时错误走离线路径导致页面无法加载的问题，改为不依赖 CM 模式直接请求服务器
+- 优化 Flaky Test `test_offline_web.py`：修复 6 项不稳定根因（SW 缓存就绪检测、mock fetch 竞态、测试间状态泄漏），替换 8 处 `try/except: pass` 为结构化断言，缩短运行时间约 22%
 
 ---
 

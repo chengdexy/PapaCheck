@@ -101,8 +101,21 @@ def _seed_homework(date_key=None):
     server_mod.db.save_homeworks(date_key, hw)
 
 
-def _wait_for_page_ready(page, selector='#bigDate', timeout=15000, state='visible'):
-    """等待页面关键元素出现，替代固定 wait_for_timeout"""
+def _click_first_homework_card_and_start(page):
+    """点击首页第一个作业卡片并确认开始（启动确认弹窗 → 点击"开始"按钮）"""
+    card = page.locator('#homeworkGrid .homework-card').first
+    expect(card).to_be_visible(timeout=10000)
+    card.click()
+    page.wait_for_selector('#startConfirmModal', timeout=5000)
+    modal = page.locator('#startConfirmModal')
+    if modal.is_visible():
+        start_btn = modal.locator('button').filter(has_text='开始')
+        if start_btn.count() > 0:
+            start_btn.first.click()
+
+
+def _wait_for_page_ready(page, selector='#bigDate', timeout=15000, state='attached'):
+    """等待页面关键元素挂载到 DOM（不强制 visible，避免大屏模式等场景下失败）"""
     page.wait_for_selector(selector, timeout=timeout, state=state)
 
 
@@ -127,6 +140,47 @@ def _wait_for_js_condition(page, js_expr, timeout=10000):
             return True
         page.wait_for_timeout(200)  # 短轮询间隔，非固定等待
     raise TimeoutError(f'等待 JS 条件超时: {js_expr}')
+
+
+def _wait_for_sw_cache_ready(page, expected_min_count=13, timeout=15000):
+    """等待 Service Worker 缓存完全填充（≥ expected_min_count 个资源），
+    替代仅检查 navigator.serviceWorker.controller，后者只表示 SW 已接管
+    页面，不代表缓存已写入完毕。"""
+    deadline = time.monotonic() + timeout / 1000
+    while time.monotonic() < deadline:
+        try:
+            count = page.evaluate('''async () => {
+                const cache = await caches.open('papacheck-v1');
+                const keys = await cache.keys();
+                return keys.length;
+            }''')
+            if count and count >= expected_min_count:
+                return True
+        except Exception:
+            pass
+        page.wait_for_timeout(200)
+    raise TimeoutError(f'SW 缓存就绪超时，预期 ≥{expected_min_count} 个资源')
+
+
+def _cleanup_browser_state(page):
+    """清理浏览器侧状态，消除测试间泄漏 —— CM 定时器 / ChangeLog / mock fetch，
+    同时设置测试加速配置缩短 CM ping 间隔和超时。"""
+    try:
+        page.evaluate('''() => {
+            // 测试加速：缩短 ping 间隔(pingIntervalMs)、ping超时(pingTimeoutMs)、重连超时(reconnectTimeoutMs)
+            window.__CM_TEST_CONFIG__ = { pingIntervalMs: 500, pingTimeoutMs: 1000, reconnectTimeoutMs: 3000 };
+            if (typeof ConnectionManager !== 'undefined') ConnectionManager.stop();
+            if (typeof ChangeLog !== 'undefined') ChangeLog.clear();
+            // 恢复 fetch（如果前一个测试 mock 了它）
+            if (window._realFetch) {
+                window.fetch = window._realFetch;
+                delete window._realFetch;
+            }
+            delete window._pingEnabled;
+            delete window._originalFetch;
+        }''')
+    except Exception:
+        pass
 
 
 class TestOnlineMainPage:
@@ -213,15 +267,7 @@ class TestOnlineHomeworkWorkflow:
         try:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             _wait_for_page_ready(page)
-            card = page.locator('#homeworkGrid .homework-card').first
-            expect(card).to_be_visible(timeout=10000)
-            card.click()
-            page.wait_for_selector('#startConfirmModal', timeout=5000)
-            modal = page.locator('#startConfirmModal')
-            if modal.is_visible():
-                start_btn = modal.locator('button').filter(has_text='开始')
-                if start_btn.count() > 0:
-                    start_btn.first.click()
+            _click_first_homework_card_and_start(page)
             # 等待作业内容加载到任务显示区
             _wait_for_js_condition(
                 page,
@@ -247,14 +293,7 @@ class TestOnlineHomeworkWorkflow:
         try:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             _wait_for_page_ready(page)
-            card = page.locator('#homeworkGrid .homework-card').first
-            card.click()
-            page.wait_for_selector('#startConfirmModal', timeout=5000)
-            modal = page.locator('#startConfirmModal')
-            if modal.is_visible():
-                start_btn = modal.locator('button').filter(has_text='开始')
-                if start_btn.count() > 0:
-                    start_btn.first.click()
+            _click_first_homework_card_and_start(page)
             # 等待作业内容加载到任务显示区
             _wait_for_js_condition(
                 page,
@@ -295,15 +334,8 @@ class TestOnlineHomeworkWorkflow:
         try:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             _wait_for_page_ready(page)
-            card = page.locator('#homeworkGrid .homework-card').first
-            card.click()
-            page.wait_for_selector('#startConfirmModal', timeout=5000)
-            modal = page.locator('#startConfirmModal')
-            if modal.is_visible():
-                start_btn = modal.locator('button').filter(has_text='开始')
-                if start_btn.count() > 0:
-                    start_btn.first.click()
-                    page.wait_for_selector('#currentTaskDisplay', state='visible', timeout=5000)
+            _click_first_homework_card_and_start(page)
+            page.wait_for_selector('#currentTaskDisplay', state='visible', timeout=5000)
             current_task = page.locator('#currentTaskDisplay')
             complete_btn = current_task.locator('.btn-complete')
             if complete_btn.count() > 0:
@@ -337,15 +369,8 @@ class TestOnlineHomeworkWorkflow:
         try:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             _wait_for_page_ready(page)
-            card = page.locator('#homeworkGrid .homework-card').first
-            card.click()
-            page.wait_for_selector('#startConfirmModal', timeout=5000)
-            modal = page.locator('#startConfirmModal')
-            if modal.is_visible():
-                start_btn = modal.locator('button').filter(has_text='开始')
-                if start_btn.count() > 0:
-                    start_btn.first.click()
-                    page.wait_for_selector('#currentTaskDisplay', state='visible', timeout=5000)
+            _click_first_homework_card_and_start(page)
+            page.wait_for_selector('#currentTaskDisplay', state='visible', timeout=5000)
             current_task = page.locator('#currentTaskDisplay')
             complete_btn = current_task.locator('.btn-complete')
             if complete_btn.count() > 0:
@@ -382,15 +407,7 @@ class TestOnlineHomeworkWorkflow:
         try:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             _wait_for_page_ready(page)
-            card = page.locator('#homeworkGrid .homework-card').first
-            expect(card).to_be_visible(timeout=10000)
-            card.click()
-            page.wait_for_selector('#startConfirmModal', timeout=5000)
-            modal = page.locator('#startConfirmModal')
-            if modal.is_visible():
-                start_btn = modal.locator('button').filter(has_text='开始')
-                if start_btn.count() > 0:
-                    start_btn.first.click()
+            _click_first_homework_card_and_start(page)
             # 等待作业内容加载到任务显示区或结算区
             _wait_for_js_condition(
                 page,
@@ -592,11 +609,9 @@ class TestAdminPage:
             page.goto(f'{test_server}/admin.html', wait_until='domcontentloaded', timeout=15000)
             page.wait_for_selector('.admin-header', timeout=15000)
             rating_alert = page.locator('.rating-alert')
-            try:
-                expect(rating_alert).not_to_be_visible(timeout=5000)
-            except AssertionError:
-                # E2E: 容忍断言时序差异，评级弹窗可能在短暂延迟后才消失
-                pass
+            # 等待页面完成渲染，确保 rating 逻辑已执行
+            page.wait_for_timeout(1000)
+            assert not rating_alert.is_visible(), '已评级的结算不应显示评级弹窗'
         finally:
             context.close()
 
@@ -629,12 +644,8 @@ class TestAdminPage:
                 # E2E: 容忍非关键 UI 状态异常，图表标签可能因渲染时序未出现
                 pass
             value_labels = page.locator('.chart-value-label')
-            try:
-                expect(value_labels.first).to_be_visible(timeout=5000)
-                assert value_labels.count() >= 1
-            except Exception:
-                # E2E: 容忍非关键 UI 状态异常，图表标签可能因渲染时序未出现
-                pass
+            page.wait_for_timeout(1000)  # 等待图表渲染完成
+            assert value_labels.count() >= 1, f'图表应至少有 1 个数值标签, 实际: {value_labels.count()}'
         finally:
             context.close()
 
@@ -668,11 +679,9 @@ class TestAdminPage:
             page.goto(f'{test_server}/admin.html', wait_until='domcontentloaded', timeout=15000)
             page.wait_for_selector('.admin-header', timeout=15000)
             reject_btns = page.locator('button').filter(has_text='驳回')
-            try:
-                expect(reject_btns).to_have_count(0, timeout=5000)
-            except AssertionError:
-                # E2E: 容忍断言时序差异，驳回按钮可能在短暂延迟后才消失
-                pass
+            # 等待页面完成渲染，确保 rating 逻辑已执行
+            page.wait_for_timeout(1000)
+            assert reject_btns.count() == 0, f'已评级的结算不应显示驳回按钮, 实际: {reject_btns.count()}'
         finally:
             context.close()
 
@@ -689,24 +698,18 @@ class TestOfflineBehavior:
         try:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             _wait_for_page_ready(page)
-            # 等待 Service Worker 完成缓存安装，否则离线 reload 无缓存可用
-            _wait_for_js_condition(
-                page,
-                'navigator.serviceWorker.controller !== null',
-                timeout=10000,
-            )
+            # 等待 Service Worker 缓存完全填充（≥13 个核心资源），
+            # 仅检查 controller 不够 —— SW 接管 ≠ 缓存写入完毕
+            _wait_for_sw_cache_ready(page, expected_min_count=13, timeout=15000)
             context.set_offline(True)
             # 离线 reload 不等待网络，由 Service Worker 缓存响应
             page.reload(wait_until='commit', timeout=15000)
             _wait_for_page_ready(page, state='attached')
             date_el = page.locator('#bigDate')
-            try:
-                expect(date_el).to_be_visible(timeout=10000)
-                text = date_el.text_content() or ''
-                assert text != '--'
-            except Exception:
-                # E2E: 容忍非关键 UI 状态异常，离线缓存加载可能存在时序差异
-                pass
+            # 离线重载后 #bigDate 可能因大屏模式被隐藏，检查 DOM 存在和内容即可
+            expect(date_el).to_be_attached(timeout=10000)
+            text = date_el.text_content() or ''
+            assert text != '--', '离线加载后日期应不是占位符'
         finally:
             context.close()
 
@@ -722,12 +725,8 @@ class TestOfflineBehavior:
         try:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             page.wait_for_selector('#bigDate', timeout=15000)
-            # 确保 Service Worker 已激活并接管页面
-            _wait_for_js_condition(
-                page,
-                'navigator.serviceWorker.controller !== null',
-                timeout=10000,
-            )
+            # 等待 Service Worker 缓存完全填充后再操作缓存
+            _wait_for_sw_cache_ready(page, expected_min_count=13, timeout=15000)
             page.evaluate('ConnectionManager.stop()')
             page.evaluate('''async () => {
               const cache = await caches.open("papacheck-v1");
@@ -796,16 +795,14 @@ class TestOfflineBehavior:
         try:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             _wait_for_page_ready(page)
+            # 等待 SW 缓存就绪后再切换离线，确保商店页面可离线访问
+            _wait_for_sw_cache_ready(page, expected_min_count=13, timeout=15000)
             context.set_offline(True)
             page.wait_for_timeout(500)  # 短等待：set_offline 是浏览器级操作，无 DOM 条件可观察
             shop_btn = page.locator('.btn-shop-nav', has_text='积分商店')
             if shop_btn.is_visible():
                 shop_btn.click()
-                try:
-                    expect(page.locator('#shopContainer')).to_be_visible(timeout=5000)
-                except Exception:
-                    # E2E: 容忍非关键 UI 状态异常，离线商店可能因缓存时序差异未渲染
-                    pass
+                expect(page.locator('#shopContainer')).to_be_visible(timeout=5000)
         finally:
             context.close()
 
@@ -825,13 +822,10 @@ class TestOfflineBehavior:
             context.set_offline(False)
             _wait_for_js_condition(page, 'document.getElementById("bigDate")?.textContent !== "--"', timeout=10000)
             date_el = page.locator('#bigDate')
-            try:
-                expect(date_el).to_be_visible(timeout=10000)
-                text = date_el.text_content() or ''
-                assert text != '--'
-            except Exception:
-                # E2E: 容忍非关键 UI 状态异常，网络恢复后数据刷新可能存在时序差异
-                pass
+            # 网络恢复后 #bigDate 可能因大屏模式被隐藏，检查 DOM 存在和内容即可
+            expect(date_el).to_be_attached(timeout=10000)
+            text = date_el.text_content() or ''
+            assert text != '--', '网络恢复后日期应正常显示'
         finally:
             context.close()
 
@@ -932,6 +926,7 @@ class TestConnectionManager:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             _wait_for_page_ready(page)
 
+            _cleanup_browser_state(page)
             page.evaluate('''() => {
                 return new Promise(function(resolve) {
                     ConnectionManager.start();
@@ -956,21 +951,18 @@ class TestConnectionManager:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             _wait_for_page_ready(page)
 
-            page.evaluate('ConnectionManager.start()')
-            _wait_for_cm_mode(page, 'online', timeout=5000)
-            mode_before = page.evaluate('ConnectionManager.getMode()')
-            assert mode_before == 'online', f'服务器在线时 getMode() 应为 online, 实际: {mode_before}'
-
+            # 先 mock fetch 再 start CM，避免真实 ping 与 mock 的竞态
+            page.evaluate('ConnectionManager.stop()')
             page.evaluate('''() => {
-                var realFetch = window.fetch;
                 window.fetch = function() {
                     return Promise.reject(new Error("mock offline"));
                 };
             }''')
+            page.evaluate('ConnectionManager.start()')
             _wait_for_cm_mode(page, 'offline', timeout=8000)
 
             mode_after = page.evaluate('ConnectionManager.getMode()')
-            assert mode_after == 'offline', f'ping 失败后 getMode() 应返回 offline, 实际: {mode_after}'
+            assert mode_after == 'offline', f'mock fetch 失败后 getMode() 应返回 offline, 实际: {mode_after}'
         finally:
             context.close()
 
@@ -986,6 +978,7 @@ class TestConnectionManager:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             _wait_for_page_ready(page)
 
+            _cleanup_browser_state(page)
             page.evaluate('ConnectionManager.start()')
             _wait_for_cm_mode(page, 'online', timeout=5000)
 
@@ -1002,6 +995,9 @@ class TestConnectionManager:
             page.evaluate('''() => {
                 window.fetch = window._realFetch;
             }''')
+            # 显式重启 CM 而非等待 setInterval 触发，消除时序不确定性
+            page.evaluate('ConnectionManager.stop()')
+            page.evaluate('ConnectionManager.start()')
             _wait_for_cm_mode(page, 'online', timeout=8000)
 
             mode_final = page.evaluate('ConnectionManager.getMode()')
@@ -1021,6 +1017,7 @@ class TestConnectionManager:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             _wait_for_page_ready(page)
 
+            _cleanup_browser_state(page)
             page.evaluate('ConnectionManager.start()')
             _wait_for_cm_mode(page, 'online', timeout=5000)
 
@@ -1046,9 +1043,7 @@ class TestConnectionManager:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             _wait_for_page_ready(page)
 
-            page.evaluate('ConnectionManager.start()')
-            _wait_for_cm_mode(page, 'online', timeout=5000)
-
+            # 确保 CM 停止，先 mock fetch 再 start，避免真实 ping 竞态
             page.evaluate('ConnectionManager.stop()')
 
             page.evaluate('''() => {
@@ -1088,6 +1083,7 @@ class TestConnectionManager:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             _wait_for_page_ready(page)
 
+            _cleanup_browser_state(page)
             page.evaluate('ConnectionManager.start()')
             _wait_for_cm_mode(page, 'online', timeout=5000)
 
@@ -1107,7 +1103,7 @@ class TestConnectionManager:
             page.evaluate('''() => {
                 ConnectionManager.start();
             }''')
-            _wait_for_cm_mode(page, 'offline', timeout=15000)
+            _wait_for_cm_mode(page, 'offline', timeout=8000)
 
             mask_display = page.evaluate('''() => {
                 var mask = document.getElementById('reconnectMask');
@@ -1132,6 +1128,7 @@ class TestConnectionManager:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             _wait_for_page_ready(page)
 
+            _cleanup_browser_state(page)
             page.evaluate('ConnectionManager.start()')
             _wait_for_cm_mode(page, 'online', timeout=5000)
 
@@ -1181,6 +1178,7 @@ class TestConnectionManager:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             _wait_for_page_ready(page)
 
+            _cleanup_browser_state(page)
             page.evaluate('ConnectionManager.start()')
             _wait_for_cm_mode(page, 'online', timeout=5000)
 
@@ -1210,7 +1208,7 @@ class TestConnectionManager:
                 if (mask) mask.style.display = 'flex';
             }''')
 
-            _wait_for_js_condition(page, 'document.getElementById("reconnectMask")?.style.display === "none"', timeout=25000)
+            _wait_for_js_condition(page, 'document.getElementById("reconnectMask")?.style.display === "none"', timeout=8000)
 
             mask_display = page.evaluate('''() => {
                 var mask = document.getElementById('reconnectMask');
@@ -1235,6 +1233,7 @@ class TestConnectionManager:
             page.goto(f'{test_server}/admin.html', wait_until='domcontentloaded', timeout=15000)
             page.wait_for_selector('.admin-header', timeout=15000)
 
+            _cleanup_browser_state(page)
             page.evaluate('ConnectionManager.stop()')
 
             page.evaluate('''() => {

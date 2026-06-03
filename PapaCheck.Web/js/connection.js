@@ -1,7 +1,6 @@
 var ConnectionManager = (function () {
   var _mode = 'offline';
   var _pingTimer = null;
-  var _pingIntervalMs = 3000;
   var _failCount = 0;
   var _syncing = false;
   var _wasOnline = false;
@@ -10,8 +9,16 @@ var ConnectionManager = (function () {
     return _mode;
   }
 
-  var _pingTimeoutMs = 3000;
-  var _reconnectTimeoutMs = 10000;
+  // 测试环境可通过 window.__CM_TEST_CONFIG__ 覆盖超时参数（读取时机为每次调用）
+  function _getPingTimeout() {
+    return (window.__CM_TEST_CONFIG__ && window.__CM_TEST_CONFIG__.pingTimeoutMs) || 3000;
+  }
+  function _getReconnectTimeout() {
+    return (window.__CM_TEST_CONFIG__ && window.__CM_TEST_CONFIG__.reconnectTimeoutMs) || 10000;
+  }
+  function _getPingInterval() {
+    return (window.__CM_TEST_CONFIG__ && window.__CM_TEST_CONFIG__.pingIntervalMs) || 3000;
+  }
 
   async function _ping() {
     var fetchPromise = fetch('/api/ping', {
@@ -31,7 +38,7 @@ var ConnectionManager = (function () {
     return Promise.race([
       fetchPromise,
       new Promise(function (resolve) {
-        setTimeout(function () { resolve(false); }, _pingTimeoutMs);
+        setTimeout(function () { resolve(false); }, _getPingTimeout());
       })
     ]);
   }
@@ -57,7 +64,7 @@ var ConnectionManager = (function () {
       await Promise.race([
         syncPromise,
         new Promise(function (resolve) {
-          setTimeout(function () { resolve('timeout'); }, _reconnectTimeoutMs);
+          setTimeout(function () { resolve('timeout'); }, _getReconnectTimeout());
         })
       ]);
       _mode = 'online';
@@ -119,7 +126,7 @@ var ConnectionManager = (function () {
               await Promise.race([
                 firstSyncPromise,
                 new Promise(function (resolve) {
-                  setTimeout(function () { resolve('timeout'); }, _reconnectTimeoutMs);
+                  setTimeout(function () { resolve('timeout'); }, _getReconnectTimeout());
                 })
               ]);
               _wasOnline = true;
@@ -147,7 +154,7 @@ var ConnectionManager = (function () {
           showToast('\u7f51\u7edc\u8fde\u63a5\u65ad\u5f00\uff0c\u4f7f\u7528\u7f13\u5b58\u6570\u636e');
         }
       }
-    }, _pingIntervalMs);
+    }, _getPingInterval());
 
     return initialPingDone;
   }
