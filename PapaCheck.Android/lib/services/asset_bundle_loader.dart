@@ -1,6 +1,11 @@
 import 'package:flutter/services.dart';
 
 class AssetBundleLoader {
+  static const Map<String, String> _cdnAssetMap = {
+    'https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js':
+        'assets/web/js/localforage.min.js',
+  };
+
   static final RegExp stylesheetRegex = RegExp(
     r'<link\s+[^>]*rel="stylesheet"[^>]*href="([^"]+)"[^>]*/?>',
   );
@@ -12,13 +17,14 @@ class AssetBundleLoader {
   static Future<String> loadAndInline(String htmlAssetPath) async {
     String html = await rootBundle.loadString(htmlAssetPath);
 
-    html = await _inlineAssets(html, stylesheetRegex, 'style');
-    html = await _inlineAssets(html, scriptSrcRegex, 'script');
+    html = await _inlineAssets(htmlAssetPath, html, stylesheetRegex, 'style');
+    html = await _inlineAssets(htmlAssetPath, html, scriptSrcRegex, 'script');
 
     return html;
   }
 
   static Future<String> _inlineAssets(
+    String htmlAssetPath,
     String html,
     RegExp regex,
     String tagName,
@@ -28,7 +34,7 @@ class AssetBundleLoader {
     for (final match in matches) {
       final src = match.group(1)!;
 
-      final assetPath = resolveAssetPath(html, src);
+      final assetPath = resolveAssetPath(htmlAssetPath, src);
       if (assetPath == null) continue;
 
       try {
@@ -47,6 +53,10 @@ class AssetBundleLoader {
   }
 
   static String? resolveAssetPath(String htmlPath, String href) {
+    if (_cdnAssetMap.containsKey(href)) {
+      return _cdnAssetMap[href];
+    }
+
     if (href.startsWith('http://') || href.startsWith('https://')) {
       return null;
     }

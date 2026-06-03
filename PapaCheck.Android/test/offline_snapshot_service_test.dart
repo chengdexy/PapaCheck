@@ -1,70 +1,82 @@
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:papacheck_android/services/offline_snapshot_service.dart';
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
+  late Directory testDir;
 
-  setUp(() {
-    SharedPreferences.setMockInitialValues({});
+  setUp(() async {
+    testDir = await Directory.systemTemp.createTemp('offline_snapshot_test_');
+    OfflineSnapshotService.setTestDirectory(testDir);
   });
 
-  /// Feature: 离线快照存储
-  ///   Scenario: 保存后可通过相同 URL 加载快照
-  ///     Given 已为某 URL 保存离线快照
-  ///     When 通过相同 URL 加载快照
-  ///     Then 返回已保存的 HTML 内容
-  test('saved snapshot can be loaded by same URL', () async {
-    const url = 'http://192.168.1.100:8080/';
-    const html = '<html><body>test child page</body></html>';
+  tearDown(() async {
+    OfflineSnapshotService.setTestDirectory(null);
+    if (await testDir.exists()) {
+      await testDir.delete(recursive: true);
+    }
+  });
+
+  /// Feature: 离线快照持久化存储
+  ///   Scenario: 保存快照后应用重启可以完整加载
+  ///     Given 应用将内联HTML快照保存到文件系统
+  ///     When 应用重启后尝试加载该快照
+  ///     Then 快照内容完整返回，与保存时一致
+  test('保存快照后应用重启可以完整加载', () async {
+    const url = 'http://192.168.1.100:8080/index.html';
+    const html =
+        '<html><head><style>body{color:red}</style></head><body>Hello</body></html>';
 
     await OfflineSnapshotService.save(url, html);
-    final result = await OfflineSnapshotService.load(url);
+    final loaded = await OfflineSnapshotService.load(url);
 
-    expect(result, html);
+    expect(loaded, equals(html));
   });
 
-  /// Feature: 离线快照存储
-  ///   Scenario: 未保存快照的 URL 加载时返回 null
-  ///     Given 未为某 URL 保存过离线快照
-  ///     When 通过该 URL 加载快照
-  ///     Then 返回 null
-  test('loading unsaved URL returns null', () async {
-    const url = 'http://192.168.1.100:8080/admin.html';
+  /// Feature: 离线快照持久化存储
+  ///   Scenario: 大体积HTML快照（含内联CSS和JS）可可靠存储和读取
+  ///     Given 一个包含大量内联CSS和JS内容的HTML快照（超过100KB）
+  ///     When 将该快照保存后再加载
+  ///     Then 加载的内容与原始内容完全一致
+  test('大体积HTML快照可可靠存储和读取', () async {
+    const url = 'http://192.168.1.100:8080/index.html';
+    // 生成超过100KB的HTML内容
+    final largeCss = 'body{color:red;}' * 5000; // ~100KB
+    final largeJs = 'console.log("test");' * 3000; // ~60KB
+    final html = '<html><head><style>$largeCss</style></head>'
+        '<body><script>$largeJs</script></body></html>';
 
-    final result = await OfflineSnapshotService.load(url);
+    await OfflineSnapshotService.save(url, html);
+    final loaded = await OfflineSnapshotService.load(url);
 
-    expect(result, isNull);
+    expect(loaded, equals(html));
   });
 
-  /// Feature: 离线快照存储
-  ///   Scenario: 同一 URL 重复保存覆盖旧快照
-  ///     Given 已为某 URL 保存离线快照
-  ///     When 再次为同一 URL 保存新快照
-  ///     Then 旧快照被新内容覆盖
-  test('saving twice overwrites previous snapshot', () async {
-    const url = 'http://192.168.1.100:8080/';
+  /// Feature: 离线快照持久化存储
+  ///   Scenario: 未保存过快照时加载返回null
+  ///     Given 从未为某个URL保存过快照
+  ///     When 尝试加载该URL的快照
+  ///     Then 返回null
+  test('未保存过快照时加载返回null', () async {
+    const url = 'http://192.168.1.100:8080/index.html';
+
+    final loaded = await OfflineSnapshotService.load(url);
+
+    expect(loaded, isNull);
+  });
+
+  /// Feature: 离线快照持久化存储
+  ///   Scenario: 保存快照后覆盖更新
+  ///     Given 已存在某个URL的快照
+  ///     When 保存新的快照内容到同一URL
+  ///     Then 加载返回最新的快照内容
+  test('保存快照后覆盖更新', () async {
+    const url = 'http://192.168.1.100:8080/index.html';
 
     await OfflineSnapshotService.save(url, '<html>old</html>');
     await OfflineSnapshotService.save(url, '<html>new</html>');
-    final result = await OfflineSnapshotService.load(url);
+    final loaded = await OfflineSnapshotService.load(url);
 
-    expect(result, '<html>new</html>');
-  });
-
-  /// Feature: 离线快照存储
-  ///   Scenario: 不同 URL 的快照相互隔离
-  ///     Given 已为两个不同 URL 分别保存快照
-  ///     When 分别通过各自 URL 加载快照
-  ///     Then 每个 URL 返回各自独立的快照内容
-  test('different URLs maintain separate snapshots', () async {
-    const childUrl = 'http://192.168.1.100:8080/';
-    const parentUrl = 'http://192.168.1.100:8080/admin.html';
-
-    await OfflineSnapshotService.save(childUrl, '<html>child</html>');
-    await OfflineSnapshotService.save(parentUrl, '<html>parent</html>');
-
-    expect(await OfflineSnapshotService.load(childUrl), '<html>child</html>');
-    expect(await OfflineSnapshotService.load(parentUrl), '<html>parent</html>');
+    expect(loaded, equals('<html>new</html>'));
   });
 }

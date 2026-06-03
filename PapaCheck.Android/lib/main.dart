@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -107,15 +106,6 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     _applyOrientation(storedRole);
     final fullUrl = _buildFullUrl(storedUrl, storedRole);
 
-    if (kDebugMode) {
-      setState(() => _url = fullUrl);
-      _initController(fullUrl);
-      if (mounted) {
-        await _checkVersion(storedUrl);
-      }
-      return;
-    }
-
     String? html = await OfflineSnapshotService.load(fullUrl);
 
     if (html == null) {
@@ -123,11 +113,35 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     }
 
     if (html != null && mounted) {
-      setState(() => _url = fullUrl);
+      setState(() {
+        _url = fullUrl;
+        _isPageReady = true;
+      });
       await _initControllerOffline(fullUrl, html);
     } else if (mounted) {
-      setState(() => _url = fullUrl);
-      _initController(fullUrl);
+      // 无离线内容，先检测服务器是否可达
+      final reachable = await _isServerReachable(fullUrl);
+      if (reachable && mounted) {
+        setState(() => _url = fullUrl);
+        _initController(fullUrl);
+      } else if (mounted) {
+        // 离线且无缓存，显示友好提示
+        final action = await ConnectFailedDialog.show(context, url: storedUrl);
+        if (!mounted) return;
+        if (action == 'retry') {
+          _startup();
+        } else if (action == 'config') {
+          _openConfig();
+        } else if (action == 'offline') {
+          // 尝试从 assets 加载
+          html = await _loadFromAssets(storedRole);
+          if (html != null && mounted) {
+            setState(() => _url = fullUrl);
+            await _initControllerOffline(fullUrl, html);
+          }
+        }
+        return;
+      }
     }
 
     if (mounted) {
@@ -217,7 +231,6 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     }
 
     await _controller!.loadHtmlString(html, baseUrl: baseUrl);
-    _waitForPageReady();
   }
 
   void _waitForPageReady() {
@@ -259,6 +272,20 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
 
     if (html != null && mounted) {
       await _initControllerOffline(url, html);
+    } else if (mounted) {
+      await _showConnectFailedDialog(url);
+    }
+  }
+
+  Future<void> _showConnectFailedDialog(String url) async {
+    if (!mounted) return;
+    final baseUrl = _getBaseUrl(url);
+    final action = await ConnectFailedDialog.show(context, url: baseUrl);
+    if (!mounted) return;
+    if (action == 'retry') {
+      _startup();
+    } else if (action == 'config') {
+      _openConfig();
     }
   }
 
@@ -270,6 +297,20 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
           const Duration(seconds: 5),
         );
     return response.transform(utf8.decoder).join();
+  }
+
+  Future<bool> _isServerReachable(String url) async {
+    try {
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 3);
+      final request = await client.getUrl(Uri.parse(url));
+      final response = await request.close().timeout(
+            const Duration(seconds: 3),
+          );
+      return response.statusCode < 500;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> _openConfig() async {
