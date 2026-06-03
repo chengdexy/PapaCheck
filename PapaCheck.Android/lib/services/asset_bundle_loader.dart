@@ -66,7 +66,7 @@ class AssetBundleLoader {
     if (href.startsWith('/')) {
       final parts = htmlPath.split('/');
       final root = parts.sublist(0, parts.length - 1).join('/');
-      return '$root${href}';
+      return '$root$href';
     }
 
     return '$htmlDir$href';
