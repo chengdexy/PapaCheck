@@ -1215,6 +1215,7 @@ function confirmStartTask(hwId) {
         ${deferBtn}
         <button onclick="closeStartConfirm(); startHomework('${hwId}', 'challenge')" style="padding:10px 16px;background:var(--accent);color:var(--bg);border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">⚔️ 开始</button>
       </div>
+      <button onclick="closeStartConfirm(); completeInSchool('${hwId}')" style="display:block;margin:10px auto 0;padding:8px 20px;border:none;border-radius:10px;background:#27ae60;color:#fff;font-size:14px;cursor:pointer;">🏫 在校提前完成</button>
   `;
   }
   modal.classList.add('show');

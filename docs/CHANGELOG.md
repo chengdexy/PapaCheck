@@ -6,7 +6,18 @@
 
 ## [Unreleased]
 
-### 变更
+### 新增（Added）
+- 作业「在校提前完成」属性：孩子端在开始确认弹框中可一键标记作业为已在学校提前完成，`actualDuration = ceil(suggestedDuration × 90%)`，直接入库
+- 管理端统计新增「在校提前完成比例」饼图（本周/本月/全部历史可切换），放在评级饼图前
+- 管理端作业列表为 `completedInSchool` 作业显示「🏫在校完成」标签
+- 独立数据库迁移脚本 `migrate_efficiency_all_modes.py`：重新计算历史效率数据（用后即删）
+
+### 变更（Changed）
+- 效率统计范围从仅挑战模式扩展为所有非驳回已完成作业（计时模式、在校提前完成等均计入）
+- 邮件导入作业默认包含 `completedInSchool: false` 字段
+- 管理端驳回作业时同步清除 `completedInSchool` 标记
+
+### 历史变更
 
 - 重构 Web 前端 API 模块：引入 `_requestWithStrategy` 统一请求策略处理器，消除 27 个方法中重复的在线/离线切换逻辑，新增 `online-first`/`online-only`/`offline-only` 三种策略
 - 新增 api.js 策略单元测试 20 个（Node.js 内置 test runner + vm 沙箱），覆盖三种策略、getData、_fetch、resetDate、migrateBountyCompletionsToTotal
