@@ -764,22 +764,22 @@ class TestOfflineBehavior:
             page.wait_for_selector('#bigDate', timeout=15000)
             page.evaluate('ConnectionManager.stop()')
 
-            page.evaluate('ChangeLog.clear()')
-            cnt = page.evaluate('ChangeLog.count()')
+            page.evaluate('async () => { await ChangeLog.clear(); }')
+            cnt = page.evaluate('async () => await ChangeLog.count()')
             assert cnt == 0, f'清空后 count 应为 0, 实际: {cnt}'
 
-            page.evaluate('ChangeLog.add("update", "uuid-1", {status: "done"})')
-            page.evaluate('ChangeLog.add("update", "uuid-2", {status: "pending"})')
-            cnt = page.evaluate('ChangeLog.count()')
+            page.evaluate('async () => { await ChangeLog.add("update", "uuid-1", {status: "done"}); }')
+            page.evaluate('async () => { await ChangeLog.add("update", "uuid-2", {status: "pending"}); }')
+            cnt = page.evaluate('async () => await ChangeLog.count()')
             assert cnt == 2, f'添加 2 条后 count 应为 2, 实际: {cnt}'
 
-            pending = page.evaluate('ChangeLog.getPending()')
+            pending = page.evaluate('async () => await ChangeLog.getPending()')
             assert len(pending) == 2, f'getPending 应返回 2 条, 实际: {len(pending)}'
             assert pending[0]['uuid'] == 'uuid-1'
             assert pending[1]['uuid'] == 'uuid-2'
 
-            page.evaluate('ChangeLog.clear()')
-            cnt = page.evaluate('ChangeLog.count()')
+            page.evaluate('async () => { await ChangeLog.clear(); }')
+            cnt = page.evaluate('async () => await ChangeLog.count()')
             assert cnt == 0, f'再次清空后 count 应为 0, 实际: {cnt}'
         finally:
             context.close()
