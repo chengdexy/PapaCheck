@@ -40,7 +40,7 @@ function tickFrame() {
   if (isAnyTaskPaused()) return;
 
   const activeHw = getActiveHomework();
-  if (activeHw) {
+  if (activeHw && !activeHw.paused) {
     checkReminders(activeHw);
   }
 
@@ -215,7 +215,7 @@ function updateBigScreen() {
   document.getElementById('bigTime').textContent = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 
   const activeHw = getActiveHomework();
-  if (activeHw) {
+  if (activeHw && !activeHw.paused) {
     checkReminders(activeHw);
   }
 
@@ -381,8 +381,9 @@ function updateCurrentTask() {
 function renderActiveHomeworkInCurrentTask(display, hw) {
   const subject = SUBJECTS[hw.subject] || SUBJECTS['其他'];
   const now = new Date();
-  const startedAt = new Date(hw.startedAt);
-  const elapsedSeconds = Math.floor((now - startedAt) / 1000);
+  const elapsedSeconds = hw.paused && hw._pausedElapsed != null
+    ? hw._pausedElapsed
+    : Math.floor((now - new Date(hw.startedAt)) / 1000);
 
   let timerHtml = '';
   let progressHtml = '';
@@ -581,8 +582,9 @@ function updateHomeworkGrid() {
       statusClassName = 'doing';
 
       const now = new Date();
-      const startedAt = new Date(hw.startedAt);
-      const elapsedSeconds = Math.floor((now - startedAt) / 1000);
+      const elapsedSeconds = hw.paused && hw._pausedElapsed != null
+        ? hw._pausedElapsed
+        : Math.floor((now - new Date(hw.startedAt)) / 1000);
 
       if (hw.mode === 'challenge') {
         const totalSeconds = hw.suggestedDuration * 60;
