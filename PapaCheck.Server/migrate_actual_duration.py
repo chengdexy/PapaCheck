@@ -14,15 +14,17 @@ import os
 import sys
 import datetime
 
-# 支持指定数据库路径
-if '--db' in sys.argv:
-    db_idx = sys.argv.index('--db')
-    DB_FILE = sys.argv[db_idx + 1]
-else:
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from db import DB_FILE
-
 import sqlite3
+
+
+def _get_default_db_path():
+    """获取默认数据库路径：--db 参数 > PAPACHECK_DB_DIR 环境变量 > 脚本所在目录/data.db"""
+    if '--db' in sys.argv:
+        idx = sys.argv.index('--db')
+        return sys.argv[idx + 1]
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    db_dir = os.environ.get('PAPACHECK_DB_DIR', script_dir)
+    return os.path.join(db_dir, 'data.db')
 
 
 def clamp_actual_duration(actual_duration, suggested_duration):
@@ -134,4 +136,4 @@ def migrate(db_path):
 
 
 if __name__ == '__main__':
-    migrate(DB_FILE)
+    migrate(_get_default_db_path())

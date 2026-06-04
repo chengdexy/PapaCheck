@@ -73,3 +73,4 @@
 | 2026-06-03 | 新增作业用时下限保护：actualDuration ≤ suggestedDuration×20% 且 ≤1分钟时修正为建议时长入库，防止秒点完成污染统计；含一次性迁移脚本和 7 个 TDD 测试 |
 | 2026-06-03 | 前端测试框架从 Node.js 内置 test runner 迁移到 Vitest，支持 IDE 测试面板集成；.gitignore 补充 node_modules/ |
 | 2026-06-03 | 优化 Flaky Test `test_offline_web.py`：修复 SW 缓存就绪检测、mock fetch 竞态、测试间状态泄漏等 6 项不稳定根因，替换 8 处 try/except: pass 为结构化断言，ConnectionManager 测试加速约 22% |
+| 2026-06-04 | 修复迁移脚本路径依赖脆弱性问题：`from db import DB_FILE` 改为 `_get_default_db_path()` 直接拼接绝对路径，不受运行目录影响；新增 6 个 pytest 单元测试覆盖迁移逻辑和幂等性 |
