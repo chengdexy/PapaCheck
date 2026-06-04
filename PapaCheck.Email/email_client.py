@@ -455,6 +455,7 @@ def _build_homework_item(subject, content):
         'completedAt': None,
         'actualDuration': None,
         'deferRequest': None,
+        'completedInSchool': False,
         'source': 'email',
     }
 

@@ -245,6 +245,32 @@ async function startHomework(id, mode) {
   }
 }
 
+async function completeInSchool(hwId, deps) {
+  const hw = (deps ? deps.homeworks : homeworks).find(h => h.id === hwId);
+  if (!hw || hw.status !== 'pending') return;
+
+  const now = new Date().toISOString();
+  hw.status = 'done';
+  hw.mode = 'challenge';
+  hw.completedInSchool = true;
+  hw.actualDuration = Math.ceil((hw.suggestedDuration || 0) * 0.9);
+  hw.startedAt = now;
+  hw.completedAt = now;
+
+  if (deps) {
+    await deps.saveHomeworks();
+    await deps.checkAllDone();
+    deps.updateBigScreen();
+    if (deps.speak) deps.speak('在学校提前完成，好样的！');
+  } else {
+    await saveHomeworksSilent();
+    await checkAllDone();
+    needsFullRender = true;
+    updateBigScreen();
+    Voice.speak('在学校提前完成，好样的！');
+  }
+}
+
 let _completingHomework = false;
 let _startingHomework = false;
 
@@ -497,6 +523,7 @@ async function checkAllDone() {
 async function calculateSettlement() {
   const doneHw = homeworks.filter(h => h.status === 'done');
   const challengeSuccess = doneHw.filter(h => h.mode === 'challenge' && !h.rejected);
+  const efficiencyHw = doneHw.filter(h => !h.rejected);
   const dailyBase = cachedData?.settings?.dailyBasePoints ?? 50;
   const homeworkBonus = challengeSuccess.reduce(
     (sum, h) => sum + (h.basePoints ?? cachedData?.settings?.homeworkBonusPerTask ?? 10), 0
@@ -526,7 +553,7 @@ async function calculateSettlement() {
   cachedData.dailySettlement[dateKey] = settlementToSave;
 
   const ratios = [];
-  challengeSuccess.forEach(hw => {
+  efficiencyHw.forEach(hw => {
     if (hw.actualDuration !== null && hw.suggestedDuration > 0) {
       ratios.push(hw.actualDuration / hw.suggestedDuration);
     }

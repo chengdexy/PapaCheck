@@ -320,6 +320,9 @@ function renderHomeworkTab() {
         const deferBadge = isDeferPending
           ? ' <span style="background:var(--warning);color:var(--bg);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">⏭️ 申请延后</span>'
           : '';
+        const completedInSchoolBadge = (hw.status === 'done' && hw.completedInSchool)
+          ? ' <span style="background:var(--success);color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">🏫在校完成</span>'
+          : '';
         const deferActions = isDeferPending
           ? `<button class="btn-sm" style="background:var(--success);color:#fff;margin-right:4px;" onclick="approveDeferHomework('${hw.id}', '${hw.deferRequest.requestedAt || ''}')">批准</button>
              <button class="btn-sm" style="background:var(--danger);color:#fff;" onclick="rejectDeferHomework('${hw.id}')">拒绝</button>`
@@ -342,7 +345,7 @@ function renderHomeworkTab() {
               <div class="hw-admin-item">
                 <div class="hw-admin-icon">${subject.icon}</div>
                 <div class="hw-admin-info">
-                  <div class="hw-admin-subject">${escapeHtml(hw.subject)} - ${escapeHtml(hw.content)}${deferBadge}</div>
+                  <div class="hw-admin-subject">${escapeHtml(hw.subject)} - ${escapeHtml(hw.content)}${deferBadge}${completedInSchoolBadge}</div>
                   <div class="hw-admin-meta">${modeText}${bpText}${hw.actualDuration !== null ? ' · 实际' + hw.actualDuration + '分钟' : ''}${elapsedText}</div>
                 </div>
                 <div class="hw-admin-status">${statusHtml}</div>
@@ -433,6 +436,7 @@ async function saveAdminHw() {
       startedAt: null,
       completedAt: null,
       actualDuration: null,
+      completedInSchool: false,
     });
   }
 
@@ -476,6 +480,7 @@ async function rejectHomework(hwId) {
   hw.startedAt = null;
   hw.completedAt = null;
   hw.actualDuration = null;
+  hw.completedInSchool = false;
   hw.mode = 'pending';
 
   await API.saveHomeworks(dateKey, adminHomeworks);
@@ -1409,8 +1414,44 @@ function renderSvgPieChart(data, total) {
     const sr = (d.start * Math.PI) / 180, er = (d.end * Math.PI) / 180;
     const x1 = cx + r * Math.cos(sr), y1 = cy + r * Math.sin(sr);
     const x2 = cx + r * Math.cos(er), y2 = cy + r * Math.sin(er);
-    const large = d.end - d.start > 180 ? 1 : 0;
+    const span = d.end - d.start;
+    if (span >= 359.999) {
+      // 360° 圆弧需拆成两段 180° 弧，否则 SVG 终点=起点时退化为空
+      const mid = d.start + 180;
+      const mr = (mid * Math.PI) / 180;
+      const xm = cx + r * Math.cos(mr), ym = cy + r * Math.sin(mr);
+      return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 1,1 ${xm},${ym} A${r},${r} 0 1,1 ${x2},${y2} Z" fill="${colors[d.rating] || 'var(--text-secondary)'}"/>`;
+    }
+    const large = span > 180 ? 1 : 0;
     return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z" fill="${colors[d.rating] || 'var(--text-secondary)'}"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 160 140" style="width:160px;height:140px;">${paths}</svg>`;
+}
+
+function renderCompletionPieChart(data, total) {
+  const cx = 80, cy = 70, r = 55;
+  let curAngle = -90;
+  const segments = data.map(d => {
+    const angle = (d.count / total) * 360;
+    const start = curAngle;
+    const end = curAngle + angle;
+    curAngle = end;
+    return { ...d, start, end };
+  });
+  const paths = segments.map(d => {
+    if (d.count === 0) return '';
+    const sr = (d.start * Math.PI) / 180, er = (d.end * Math.PI) / 180;
+    const x1 = cx + r * Math.cos(sr), y1 = cy + r * Math.sin(sr);
+    const x2 = cx + r * Math.cos(er), y2 = cy + r * Math.sin(er);
+    const span = d.end - d.start;
+    if (span >= 359.999) {
+      const mid = d.start + 180;
+      const mr = (mid * Math.PI) / 180;
+      const xm = cx + r * Math.cos(mr), ym = cy + r * Math.sin(mr);
+      return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 1,1 ${xm},${ym} A${r},${r} 0 1,1 ${x2},${y2} Z" fill="${d.color || 'var(--text-secondary)'}"/>`;
+    }
+    const large = span > 180 ? 1 : 0;
+    return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z" fill="${d.color || 'var(--text-secondary)'}"/>`;
   }).join('');
   return `<svg viewBox="0 0 160 140" style="width:160px;height:140px;">${paths}</svg>`;
 }
@@ -1509,6 +1550,21 @@ function renderStatsTab() {
   const ratingPieData = Object.entries(ratingCounts).map(([rating, count]) => ({ rating, count }));
   const ratingTotal = ratingPieData.reduce((s, d) => s + d.count, 0);
 
+  // 在校提前完成比例
+  let completedInSchoolCount = 0;
+  let totalDoneCount = 0;
+  dateRange.forEach(date => {
+    const hwList = cachedData?.homeworks?.[date] || [];
+    const doneHw = hwList.filter(h => h.status === 'done' && !h.rejected);
+    completedInSchoolCount += doneHw.filter(h => h.completedInSchool).length;
+    totalDoneCount += doneHw.length;
+  });
+  const completedInSchoolPieData = [
+    { label: '在校提前完成', count: completedInSchoolCount, color: 'var(--success)' },
+    { label: '在家完成', count: totalDoneCount - completedInSchoolCount, color: 'var(--accent)' },
+  ];
+  const completedInSchoolTotal = completedInSchoolPieData.reduce((s, d) => s + d.count, 0);
+
   const shownRatings = ratingsList.slice(0, _ratingShowCount);
   const hasMoreRatings = ratingsList.length > _ratingShowCount;
 
@@ -1565,6 +1621,23 @@ function renderStatsTab() {
       ${efficiencyRatios.length === 0 || efficiencyRatios.every(d => d.value === 0)
       ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'
       : renderSvgLineChart(efficiencyRatios, { color: 'var(--warning)', avgColor: 'var(--accent)', unit: '%' })}
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-title">🏫 在校提前完成比例</div>
+      <div class="chart-pie-section">
+      ${completedInSchoolTotal > 0 ? `<div style="display:flex;align-items:center;gap:16px;margin-bottom:8px;">
+        ${renderCompletionPieChart(completedInSchoolPieData, completedInSchoolTotal)}
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          ${completedInSchoolPieData.map(d =>
+        `<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+              <span style="width:10px;height:10px;border-radius:2px;background:${d.color};display:inline-block;"></span>
+              ${d.label}: ${d.count}项 (${completedInSchoolTotal > 0 ? Math.round(d.count / completedInSchoolTotal * 100) : 0}%)
+            </div>`
+      ).join('')}
+        </div>
+      </div>` : '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'}
+      </div>
     </div>
 
     <div class="chart-container">
