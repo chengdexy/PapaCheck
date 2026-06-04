@@ -15,6 +15,7 @@
 
 ### 新增
 
+- 一次性数据库迁移脚本 `migrate_actual_duration.py`：修正历史异常 actualDuration 数据并同步更新 efficiency_history
 - `clampActualDuration` 函数单元测试 7 个（Vitest），覆盖正常用时、修正触发、边界值等场景
 - 项目级 Vitest 配置（`vitest.config.js`、`package.json`）
 
