@@ -1428,32 +1428,71 @@ function renderSvgPieChart(data, total) {
   return `<svg viewBox="0 0 160 140" style="width:160px;height:140px;">${paths}</svg>`;
 }
 
-function renderCompletionPieChart(data, total) {
-  const cx = 80, cy = 70, r = 55;
-  let curAngle = -90;
-  const segments = data.map(d => {
-    const angle = (d.count / total) * 360;
-    const start = curAngle;
-    const end = curAngle + angle;
-    curAngle = end;
-    return { ...d, start, end };
-  });
-  const paths = segments.map(d => {
-    if (d.count === 0) return '';
-    const sr = (d.start * Math.PI) / 180, er = (d.end * Math.PI) / 180;
-    const x1 = cx + r * Math.cos(sr), y1 = cy + r * Math.sin(sr);
-    const x2 = cx + r * Math.cos(er), y2 = cy + r * Math.sin(er);
-    const span = d.end - d.start;
-    if (span >= 359.999) {
-      const mid = d.start + 180;
-      const mr = (mid * Math.PI) / 180;
-      const xm = cx + r * Math.cos(mr), ym = cy + r * Math.sin(mr);
-      return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 1,1 ${xm},${ym} A${r},${r} 0 1,1 ${x2},${y2} Z" fill="${d.color || 'var(--text-secondary)'}"/>`;
+function renderStackedBarChart(data) {
+  const width = 600, height = 180;
+  const pad = { top: 24, right: 16, bottom: 32, left: 40 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+
+  const maxVal = Math.max(1, ...data.map(d => d.inSchool + d.atHome));
+  const yMax = Math.ceil(maxVal * 1.1);
+
+  const yLines = [];
+  const yStep = yMax <= 4 ? 1 : Math.ceil(yMax / 4);
+  for (let v = 0; v <= yMax; v += yStep) yLines.push(v);
+  if (yLines[yLines.length - 1] < yMax) yLines.push(yMax);
+
+  // 柱子均匀分布
+  const n = data.length;
+  const barTotalWidth = plotW / n;
+  const barWidth = Math.max(4, barTotalWidth * 0.7);
+  const barGap = (barTotalWidth - barWidth) / 2;
+  const labelInterval = n <= 14 ? 1 : n <= 31 ? 3 : Math.ceil(n / 10);
+
+  let barsSvg = '';
+  let labelsSvg = '';
+
+  data.forEach((d, i) => {
+    const total = d.inSchool + d.atHome;
+    const barX = pad.left + i * barTotalWidth + barGap;
+    const bottomY = pad.top + plotH;
+    const totalH = total > 0 ? plotH * (total / yMax) : 0;
+    const inSchoolH = total > 0 ? plotH * (d.inSchool / yMax) : 0;
+    const atHomeH = totalH - inSchoolH;
+
+    // 在校（底部，贴横轴）
+    if (d.inSchool > 0) {
+      barsSvg += `<rect x="${barX}" y="${bottomY - inSchoolH}" width="${barWidth}" height="${Math.max(1, inSchoolH)}" fill="var(--success)" rx="1"><title>${d.label} 在校 ${d.inSchool}项</title></rect>`;
     }
-    const large = span > 180 ? 1 : 0;
-    return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z" fill="${d.color || 'var(--text-secondary)'}"/>`;
-  }).join('');
-  return `<svg viewBox="0 0 160 140" style="width:160px;height:140px;">${paths}</svg>`;
+    // 在家（顶部）
+    if (d.atHome > 0) {
+      barsSvg += `<rect x="${barX}" y="${bottomY - inSchoolH - atHomeH}" width="${barWidth}" height="${Math.max(1, atHomeH)}" fill="var(--accent)" rx="1"><title>${d.label} 在家 ${d.atHome}项</title></rect>`;
+    }
+
+    if (i % labelInterval === 0) {
+      const lx = barX + barWidth / 2;
+      labelsSvg += `<text x="${lx}" y="${height - 5}" text-anchor="middle" font-size="10" fill="var(--text-secondary)">${d.label}</text>`;
+    }
+  });
+
+  let gridSvg = '';
+  yLines.forEach(v => {
+    const y = pad.top + plotH * (1 - v / yMax);
+    gridSvg += `<line x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>\n`;
+    gridSvg += `<text x="${pad.left - 6}" y="${y + 3}" text-anchor="end" font-size="10" fill="var(--text-secondary)">${v}</text>\n`;
+  });
+
+  // 图例
+  const legendX = pad.left;
+  const legendY = 2;
+  const legendSvg = `
+    <rect x="${legendX}" y="${legendY}" width="10" height="10" fill="var(--success)" rx="2"/>
+    <text x="${legendX + 14}" y="${legendY + 9}" font-size="10" fill="var(--text-secondary)">在校</text>
+    <rect x="${legendX + 44}" y="${legendY}" width="10" height="10" fill="var(--accent)" rx="2"/>
+    <text x="${legendX + 58}" y="${legendY + 9}" font-size="10" fill="var(--text-secondary)">在家</text>
+  `;
+
+  return `<svg viewBox="0 0 ${width} ${height}" style="width:100%;height:${height}px;">${gridSvg}${barsSvg}${labelsSvg}${legendSvg}</svg>`;
 }
 
 // ========== Tab 5: Statistics ==========
@@ -1509,6 +1548,30 @@ function aggregateDaily(data, groupMode, mode) {
   });
 }
 
+function aggregateCompletionData(data, groupMode) {
+  if (!data.length) return [];
+  if (groupMode === 'day') return data.map(d => {
+    return { label: d.date.slice(5), inSchool: d.inSchool, atHome: d.atHome };
+  });
+
+  const groups = {};
+  data.forEach(d => {
+    const key = groupMode === 'week' ? getWeekStart(d.date) : d.date.slice(0, 7);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(d);
+  });
+
+  return Object.entries(groups).map(([key, items]) => {
+    const inSchool = items.reduce((s, d) => s + d.inSchool, 0);
+    const atHome = items.reduce((s, d) => s + d.atHome, 0);
+    return {
+      label: groupMode === 'week' ? formatWeekLabel(key) : key,
+      inSchool,
+      atHome,
+    };
+  });
+}
+
 function renderStatsTab() {
   const container = document.getElementById('adminContent');
 
@@ -1551,19 +1614,15 @@ function renderStatsTab() {
   const ratingTotal = ratingPieData.reduce((s, d) => s + d.count, 0);
 
   // 在校提前完成比例
-  let completedInSchoolCount = 0;
-  let totalDoneCount = 0;
+  const completedInSchoolBarData = [];
   dateRange.forEach(date => {
     const hwList = cachedData?.homeworks?.[date] || [];
     const doneHw = hwList.filter(h => h.status === 'done' && !h.rejected);
-    completedInSchoolCount += doneHw.filter(h => h.completedInSchool).length;
-    totalDoneCount += doneHw.length;
+    const inSchool = doneHw.filter(h => h.completedInSchool).length;
+    const atHome = doneHw.length - inSchool;
+    completedInSchoolBarData.push({ date, inSchool, atHome });
   });
-  const completedInSchoolPieData = [
-    { label: '在校提前完成', count: completedInSchoolCount, color: 'var(--success)' },
-    { label: '在家完成', count: totalDoneCount - completedInSchoolCount, color: 'var(--accent)' },
-  ];
-  const completedInSchoolTotal = completedInSchoolPieData.reduce((s, d) => s + d.count, 0);
+  const barData = aggregateCompletionData(completedInSchoolBarData, groupMode);
 
   const shownRatings = ratingsList.slice(0, _ratingShowCount);
   const hasMoreRatings = ratingsList.length > _ratingShowCount;
@@ -1625,19 +1684,9 @@ function renderStatsTab() {
 
     <div class="chart-container">
       <div class="chart-title">🏫 在校提前完成比例</div>
-      <div class="chart-pie-section">
-      ${completedInSchoolTotal > 0 ? `<div style="display:flex;align-items:center;gap:16px;margin-bottom:8px;">
-        ${renderCompletionPieChart(completedInSchoolPieData, completedInSchoolTotal)}
-        <div style="display:flex;flex-direction:column;gap:4px;">
-          ${completedInSchoolPieData.map(d =>
-        `<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
-              <span style="width:10px;height:10px;border-radius:2px;background:${d.color};display:inline-block;"></span>
-              ${d.label}: ${d.count}项 (${completedInSchoolTotal > 0 ? Math.round(d.count / completedInSchoolTotal * 100) : 0}%)
-            </div>`
-      ).join('')}
-        </div>
-      </div>` : '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'}
-      </div>
+      ${barData.length === 0
+      ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'
+      : renderStackedBarChart(barData)}
     </div>
 
     <div class="chart-container">
