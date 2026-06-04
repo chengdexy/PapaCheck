@@ -524,6 +524,76 @@ async function calculateSettlement() {
   const doneHw = homeworks.filter(h => h.status === 'done');
   const challengeSuccess = doneHw.filter(h => h.mode === 'challenge' && !h.rejected);
   const efficiencyHw = doneHw.filter(h => !h.rejected);
+
+  const dateKey = Util.dateKey(currentDate);
+
+  // 检查当天是否已有 settlement 并已评级
+  const existingSettlement = cachedData?.dailySettlement?.[dateKey];
+
+  if (existingSettlement && existingSettlement.rating) {
+    // 当天已评级：只计算新增作业的分数，不含每日基础分
+    const prevHomeworkBonus = existingSettlement.homeworkBonus || 0;
+
+    const currentHomeworkBonus = challengeSuccess.reduce(
+      (sum, h) => sum + (h.basePoints ?? cachedData?.settings?.homeworkBonusPerTask ?? 10), 0
+    );
+
+    const newHomeworkBonus = currentHomeworkBonus - prevHomeworkBonus;
+
+    if (newHomeworkBonus > 0) {
+      // 用已有倍率计算新增积分（不含每日基础分）
+      const multiplier = existingSettlement.multiplier;
+      const additionalPoints = Math.round(newHomeworkBonus * multiplier);
+
+      const updatedSettlement = {
+        ...existingSettlement,
+        homeworkBonus: currentHomeworkBonus,
+        totalBeforeRating: existingSettlement.dailyBase + currentHomeworkBonus,
+        doneCount: doneHw.length,
+        finalPoints: (existingSettlement.finalPoints || 0) + additionalPoints,
+      };
+
+      window._settlement = updatedSettlement;
+      await API.saveSettlement(dateKey, updatedSettlement);
+
+      if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
+      cachedData.dailySettlement[dateKey] = updatedSettlement;
+
+      if (additionalPoints > 0) {
+        await API.updatePoints('earn', additionalPoints,
+          `追加完成作业，按${existingSettlement.rating}评级倍率计算`);
+      }
+    } else {
+      // 没有新作业加分，只更新 doneCount
+      const updatedSettlement = {
+        ...existingSettlement,
+        doneCount: doneHw.length,
+      };
+      window._settlement = updatedSettlement;
+      await API.saveSettlement(dateKey, updatedSettlement);
+      if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
+      cachedData.dailySettlement[dateKey] = updatedSettlement;
+    }
+
+    // 保存 efficiency 数据
+    const ratios = [];
+    efficiencyHw.forEach(hw => {
+      if (hw.actualDuration !== null && hw.suggestedDuration > 0) {
+        ratios.push(hw.actualDuration / hw.suggestedDuration);
+      }
+    });
+    const averageRatio = ratios.length > 0
+      ? ratios.reduce((a, b) => a + b, 0) / ratios.length
+      : 0;
+
+    await API.saveEfficiency(dateKey, { averageRatio, ratios });
+
+    needsFullRender = true;
+    updateBigScreen();
+    return;
+  }
+
+  // 当天未评级：正常计算结算
   const dailyBase = cachedData?.settings?.dailyBasePoints ?? 50;
   const homeworkBonus = challengeSuccess.reduce(
     (sum, h) => sum + (h.basePoints ?? cachedData?.settings?.homeworkBonusPerTask ?? 10), 0
@@ -538,7 +608,6 @@ async function calculateSettlement() {
 
   window._settlement = settlementData;
 
-  const dateKey = Util.dateKey(currentDate);
   const settlementToSave = {
     ...settlementData,
     rating: null,
