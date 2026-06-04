@@ -5,23 +5,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="PapaCheck — 爸~检查！家庭自托管作业管理系统。AI 自动收作业，游戏化激励让孩子主动完成作业。免费下载 Windows 客户端。">
-    <meta name="theme-color" content="#0f172a">
+    <meta name="theme-color" content="#FFFBF5">
     <meta property="og:title" content="PapaCheck — 爸~检查！">
     <meta property="og:description" content="局域网自托管 · 数据不上云 · 全家零门槛。AI 自动收作业，孩子自主赚积分，家长远程做管理。">
     <meta property="og:image" content="assets/PapaCheck_ban.jpg">
     <title>PapaCheck — 爸~检查！让写作业变成闯关游戏</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600;700;900&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;900&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <link rel="icon" type="image/png" href="assets/favicon.png">
 </head>
 
 <body>
-    <div id="particle-canvas"></div>
 
-    <nav class="navbar">
+    <!-- 背景装饰 -->
+    <div class="bg-deco" aria-hidden="true">
+        <div class="bg-blob bg-blob--1"></div>
+        <div class="bg-blob bg-blob--2"></div>
+        <div class="bg-blob bg-blob--3"></div>
+    </div>
+
+    <!-- 导航栏 -->
+    <nav class="navbar" id="navbar">
         <div class="nav-inner">
             <a href="#" class="nav-logo">PapaCheck</a>
             <div class="nav-links">
@@ -34,42 +41,93 @@
         </div>
     </nav>
 
-    <section class="hero">
-        <div class="hero-grid"></div>
-        <div class="hero-content">
-            <div class="hero-badge reveal">🎮 家庭自托管 · 免费使用</div>
-            <h1 class="hero-title reveal">
-                <span class="hero-title-sub">爸~检查！</span>
-                <span class="hero-title-main">PapaCheck</span>
-            </h1>
-            <p class="hero-desc reveal">
-                从此不用催作业<br>
-                <span class="text-accent">AI 自动收</span> · <span class="text-accent">孩子主动做</span> · <span
-                    class="text-accent">家长远程管</span>
-            </p>
-            <p class="hero-subtitle reveal">局域网自托管 · 数据不上云 · 全家零门槛</p>
-            <div class="hero-actions reveal">
-                <a href="#download" class="btn btn-primary">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="7 10 12 15 17 10" />
-                        <line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                    <span>免费下载</span>
-                </a>
-                <a href="#features" class="btn btn-ghost">了解更多 ↓</a>
+    <!-- Hero -->
+    <section class="hero" id="hero">
+        <!-- 浮动装饰元素 -->
+        <div class="hero-float hero-float--book" aria-hidden="true" data-parallax="0.06">📖</div>
+        <div class="hero-float hero-float--pencil" aria-hidden="true" data-parallax="0.09">✏️</div>
+        <div class="hero-float hero-float--star1" aria-hidden="true" data-parallax="0.04">⭐</div>
+        <div class="hero-float hero-float--star2" aria-hidden="true" data-parallax="0.05">✨</div>
+        <div class="hero-float hero-float--trophy" aria-hidden="true" data-parallax="0.07">🏆</div>
+        <div class="hero-float hero-float--plane" aria-hidden="true" data-parallax="0.08">📄</div>
+
+        <div class="hero-inner">
+            <div class="hero-content">
+                <div class="hero-badge reveal">
+                    <span class="badge-dot"></span>
+                    家庭自托管 · 免费使用
+                </div>
+                <h1 class="hero-title reveal">
+                    <span class="hero-title-cn">爸~检查！</span>
+                    <span class="hero-title-en">PapaCheck</span>
+                </h1>
+                <p class="hero-desc reveal">
+                    家庭作业管理从未如此轻松
+                </p>
+                <div class="hero-tags reveal">
+                    <span class="hero-tag tag-ai">AI 自动收</span>
+                    <span class="hero-tag tag-kids">孩子主动做</span>
+                    <span class="hero-tag tag-parents">家长远程管</span>
+                </div>
+                <p class="hero-subtitle reveal">局域网自托管 · 数据不上云 · 全家零门槛</p>
+                <div class="hero-actions reveal">
+                    <a href="#download" class="btn btn-primary">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        免费下载
+                    </a>
+                    <a href="#features" class="btn btn-outline">了解更多 ↓</a>
+                </div>
+            </div>
+
+            <!-- 纯 CSS 主题插图 -->
+            <div class="hero-illustration reveal" aria-hidden="true">
+                <div class="illu-scene">
+                    <div class="illu-desk"></div>
+                    <div class="illu-notebook">
+                        <div class="illu-nb-line"></div>
+                        <div class="illu-nb-line"></div>
+                        <div class="illu-nb-line"></div>
+                        <div class="illu-nb-line illu-nb-line--short"></div>
+                    </div>
+                    <div class="illu-pencil"></div>
+                    <div class="illu-star illu-star--big">⭐</div>
+                    <div class="illu-star illu-star--small">✦</div>
+                    <div class="illu-check">✓</div>
+                </div>
             </div>
         </div>
-        <div class="hero-scroll-indicator">
-            <span>向下滚动</span>
-            <div class="scroll-arrow"></div>
+
+        <div class="hero-scroll">
+            <span>向下探索</span>
+            <div class="hero-scroll-arrow"></div>
         </div>
     </section>
 
+    <!-- 价值主张 -->
+    <section class="value-section">
+        <div class="value-card reveal">
+            <div class="value-side">
+                <span class="value-emoji">😫</span>
+                <h3>每天催作业，心累</h3>
+                <p>下班回家还要盯着孩子写作业，一问就烦躁，不说又不放心</p>
+            </div>
+            <div class="value-arrow">→</div>
+            <div class="value-side">
+                <span class="value-emoji">😎</span>
+                <h3>孩子主动做，省心</h3>
+                <p>AI 自动收录、积分正向激励，孩子把写作业当成闯关游戏</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Banner -->
     <section class="banner-section">
         <div class="banner-wrapper reveal">
-            <!-- TODO: 替换为真实产品截图（800×500 JPG） -->
             <div class="screenshot-placeholder banner-placeholder">
                 <span class="placeholder-icon">📸</span>
                 <span class="placeholder-text">产品主界面截图（800×500）</span>
@@ -77,60 +135,85 @@
         </div>
     </section>
 
+    <!-- 核心功能 -->
     <section class="features" id="features">
         <div class="section-header reveal">
             <span class="section-label">核心功能</span>
-            <h2 class="section-title">写作业也可以是<span class="text-gradient">一场冒险</span></h2>
+            <h2 class="section-title">写作业也可以是<span class="text-accent">一场冒险</span></h2>
             <p class="section-desc">从 AI 自动收录到积分兑换奖励，让孩子主动完成作业</p>
         </div>
         <div class="features-grid">
             <div class="feature-card reveal" data-delay="0">
-                <div class="feature-icon" style="--card-accent: #38bdf8">📋</div>
-                <h3 class="feature-title">双模式作业计时</h3>
-                <p class="feature-desc">挑战模式设定目标时长，提前完成额外奖励积分；计时模式自由记录，实时进度条与动画反馈</p>
+                <div class="feature-icon-wrap" style="--card-accent: #5B9BD5">
+                    <span class="feature-icon">📋</span>
+                </div>
+                <h3 class="feature-title">作业管理</h3>
+                <p class="feature-desc">添加、开始、暂停、完成作业。支持挑战模式（限时）和自由模式（计时器），实时进度条与动画反馈</p>
             </div>
-            <div class="feature-card reveal" data-delay="100">
-                <div class="feature-icon" style="--card-accent: #818cf8">📧</div>
+            <div class="feature-card reveal" data-delay="60">
+                <div class="feature-icon-wrap" style="--card-accent: #7B6FDE">
+                    <span class="feature-icon">📧</span>
+                </div>
                 <h3 class="feature-title">AI 自动收录作业</h3>
-                <p class="feature-desc">老师发邮件布置作业，AI 自动解析内容并写入清单，家长孩子都不用操心录入</p>
+                <p class="feature-desc">转发老师作业邮件到指定邮箱，AI 自动解析内容并写入清单，附件自动下载保存，家长孩子都不用操心录入</p>
             </div>
-            <div class="feature-card reveal" data-delay="200">
-                <div class="feature-icon" style="--card-accent: #4ade80">⭐</div>
-                <h3 class="feature-title">积分评级体系</h3>
-                <p class="feature-desc">家长远程评级（优/良/可/差），效率加成计算积分。差评积分归零，正向激励效果拉满</p>
+            <div class="feature-card reveal" data-delay="120">
+                <div class="feature-icon-wrap" style="--card-accent: #4A9E8E">
+                    <span class="feature-icon">⭐</span>
+                </div>
+                <h3 class="feature-title">积分 & 评级</h3>
+                <p class="feature-desc">家长四级评级（优/良/可/差）× 效率加成 = 最终积分。当天已评级后新增作业自动按已有倍率追加积分</p>
+            </div>
+            <div class="feature-card reveal" data-delay="180">
+                <div class="feature-icon-wrap" style="--card-accent: #F0A830">
+                    <span class="feature-icon">🏪</span>
+                </div>
+                <h3 class="feature-title">积分商店</h3>
+                <p class="feature-desc">孩子用积分自主兑换游戏时间或奖励物品，支持 Buff 系统（双倍积分等），三层激励停不下来</p>
+            </div>
+            <div class="feature-card reveal" data-delay="240">
+                <div class="feature-icon-wrap" style="--card-accent: #E8917E">
+                    <span class="feature-icon">🎁</span>
+                </div>
+                <h3 class="feature-title">奖励箱 & 赏金</h3>
+                <p class="feature-desc">家长随时发放惊喜奖励，孩子自主兑换。还可发布赏金任务（如"帮妈妈洗碗"），孩子提交证明获取积分</p>
             </div>
             <div class="feature-card reveal" data-delay="300">
-                <div class="feature-icon" style="--card-accent: #fbbf24">🏪</div>
-                <h3 class="feature-title">积分商店兑换</h3>
-                <p class="feature-desc">孩子用积分自主兑换游戏时间、玩具、零食，还可购买增益 Buff，三层激励停不下来</p>
+                <div class="feature-icon-wrap" style="--card-accent: #5B9BD5">
+                    <span class="feature-icon">�</span>
+                </div>
+                <h3 class="feature-title">语音提醒</h3>
+                <p class="feature-desc">TTS 中文语音全程陪伴：任务超时提醒、评级结果播报、商店上新提醒等场景，让写作业不再枯燥</p>
             </div>
-            <div class="feature-card reveal" data-delay="400">
-                <div class="feature-icon" style="--card-accent: #f472b6">🎁</div>
-                <h3 class="feature-title">家长奖励箱</h3>
-                <p class="feature-desc">家长随时发放惊喜奖励，孩子自主兑换。做得好就奖励，惊喜感满满</p>
+            <div class="feature-card reveal" data-delay="360">
+                <div class="feature-icon-wrap" style="--card-accent: #7B6FDE">
+                    <span class="feature-icon">�</span>
+                </div>
+                <h3 class="feature-title">数据统计</h3>
+                <p class="feature-desc">管理端 SVG 折线图和饼图展示作业用时趋势、效率比、评级分布。所有数据本地存储不泄露</p>
             </div>
-            <div class="feature-card reveal" data-delay="500">
-                <div class="feature-icon" style="--card-accent: #38bdf8">🔊</div>
-                <h3 class="feature-title">语音提醒陪伴</h3>
-                <p class="feature-desc">TTS 中文语音全程陪伴：任务提醒、超时预警、评级播报、整点报时，覆盖近 20 个场景</p>
-            </div>
-            <div class="feature-card reveal" data-delay="600">
-                <div class="feature-icon" style="--card-accent: #a78bfa">📊</div>
-                <h3 class="feature-title">管理端数据看板</h3>
-                <p class="feature-desc">SVG 折线图和饼图展示作业用时趋势、效率比、评级分布，所有数据本地存储不泄露</p>
+            <div class="feature-card reveal" data-delay="420">
+                <div class="feature-icon-wrap" style="--card-accent: #4A9E8E">
+                    <span class="feature-icon">🔌</span>
+                </div>
+                <h3 class="feature-title">离线可用</h3>
+                <p class="feature-desc">断网时核心功能正常工作，联网后自动同步数据。Service Worker + localforage 保障体验</p>
             </div>
         </div>
     </section>
 
+    <!-- 截图 -->
     <section class="screenshots-section">
+        <div class="section-header reveal">
+            <span class="section-label">界面预览</span>
+            <h2 class="section-title">一目了然<span class="text-accent">的数据洞察</span></h2>
+        </div>
         <div class="screenshot-grid reveal">
-            <!-- TODO: 替换为真实管理端图表截图 -->
             <div class="screenshot-placeholder">
                 <span class="placeholder-icon">📊</span>
                 <span class="placeholder-text">效率折线图截图</span>
                 <span class="placeholder-hint">管理端 → 统计 Tab → 用时 / 效率比</span>
             </div>
-            <!-- TODO: 替换为真实管理端图表截图 -->
             <div class="screenshot-placeholder">
                 <span class="placeholder-icon">🥧</span>
                 <span class="placeholder-text">评级分布饼图截图</span>
@@ -139,30 +222,26 @@
         </div>
     </section>
 
+    <!-- 下载 -->
     <section class="download-section" id="download">
         <div class="section-header reveal">
             <span class="section-label">免费下载</span>
-            <h2 class="section-title">选择你的平台<span class="text-gradient">开始使用</span></h2>
+            <h2 class="section-title">选择你的平台<span class="text-accent">开始使用</span></h2>
             <p class="section-desc">Windows 版和 Android 版均可免费下载使用，在家庭局域网内自托管</p>
         </div>
-        <!-- TODO: 替换为真实多设备展示截图 -->
-        <div class="screenshot-wide reveal">
-            <div class="screenshot-placeholder wide-placeholder">
-                <span class="placeholder-icon">🖥️📱📲</span>
-                <span class="placeholder-text">电脑 / 手机 / 平板多设备展示（1200×400）</span>
-            </div>
-        </div>
-        <div class="download-cards reveal">
-            <div class="download-card">
-                <div class="download-icon">🪟</div>
+        <div class="download-cards">
+            <div class="download-card reveal" data-delay="0">
+                <div class="download-icon-wrap">
+                    <span class="download-icon">🪟</span>
+                </div>
                 <h3 class="download-title">Windows 桌面版</h3>
-                <p class="download-desc">运行 PapaCheck.exe 即可启动内置服务器，支持系统托盘、开机自启、邮件同步和配置管理</p>
+                <p class="download-desc">从 GitHub Releases 下载 PapaCheck.exe，双击运行即可启动内置服务器，支持系统托盘、开机自启</p>
                 <div class="download-meta">
                     <span>免费使用</span>
-                    <span>系统托盘运行</span>
+                    <span>tkinter GUI</span>
                 </div>
-                <a href="https://github.com/chengdexy/PapaCheck/releases/latest"
-                    class="btn btn-primary download-btn" target="_blank" rel="noopener">
+                <a href="https://github.com/chengdexy/PapaCheck/releases/latest" class="btn btn-primary download-btn"
+                    target="_blank" rel="noopener">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -172,16 +251,18 @@
                     下载 EXE
                 </a>
             </div>
-            <div class="download-card">
-                <div class="download-icon">📱</div>
+            <div class="download-card reveal" data-delay="80">
+                <div class="download-icon-wrap">
+                    <span class="download-icon">📱</span>
+                </div>
                 <h3 class="download-title">Android 版</h3>
-                <p class="download-desc">从桌面端 OTA 安装，或在浏览器访问 /api/download 下载 APK，适配手机和平板大屏模式</p>
+                <p class="download-desc">从桌面端 OTA 安装，或在浏览器访问 /api/download 下载 APK。Flutter WebView 混合应用，适配手机和平板</p>
                 <div class="download-meta">
                     <span>通过桌面端安装</span>
-                    <span>WebView 混合应用</span>
+                    <span>Flutter WebView</span>
                 </div>
-                <a href="https://github.com/chengdexy/PapaCheck/releases/latest"
-                    class="btn btn-primary download-btn" target="_blank" rel="noopener">
+                <a href="https://github.com/chengdexy/PapaCheck/releases/latest" class="btn btn-primary download-btn"
+                    target="_blank" rel="noopener">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -191,15 +272,17 @@
                     下载 APK
                 </a>
             </div>
-            <div class="download-card">
-                <div class="download-icon">🌐</div>
+            <div class="download-card reveal" data-delay="160">
+                <div class="download-icon-wrap">
+                    <span class="download-icon">🌐</span>
+                </div>
                 <h3 class="download-title">源码获取</h3>
-                <p class="download-desc">完整源码在 GitHub 开源（AGPL-3.0），自行部署或二次开发</p>
+                <p class="download-desc">完整源码在 GitHub 开源（AGPL-3.0），Python + SQLite + 原生 HTML/CSS/JS，自行部署或二次开发</p>
                 <div class="download-meta">
                     <span>AGPL-3.0</span>
                     <span>开源可审计</span>
                 </div>
-                <a href="https://github.com/chengdexy/PapaCheck" class="btn btn-ghost download-btn" target="_blank"
+                <a href="https://github.com/chengdexy/PapaCheck" class="btn btn-outline download-btn" target="_blank"
                     rel="noopener">
                     查看源码
                 </a>
@@ -207,44 +290,49 @@
         </div>
     </section>
 
+    <!-- 使用指南 -->
     <section class="guide-section" id="guide">
         <div class="section-header reveal">
-            <span class="section-label">使用指南</span>
-            <h2 class="section-title">三步搞定<span class="text-gradient">全家使用</span></h2>
+            <span class="section-label">快速开始</span>
+            <h2 class="section-title">三步搞定<span class="text-accent">全家使用</span></h2>
             <p class="section-desc">不需要懂编程，跟着步骤走就能让全家用起来</p>
         </div>
         <div class="guide-steps reveal">
             <div class="guide-step">
                 <div class="guide-step-num">1</div>
                 <div class="guide-step-body">
-                    <h3>运行 PapaCheck.exe</h3>
-                    <p>在家庭电脑上下载并运行 Windows 桌面版，GUI 自动启动内置服务器，首次运行自动创建数据库，零配置即可使用</p>
+                    <h3>下载并启动 Windows 桌面端</h3>
+                    <p>从 GitHub Releases 下载最新版 PapaCheck.exe，双击运行即可。服务默认启动在 8080 端口，首次运行自动创建数据库和 TTS 语音缓存</p>
                 </div>
             </div>
+            <div class="guide-step-connector" aria-hidden="true"></div>
             <div class="guide-step">
                 <div class="guide-step-num">2</div>
                 <div class="guide-step-body">
-                    <h3>其他设备浏览器访问</h3>
+                    <h3>浏览器访问（任何设备）</h3>
                     <p>在手机/平板浏览器输入 EXE 主界面上显示的局域网地址（192.x.x.x:8080），孩子端和管理端均可从同一入口访问</p>
                 </div>
             </div>
+            <div class="guide-step-connector" aria-hidden="true"></div>
             <div class="guide-step">
                 <div class="guide-step-num">3</div>
                 <div class="guide-step-body">
-                    <h3>Android 设备安装 APK</h3>
-                    <p>在 Android 设备浏览器访问 /api/download 下载安装 APK，或从管理端页面扫码安装，即可获得原生应用体验</p>
+                    <h3>邮件同步（可选）</h3>
+                    <p>在 Windows 端菜单栏选择服务配置，填写 IMAP 邮箱信息和 API Key。点击邮件作业同步，AI 自动拉取邮件、解析作业并发布</p>
                 </div>
             </div>
         </div>
         <div class="guide-note reveal">
-            <p>📌 整套系统在家庭局域网内运行，数据不经过云端，无需注册账号，用完即走</p>
+            <span class="guide-note-icon">📌</span>
+            <p>整套系统在家庭局域网内运行，数据不经过云端，无需注册账号</p>
         </div>
     </section>
 
+    <!-- 全平台 -->
     <section class="platform-section">
         <div class="section-header reveal">
-            <span class="section-label">全平台覆盖</span>
-            <h2 class="section-title">无论用什么设备<span class="text-gradient">都能用</span></h2>
+            <span class="section-label">多端支持</span>
+            <h2 class="section-title">无论用什么设备<span class="text-accent">都能用</span></h2>
         </div>
         <div class="platform-grid reveal">
             <div class="platform-item">
@@ -265,6 +353,7 @@
         </div>
     </section>
 
+    <!-- Footer -->
     <footer class="footer">
         <div class="footer-inner">
             <div class="footer-brand">
