@@ -1290,6 +1290,8 @@ class TestAPIRoutingByConnectionMode:
         try:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
             _wait_for_page_ready(page)
+            # 等待页面初始化（getData 等异步操作）完成后再操作 IndexedDB
+            page.wait_for_timeout(1000)
 
             page.evaluate('ConnectionManager.stop()')
 
