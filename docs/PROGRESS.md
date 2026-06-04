@@ -33,7 +33,7 @@
 
 - [x] Python HTTP 服务器 + SQLite 数据库
 - [x] TTS 语音提醒（edge-tts）
-- [x] 邮件同步（IMAP + DeepSeek AI 解析）
+- [x] 邮件同步（IMAP + AI 解析）
 - [x] 附件下载
 - [x] 离线支持（Service Worker + localforage）
 - [x] 增量同步（pull/push）

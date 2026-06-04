@@ -4,7 +4,7 @@
 
 > **v1.1.6** — 家庭作业管理从未如此轻松
 
-PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和跟踪孩子的作业完成情况。老师通过邮件布置作业，AI 自动解析并添加到清单；孩子可以自主开始/暂停/完成作业并获得积分；家长远程评级并管理积分商店。
+PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和跟踪孩子的作业完成情况。支持通过转发微信群中老师布置的作业到邮件，AI 自动解析并添加到清单；孩子可以自主开始/暂停/完成作业并获得积分；家长远程评级并管理积分商店。
 
 ## ✨ 核心功能
 
@@ -34,6 +34,7 @@ PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和�
 **方式一：浏览器（任何设备）**
 
 在浏览器中访问 `http://192.x.x.x:8080`：
+
 - 孩子端：`http://192.x.x.x:8080/`
 - 管理端：`http://192.x.x.x:8080/admin.html`
 
@@ -45,7 +46,7 @@ PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和�
 
 ### 3. 邮件同步（可选）
 
-在 Windows 端菜单栏选择 **服务配置**，填写 IMAP 邮箱信息、接收作业的邮箱地址和 DeepSeek API Key。点击 **邮件作业同步** 按钮，AI 会自动拉取邮件、解析作业并发布。
+在 Windows 端菜单栏选择 **服务配置**，填写 IMAP 邮箱信息、接收作业的邮箱地址和 API Key （用于解析邮件内容）。点击 **邮件作业同步** 按钮，AI 会自动拉取邮件、解析作业并发布。
 
 ### 4. 生成测试数据（可选）
 
@@ -70,15 +71,15 @@ PapaCheck/
 
 ## 🛠 技术栈
 
-| 模块 | 技术 |
-|------|------|
-| **Server** | Python 3, `http.server`, SQLite, edge-tts |
-| **Web 前端** | 原生 HTML/CSS/JS, SVG 图表, Service Worker |
-| **Windows 桌面端** | Python, tkinter, Windows Credential Manager |
-| **Email 模块** | IMAP4_SSL, DeepSeek API |
-| **Android 端** | Flutter, `webview_flutter` |
-| **测试** | Vitest（前端）、pytest（后端）、Flutter test（Android） |
-| **构建发布** | PyInstaller（EXE）、release.py（一站式：EXE + APK + ZIP） |
+| 模块              | 技术                                               |
+| --------------- | ------------------------------------------------ |
+| **Server**      | Python 3, `http.server`, SQLite, edge-tts        |
+| **Web 前端**      | 原生 HTML/CSS/JS, SVG 图表, Service Worker           |
+| **Windows 桌面端** | Python, tkinter, Windows Credential Manager      |
+| **Email 模块**    | IMAP4\_SSL, LLM API（邮件解析）                      |
+| **Android 端**   | Flutter, `webview_flutter`                       |
+| **测试**          | Vitest（前端）、pytest（后端）、Flutter test（Android）      |
+| **构建发布**        | PyInstaller（EXE）、release.py（一站式：EXE + APK + ZIP） |
 
 ## 🔧 开发
 
@@ -95,13 +96,13 @@ npx vitest run PapaCheck.Tests/test_duplicate_rating.js
 
 ### 项目文档
 
-| 文档 | 说明 |
-|------|------|
-| [PRD](docs/PRD.md) | 产品需求文档 |
-| [ARCHITECTURE](docs/ARCHITECTURE.md) | 技术架构文档 |
-| [API](docs/API.md) | API 接口文档 |
-| [CHANGELOG](docs/CHANGELOG.md) | 变更日志 |
-| [PROGRESS](docs/PROGRESS.md) | 进度记录 |
+| 文档                                   | 说明       |
+| ------------------------------------ | -------- |
+| [PRD](docs/PRD.md)                   | 产品需求文档   |
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | 技术架构文档   |
+| [API](docs/API.md)                   | API 接口文档 |
+| [CHANGELOG](docs/CHANGELOG.md)       | 变更日志     |
+| [PROGRESS](docs/PROGRESS.md)         | 进度记录     |
 
 ### 测试驱动开发
 
