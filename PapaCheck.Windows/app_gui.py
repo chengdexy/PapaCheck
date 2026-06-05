@@ -701,7 +701,7 @@ class PapaCheckApp:
         if self.destroyed:
             return
         if not self.server_thread or not self.server_thread.is_alive():
-            if self.running:
+            if self.running and not self._quitting:
                 self._handle_server_exit()
         else:
             self.root.after(2000, self._check_still_running)
@@ -856,10 +856,11 @@ class PapaCheckApp:
         self.root.after(200, self._update_tray_menu)
 
     def _quit_app(self):
+        if self._quitting:
+            return
         self._quitting = True
         self._disable_ui()
         if self.server_thread and self.server_thread.is_alive():
-            self._append_log('正在停止服务器...')
             self._stop_server()
         else:
             self._do_destroy()
