@@ -968,11 +968,55 @@ function updateSaverTime() {
 // ========== Init ==========
 async function init() {
   showTransitionMask('正在加载数据…');
-  try {
-    cachedData = await API.getData();
-    isServerMode = true;
-    hideTransitionMask();
-  } catch (e) {
+
+  // 先启动 ConnectionManager 检测连接状态（与 admin.js 保持一致）
+  await ConnectionManager.start();
+
+  var mode = ConnectionManager.getMode();
+
+  if (mode === 'online') {
+    try {
+      cachedData = await API.getData();
+      isServerMode = true;
+      hideTransitionMask();
+      // 立即缓存到本地 DB，确保离线时可用（与 admin.js 的 refreshAllData 保持一致）
+      try { await DB.cacheFullData(cachedData); } catch (e) { }
+    } catch (e) {
+      // CM 检测到在线，但实际请求时网络已断，降级到本地 DB
+      try {
+        var localData = await DB.getFullData();
+        if (localData && Object.keys(localData).length > 0) {
+          isServerMode = false;
+          cachedData = localData;
+          cachedData._loadedOffline = true;
+          showToast('网络不稳定，已切换到离线模式');
+          hideTransitionMask();
+        } else {
+          hideTransitionMask();
+          showToast('未连接服务器，请检查网络');
+          isServerMode = false;
+          cachedData = { homeworks: {}, freeTimeTasks: {}, dailySettlement: {}, points: { balance: 0 }, shopItems: [], rewardBox: [], activeBuffs: [], bountyTasks: [], bountySubmissions: {}, bountyCompletions: {}, settings: {} };
+          var _recoveryOnline = setInterval(function () {
+            if (ConnectionManager.getMode() === 'online') {
+              clearInterval(_recoveryOnline);
+              location.reload();
+            }
+          }, 2000);
+        }
+      } catch (dbErr) {
+        hideTransitionMask();
+        showToast('未连接服务器，请检查网络');
+        isServerMode = false;
+        cachedData = { homeworks: {}, freeTimeTasks: {}, dailySettlement: {}, points: { balance: 0 }, shopItems: [], rewardBox: [], activeBuffs: [], bountyTasks: [], bountySubmissions: {}, bountyCompletions: {}, settings: {} };
+        var _recoveryOnline2 = setInterval(function () {
+          if (ConnectionManager.getMode() === 'online') {
+            clearInterval(_recoveryOnline2);
+            location.reload();
+          }
+        }, 2000);
+      }
+    }
+  } else {
     try {
       var localData = await DB.getFullData();
       if (localData && Object.keys(localData).length > 0) {
@@ -983,31 +1027,28 @@ async function init() {
         hideTransitionMask();
       } else {
         hideTransitionMask();
-        document.getElementById('bigMode').innerHTML = `
-          <div style="display:flex;align-items:center;justify-content:center;height:100%;text-align:center;">
-            <div>
-              <div style="font-size:80px;margin-bottom:20px;">🔌</div>
-              <div style="font-size:32px;font-weight:700;margin-bottom:12px;">未连接服务器</div>
-              <div style="font-size:20px;color:var(--text-secondary);">请先确保 PC 端服务已启动</div>
-            </div>
-          </div>`;
-        updateConnStatus();
-        ConnectionManager.start();
-        return;
+        showToast('未连接服务器，请检查网络');
+        isServerMode = false;
+        cachedData = { homeworks: {}, freeTimeTasks: {}, dailySettlement: {}, points: { balance: 0 }, shopItems: [], rewardBox: [], activeBuffs: [], bountyTasks: [], bountySubmissions: {}, bountyCompletions: {}, settings: {} };
+        // 定时检查网络恢复后自动重载页面
+        var _recoveryTimer = setInterval(function () {
+          if (ConnectionManager.getMode() === 'online') {
+            clearInterval(_recoveryTimer);
+            location.reload();
+          }
+        }, 2000);
       }
     } catch (dbErr) {
       hideTransitionMask();
-      document.getElementById('bigMode').innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:center;height:100%;text-align:center;">
-          <div>
-            <div style="font-size:80px;margin-bottom:20px;">🔌</div>
-            <div style="font-size:32px;font-weight:700;margin-bottom:12px;">未连接服务器</div>
-            <div style="font-size:20px;color:var(--text-secondary);">请先运行 python server.py</div>
-          </div>
-        </div>`;
-      updateConnStatus();
-      ConnectionManager.start();
-      return;
+      showToast('未连接服务器，请检查网络');
+      isServerMode = false;
+      cachedData = { homeworks: {}, freeTimeTasks: {}, dailySettlement: {}, points: { balance: 0 }, shopItems: [], rewardBox: [], activeBuffs: [], bountyTasks: [], bountySubmissions: {}, bountyCompletions: {}, settings: {} };
+      var _recoveryTimer2 = setInterval(function () {
+        if (ConnectionManager.getMode() === 'online') {
+          clearInterval(_recoveryTimer2);
+          location.reload();
+        }
+      }, 2000);
     }
   }
   API.migrateBountyCompletionsToTotal(cachedData);
@@ -1034,8 +1075,6 @@ async function init() {
   startPoll(5000);
 
   updateConnStatus();
-
-  ConnectionManager.start();
 }
 
 init();
