@@ -1731,3 +1731,197 @@ class TestSaveFunctionsTriggerRecordModification:
             ('efficiency_history', '2025-06-15')
         ).fetchone()
         assert row is not None
+
+
+# Feature: 作业移动触发修改记录
+class TestMoveHomeworkRecordsModification:
+    # Feature: 作业移动触发修改记录
+    #   Scenario: move_homework 后 last_modified 表中存在源日期和目标日期的记录
+    #     Given 数据库已保存两条作业到指定日期
+    #     When 将其中一条作业移动到另一日期
+    #     Then last_modified 表中存在源日期和目标日期的 homeworks 记录
+    def test_move_homework_records_modification_for_both_dates(self, db, test_date, sample_homeworks):
+        db.save_homeworks(test_date, sample_homeworks)
+        db.move_homework(test_date, '2025-06-16', 'hw1')
+
+        conn = db._mgr.get()
+        row_from = conn.execute(
+            "SELECT * FROM last_modified WHERE table_name = ? AND record_key = ?",
+            ('homeworks', test_date)
+        ).fetchone()
+        row_to = conn.execute(
+            "SELECT * FROM last_modified WHERE table_name = ? AND record_key = ?",
+            ('homeworks', '2025-06-16')
+        ).fetchone()
+        assert row_from is not None, f'move_homework 应为源日期 {test_date} 记录修改'
+        assert row_to is not None, 'move_homework 应为目标日期 2025-06-16 记录修改'
+
+
+# Feature: 推送合并跨日期 UUID 搜索
+class TestPushMergeCrossDateKeySearch:
+    # Feature: 推送合并跨日期 UUID 搜索
+    #   Scenario: push_merge 在指定 date_key 找不到 UUID 时搜索其他 date_key 避免重复
+    #     Given 服务端作业已被 move_homework 从今天移到明天
+    #     When 推送一条离线 ChangeLog 条目（date=今天，UUID=已移走的作业）
+    #     Then 作业仍在明天的列表中，不会在今天的列表中出现
+    def test_push_merge_finds_uuid_in_other_date_key_avoids_duplication(self, db, test_date, sample_homeworks):
+        """复现 Bug：作业延后批准后，离线客户端 ChangeLog 仍带着 date=today 推回服务端，
+        push_merge 在 today 找不到 UUID 就盲目 append，导致作业同时出现在今天和明天。"""
+        # Step 1: 服务端保存作业到今天
+        db.save_homeworks(test_date, sample_homeworks)
+        # Step 2: 服务端批准延后 → move_homework 将 'hw1' 从今天移到明天
+        db.move_homework(test_date, '2025-06-16', 'hw1')
+        # Step 3: 验证 move 成功
+        today_hw = db.get_homeworks(test_date)
+        tomorrow_hw = db.get_homeworks('2025-06-16')
+        assert len(today_hw) == 1
+        assert today_hw[0]['id'] == 'hw2'
+        assert len(tomorrow_hw) == 1
+        assert tomorrow_hw[0]['id'] == 'hw1'
+
+        # Step 4: 模拟离线客户端 ChangeLog 推送——条目仍带着 date=today
+        changes = [{
+            'type': 'update',
+            'uuid': sample_homeworks[0].get('uuid', 'hw1'),
+            'data': {
+                'id': 'hw1',
+                'subject': 'math',
+                'content': '练习册第15页',
+                'mode': 'challenge',
+                'suggestedDuration': 20,
+                'basePoints': 10,
+                'status': 'pending',
+                'date': test_date,  # 离线条目仍标记为今天的日期
+                'lastModified': '2025-06-15T12:00:00',
+                'isDeleted': False,
+            },
+            'timestamp': '2025-06-15T12:00:00',
+        }]
+
+        db.push_merge(changes)
+
+        # Step 5: 验证作业没有在今天的列表中重复出现
+        today_after = db.get_homeworks(test_date)
+        tomorrow_after = db.get_homeworks('2025-06-16')
+        assert len(today_after) == 1, \
+            f'作业不应回到今天的列表，实际 today: {len(today_after)} 条，内容: {[h.get("id") for h in today_after]}'
+        assert today_after[0]['id'] == 'hw2', \
+            f'今天的作业应只有 hw2，实际: {today_after[0]["id"]}'
+        assert len(tomorrow_after) == 1, \
+            f'明天的作业应仍为 1 条，实际: {len(tomorrow_after)} 条'
+        assert tomorrow_after[0]['id'] == 'hw1'
+
+    # Feature: 推送合并跨日期 UUID 搜索
+    #   Scenario: push_merge 在所有 date_key 都找不到 UUID 时才 append
+    #     Given 数据库已初始化且无任何作业
+    #     When 推送一条全新的作业变更
+    #     Then 新作业出现在指定的日期列表中
+    def test_push_merge_appends_when_uuid_not_found_anywhere(self, db, test_date):
+        """当 UUID 在所有 date_key 中都不存在时，正常 append 到指定 date_key"""
+        changes = [{
+            'type': 'update',
+            'uuid': 'hw-brand-new',
+            'data': {
+                'id': 'hw-brand-new',
+                'subject': 'science',
+                'content': '新科学作业',
+                'mode': 'timer',
+                'suggestedDuration': 15,
+                'basePoints': 8,
+                'status': 'pending',
+                'date': test_date,
+                'lastModified': '2025-06-15T12:00:00',
+                'isDeleted': False,
+            },
+            'timestamp': '2025-06-15T12:00:00',
+        }]
+
+        db.push_merge(changes)
+
+        homeworks = db.get_homeworks(test_date)
+        assert len(homeworks) == 1
+        assert homeworks[0]['id'] == 'hw-brand-new'
+
+    # Feature: 推送合并跨日期 UUID 搜索
+    #   Scenario: push_merge 在其他 date_key 找到 UUID 后正确应用更新
+    #     Given 服务端作业已被 move_homework 移到明天
+    #     When 推送一条包含更新内容的变更（date=今天）
+    #     Then 明天的作业被更新为新内容，今天的列表不受影响
+    def test_push_merge_applies_update_to_found_date_key(self, db, test_date, sample_homeworks):
+        """当在其他 date_key 找到 UUID 时，应在此 date_key 应用更新"""
+        db.save_homeworks(test_date, sample_homeworks)
+        db.move_homework(test_date, '2025-06-16', 'hw1')
+
+        changes = [{
+            'type': 'update',
+            'uuid': 'hw1',
+            'data': {
+                'id': 'hw1',
+                'subject': 'math',
+                'content': '更新后的内容',
+                'mode': 'challenge',
+                'suggestedDuration': 30,
+                'basePoints': 15,
+                'status': 'done',
+                'date': test_date,  # 仍标记为今天，但实际在明天
+                'lastModified': '2025-06-16T10:00:00',
+                'isDeleted': False,
+            },
+            'timestamp': '2025-06-16T10:00:00',
+        }]
+
+        db.push_merge(changes)
+
+        today_after = db.get_homeworks(test_date)
+        tomorrow_after = db.get_homeworks('2025-06-16')
+        assert len(today_after) == 1
+        assert len(tomorrow_after) == 1
+        assert tomorrow_after[0]['content'] == '更新后的内容', \
+            f'明天的作业内容应被更新，实际: {tomorrow_after[0]["content"]}'
+        assert tomorrow_after[0]['suggestedDuration'] == 30
+        assert tomorrow_after[0]['lastModified'] == '2025-06-16T10:00:00'
+
+    # Feature: 推送合并跨日期 UUID 搜索
+    #   Scenario: push_merge 在其他 date_key 找到 UUID 后正确处理 delete 变更
+    #     Given 服务端作业已被 move_homework 移到明天
+    #     When 推送一条 delete 变更（date=今天）
+    #     Then 明天的作业被标记为 isDeleted，今天列表不受影响
+    def test_push_merge_applies_delete_to_found_date_key(self, db, test_date, sample_homeworks):
+        """当在其他 date_key 找到 UUID 时，delete 变更应标记找到的条目"""
+        db.save_homeworks(test_date, sample_homeworks)
+        db.move_homework(test_date, '2025-06-16', 'hw1')
+
+        changes = [{
+            'type': 'delete',
+            'uuid': 'hw1',
+            'data': {
+                'id': 'hw1',
+                'subject': 'math',
+                'content': '练习册第15页',
+                'mode': 'challenge',
+                'suggestedDuration': 20,
+                'basePoints': 10,
+                'status': 'pending',
+                'date': test_date,
+                'lastModified': '2025-06-16T12:00:00',
+                'isDeleted': True,
+            },
+            'timestamp': '2025-06-16T12:00:00',
+        }]
+
+        db.push_merge(changes)
+
+        today_after = db.get_homeworks(test_date)
+        tomorrow_after = db.get_homeworks('2025-06-16')
+        assert len(today_after) == 1
+        assert len(tomorrow_after) == 0, \
+            f'明天的 hw1 应被标记 isDeleted 并被过滤，实际: {len(tomorrow_after)} 条'
+
+        # 验证数据库中确实标记了 isDeleted
+        conn = db._mgr.get()
+        raw = json.loads(conn.execute(
+            "SELECT data FROM homeworks WHERE date_key = ?", ('2025-06-16',)
+        ).fetchone()['data'])
+        deleted = [i for i in raw if i.get('id') == 'hw1']
+        assert len(deleted) == 1
+        assert deleted[0].get('isDeleted') is True

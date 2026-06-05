@@ -177,6 +177,26 @@ def _find_by_uuid(items, uuid):
     return -1, None
 
 
+def _find_uuid_in_all_date_keys(conn, table, uuid, exclude_key=None):
+    """在指定表的所有 date_key 行中搜索 UUID。
+    返回 (date_key, index, item) 或 (None, -1, None)。
+    """
+    rows = conn.execute(f"SELECT date_key, data FROM {table}").fetchall()
+    for row in rows:
+        date_key = row['date_key']
+        if exclude_key is not None and date_key == exclude_key:
+            continue
+        try:
+            items = json.loads(row['data'])
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if isinstance(items, list):
+            idx, item = _find_by_uuid(items, uuid)
+            if item is not None:
+                return date_key, idx, item
+    return None, -1, None
+
+
 def _get_date_data_raw(conn, table, date_key, default=None):
     row = conn.execute(f"SELECT data FROM {table} WHERE date_key = ?", (date_key,)).fetchone()
     if row:
@@ -231,7 +251,32 @@ def push_merge(changes):
                         elif new_last_modified >= old_last:
                             existing[idx] = data
                     else:
-                        existing.append(data)
+                        # 在当前 date_key 未找到 UUID，搜索所有其他 date_key
+                        # 防止因服务端 move_homework 等操作导致跨天重复追加
+                        found_key, found_idx, found_item = _find_uuid_in_all_date_keys(
+                            conn, table, uuid, exclude_key=record_key
+                        )
+                        if found_item is None and data.get('id'):
+                            found_key, found_idx, found_item = _find_uuid_in_all_date_keys(
+                                conn, table, data['id'], exclude_key=record_key
+                            )
+                        if found_item is None and data.get('taskId'):
+                            found_key, found_idx, found_item = _find_uuid_in_all_date_keys(
+                                conn, table, data['taskId'], exclude_key=record_key
+                            )
+                        if found_item is not None:
+                            found_list = _get_date_data_raw(conn, table, found_key, [])
+                            if isinstance(found_list, list):
+                                old_last = found_item.get('lastModified', '0')
+                                if change_type == 'delete':
+                                    found_list[found_idx]['isDeleted'] = True
+                                    found_list[found_idx]['lastModified'] = new_last_modified
+                                elif new_last_modified >= old_last:
+                                    found_list[found_idx] = data
+                                _set_date_data(conn, table, found_key, found_list)
+                                record_modification(table, found_key, timestamp, conn=conn)
+                        else:
+                            existing.append(data)
 
                     _set_date_data(conn, table, record_key, existing)
                     record_modification(table, record_key, timestamp, conn=conn)
@@ -541,6 +586,11 @@ def move_homework(from_date, to_date, hw_id):
         _set_date_data(conn, 'homeworks', to_date, to_list)
 
         conn.commit()
+
+        now = datetime.datetime.now().isoformat()
+        record_modification('homeworks', from_date, now, conn=conn)
+        record_modification('homeworks', to_date, now, conn=conn)
+
         return hw
 
 
