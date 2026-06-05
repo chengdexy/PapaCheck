@@ -489,7 +489,6 @@ function updateHomeworkGrid() {
   const pendingHomeworks = homeworks.filter(h => h.status !== 'done');
 
   if (pendingHomeworks.length === 0) {
-    card.style.display = 'block';
 
     const dateKey = Util.dateKey(currentDate);
     const bountyTasks = cachedData?.bountyTasks || [];
