@@ -724,7 +724,9 @@ class TestOfflineBehavior:
         page = context.new_page()
         try:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
-            page.wait_for_selector('#bigDate', timeout=15000)
+            _wait_for_page_ready(page)
+            # 等待页面初始化完成后再操作缓存
+            page.wait_for_timeout(1000)
             # 等待 Service Worker 缓存完全填充后再操作缓存
             _wait_for_sw_cache_ready(page, expected_min_count=13, timeout=15000)
             page.evaluate('ConnectionManager.stop()')
@@ -761,7 +763,7 @@ class TestOfflineBehavior:
         page = context.new_page()
         try:
             page.goto(test_server, wait_until='domcontentloaded', timeout=15000)
-            page.wait_for_selector('#bigDate', timeout=15000)
+            _wait_for_page_ready(page)
             page.evaluate('ConnectionManager.stop()')
 
             page.evaluate('async () => { await ChangeLog.clear(); }')
