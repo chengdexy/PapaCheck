@@ -7,6 +7,7 @@ var CORE_RESOURCES = [
   '/css/style.css',
   '/css/admin.css',
   '/js/api.js',
+  '/js/connection.js',
   '/js/app.js',
   '/js/big-screen.js',
   '/js/admin.js',
