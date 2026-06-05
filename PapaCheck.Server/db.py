@@ -181,7 +181,9 @@ def _find_uuid_in_all_date_keys(conn, table, uuid, exclude_key=None):
     """在指定表的所有 date_key 行中搜索 UUID。
     返回 (date_key, index, item) 或 (None, -1, None)。
     """
-    rows = conn.execute(f"SELECT date_key, data FROM {table}").fetchall()
+    if table not in _DATE_KEY_TABLES:
+        raise ValueError(f"Invalid table name: {table}")
+    rows = conn.execute("SELECT date_key, data FROM {}".format(table)).fetchall()
     for row in rows:
         date_key = row['date_key']
         if exclude_key is not None and date_key == exclude_key:

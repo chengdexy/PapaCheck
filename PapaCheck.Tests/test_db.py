@@ -1925,3 +1925,15 @@ class TestPushMergeCrossDateKeySearch:
         deleted = [i for i in raw if i.get('id') == 'hw1']
         assert len(deleted) == 1
         assert deleted[0].get('isDeleted') is True
+
+    # Feature: _find_uuid_in_all_date_keys 表名白名单校验
+    #   Scenario: 传入无效表名时抛出 ValueError
+    #     Given 数据库已初始化
+    #     When 调用 _find_uuid_in_all_date_keys 传入不在 _DATE_KEY_TABLES 中的表名
+    #     Then 抛出 ValueError
+    def test_find_uuid_in_all_date_keys_rejects_invalid_table(self, db):
+        """传入非法表名应抛出 ValueError，防止 SQL 注入"""
+        import pytest
+        conn = db._mgr.get()
+        with pytest.raises(ValueError, match='Invalid table name'):
+            db._find_uuid_in_all_date_keys(conn, 'malicious_table; DROP TABLE homeworks;', 'test-uuid')
