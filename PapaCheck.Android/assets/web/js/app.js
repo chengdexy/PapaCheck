@@ -21,7 +21,7 @@ function showTransitionMask(text) {
   document.getElementById('transitionText').textContent = text;
   mask.style.display = 'flex';
   clearTimeout(mask._timeout);
-  mask._timeout = setTimeout(function () { mask.style.display = 'none'; }, 5000);
+  mask._timeout = setTimeout(function() { mask.style.display = 'none'; }, 5000);
 }
 function hideTransitionMask() {
   var mask = document.getElementById('transitionMask');
