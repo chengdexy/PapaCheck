@@ -201,7 +201,7 @@ async function requestDeferHomework(hwId) {
     await API.deferHomework(dateKey, hwId, 'request', new Date().toISOString());
     cachedData = await API.getData();
     homeworks = cachedData.homeworks?.[dateKey] || [];
-    Voice.speak('已申请延后，等待爸爸确认');
+    Voice.speak('已申请延后，等待审核');
     needsFullRender = true;
     updateBigScreen();
     showToast('已申请将"' + hw.subject + ' - ' + hw.content + '"延后到明天');
@@ -674,8 +674,8 @@ async function submitForRating() {
     stopTickTimer();
     needsFullRender = true;
     updateBigScreen();
-    showToast('已提交等待爸爸评级');
-    Voice.speak('全部作业已完成，等待爸爸评级');
+    showToast('今日作业已提交，等待评级');
+    Voice.speak('全部作业已完成，等待评级');
   } finally {
     _submittingRating = false;
   }
@@ -780,9 +780,9 @@ function startPoll(intervalMs) {
         for (const dh of oldDeferred) {
           const stillThere = newHw.find(h => h.id === dh.id);
           if (!stillThere) {
-            Voice.speak('爸爸批准了' + dh.subject + '的延后申请，明天再做');
+            Voice.speak(dh.subject + '的延后申请已批准，明天再做');
           } else if (!stillThere.deferRequest) {
-            Voice.speak('爸爸拒绝了' + dh.subject + '的延后申请，今天完成吧');
+            Voice.speak(dh.subject + '的延后申请未通过，今天完成吧');
           }
         }
 
