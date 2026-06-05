@@ -336,7 +336,7 @@ function updateCurrentTask() {
         display.innerHTML = `
           <div class="current-task-icon">⏳</div>
           <div class="current-task-name">${escapeHtml(task.name)}</div>
-          <div class="current-task-time">等待爸爸审核中...</div>
+          <div class="current-task-time">等待审核中...</div>
         `;
         return;
       }
@@ -351,7 +351,7 @@ function updateCurrentTask() {
     display.innerHTML = `
         <div class="current-task-icon">${ratingEmoji[settlement.rating] || '🎉'}</div>
         <div class="current-task-name">今日获得 ${settlement.finalPoints} 积分</div>
-        <div class="current-task-time">爸爸评级：${settlement.rating} · 倍率 x${settlement.multiplier}</div>
+        <div class="current-task-time">评级结果：${settlement.rating} · 倍率 x${settlement.multiplier}</div>
       `;
     return;
   }
@@ -519,7 +519,7 @@ function updateHomeworkGrid() {
     bountyCards.push(...submittedSubs.map(sub => {
       const task = bountyTasks.find(t => t.id === sub.taskId);
       if (!task) return '';
-      return '<div class="homework-card" style="border-left:3px solid var(--warning);opacity:0.8;"><div class="homework-card-row"><span style="font-size:28px;flex-shrink:0;">⏳</span><div class="homework-card-info"><div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-size:18px;font-weight:600;">' + escapeHtml(task.name) + typeLabel(task) + '</span>' + (historyCounts[task.id] ? '<span style="font-size:18px;font-weight:700;color:var(--accent);">x' + historyCounts[task.id] + '</span>' : '') + '</div><div style="font-size:13px;color:var(--warning);margin-top:2px;">等待爸爸审核中...</div></div></div></div>';
+      return '<div class="homework-card" style="border-left:3px solid var(--warning);opacity:0.8;"><div class="homework-card-row"><span style="font-size:28px;flex-shrink:0;">⏳</span><div class="homework-card-info"><div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-size:18px;font-weight:600;">' + escapeHtml(task.name) + typeLabel(task) + '</span>' + (historyCounts[task.id] ? '<span style="font-size:18px;font-weight:700;color:var(--accent);">x' + historyCounts[task.id] + '</span>' : '') + '</div><div style="font-size:13px;color:var(--warning);margin-top:2px;">等待审核中...</div></div></div></div>';
     }));
     bountyCards.push(...doingSubs.map(sub => {
       const task = bountyTasks.find(t => t.id === sub.taskId);
@@ -865,7 +865,7 @@ function updateSettlementPage() {
         </div>
       </div>
       ${isSubmitted
-      ? '<div class="settlement-waiting">请爸爸检查作业...</div><div class="settlement-spinner"></div>'
+      ? '<div class="settlement-waiting">作业已提交，等待评级...</div><div class="settlement-spinner"></div>'
       : '<button class="btn-submit-rating" onclick="submitForRating()">提交等待评级</button>'
     }
       <div class="settlement-homeworks">
@@ -910,7 +910,7 @@ function updateRatedPage() {
 
   container.innerHTML = `
     <div class="settlement-card">
-      <div class="settlement-title">爸爸已评级</div>
+      <div class="settlement-title">评级已完成</div>
       <div class="rated-grade">${settlement.rating}</div>
       <div class="rated-multiplier">倍率 x${settlement.multiplier}</div>
       <div class="settlement-summary">
@@ -999,7 +999,7 @@ async function redeemFromRewardBox(itemId) {
   const redemptions = cachedData?.redemptions || [];
   const alreadyPending = redemptions.find(rd => rd.rewardBoxItemId === itemId && rd.status === 'pending');
   if (alreadyPending) {
-    showToast('已提交过，等待爸爸确认');
+    showToast('已提交过，等待确认');
     return;
   }
 
@@ -1022,8 +1022,8 @@ async function redeemFromRewardBox(itemId) {
 
     cachedData = await API.getData();
     showMyRewards();
-    showToast('已提交，等待爸爸确认');
-    Voice.speak('已提交申请，等待爸爸确认');
+    showToast('已提交，等待确认');
+    Voice.speak('已提交申请，等待确认');
   } finally {
     _redeemingRewardBox = false;
   }
@@ -1087,7 +1087,7 @@ async function updateShopPage() {
       <div class="shop-balance">余额: ${points}</div>
       <div class="shop-grid">
         ${sorted.length === 0
-      ? '<div style="text-align:center;color:var(--text-secondary);padding:40px;font-size:20px;">商店暂无商品<br>等待爸爸添加</div>'
+      ? '<div style="text-align:center;color:var(--text-secondary);padding:40px;font-size:20px;">商店暂无商品<br>敬请期待</div>'
       : sorted.map(item => {
         const remaining = item.remainingQuantity ?? 0;
         const soldOut = remaining <= 0;

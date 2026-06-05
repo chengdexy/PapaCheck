@@ -505,7 +505,7 @@ async function approveDeferHomework(hwId, requestedAt) {
 
   await refreshAllData();
   renderHomeworkTab();
-  pregenSpeech(['爸爸批准了' + hw.subject + '的延后申请，明天再做']);
+  pregenSpeech([hw.subject + '的延后申请已批准，明天再做']);
   showToast('已批准延后：' + hw.subject + ' - ' + hw.content);
 }
 
@@ -518,7 +518,7 @@ async function rejectDeferHomework(hwId) {
 
   await refreshAllData();
   renderHomeworkTab();
-  pregenSpeech(['爸爸拒绝了' + hw.subject + '的延后申请，今天完成吧']);
+  pregenSpeech([hw.subject + '的延后申请未通过，今天完成吧']);
   showToast('已拒绝延后：' + hw.subject + ' - ' + hw.content);
 }
 
@@ -2093,7 +2093,7 @@ async function confirmAdjustPoints() {
     const diff = newBalance - oldBalance;
     if (diff !== 0) {
       const action = diff > 0 ? 'earn' : 'spend';
-      await API.updatePoints(action, Math.abs(diff), `爸爸调整积分至${newBalance}`);
+      await API.updatePoints(action, Math.abs(diff), `积分已被调整为${newBalance}`);
       const note = diff > 0
         ? '获得奖励积分：' + diff + '分'
         : '被惩罚，扣除积分：' + Math.abs(diff) + '分';
