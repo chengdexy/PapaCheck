@@ -63,6 +63,7 @@ class BatteryMonitor {
 
   final Battery _battery = Battery();
   Timer? _pollTimer;
+  StreamSubscription<BatteryState>? _stateSubscription;
   WebViewController? _controller;
   bool _alerted20 = false;
   bool _alerted10 = false;
@@ -82,7 +83,8 @@ class BatteryMonitor {
     _alerted20 = false;
     _alerted10 = false;
 
-    _battery.onBatteryStateChanged.listen(_onBatteryStateChanged);
+    _stateSubscription =
+        _battery.onBatteryStateChanged.listen(_onBatteryStateChanged);
 
     // 延迟启动检查，避免与页面初始化竞态
     Future.delayed(_startupDelay, _checkAndAlert);
@@ -92,6 +94,8 @@ class BatteryMonitor {
   void stop() {
     _pollTimer?.cancel();
     _pollTimer = null;
+    _stateSubscription?.cancel();
+    _stateSubscription = null;
     _controller = null;
   }
 
