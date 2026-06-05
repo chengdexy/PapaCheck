@@ -4,6 +4,13 @@
 
 ---
 
+## [Unreleased]
+
+### 修复（Fixed）
+- 孩子端赏金任务列表过多时超出框架且无滚动条：移除 `updateHomeworkGrid()` 中错误的 `card.style.display = 'block'`，恢复 CSS `display: flex` 弹性布局，使 `.homework-grid` 的 `overflow-y: auto` 正常生效
+
+---
+
 ## [1.1.6] - 2026-06-04
 
 ### 新增（Added）
