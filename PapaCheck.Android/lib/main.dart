@@ -9,6 +9,7 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:battery_plus/battery_plus.dart';
 
 import 'services/asset_bundle_loader.dart';
 import 'services/config_service.dart';
@@ -55,6 +56,75 @@ class PapaCheckBrowser extends StatelessWidget {
   }
 }
 
+/// 电池监控服务：周期性检测电量，低于阈值时通过 WebView 触发前端 TTS 语音提醒
+class BatteryMonitor {
+  static const _pollInterval = Duration(seconds: 30);
+  static const _startupDelay = Duration(seconds: 3);
+
+  final Battery _battery = Battery();
+  Timer? _pollTimer;
+  WebViewController? _controller;
+  bool _alerted20 = false;
+  bool _alerted10 = false;
+  BatteryState? _lastState;
+
+  /// 纯逻辑：根据当前电量和已触发标记，返回应该触发的提醒类型（供测试使用）
+  /// 返回 null 表示无需提醒，'20' 表示 20% 提醒，'10' 表示 10% 提醒
+  static String? evaluateAlert(
+      int batteryLevel, bool alerted20, bool alerted10) {
+    if (batteryLevel <= 10 && !alerted10) return '10';
+    if (batteryLevel <= 20 && !alerted20) return '20';
+    return null;
+  }
+
+  void start(WebViewController controller) {
+    _controller = controller;
+    _alerted20 = false;
+    _alerted10 = false;
+
+    _battery.onBatteryStateChanged.listen(_onBatteryStateChanged);
+
+    // 延迟启动检查，避免与页面初始化竞态
+    Future.delayed(_startupDelay, _checkAndAlert);
+    _pollTimer = Timer.periodic(_pollInterval, (_) => _checkAndAlert());
+  }
+
+  void stop() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    _controller = null;
+  }
+
+  Future<void> _checkAndAlert() async {
+    if (_controller == null) return;
+    try {
+      final level = await _battery.batteryLevel;
+      final alert = evaluateAlert(level, _alerted20, _alerted10);
+      if (alert == '10') {
+        _alerted10 = true;
+        _alerted20 = true;
+        _controller!.runJavaScript(
+          "Voice.speak('\u7535\u91cf\u4e25\u91cd\u4e0d\u8db3\uff0c\u4ec5\u5269' + $level + '%\uff0c\u8bf7\u7acb\u5373\u5145\u7535')",
+        );
+      } else if (alert == '20') {
+        _alerted20 = true;
+        _controller!.runJavaScript(
+          "Voice.speak('\u7535\u91cf\u4e0d\u8db3\uff0c\u8fd8\u5269' + $level + '%\uff0c\u8bf7\u5145\u7535')",
+        );
+      }
+    } catch (_) {}
+  }
+
+  void _onBatteryStateChanged(BatteryState state) {
+    if (_lastState != null && state == BatteryState.charging) {
+      // 检测到充电，重置阈值标记
+      _alerted20 = false;
+      _alerted10 = false;
+    }
+    _lastState = state;
+  }
+}
+
 class PapaCheckApp extends StatefulWidget {
   const PapaCheckApp({super.key});
 
@@ -68,6 +138,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   WebViewController? _controller;
   bool _isPageReady = false;
   Timer? _readyCheckTimer;
+  BatteryMonitor? _batteryMonitor;
 
   @override
   void initState() {
@@ -78,6 +149,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   @override
   void dispose() {
     _readyCheckTimer?.cancel();
+    _batteryMonitor?.stop();
     super.dispose();
   }
 
@@ -116,6 +188,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         _isPageReady = true;
       });
       await _initControllerOffline(fullUrl, html);
+      _startBatteryMonitor();
     } else if (mounted) {
       // 无离线内容，先检测服务器是否可达
       final reachable = await _isServerReachable(fullUrl);
@@ -253,12 +326,14 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
             _readyCheckTimer?.cancel();
             if (mounted) {
               setState(() => _isPageReady = true);
+              _startBatteryMonitor();
             }
           }
         } catch (_) {
           if (ticks >= 30 && mounted) {
             _readyCheckTimer?.cancel();
             setState(() => _isPageReady = true);
+            _startBatteryMonitor();
           }
         }
       },
@@ -448,6 +523,13 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
 
   String _getBaseUrl(String fullUrl) {
     return fullUrl.replaceAll('/admin.html', '');
+  }
+
+  void _startBatteryMonitor() {
+    if (_controller == null) return;
+    _batteryMonitor?.stop();
+    _batteryMonitor = BatteryMonitor();
+    _batteryMonitor!.start(_controller!);
   }
 
   @override
