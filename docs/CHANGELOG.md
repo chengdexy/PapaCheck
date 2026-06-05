@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### 修复（Fixed）
+- 推迟到明天做的作业，离线转在线模式同步后回到今天的作业列表：修改 `db.py` 的 `push_merge()` 在指定 `date_key` 找不到 UUID 时跨所有 `date_key` 搜索，防止因 `move_homework` 造成的跨天重复追加；`move_homework()` 补充调用 `record_modification()` 更新 `last_modified` 表
 - 孩子端赏金任务列表过多时超出框架且无滚动条：移除 `updateHomeworkGrid()` 中错误的 `card.style.display = 'block'`，恢复 CSS `display: flex` 弹性布局，使 `.homework-grid` 的 `overflow-y: auto` 正常生效
 - 孩子端/管理端静置后误切离线模式：ConnectionManager 引入 ping 失败阈值（连续 3 次失败才切换离线），利用已有 `_failCount` 变量，防止设备休眠/浏览器后台节流导致的偶发 ping 超时误判
 - Windows 端退出时重复日志 + 偶发卡死：删除 `_quit_app()` 中重复的"正在停止服务器..."日志；`_check_still_running()` 检查 `_quitting` 标志位防止退出期间重复调用 `_handle_server_exit()`；`_quit_app()` 添加防重入守卫
