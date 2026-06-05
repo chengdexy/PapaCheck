@@ -93,6 +93,9 @@ var ConnectionManager = (function () {
         if (ok) {
           _mode = 'online';
           _wasOnline = true;
+          _failCount = 0;
+        } else {
+          _failCount++;
         }
         hideReconnectMask();
         updateConnStatus();
@@ -147,11 +150,14 @@ var ConnectionManager = (function () {
           updateConnStatus();
         }
       } else {
-        var wasOnline = _mode === 'online';
-        _mode = 'offline';
-        updateConnStatus();
-        if (wasOnline && typeof showToast === 'function') {
-          showToast('\u7f51\u7edc\u8fde\u63a5\u65ad\u5f00\uff0c\u4f7f\u7528\u7f13\u5b58\u6570\u636e');
+        _failCount++;
+        if (_failCount >= 3) {
+          var wasOnline = _mode === 'online';
+          _mode = 'offline';
+          updateConnStatus();
+          if (wasOnline && typeof showToast === 'function') {
+            showToast('\u7f51\u7edc\u8fde\u63a5\u65ad\u5f00\uff0c\u4f7f\u7528\u7f13\u5b58\u6570\u636e');
+          }
         }
       }
     }, _getPingInterval());
