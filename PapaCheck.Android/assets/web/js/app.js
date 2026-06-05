@@ -996,9 +996,10 @@ async function init() {
           showToast('未连接服务器，请检查网络');
           isServerMode = false;
           cachedData = { homeworks: {}, freeTimeTasks: {}, dailySettlement: {}, points: { balance: 0 }, shopItems: [], rewardBox: [], activeBuffs: [], bountyTasks: [], bountySubmissions: {}, bountyCompletions: {}, settings: {} };
-          var _recoveryOnline = setInterval(function () {
+          if (window._recoveryInterval) clearInterval(window._recoveryInterval);
+          window._recoveryInterval = setInterval(function () {
             if (ConnectionManager.getMode() === 'online') {
-              clearInterval(_recoveryOnline);
+              clearInterval(window._recoveryInterval);
               location.reload();
             }
           }, 2000);
@@ -1008,9 +1009,10 @@ async function init() {
         showToast('未连接服务器，请检查网络');
         isServerMode = false;
         cachedData = { homeworks: {}, freeTimeTasks: {}, dailySettlement: {}, points: { balance: 0 }, shopItems: [], rewardBox: [], activeBuffs: [], bountyTasks: [], bountySubmissions: {}, bountyCompletions: {}, settings: {} };
-        var _recoveryOnline2 = setInterval(function () {
+        if (window._recoveryInterval) clearInterval(window._recoveryInterval);
+        window._recoveryInterval = setInterval(function () {
           if (ConnectionManager.getMode() === 'online') {
-            clearInterval(_recoveryOnline2);
+            clearInterval(window._recoveryInterval);
             location.reload();
           }
         }, 2000);
@@ -1031,9 +1033,10 @@ async function init() {
         isServerMode = false;
         cachedData = { homeworks: {}, freeTimeTasks: {}, dailySettlement: {}, points: { balance: 0 }, shopItems: [], rewardBox: [], activeBuffs: [], bountyTasks: [], bountySubmissions: {}, bountyCompletions: {}, settings: {} };
         // 定时检查网络恢复后自动重载页面
-        var _recoveryTimer = setInterval(function () {
+        if (window._recoveryInterval) clearInterval(window._recoveryInterval);
+        window._recoveryInterval = setInterval(function () {
           if (ConnectionManager.getMode() === 'online') {
-            clearInterval(_recoveryTimer);
+            clearInterval(window._recoveryInterval);
             location.reload();
           }
         }, 2000);
@@ -1043,9 +1046,10 @@ async function init() {
       showToast('未连接服务器，请检查网络');
       isServerMode = false;
       cachedData = { homeworks: {}, freeTimeTasks: {}, dailySettlement: {}, points: { balance: 0 }, shopItems: [], rewardBox: [], activeBuffs: [], bountyTasks: [], bountySubmissions: {}, bountyCompletions: {}, settings: {} };
-      var _recoveryTimer2 = setInterval(function () {
+      if (window._recoveryInterval) clearInterval(window._recoveryInterval);
+      window._recoveryInterval = setInterval(function () {
         if (ConnectionManager.getMode() === 'online') {
-          clearInterval(_recoveryTimer2);
+          clearInterval(window._recoveryInterval);
           location.reload();
         }
       }, 2000);
