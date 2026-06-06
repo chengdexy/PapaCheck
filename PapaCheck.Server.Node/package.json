@@ -28,10 +28,14 @@
     "@fastify/swagger-ui": "^5.2.2",
     "better-sqlite3": "^11.7.0",
     "fastify": "^5.2.1",
+    "imap": "^0.8.19",
+    "mailparser": "^3.9.9",
     "minimist": "^1.2.8"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
+    "@types/imap": "^0.8.43",
+    "@types/mailparser": "^3.4.6",
     "@types/minimist": "^1.2.5",
     "@types/node": "^22.13.0",
     "esbuild": "^0.25.0",

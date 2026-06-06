@@ -4,6 +4,7 @@ import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import { PapaCheckDB } from './db/index.js';
 import { TTSBridge } from './tts/index.js';
+import { EmailSync } from './email/index.js';
 import fastifyStatic from '@fastify/static';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
@@ -429,6 +430,75 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       tts.pregenSpeech(body.texts);
     }
     return sendJson(reply, { ok: true });
+  });
+
+  // 35. POST /api/email/config - 保存邮箱配置
+  app.post('/api/email/config', async (request, reply) => {
+    const body = request.body as {
+      host?: string;
+      port?: number;
+      user?: string;
+      password?: string;
+      apiKey?: string;
+      apiUrl?: string;
+    };
+
+    if (!body.host || !body.port || !body.user || !body.password) {
+      return reply.status(400).send({
+        error: '请填写完整的 IMAP 配置（host, port, user, password）',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    db.saveEmailConfig(body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 36. POST /api/email/sync - 触发邮件同步
+  app.post('/api/email/sync', async (request, reply) => {
+    const config = db.getEmailConfig();
+
+    if (!config) {
+      return reply.status(400).send({
+        error: '请先配置邮箱',
+        code: 'EMAIL_CONFIG_MISSING',
+      });
+    }
+
+    if (!config.apiKey || !config.apiUrl) {
+      return reply.status(400).send({
+        error: '请配置 AI API Key 和 API URL',
+        code: 'AI_CONFIG_MISSING',
+      });
+    }
+
+    const syncer = new EmailSync(config);
+    const result = await syncer.sync();
+
+    if (!result.ok) {
+      return reply.status(500).send({
+        error: result.error || '邮件同步失败',
+        code: 'EMAIL_SYNC_ERROR',
+      });
+    }
+
+    // 保存解析出的作业
+    if (result.homeworks && result.homeworks.length > 0) {
+      for (const hw of result.homeworks) {
+        const dateKey = hw.date || new Date().toISOString().slice(0, 10);
+        const hwId = `email-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        db.putHomework(hwId, {
+          id: hwId,
+          subject: hw.subject,
+          content: hw.content,
+          dateKey,
+          status: 'pending',
+          source: 'email',
+        });
+      }
+    }
+
+    return sendJson(reply, { ok: true, homeworks: result.homeworks || [] });
   });
 
   // CRDT 同步推送

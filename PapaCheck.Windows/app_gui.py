@@ -17,6 +17,7 @@ import ctypes
 import ctypes.wintypes
 import urllib.request
 import urllib.error
+import subprocess
 
 _CUR_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -29,13 +30,7 @@ else:
     _DB_DIR = os.path.normpath(os.path.join(_CUR_DIR, '..', 'PapaCheck.Server'))
 os.environ['PAPACHECK_DB_DIR'] = _DB_DIR
 
-# --- email_client 导入（需在 import server 之前，确保 db 可寻址） ---
-_EMAIL_DIR = os.path.normpath(os.path.join(_CUR_DIR, '..', 'PapaCheck.Email'))
-_SERVER_DIR2 = os.path.normpath(os.path.join(_CUR_DIR, '..', 'PapaCheck.Server'))
-for p in (_EMAIL_DIR, _SERVER_DIR2):
-    if p not in sys.path:
-        sys.path.insert(0, p)
-import email_client
+
 
 # --- Windows Credential Manager ---
 _CredWriteW = ctypes.windll.advapi32.CredWriteW
@@ -188,7 +183,6 @@ if _SERVER_DIR not in sys.path:
     sys.path.insert(0, _SERVER_DIR)
 
 import winreg
-from server import init_server
 
 AUTORUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 APP_NAME = "PapaCheckServer"
@@ -207,6 +201,67 @@ def _resource_path(relative):
     if getattr(sys, 'frozen', False):
         return os.path.join(sys._MEIPASS, relative)
     return os.path.normpath(os.path.join(_CUR_DIR, '..', relative))
+
+
+# ===== Node.js 服务器子进程管理 =====
+
+def _get_node_server_exe():
+    """查找 Node.js 服务器 EXE 路径（模块级函数）"""
+    if getattr(sys, 'frozen', False):
+        # PyInstaller 打包环境
+        exe = os.path.join(sys._MEIPASS, 'Server.Node', 'papacheck-server.exe')
+    else:
+        # 开发环境
+        exe = os.path.normpath(os.path.join(
+            _CUR_DIR, '..', 'PapaCheck.Server.Node', 'dist', 'papacheck-server.exe'
+        ))
+    if not os.path.exists(exe):
+        raise FileNotFoundError(f'Node.js 服务器未找到: {exe}')
+    return exe
+
+
+def _start_node_server_process(exe_path, db_path, web_dir, port):
+    """通过 subprocess.Popen 启动 Node.js 服务器进程"""
+    cmd = [
+        exe_path,
+        '--port', str(port),
+        '--web-dir', web_dir,
+        '--db-path', db_path,
+    ]
+
+    creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        creationflags=creationflags,
+    )
+
+    # 等待服务器就绪（轮询端口）
+    for _ in range(30):
+        if process.poll() is not None:
+            raise Exception('Node.js 服务器启动失败')
+        try:
+            with socket.socket() as s:
+                s.settimeout(1)
+                s.connect(('127.0.0.1', port))
+            return process
+        except (ConnectionRefusedError, OSError, socket.timeout):
+            time.sleep(1)
+
+    raise Exception('Node.js 服务器启动超时')
+
+
+def _stop_node_server_process(process):
+    """终止 Node.js 服务器子进程"""
+    if process is None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=3)
 
 
 class ServerThread(threading.Thread):
@@ -290,6 +345,7 @@ class PapaCheckApp:
 
         self.server = None
         self.server_thread = None
+        self._node_process = None
         self.ip = '127.0.0.1'
         self.running = False
         self.tray_icon = None
@@ -625,13 +681,47 @@ class PapaCheckApp:
 
     # ===== 服务器生命周期 =====
 
+    def _get_local_ip(self):
+        """获取本机局域网 IP 地址"""
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.settimeout(2)
+            s.connect(('10.254.254.254', 1))
+            ip = s.getsockname()[0]
+        except Exception:
+            ip = '127.0.0.1'
+        finally:
+            s.close()
+        return ip
+
+    def _get_node_server_exe(self):
+        """查找 Node.js 服务器 EXE 路径（类方法包装）"""
+        return _get_node_server_exe()
+
+    def _start_node_server(self):
+        """通过子进程启动 Node.js 服务器"""
+        exe_path = self._get_node_server_exe()
+        db_path = os.path.join(_DB_DIR, 'data.db')
+        web_dir = _resource_path('PapaCheck.Web')
+
+        process = _start_node_server_process(
+            exe_path=exe_path,
+            db_path=db_path,
+            web_dir=web_dir,
+            port=_PORT,
+        )
+        self._node_process = process
+        self.ip = self._get_local_ip()
+
+    def _stop_node_server(self):
+        """终止 Node.js 服务器子进程"""
+        _stop_node_server_process(self._node_process)
+        self._node_process = None
+
     def _start_server(self):
-        if self.server:
-            try:
-                self.server.server_close()
-            except Exception:
-                pass
-            self.server = None
+        if self._node_process:
+            _stop_node_server_process(self._node_process)
+            self._node_process = None
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         in_use = False
@@ -649,17 +739,13 @@ class PapaCheckApp:
             return
 
         self._append_log('正在启动服务器...')
-        self.log_redirector.__enter__()
         try:
-            self.server, self.ip = init_server(quiet=True)
+            self._start_node_server()
         except Exception as e:
-            self.log_redirector.__exit__(None, None, None)
             self._append_log('服务器启动失败: ' + str(e))
             self._handle_server_exit()
             return
 
-        self.server_thread = ServerThread(self.server)
-        self.server_thread.start()
         self.running = True
         self._set_status(True)
 
@@ -675,21 +761,14 @@ class PapaCheckApp:
         self.root.after(2000, self._check_still_running)
 
     def _stop_server(self):
-        if self.server_thread and self.server_thread.is_alive():
+        if self._node_process:
             self._append_log('正在停止服务器...')
             self.start_btn.config(state=tk.DISABLED)
-            self.server_thread.stop()
-            self.root.after(200, self._wait_shutdown)
-
-    def _wait_shutdown(self):
-        if self.server_thread and self.server_thread.is_alive():
-            self.root.after(200, self._wait_shutdown)
-        else:
+            self._stop_node_server()
             self._handle_server_exit()
+            self.start_btn.config(state=tk.NORMAL)
             if self._quitting:
                 self._do_destroy()
-            else:
-                self.start_btn.config(state=tk.NORMAL)
 
     def _toggle_server(self):
         if self.running:
@@ -700,20 +779,15 @@ class PapaCheckApp:
     def _check_still_running(self):
         if self.destroyed:
             return
-        if not self.server_thread or not self.server_thread.is_alive():
+        if self._node_process and self._node_process.poll() is not None:
             if self.running and not self._quitting:
                 self._handle_server_exit()
         else:
             self.root.after(2000, self._check_still_running)
 
     def _handle_server_exit(self):
-        if self.server:
-            try:
-                self.server.server_close()
-            except Exception:
-                pass
-            self.server = None
-        self.log_redirector.__exit__(None, None, None)
+        _stop_node_server_process(self._node_process)
+        self._node_process = None
         self.running = False
         self._set_status(False)
         self._append_log('服务器已停止')
@@ -860,7 +934,7 @@ class PapaCheckApp:
             return
         self._quitting = True
         self._disable_ui()
-        if self.server_thread and self.server_thread.is_alive():
+        if self._node_process:
             self._stop_server()
         else:
             self._do_destroy()
@@ -1261,6 +1335,28 @@ class PapaCheckApp:
             except Exception:
                 pass
 
+            # 保存邮箱配置到 Node.js 服务器（供 /api/email/sync 使用）
+            if use_ai:
+                try:
+                    pw_val = entries['password'].get().strip() or _credential_read('PapaCheck/email_password') or ''
+                    ak_val = entries['ai_api_key'].get().strip() or _credential_read('PapaCheck/ai_api_key') or ''
+                    if pw_val and ak_val:
+                        email_cfg = {
+                            'host': entries['imap_server'].get().strip(),
+                            'port': int(entries['port'].get().strip()),
+                            'user': entries['email'].get().strip(),
+                            'password': pw_val,
+                            'apiKey': ak_val,
+                            'apiUrl': entries['ai_base_url'].get().strip(),
+                        }
+                        url = _server_url_var.get().strip().rstrip('/') + '/api/email/config'
+                        payload = json.dumps(email_cfg).encode()
+                        req = urllib.request.Request(url, data=payload, method='POST')
+                        req.add_header('Content-Type', 'application/json')
+                        urllib.request.urlopen(req, timeout=5)
+                except Exception:
+                    pass
+
             pw = entries['password'].get().strip()
             if pw:
                 _credential_write('PapaCheck/email_password', pw)
@@ -1375,7 +1471,16 @@ class PapaCheckApp:
 
         test_text = 'hello'
         try:
-            email_client.call_ai(ak, url, model, test_text)
+            api_url = f'{url}/v1/chat/completions'
+            payload = json.dumps({
+                'model': model,
+                'messages': [{'role': 'user', 'content': test_text}],
+            }).encode('utf-8')
+            req = urllib.request.Request(api_url, data=payload, method='POST')
+            req.add_header('Content-Type', 'application/json')
+            req.add_header('Authorization', f'Bearer {ak}')
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                json.loads(resp.read().decode('utf-8'))
             tkmsg.showinfo('成功', '✅ AI 服务连接正常', parent=parent)
         except Exception as e:
             tkmsg.showerror('失败', f'连接失败: {e}', parent=parent)
@@ -1424,58 +1529,57 @@ class PapaCheckApp:
                          args=(cfg, pw, ak), daemon=True).start()
 
     def _run_email_sync(self, cfg, pw, ak):
-        matched_ids = None
         try:
             self.root.after(0, lambda: self._append_log('正在连接邮箱...'))
-            messages, matched_ids = email_client.fetch_emails_from_sender(
-                cfg['imap_server'], cfg['port'],
-                cfg['email'], pw,
-                cfg['sender'],
-                search_all=False, mark_as_read=cfg.get('mark_as_read', True),
-                attachment_dir=_get_attachment_dir(cfg),
-            )
-            if not messages:
+
+            server_url = cfg['server_url'].strip().rstrip('/')
+
+            # 1. 保存邮箱配置到 Node.js 服务器
+            email_cfg = {
+                'host': cfg['imap_server'],
+                'port': cfg['port'],
+                'user': cfg['email'],
+                'password': pw,
+                'apiKey': ak,
+                'apiUrl': cfg['ai_base_url'],
+            }
+            config_url = server_url + '/api/email/config'
+            payload = json.dumps(email_cfg).encode()
+            req = urllib.request.Request(config_url, data=payload, method='POST')
+            req.add_header('Content-Type', 'application/json')
+            urllib.request.urlopen(req, timeout=10)
+
+            # 2. 触发邮件同步
+            sync_url = server_url + '/api/email/sync'
+            req = urllib.request.Request(sync_url, method='POST')
+            req.add_header('Content-Type', 'application/json')
+            resp = urllib.request.urlopen(req, timeout=120)
+            result = json.loads(resp.read())
+
+            if not result.get('ok'):
+                error_msg = result.get('error', '未知错误')
+                self.root.after(0, lambda: self._append_log(f'同步失败: {error_msg}'))
+                return
+
+            homeworks = result.get('homeworks', [])
+            if not homeworks:
                 self.root.after(0, lambda: self._append_log('未找到匹配的邮件，同步结束'))
                 return
 
-            self.root.after(0, lambda: self._append_log(f'共收取 {len(messages)} 封邮件'))
+            self.root.after(0, lambda: self._append_log(f'共解析出 {len(homeworks)} 项作业'))
 
-            attach_count = sum(len(m.get('attachments', [])) for m in messages)
-            if attach_count:
-                attach_dir = _get_attachment_dir(cfg)
-                self.root.after(0, lambda c=attach_count, d=attach_dir: self._append_log(f'下载了 {c} 个附件到 {d}'))
+            # 打开附件目录
+            attach_dir = _get_attachment_dir(cfg)
+            if os.path.exists(attach_dir):
                 self.root.after(100, lambda: self._open_attach_dir())
 
-            email_text = '\n'.join(m.get('body', '') for m in messages)
-
-            self.root.after(0, lambda: self._append_log('正在调用 AI 解析...'))
-            ai_output = email_client.call_ai(ak, cfg['ai_base_url'], cfg['ai_model'], email_text)
-
-            new_items = email_client._parse_homework_text(ai_output)
-            if not new_items:
-                self.root.after(0, lambda: self._append_log('AI 未解析出作业项'))
-                raise Exception('AI 未解析出作业项')
-
-            today = email_client._get_today_key()
-            save_homeworks_via_api(cfg['server_url'], today, new_items)
-
-            count = len(new_items)
-            self.root.after(0, lambda: self._append_log(f'已添加 {count} 项作业到今日作业清单'))
             self.root.after(0, lambda: self._append_log('邮件作业同步完成'))
 
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8', errors='replace')
+            self.root.after(0, lambda: self._append_log(f'错误: HTTP {e.code} - {error_body}'))
         except Exception as e:
-            error_msg = str(e)
-            if matched_ids and cfg.get('mark_as_read', True):
-                try:
-                    email_client.mark_matched_ids_as_unread(
-                        cfg['imap_server'], cfg['port'],
-                        cfg['email'], pw,
-                        matched_ids,
-                    )
-                    self.root.after(0, lambda: self._append_log('已将邮件恢复为未读状态'))
-                except Exception:
-                    self.root.after(0, lambda: self._append_log('恢复邮件状态失败，请手动处理'))
-            self.root.after(0, lambda: self._append_log(f'错误: {error_msg}'))
+            self.root.after(0, lambda: self._append_log(f'错误: {e}'))
         finally:
             self.root.after(0, lambda: self._email_sync_btn.config(
                 state=tk.NORMAL, text='AI 发作业'))

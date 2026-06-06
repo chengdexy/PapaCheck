@@ -59,6 +59,7 @@ const SINGLE_ROW_TABLES = new Set([
   'bounty_tasks',
   'badges',
   'points',
+  'email_config',
 ]);
 
 // ==================== Database Class ====================
@@ -151,6 +152,11 @@ export class PapaCheckDB {
         data TEXT NOT NULL DEFAULT '[]'
       );
 
+      CREATE TABLE IF NOT EXISTS email_config (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        data TEXT NOT NULL DEFAULT '{}'
+      );
+
       CREATE TABLE IF NOT EXISTS bounty_submissions (
         date_key TEXT PRIMARY KEY,
         data TEXT NOT NULL DEFAULT '[]'
@@ -194,6 +200,7 @@ export class PapaCheckDB {
       { table: 'settings', data: '{}' },
       { table: 'active_buffs', data: '[]' },
       { table: 'bounty_tasks', data: '[]' },
+      { table: 'email_config', data: '{}' },
     ];
 
     // 每张表单独准备语句
@@ -896,6 +903,21 @@ export class PapaCheckDB {
     data.lastModified = data.lastModified ?? now;
     this._setDateData('bounty_completions', id, data);
     this.recordModification('bounty_completions', id, now);
+  }
+
+  // ==================== Email Config ====================
+
+  getEmailConfig(): any | null {
+    const data = this._getJson('email_config');
+    if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+      return data;
+    }
+    return null;
+  }
+
+  saveEmailConfig(config: any): void {
+    this._setJson('email_config', config);
+    this.recordModification('email_config', '1', new Date().toISOString());
   }
 
   // ==================== Sync ====================

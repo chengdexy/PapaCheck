@@ -70,7 +70,7 @@
 
 | 日期 | 变更 |
 |------|------|
-| 2026-06-06 | 修复：`fullSync()` 中 `ChangeLog.clear()` 全量清空导致推送期间新增条目丢失，消耗的时间类道具被恢复；改为 `clearUpTo(maxId)` 精确清除 |
+| 2026-06-06 | Phase 4 完成：Windows 端迁移至 Node.js 服务器（子进程启动 Node.js EXE、邮件同步重写为 Node.js、构建流程更新、Windows 端 10 个新测试 + Node.js 175 个测试） |
 | 2026-06-06 | Phase 3 完成：CRDT 同步引擎（字段级 LWW + PN-Counter + OR-Set 合并引擎，crdt_operations 表，crdt-push/pull 端点，前端操作日志 + CRDT 同步流程 + connection.js 重连降级） |
 | 2026-06-06 | Phase 2 完成：RESTful API 重写（新增 12 PUT + 4 PATCH + 4 DELETE + 2 HEAD 端点，统一错误格式，api.js 新增 30 个方法） |
 | 2026-06-06 | Phase 1 完成：Node.js 服务器骨架（Fastify + better-sqlite3 + 34 个 API 端点 + 83 个测试 + pkg 构建 + Swagger 文档） |
