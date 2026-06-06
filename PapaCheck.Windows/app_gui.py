@@ -1640,10 +1640,9 @@ class PapaCheckApp:
             req.add_header('Content-Type', 'application/json')
             urllib.request.urlopen(req, timeout=10)
 
-            # 2. 触发邮件同步
+            # 2. 触发邮件同步（无 body，不设 Content-Type，避免 Fastify 报空 body 错误）
             sync_url = server_url + '/api/email/sync'
             req = urllib.request.Request(sync_url, method='POST')
-            req.add_header('Content-Type', 'application/json')
             resp = urllib.request.urlopen(req, timeout=120)
             result = json.loads(resp.read())
 
