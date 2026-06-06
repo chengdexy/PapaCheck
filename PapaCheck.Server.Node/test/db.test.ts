@@ -105,6 +105,49 @@ describe('Database', () => {
     });
   });
 
+  describe('putHomework 容错', () => {
+    it('dateKey 数据损坏为 object 时能正常写入新作业', () => {
+      // 模拟数据损坏：现有数据为对象而非数组
+      (db as any).db.prepare(
+        "INSERT OR REPLACE INTO homeworks (date_key, data) VALUES (?, ?)"
+      ).run('2026-06-06', JSON.stringify({ id: 'orphan', subject: '损坏数据' }));
+
+      // 写入新作业
+      db.putHomework('new-hw-1', {
+        id: 'new-hw-1',
+        subject: '数学',
+        content: '练习册',
+        dateKey: '2026-06-06',
+        status: 'pending',
+      });
+
+      // 验证已恢复为数组
+      const hwList = db.getHomeworks('2026-06-06');
+      expect(Array.isArray(hwList)).toBe(true);
+      expect(hwList.length).toBe(1);
+      expect(hwList[0].subject).toBe('数学');
+    });
+  });
+
+  describe('_safeJsonParse 集成', () => {
+    it('_getJson 在 shop_items 表非法 JSON 时不崩溃', () => {
+      // 直接写入非法 JSON（INSERT 确保行存在）
+      (db as any).db.prepare("INSERT OR REPLACE INTO shop_items (id, data) VALUES (1, ?)").run('{broken');
+      // 不抛出即可
+      expect(() => db.getShopItems()).not.toThrow();
+      expect(db.getShopItems()).toEqual([]);
+    });
+
+    it('_getDateDataRaw 在 homeworks 表非法 JSON 时不崩溃', () => {
+      (db as any).db.prepare(
+        "INSERT OR REPLACE INTO homeworks (date_key, data) VALUES (?, ?)"
+      ).run('corrupt-date', '{broken');
+
+      // 底层方法应该安全返回 undefined
+      expect(() => { (db as any)._getDateDataRaw('homeworks', 'corrupt-date'); }).not.toThrow();
+    });
+  });
+
   describe('homeworks CRUD', () => {
     const dateKey = '2026-06-06';
     const hwItems = [

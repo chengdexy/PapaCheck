@@ -456,6 +456,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       apiKey?: string;
       apiUrl?: string;
       markAsRead?: boolean;
+      attachmentDir?: string;
     };
 
     if (!body.host || !body.port || !body.user || !body.password) {
