@@ -31,7 +31,7 @@ async function build() {
   );
 
   console.log('\n=== Step 2: esbuild 打包为 CJS bundle ===\n');
-  run('npx esbuild src/index.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/bundle.cjs --external:better-sqlite3');
+  run('npx esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/bundle.cjs --external:better-sqlite3');
 
   console.log('\n=== Step 3: 创建临时 package.json 用于 pkg（CJS） ===\n');
   const pkgJson = {
@@ -49,13 +49,13 @@ async function build() {
         'dist/scripts/**/*',
         'node_modules/better-sqlite3/**/*',
       ],
-      targets: ['node18-win-x64'],
+      targets: ['node20-win-x64'],
     },
   };
   writeFileSync(resolve(DIST, 'package.json'), JSON.stringify(pkgJson, null, 2));
 
   console.log('\n=== Step 4: pkg 打包 EXE ===\n');
-  run(`npx pkg dist/package.json --targets node18-win-x64 --output "${PKG_OUTPUT}"`);
+  run(`npx pkg dist/package.json --targets node20-win-x64 --output "${PKG_OUTPUT}"`);
 
   console.log('\n=== Step 5: 验证 EXE ===\n');
   if (existsSync(PKG_OUTPUT)) {
