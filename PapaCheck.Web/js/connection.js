@@ -46,19 +46,14 @@ var ConnectionManager = (function () {
   async function _doReconnect() {
     if (_syncing) return;
     _syncing = true;
-    _mode = 'reconnecting';
-    showReconnectMask();
-    updateConnStatus();
     try {
       var syncPromise = (async function () {
         if (typeof SyncEngine !== 'undefined' && SyncEngine.fullSync) {
           await SyncEngine.fullSync();
         }
-        if (typeof API !== 'undefined' && API.getData) {
-          var serverData = await API.getData();
-          if (typeof cachedData !== 'undefined') {
-            cachedData = serverData;
-          }
+        // fullSync 内部已缓存最新数据到 IndexedDB，直接读取，不再调用 API.getData()
+        if (typeof DB !== 'undefined' && DB.getFullData && typeof cachedData !== 'undefined') {
+          cachedData = await DB.getFullData();
         }
       })();
       await Promise.race([
@@ -107,44 +102,14 @@ var ConnectionManager = (function () {
       var ok = await _ping();
       if (ok) {
         if (_mode === 'offline' && !_syncing) {
-          if (_wasOnline) {
-            await _doReconnect();
-          } else {
-            _syncing = true;
-            _mode = 'online';
-            showReconnectMask();
-            updateConnStatus();
-            try {
-              var firstSyncPromise = (async function () {
-                if (typeof SyncEngine !== 'undefined' && SyncEngine.fullSync) {
-                  await SyncEngine.fullSync();
-                }
-                if (typeof API !== 'undefined' && API.getData) {
-                  var serverData = await API.getData();
-                  if (typeof cachedData !== 'undefined') {
-                    cachedData = serverData;
-                  }
-                }
-              })();
-              await Promise.race([
-                firstSyncPromise,
-                new Promise(function (resolve) {
-                  setTimeout(function () { resolve('timeout'); }, _getReconnectTimeout());
-                })
-              ]);
-              _wasOnline = true;
-            } catch (syncErr) {
-              _mode = 'offline';
-            } finally {
-              hideReconnectMask();
-              updateConnStatus();
-              _syncing = false;
-            }
-          }
-        } else if (_mode === 'reconnecting') {
-          _mode = 'online';
-          hideReconnectMask();
+          // 立即切换到 reconnecting，阻止 pollServer/refreshAllData 发起请求
+          _mode = 'reconnecting';
+          showReconnectMask();
           updateConnStatus();
+          await _doReconnect();
+        } else if (_mode === 'reconnecting') {
+          // 重连过程中 ping 持续成功：可能 _doReconnect() 同步超时但连接仍在，
+          // 此处不做干预，由 _doReconnect() 的 finally 块决定最终状态
         } else {
           _mode = 'online';
           updateConnStatus();
