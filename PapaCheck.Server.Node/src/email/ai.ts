@@ -18,7 +18,7 @@ export interface AIResponse {
 export function buildAIEndpoint(apiUrl: string): string {
   return apiUrl.includes('/chat/completions')
     ? apiUrl
-    : apiUrl.replace(/\/+$/, '') + '/v1/chat/completions';
+    : apiUrl.replace(/\/+$/, '') + '/chat/completions';
 }
 
 /**
