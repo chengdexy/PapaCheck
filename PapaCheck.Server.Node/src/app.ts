@@ -598,6 +598,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     params: { type: 'object', required: ['date'], properties: { date: { type: 'string', minLength: 10 } } },
     body: { type: 'object' },
   };
+  // DELETE 路由专用 schema：不解析 body，避免空 body 报错
+  const deleteParamSchema = {
+    params: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1 } } },
+  };
 
   // 35. PUT /api/homeworks/:id
   app.put<{ Params: { id: string } }>('/api/homeworks/:id', { schema: idParamSchema }, async (request, reply) => {
@@ -701,25 +705,25 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // ==================== DELETE Endpoints ====================
 
   // 51. DELETE /api/homeworks/:id
-  app.delete<{ Params: { id: string } }>('/api/homeworks/:id', { schema: idParamSchema }, async (request, reply) => {
+  app.delete<{ Params: { id: string } }>('/api/homeworks/:id', { schema: deleteParamSchema }, async (request, reply) => {
     db.deleteHomework(request.params.id);
     return sendJson(reply, { ok: true });
   });
 
   // 52. DELETE /api/shop/:id
-  app.delete<{ Params: { id: string } }>('/api/shop/:id', { schema: idParamSchema }, async (request, reply) => {
+  app.delete<{ Params: { id: string } }>('/api/shop/:id', { schema: deleteParamSchema }, async (request, reply) => {
     db.deleteShopItem(request.params.id);
     return sendJson(reply, { ok: true });
   });
 
   // 53. DELETE /api/active-buffs/:id
-  app.delete<{ Params: { id: string } }>('/api/active-buffs/:id', { schema: idParamSchema }, async (request, reply) => {
+  app.delete<{ Params: { id: string } }>('/api/active-buffs/:id', { schema: deleteParamSchema }, async (request, reply) => {
     db.deleteBuff(request.params.id);
     return sendJson(reply, { ok: true });
   });
 
   // 54. DELETE /api/bounty-tasks/:id
-  app.delete<{ Params: { id: string } }>('/api/bounty-tasks/:id', { schema: idParamSchema }, async (request, reply) => {
+  app.delete<{ Params: { id: string } }>('/api/bounty-tasks/:id', { schema: deleteParamSchema }, async (request, reply) => {
     db.deleteBountyTask(request.params.id);
     return sendJson(reply, { ok: true });
   });
