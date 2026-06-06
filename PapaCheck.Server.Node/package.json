@@ -10,7 +10,7 @@
     "start": "node dist/index.js",
     "build": "tsc",
     "build:sea": "node scripts/build-sea.mjs",
-    "test": "vitest run",
+    "test": "vitest run --config ../vitest.config.js",
     "test:watch": "vitest"
   },
   "pkg": {

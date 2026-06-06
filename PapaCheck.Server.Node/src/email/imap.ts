@@ -30,7 +30,6 @@ export function connect(config: ImapConfig): Promise<Connection> {
       user: config.user,
       password: config.password,
       tls: config.port === 993,
-      tlsOptions: { rejectUnauthorized: false },
     });
 
     imap.once('ready', () => {

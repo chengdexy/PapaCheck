@@ -94,7 +94,7 @@ export class TTSBridge {
   constructor(options: TTSBridgeOptions = {}) {
     this.pythonPath = options.pythonPath ?? 'python';
     this.scriptPath = resolveScriptPath(options.scriptPath);
-    this.cacheDir = options.cacheDir ?? join(__dirname, '..', '..', 'tts_cache');
+    this.cacheDir = options.cacheDir ?? join(_moduleDirname, '..', '..', 'tts_cache');
     this.spawnFn = options._spawn ?? spawn as unknown as SpawnFn;
   }
 
