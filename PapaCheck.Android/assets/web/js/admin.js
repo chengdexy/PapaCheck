@@ -780,6 +780,7 @@ async function adjustShopQty(itemId, delta) {
 }
 
 async function deleteShopItem(id) {
+  adminShopItems = adminShopItems.filter(i => i.id !== id);
   await API.deleteShopItem(id);
   await refreshAllData();
   renderShopTab();
