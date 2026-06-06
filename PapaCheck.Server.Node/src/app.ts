@@ -273,10 +273,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true });
   });
 
-  // 18. POST /api/homeworks/:date
-  app.post<{ Params: { date: string } }>('/api/homeworks/:date', async (request, reply) => {
-    const body = request.body as { homeworks: unknown[] };
-    db.saveHomeworks(request.params.date, body.homeworks);
+  // 18. POST /api/homeworks — 全量替换当日作业列表（body 含 dateKey + homeworks）
+  app.post('/api/homeworks', async (request, reply) => {
+    const body = request.body as { dateKey?: string; homeworks: unknown[] };
+    const dateKey = body.dateKey;
+    if (!dateKey) {
+      return reply.status(400).send({ error: '缺少 dateKey' });
+    }
+    db.saveHomeworks(dateKey, body.homeworks);
     return sendJson(reply, { ok: true });
   });
 

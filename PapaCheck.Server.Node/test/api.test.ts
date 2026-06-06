@@ -217,13 +217,14 @@ describe('POST /api/data', () => {
   });
 });
 
-describe('POST /api/homeworks/:date', () => {
+describe('POST /api/homeworks', () => {
   it('保存作业', async () => {
+    const dateKey = '2026-06-06';
     const homeworks = [{ id: 'hw_test', subject: '数学', content: '测试作业' }];
     const res = await app.inject({
       method: 'POST',
-      url: '/api/homeworks/2026-06-06',
-      payload: { homeworks },
+      url: '/api/homeworks',
+      payload: { dateKey, homeworks },
     });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
@@ -425,8 +426,9 @@ describe('POST /api/defer-homework', () => {
     // 确保存在一条作业
     await app.inject({
       method: 'POST',
-      url: `/api/homeworks/${testDate}`,
+      url: '/api/homeworks',
       payload: {
+        dateKey: testDate,
         homeworks: [{ id: hwId, subject: '延迟测试', content: '测试延迟功能', status: 'pending' }],
       },
     });
