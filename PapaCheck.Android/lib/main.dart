@@ -11,12 +11,10 @@ import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:battery_plus/battery_plus.dart';
 
-import 'services/asset_bundle_loader.dart';
 import 'services/config_service.dart';
-import 'services/html_resource_inliner.dart';
 import 'services/offline_snapshot_service.dart';
 import 'widgets/connect_failed_dialog.dart';
-import 'widgets/ip_config_dialog.dart';
+import 'widgets/setup_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -162,8 +160,62 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     final storedRole = await ConfigService.getRole();
 
     if (storedUrl == null || storedUrl.isEmpty || storedRole == null) {
+      // 首次安装：显示全屏引导页
       if (!mounted) return;
-      final result = await IpConfigDialog.show(context);
+      final result = await SetupPage.show(context);
+      if (result != null && mounted) {
+        _applyOrientation(result.role);
+        final fullUrl = _buildFullUrl(result.url, result.role);
+        setState(() {
+          _url = fullUrl;
+          _role = result.role;
+        });
+        _initController(fullUrl);
+        _trySaveOfflineSnapshot(fullUrl);
+      }
+      return;
+    }
+
+    // 已有配置：先尝试连接服务器
+    _role = storedRole;
+    _applyOrientation(storedRole);
+    final fullUrl = _buildFullUrl(storedUrl, storedRole);
+
+    final reachable = await _isServerReachable(fullUrl);
+    if (reachable && mounted) {
+      setState(() => _url = fullUrl);
+      _initController(fullUrl);
+      _trySaveOfflineSnapshot(fullUrl);
+      if (mounted) _checkVersion(storedUrl);
+      return;
+    }
+
+    // 服务器不可达，尝试从离线缓存加载
+    if (mounted) {
+      String? html = await OfflineSnapshotService.load(fullUrl);
+      if (html != null && mounted) {
+        setState(() {
+          _url = fullUrl;
+          _isPageReady = true;
+        });
+        await _initControllerOffline(fullUrl, html);
+        _startBatteryMonitor();
+        return;
+      }
+    }
+
+    // 无缓存，回到配置页面
+    if (!mounted) return;
+    final action = await ConnectFailedDialog.show(context, url: storedUrl);
+    if (!mounted) return;
+    if (action == 'retry') {
+      _startup();
+    } else if (action == 'config') {
+      final result = await SetupPage.show(
+        context,
+        initialUrl: storedUrl,
+        initialRole: storedRole,
+      );
       if (result != null && mounted) {
         await ConfigService.setUrl(result.url);
         await ConfigService.setRole(result.role);
@@ -174,82 +226,12 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
           _role = result.role;
         });
         _initController(fullUrl);
+        _trySaveOfflineSnapshot(fullUrl);
       }
-      return;
-    }
-
-    _role = storedRole;
-    _applyOrientation(storedRole);
-    final fullUrl = _buildFullUrl(storedUrl, storedRole);
-
-    String? html = await OfflineSnapshotService.load(fullUrl);
-
-    html ??= await _loadFromAssets(storedRole);
-
-    if (html != null && mounted) {
-      setState(() {
-        _url = fullUrl;
-        _isPageReady = true;
-      });
-      await _initControllerOffline(fullUrl, html);
-      _startBatteryMonitor();
-    } else if (mounted) {
-      // 无离线内容，先检测服务器是否可达
-      final reachable = await _isServerReachable(fullUrl);
-      if (reachable && mounted) {
-        setState(() => _url = fullUrl);
-        _initController(fullUrl);
-      } else if (mounted) {
-        // 离线且无缓存，显示友好提示
-        final action = await ConnectFailedDialog.show(context, url: storedUrl);
-        if (!mounted) return;
-        if (action == 'retry') {
-          _startup();
-        } else if (action == 'config') {
-          _openConfig();
-        } else if (action == 'offline') {
-          // 尝试从 assets 加载
-          html = await _loadFromAssets(storedRole);
-          if (html != null && mounted) {
-            setState(() => _url = fullUrl);
-            await _initControllerOffline(fullUrl, html);
-          }
-        }
-        return;
-      }
-    }
-
-    if (mounted) {
-      _trySaveOfflineSnapshot(fullUrl).then((saved) {
-        if (saved && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('\u2705 离线快照已更新'),
-              duration: Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      });
-    }
-
-    if (mounted) {
-      await _checkVersion(storedUrl);
     }
   }
 
-  Future<String?> _loadFromAssets(DeviceRole role) async {
-    final assetPath = role == DeviceRole.parent
-        ? 'assets/web/admin.html'
-        : 'assets/web/index.html';
-    try {
-      return await AssetBundleLoader.loadAndInline(assetPath);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<bool> _trySaveOfflineSnapshot(String fullUrl) async {
+  Future<void> _trySaveOfflineSnapshot(String fullUrl) async {
     final client = HttpClient();
     client.connectionTimeout = const Duration(seconds: 5);
     try {
@@ -257,20 +239,12 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
       final response = await request.close().timeout(
             const Duration(seconds: 5),
           );
-      if (response.statusCode >= 500) return false;
+      if (response.statusCode >= 500) return;
 
       final html = await response.transform(utf8.decoder).join();
-
-      final baseUrl = _getBaseUrl(fullUrl);
-      final inlined = await HtmlResourceInliner.inlineResources(
-        html,
-        baseUrl,
-        _fetchResource,
-      );
-      await OfflineSnapshotService.save(fullUrl, inlined);
-      return true;
+      await OfflineSnapshotService.save(fullUrl, html);
     } catch (_) {
-      return false;
+      // 非致命：快照保存失败不影响主流程
     } finally {
       client.close();
     }
@@ -347,9 +321,8 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   void _handlePageLoadError(String url) async {
     if (!mounted) return;
 
+    // 先尝试离线缓存
     String? html = await OfflineSnapshotService.load(url);
-    html ??= await _loadFromAssets(_role!);
-
     if (html != null && mounted) {
       await _initControllerOffline(url, html);
     } else if (mounted) {
@@ -401,7 +374,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
 
   Future<void> _openConfig() async {
     final baseUrl = _getBaseUrl(_url!);
-    final result = await IpConfigDialog.show(
+    final result = await SetupPage.show(
       context,
       initialUrl: baseUrl,
       initialRole: _role,
