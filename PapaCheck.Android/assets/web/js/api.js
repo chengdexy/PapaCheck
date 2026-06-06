@@ -116,9 +116,9 @@ const API = {
     return await this._requestWithStrategy(
       'online-first',
       async () => {
-        await this._fetch('/api/homeworks/' + dateKey, {
+        await this._fetch('/api/homeworks', {
           method: 'POST',
-          body: JSON.stringify({ homeworks: list }),
+          body: JSON.stringify({ dateKey: dateKey, homeworks: list }),
         });
         return true;
       },
