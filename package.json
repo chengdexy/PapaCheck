@@ -22,7 +22,9 @@
   },
   "homepage": "https://github.com/chengdexy/PapaCheck#readme",
   "devDependencies": {
+    "imap": "^0.8.19",
     "jsdom": "^29.1.1",
+    "mailparser": "^3.9.9",
     "vitest": "^4.1.8"
   }
 }
