@@ -7,6 +7,7 @@ import { TTSBridge } from './tts/index.js';
 import fastifyStatic from '@fastify/static';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+import { AppError, ErrorCodes } from './errors.js';
 
 export interface AppOptions {
   port: number;
@@ -22,6 +23,42 @@ function sendJson(reply: FastifyReply, data: unknown): unknown {
   return data;
 }
 
+// ==================== JSON Schema 定义 ====================
+
+const pingSchema = {
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        ok: { type: 'boolean' },
+        serverTime: { type: 'string' },
+      },
+      required: ['ok', 'serverTime'],
+    },
+  },
+};
+
+const versionSchema = {
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        clientVersion: { type: 'string' },
+      },
+      required: ['clientVersion'],
+    },
+  },
+};
+
+const dataSchema = {
+  response: {
+    200: {
+      type: 'object',
+      additionalProperties: true,
+    },
+  },
+};
+
 /** 计算指定日期的下一天（YYYY-MM-DD） */
 function getTomorrow(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00Z');
@@ -32,6 +69,41 @@ function getTomorrow(dateStr: string): string {
 export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   const app = Fastify({
     logger: false,
+  });
+
+  // ==================== 全局错误处理器 ====================
+
+  app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof AppError) {
+      return reply.status(error.statusCode).send({
+        error: error.message,
+        code: error.code,
+        details: error.details,
+      });
+    }
+
+    // Fastify 内置校验错误（来自 JSON Schema）
+    if (error.validation) {
+      return reply.status(400).send({
+        error: '请求参数校验失败',
+        code: ErrorCodes.VALIDATION_ERROR,
+        details: error.validation,
+      });
+    }
+
+    // 未知错误
+    console.error('未处理的错误:', error);
+    return reply.status(500).send({
+      error: '服务器内部错误',
+      code: ErrorCodes.INTERNAL_ERROR,
+    });
+  });
+
+  app.setNotFoundHandler((_request, reply) => {
+    return reply.status(404).send({
+      error: '请求的资源不存在',
+      code: ErrorCodes.NOT_FOUND,
+    });
   });
 
   // 创建数据库和 TTS 实例
@@ -48,7 +120,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   app.addHook('onRequest', async (request, reply) => {
     reply.header('Access-Control-Allow-Origin', '*');
-    reply.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    reply.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS');
     reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
     if (request.method === 'OPTIONS') {
@@ -59,12 +131,12 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // ==================== GET Endpoints ====================
 
   // 1. GET /api/ping - 心跳
-  app.get('/api/ping', async (_request, reply) => {
+  app.get('/api/ping', { schema: pingSchema }, async (_request, reply) => {
     return sendJson(reply, { ok: true, serverTime: new Date().toISOString() });
   });
 
   // 2. GET /api/version - 客户端版本号
-  app.get('/api/version', async (_request, reply) => {
+  app.get('/api/version', { schema: versionSchema }, async (_request, reply) => {
     let clientVersion = '1.0.0';
     if (options.webDir) {
       try {
@@ -92,7 +164,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   // 3. GET /api/data - 完整数据
-  app.get('/api/data', async (_request, reply) => {
+  app.get('/api/data', { schema: dataSchema }, async (_request, reply) => {
     return sendJson(reply, db.getFullData());
   });
 
@@ -357,6 +429,156 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
     return sendJson(reply, { ok: true });
   });
+
+  // ==================== PUT Endpoints ====================
+
+  // 35. PUT /api/homeworks/:id
+  app.put<{ Params: { id: string } }>('/api/homeworks/:id', async (request, reply) => {
+    db.putHomework(request.params.id, request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 36. PUT /api/settlement/:date
+  app.put<{ Params: { date: string } }>('/api/settlement/:date', async (request, reply) => {
+    db.putSettlement(request.params.date, request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 37. PUT /api/shop/:id
+  app.put<{ Params: { id: string } }>('/api/shop/:id', async (request, reply) => {
+    db.putShopItem(request.params.id, request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 38. PUT /api/redemptions/:id
+  app.put<{ Params: { id: string } }>('/api/redemptions/:id', async (request, reply) => {
+    db.putRedemption(request.params.id, request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 39. PUT /api/reward-box/:id
+  app.put<{ Params: { id: string } }>('/api/reward-box/:id', async (request, reply) => {
+    db.putRewardBoxItem(request.params.id, request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 40. PUT /api/settings
+  app.put('/api/settings', async (request, reply) => {
+    db.putSettings(request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 41. PUT /api/active-buffs/:id
+  app.put<{ Params: { id: string } }>('/api/active-buffs/:id', async (request, reply) => {
+    db.putBuff(request.params.id, request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 42. PUT /api/efficiency/:date
+  app.put<{ Params: { date: string } }>('/api/efficiency/:date', async (request, reply) => {
+    db.putEfficiency(request.params.date, request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 43. PUT /api/freetime/:id
+  app.put<{ Params: { id: string } }>('/api/freetime/:id', async (request, reply) => {
+    db.putFreeTimeTask(request.params.id, request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 44. PUT /api/bounty-tasks/:id
+  app.put<{ Params: { id: string } }>('/api/bounty-tasks/:id', async (request, reply) => {
+    db.putBountyTask(request.params.id, request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 45. PUT /api/bounty-submissions/:id
+  app.put<{ Params: { id: string } }>('/api/bounty-submissions/:id', async (request, reply) => {
+    db.putBountySubmission(request.params.id, request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 46. PUT /api/bounty-completions/:id
+  app.put<{ Params: { id: string } }>('/api/bounty-completions/:id', async (request, reply) => {
+    db.putBountyCompletion(request.params.id, request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // ==================== PATCH Endpoints ====================
+
+  // 47. PATCH /api/homeworks/:id
+  app.patch<{ Params: { id: string } }>('/api/homeworks/:id', async (request, reply) => {
+    db.patchHomework(request.params.id, request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 48. PATCH /api/settlement/:date
+  app.patch<{ Params: { date: string } }>('/api/settlement/:date', async (request, reply) => {
+    db.patchSettlement(request.params.date, request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 49. PATCH /api/points - 增量更新积分
+  app.patch('/api/points', async (request, reply) => {
+    const body = request.body as { earn?: number; spend?: number; detail?: string };
+    const balance = db.patchPoints(body);
+    return sendJson(reply, { ok: true, balance });
+  });
+
+  // 50. PATCH /api/settings
+  app.patch('/api/settings', async (request, reply) => {
+    db.patchSettings(request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // ==================== DELETE Endpoints ====================
+
+  // 51. DELETE /api/homeworks/:id
+  app.delete<{ Params: { id: string } }>('/api/homeworks/:id', async (request, reply) => {
+    db.deleteHomework(request.params.id);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 52. DELETE /api/shop/:id
+  app.delete<{ Params: { id: string } }>('/api/shop/:id', async (request, reply) => {
+    db.deleteShopItem(request.params.id);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 53. DELETE /api/active-buffs/:id
+  app.delete<{ Params: { id: string } }>('/api/active-buffs/:id', async (request, reply) => {
+    db.deleteBuff(request.params.id);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 54. DELETE /api/bounty-tasks/:id
+  app.delete<{ Params: { id: string } }>('/api/bounty-tasks/:id', async (request, reply) => {
+    db.deleteBountyTask(request.params.id);
+    return sendJson(reply, { ok: true });
+  });
+
+  // ==================== HEAD Endpoints ====================
+
+  // 55. HEAD /api/shop/:id
+  app.head<{ Params: { id: string } }>('/api/shop/:id', async (request, reply) => {
+    const item = db.getShopItemById(request.params.id);
+    if (!item) {
+      return reply.status(404).send();
+    }
+    return reply.status(200).send();
+  });
+
+  // 56. HEAD /api/bounty-tasks/:id
+  app.head<{ Params: { id: string } }>('/api/bounty-tasks/:id', async (request, reply) => {
+    const item = db.getBountyTaskById(request.params.id);
+    if (!item) {
+      return reply.status(404).send();
+    }
+    return reply.status(200).send();
+  });
+
+  // HEAD /api/homeworks/:id 由 Fastify 从 GET /api/homeworks/:date 自动生成
+  // 由于该路由按日期查询返回数组，HEAD 始终返回 200（含空数组），不做存在性检查
 
   // ==================== Static Files ====================
 

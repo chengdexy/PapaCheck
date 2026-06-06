@@ -606,3 +606,237 @@ describe('GET /api/speak', () => {
     tts.speak = originalSpeak;
   });
 });
+
+// ==================== PUT Endpoints ====================
+
+describe('PUT /api/homeworks/:id', () => {
+  it('创建新的作业', async () => {
+    const hw = { id: 'hw-put-1', subject: '数学', content: '测试', status: 'pending' };
+    const res = await app.inject({ method: 'PUT', url: '/api/homeworks/hw-put-1', payload: hw });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toHaveProperty('ok', true);
+  });
+});
+
+describe('PUT /api/settlement/:date', () => {
+  it('全量更新结算', async () => {
+    const data = { rating: 'A', dailyBase: 100, actualPoints: 95 };
+    const res = await app.inject({ method: 'PUT', url: '/api/settlement/2026-06-06', payload: data });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+describe('PUT /api/shop/:id', () => {
+  it('全量更新商店商品', async () => {
+    const item = { id: 'shop-put-1', name: '测试商品', baseQuantity: 5, remainingQuantity: 5 };
+    const res = await app.inject({ method: 'PUT', url: '/api/shop/shop-put-1', payload: item });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+describe('PUT /api/redemptions/:id', () => {
+  it('全量更新兑换记录', async () => {
+    const data = { id: 'red-put-1', itemId: 'r1', itemName: '兑换测试', status: 'pending' };
+    const res = await app.inject({ method: 'PUT', url: '/api/redemptions/red-put-1', payload: data });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+describe('PUT /api/reward-box/:id', () => {
+  it('全量更新奖励箱', async () => {
+    const data = { id: 'rb-put-1', name: '宝箱测试', quantity: 1 };
+    const res = await app.inject({ method: 'PUT', url: '/api/reward-box/rb-put-1', payload: data });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+describe('PUT /api/settings', () => {
+  it('全量更新设置', async () => {
+    const data = { dailyBasePoints: 150, ratingMultipliers: { A: 1.0, B: 0.8 } };
+    const res = await app.inject({ method: 'PUT', url: '/api/settings', payload: data });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+describe('PUT /api/active-buffs/:id', () => {
+  it('全量更新 Buff', async () => {
+    const data = { id: 'buff-put-1', name: '专注测试', duration: 30, unit: 'min' };
+    const res = await app.inject({ method: 'PUT', url: '/api/active-buffs/buff-put-1', payload: data });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+describe('PUT /api/efficiency/:date', () => {
+  it('全量更新效率', async () => {
+    const data = { efficiencyRatio: 0.9, averageRatio: 0.8 };
+    const res = await app.inject({ method: 'PUT', url: '/api/efficiency/2026-06-06', payload: data });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+describe('PUT /api/freetime/:id', () => {
+  it('全量更新自由时间', async () => {
+    const data = { id: 'ft-put-1', name: '自由活动测试', durationMinutes: 30 };
+    const res = await app.inject({ method: 'PUT', url: '/api/freetime/ft-put-1', payload: data });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+describe('PUT /api/bounty-tasks/:id', () => {
+  it('全量更新赏金任务', async () => {
+    const data = { id: 'bt-put-1', name: '赏金测试', points: 100 };
+    const res = await app.inject({ method: 'PUT', url: '/api/bounty-tasks/bt-put-1', payload: data });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+describe('PUT /api/bounty-submissions/:id', () => {
+  it('全量更新赏金提交', async () => {
+    const data = { id: 'bs-put-1', taskId: 'bt_test', startedAt: '2026-06-06T10:00:00Z' };
+    const res = await app.inject({ method: 'PUT', url: '/api/bounty-submissions/bs-put-1', payload: data });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+describe('PUT /api/bounty-completions/:id', () => {
+  it('全量更新赏金完成', async () => {
+    const data = { id: 'bc-put-1', taskId: 'bt_test', completed: true };
+    const res = await app.inject({ method: 'PUT', url: '/api/bounty-completions/bc-put-1', payload: data });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+// ==================== PATCH Endpoints ====================
+
+describe('PATCH /api/homeworks/:id', () => {
+  it('部分更新作业状态', async () => {
+    // 先创建一条作业
+    const hw = { id: 'hw-patch-1', subject: '英语', content: '测试', status: 'pending' };
+    await app.inject({ method: 'PUT', url: '/api/homeworks/hw-patch-1', payload: hw });
+
+    const res = await app.inject({ method: 'PATCH', url: '/api/homeworks/hw-patch-1', payload: { status: 'in_progress' } });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+
+    // 验证更新
+    const getRes = await app.inject({ method: 'GET', url: '/api/homeworks/2026-06-06' });
+    const items = JSON.parse(getRes.body);
+    const updated = items.find((h: any) => h.id === 'hw-patch-1');
+    expect(updated).toBeDefined();
+    expect(updated.status).toBe('in_progress');
+  });
+});
+
+describe('PATCH /api/settlement/:date', () => {
+  it('部分更新结算', async () => {
+    const res = await app.inject({ method: 'PATCH', url: '/api/settlement/2026-06-06', payload: { rating: 'A+' } });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+describe('PATCH /api/points', () => {
+  it('增量更新积分', async () => {
+    const res = await app.inject({ method: 'PATCH', url: '/api/points', payload: { earn: 10, detail: '测试加分' } });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toHaveProperty('balance');
+  });
+});
+
+describe('PATCH /api/settings', () => {
+  it('部分更新设置', async () => {
+    const res = await app.inject({ method: 'PATCH', url: '/api/settings', payload: { dailyBasePoints: 200 } });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+// ==================== DELETE Endpoints ====================
+
+describe('DELETE /api/homeworks/:id', () => {
+  it('软删作业', async () => {
+    // 先创建一条作业
+    const hw = { id: 'hw-del-1', subject: '语文', content: '删除测试', status: 'pending' };
+    await app.inject({ method: 'PUT', url: '/api/homeworks/hw-del-1', payload: hw });
+
+    const res = await app.inject({ method: 'DELETE', url: '/api/homeworks/hw-del-1' });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+describe('DELETE /api/shop/:id', () => {
+  it('软删商品', async () => {
+    const res = await app.inject({ method: 'DELETE', url: '/api/shop/shop-put-1' });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+describe('DELETE /api/active-buffs/:id', () => {
+  it('软删 Buff', async () => {
+    const res = await app.inject({ method: 'DELETE', url: '/api/active-buffs/buff-put-1' });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+describe('DELETE /api/bounty-tasks/:id', () => {
+  it('软删赏金任务', async () => {
+    const res = await app.inject({ method: 'DELETE', url: '/api/bounty-tasks/bt-put-1' });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+// ==================== HEAD Endpoints ====================
+
+describe('HEAD /api/homeworks/:id', () => {
+  it('返回 200（由 GET 路由自动生成 HEAD）', async () => {
+    // 先创建一条作业
+    const hw = { id: 'hw-head-1', subject: '科学', content: 'HEAD测试', status: 'pending' };
+    await app.inject({ method: 'PUT', url: '/api/homeworks/hw-head-1', payload: hw });
+
+    const res = await app.inject({ method: 'HEAD', url: '/api/homeworks/hw-head-1' });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('不存在的记录也返回 200（GET 返回空数组）', async () => {
+    const res = await app.inject({ method: 'HEAD', url: '/api/homeworks/nonexistent-id' });
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+describe('HEAD /api/shop/:id', () => {
+  it('存在的商品返回 200', async () => {
+    // 先创建一条商品供 HEAD 检查
+    const item = { id: 'shop-head-1', name: 'HEAD商品', baseQuantity: 3, remainingQuantity: 3 };
+    await app.inject({ method: 'PUT', url: '/api/shop/shop-head-1', payload: item });
+
+    const res = await app.inject({ method: 'HEAD', url: '/api/shop/shop-head-1' });
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+describe('HEAD /api/bounty-tasks/:id', () => {
+  it('存在的赏金任务返回 200', async () => {
+    const data = { id: 'bt-head-1', name: 'HEAD赏金', points: 50 };
+    await app.inject({ method: 'PUT', url: '/api/bounty-tasks/bt-head-1', payload: data });
+
+    const res = await app.inject({ method: 'HEAD', url: '/api/bounty-tasks/bt-head-1' });
+    expect(res.statusCode).toBe(200);
+  });
+});

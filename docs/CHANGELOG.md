@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### Added
+- Node.js 服务器 PUT/PATCH/DELETE/HEAD 路由：12 个 PUT、4 个 PATCH、4 个 DELETE、3 个 HEAD 端点，使用 `sendJson()` 统一响应格式
+- CORS 头新增 PUT、PATCH、DELETE、HEAD 方法支持
+- 23 个新测试覆盖所有新增路由
+
 ## [1.2.0] - 2026-06-06
 
 ### Added
@@ -19,6 +24,15 @@
 - 单 EXE 构建脚本（Node.js SEA --build-sea）
 - 83 个 Vitest 集成测试覆盖所有端点
 - pkg 单 EXE 构建脚本（兼容 node18-win-x64，61 MB 输出）
+
+### Added
+- PUT 端点 12 个：homeworks, settlement, shop, redemptions, reward-box, settings, active-buffs, efficiency, freetime, bounty-tasks, bounty-submissions, bounty-completions
+- PATCH 端点 4 个：homeworks（部分更新字段）, settlement, points（增量积分）, settings
+- DELETE 端点 4 个：homeworks, shop, active-buffs, bounty-tasks（软删 isDeleted）
+- HEAD 端点 2 个：shop, bounty-tasks（资源存在检查）
+- 统一错误格式：AppError 类 + 全局 setErrorHandler（`{ error, code, details? }`）
+- api.js 新增 30 个方法：put/patch/delete/head 覆盖所有数据类型
+- 更新 CORS 头支持 PUT/PATCH/DELETE/HEAD 预检请求
 
 ### Fixed
 - 离线→在线切换的竞态窗口：ping 恢复后立即切换 `reconnecting` 状态，阻止 `pollServer`/`refreshAllData` 在 sync 完成前获取旧数据
