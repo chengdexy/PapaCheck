@@ -241,66 +241,13 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
           );
       if (response.statusCode >= 500) return;
 
-      var html = await response.transform(utf8.decoder).join();
-
-      // 内联 CSS/JS 资源，确保离线时样式和脚本可用
-      final baseUrl = _getBaseUrl(fullUrl);
-
-      // 内联 <link rel="stylesheet" href="...">
-      final cssPattern = RegExp(
-        r'<link[^>]*rel="stylesheet"[^>]*href="([^"]+)"[^>]*>',
-        caseSensitive: false,
-      );
-      html = await _inlineResources(
-        html, cssPattern,
-        (css) => '  <style>$css</style>\n',
-        baseUrl, client,
-      );
-
-      // 内联 <script src="...">
-      final jsPattern = RegExp(
-        r'<script[^>]*src="([^"]+)"[^>]*>\s*</script>',
-        caseSensitive: false,
-      );
-      html = await _inlineResources(
-        html, jsPattern,
-        (js) => '  <script>$js</script>\n',
-        baseUrl, client,
-      );
-
+      final html = await response.transform(utf8.decoder).join();
       await OfflineSnapshotService.save(fullUrl, html);
     } catch (_) {
       // 非致命：快照保存失败不影响主流程
     } finally {
       client.close();
     }
-  }
-
-  Future<String> _inlineResources(
-    String html,
-    RegExp pattern,
-    String Function(String content) wrap,
-    String baseUrl,
-    HttpClient client,
-  ) async {
-    var result = html;
-    for (final match in pattern.allMatches(html)) {
-      final href = match.group(1);
-      if (href == null) continue;
-      try {
-        final url = href.startsWith('http')
-            ? href
-            : '$baseUrl/${href.startsWith('/') ? href.substring(1) : href}';
-        final req = await client.getUrl(Uri.parse(url));
-        final res = await req.close().timeout(const Duration(seconds: 5));
-        if (res.statusCode >= 500) continue;
-        final content = await res.transform(utf8.decoder).join();
-        result = result.replaceFirst(match.group(0)!, wrap(content));
-      } catch (_) {
-        // 单个资源失败不影响其他资源
-      }
-    }
-    return result;
   }
 
   Future<void> _initController(String url) async {
