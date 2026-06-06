@@ -3,8 +3,17 @@ import type { Readable } from 'stream';
 import { createHash } from 'crypto';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { writeFileSync, unlinkSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
+
+// __dirname polyfill：兼容 ESM（tsx）和 CJS（pkg/SEA）
+const _moduleFilename = typeof __filename !== 'undefined'
+  ? __filename
+  : fileURLToPath(import.meta.url);
+const _moduleDirname = typeof __dirname !== 'undefined'
+  ? __dirname
+  : dirname(_moduleFilename);
 
 /** 可被 mock 的 spawn 函数签名 */
 export type SpawnFn = (
@@ -72,7 +81,7 @@ function resolveScriptPath(explicit?: string): string {
   }
 
   // 4. 文件系统默认路径（开发模式）
-  return join(__dirname, '..', '..', 'scripts', 'tts_bridge.py');
+  return join(_moduleDirname, '..', '..', 'scripts', 'tts_bridge.py');
 }
 
 export class TTSBridge {
