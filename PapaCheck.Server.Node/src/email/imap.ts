@@ -2,6 +2,8 @@ import Connection from 'imap';
 import { simpleParser } from 'mailparser';
 import type { ParsedMail } from 'mailparser';
 import { PassThrough } from 'stream';
+import { writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
 
 export interface ImapConfig {
   host: string;
@@ -9,6 +11,7 @@ export interface ImapConfig {
   user: string;
   password: string;
   markAsRead?: boolean;
+  attachmentDir?: string;
 }
 
 export interface EmailMessage {
@@ -49,7 +52,7 @@ export function connect(config: ImapConfig): Promise<Connection> {
 /**
  * 获取未读邮件列表，解析邮件内容返回 EmailMessage[]
  */
-export function fetchUnseen(imap: Connection, markAsRead = true): Promise<EmailMessage[]> {
+export function fetchUnseen(imap: Connection, markAsRead = true, attachmentDir?: string): Promise<EmailMessage[]> {
   return new Promise((resolve, reject) => {
     imap.openBox('INBOX', false, (openErr) => {
       if (openErr) {
@@ -96,6 +99,21 @@ export function fetchUnseen(imap: Connection, markAsRead = true): Promise<EmailM
                   html: parsed.html as string | undefined,
                   hasAttachments: Array.isArray(parsed.attachments) && parsed.attachments.length > 0,
                 });
+
+                // 保存附件到附件目录
+                if (attachmentDir && Array.isArray(parsed.attachments) && parsed.attachments.length > 0) {
+                  try {
+                    await mkdir(attachmentDir, { recursive: true });
+                    for (const att of parsed.attachments) {
+                      if (att.filename && att.content) {
+                        const filePath = join(attachmentDir, att.filename);
+                        await writeFile(filePath, att.content);
+                      }
+                    }
+                  } catch {
+                    // 附件下载失败不影响主流程
+                  }
+                }
               } catch {
                 // skip parse errors
               }

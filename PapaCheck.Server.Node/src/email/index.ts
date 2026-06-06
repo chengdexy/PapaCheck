@@ -49,7 +49,7 @@ export class EmailSync {
       });
 
       // 2. 获取未读邮件
-      const messages = await fetchUnseen(imap, this.config.markAsRead);
+      const messages = await fetchUnseen(imap, this.config.markAsRead, this.config.attachmentDir);
 
       if (messages.length === 0) {
         return { ok: true, homeworks: [] };

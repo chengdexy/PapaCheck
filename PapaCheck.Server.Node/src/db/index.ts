@@ -224,7 +224,7 @@ export class PapaCheckDB {
 
   private _getJson(table: string, idValue: number = 1): any {
     const row = this.db.prepare(`SELECT data FROM ${table} WHERE id = ?`).get(idValue) as { data: string } | undefined;
-    return row ? JSON.parse(row.data) : null;
+    return row ? this._safeJsonParse(row.data) ?? null : null;
   }
 
   private _setJson(table: string, data: any, idValue: number = 1): void {
@@ -236,7 +236,7 @@ export class PapaCheckDB {
 
   private _getDateDataRaw(table: string, dateKey: string): any {
     const row = this.db.prepare(`SELECT data FROM ${table} WHERE date_key = ?`).get(dateKey) as { data: string } | undefined;
-    return row ? JSON.parse(row.data) : undefined;
+    return row ? this._safeJsonParse(row.data) : undefined;
   }
 
   private _getDateData(table: string, dateKey: string, defaultVal: any = null): any {
@@ -269,18 +269,18 @@ export class PapaCheckDB {
     if (lastReset !== today) {
       const itemsRow = this.db.prepare("SELECT data FROM shop_items WHERE id = 1").get() as { data: string };
       if (!itemsRow) return;
-      const items = JSON.parse(itemsRow.data) as any[];
-      let changed = false;
+      const items = this._safeJsonParse(itemsRow.data);
+      if (!Array.isArray(items)) return;
       for (const item of items) {
-        const base = item.baseQuantity ?? 0;
-        if (base > 0 && item.remainingQuantity !== base) {
-          item.remainingQuantity = base;
-          changed = true;
+        if (item && typeof item === 'object' && item._originalDailyLimit !== undefined) {
+          item.dailyLimit = item._originalDailyLimit;
+          delete item._originalDailyLimit;
+        }
+        if (item && typeof item === 'object' && item.dailyLimit !== undefined && typeof item.dailySold === 'number') {
+          item.dailySold = 0;
         }
       }
-      if (changed) {
-        this.db.prepare("UPDATE shop_items SET data = ? WHERE id = 1").run(JSON.stringify(items));
-      }
+      this._setJson('shop_items', items);
       this.db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('last_shop_reset', ?)").run(today);
     }
   }
@@ -365,7 +365,7 @@ export class PapaCheckDB {
     // homeworks
     const hwRows = this.db.prepare("SELECT date_key, data FROM homeworks").all() as { date_key: string; data: string }[];
     for (const row of hwRows) {
-      const items = JSON.parse(row.data);
+      const items = this._safeJsonParse(row.data);
       if (Array.isArray(items)) {
         data.homeworks[row.date_key] = items.filter((h: any) => !h.isDeleted);
       }
@@ -564,12 +564,21 @@ export class PapaCheckDB {
 
     if (existing) {
       const items = this._getDateDataRaw('homeworks', existing.dateKey);
+      if (!Array.isArray(items)) {
+        // 数据损坏：覆盖为新数组
+        this._setDateData('homeworks', existing.dateKey, [data]);
+        this.recordModification('homeworks', existing.dateKey, now);
+        return;
+      }
       items[existing.index] = data;
       this._setDateData('homeworks', existing.dateKey, items);
       this.recordModification('homeworks', existing.dateKey, now);
     } else {
       const dateKey = data.dateKey ?? data.date ?? new Date().toISOString().slice(0, 10);
-      const items = this._getDateDataRaw('homeworks', dateKey) ?? [];
+      let items = this._getDateDataRaw('homeworks', dateKey);
+      if (!Array.isArray(items)) {
+        items = [];
+      }
       items.push(data);
       this._setDateData('homeworks', dateKey, items);
       this.recordModification('homeworks', dateKey, now);

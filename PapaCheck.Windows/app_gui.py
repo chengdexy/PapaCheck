@@ -1439,6 +1439,7 @@ class PapaCheckApp:
                             'apiKey': ak_val,
                             'apiUrl': entries['ai_base_url'].get().strip(),
                             'markAsRead': mark_read_var.get(),
+                            'attachmentDir': _attach_dir_var.get(),
                         }
                         url = _server_url_var.get().strip().rstrip('/') + '/api/email/config'
                         payload = json.dumps(email_cfg).encode()
@@ -1635,6 +1636,7 @@ class PapaCheckApp:
                 'apiKey': ak,
                 'apiUrl': cfg['ai_base_url'],
                 'markAsRead': cfg.get('mark_as_read', True),
+                'attachmentDir': cfg.get('email_attachment_dir', ''),
             }
             config_url = server_url + '/api/email/config'
             payload = json.dumps(email_cfg).encode()
