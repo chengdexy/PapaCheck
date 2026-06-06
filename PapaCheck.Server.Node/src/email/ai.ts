@@ -13,6 +13,15 @@ export interface AIResponse {
 }
 
 /**
+ * 构建 AI API 端点 URL：兼容用户只配置了 base URL 的情况
+ */
+export function buildAIEndpoint(apiUrl: string): string {
+  return apiUrl.includes('/chat/completions')
+    ? apiUrl
+    : apiUrl.replace(/\/+$/, '') + '/v1/chat/completions';
+}
+
+/**
  * 调用 OpenAI/DeepSeek 兼容 API
  */
 export async function callAI(
@@ -20,10 +29,7 @@ export async function callAI(
   apiKey: string,
   apiUrl: string
 ): Promise<string> {
-  // 兼容用户只配置了 base URL 的情况（如 https://api.deepseek.com）
-  const endpoint = apiUrl.includes('/chat/completions')
-    ? apiUrl
-    : apiUrl.replace(/\/+$/, '') + '/v1/chat/completions';
+  const endpoint = buildAIEndpoint(apiUrl);
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
