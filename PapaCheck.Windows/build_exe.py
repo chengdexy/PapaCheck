@@ -125,7 +125,7 @@ cmd = [
     '--windowed',
     '--name', 'PapaCheck',
     '--icon', os.path.join(WORK_DIR, 'icon.ico'),
-    '--add-data', f'{WEB_DIR};Web',
+    '--add-data', f'{WEB_DIR};PapaCheck.Web',
     '--add-data', f'{os.path.join(WORK_DIR, "icon.ico")};.',
     '--add-data', f'{node_exe_path};Server.Node',
     *apk_add_data,

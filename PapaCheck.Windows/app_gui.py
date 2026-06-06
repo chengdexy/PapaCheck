@@ -325,7 +325,9 @@ def _start_node_server_process(exe_path, db_path, web_dir, port):
     # 等待服务器就绪（轮询端口）
     for _ in range(30):
         if process.poll() is not None:
-            raise Exception('Node.js 服务器启动失败')
+            err = process.stderr.read().decode('utf-8', errors='replace').strip() if process.stderr else ''
+            detail = f': {err}' if err else ''
+            raise Exception(f'Node.js 服务器启动失败{detail}')
         try:
             with socket.socket() as s:
                 s.settimeout(1)
