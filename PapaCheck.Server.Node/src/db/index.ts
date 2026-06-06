@@ -213,6 +213,15 @@ export class PapaCheckDB {
 
   // ==================== Internal Helpers ====================
 
+  private _safeJsonParse(data: string): any | undefined {
+    try {
+      const val = JSON.parse(data);
+      return val !== null && val !== undefined ? val : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   private _getJson(table: string, idValue: number = 1): any {
     const row = this.db.prepare(`SELECT data FROM ${table} WHERE id = ?`).get(idValue) as { data: string } | undefined;
     return row ? JSON.parse(row.data) : null;
@@ -365,31 +374,46 @@ export class PapaCheckDB {
     // dailySettlement
     const dsRows = this.db.prepare("SELECT date_key, data FROM daily_settlement").all() as { date_key: string; data: string }[];
     for (const row of dsRows) {
-      data.dailySettlement[row.date_key] = JSON.parse(row.data);
+      const val = this._safeJsonParse(row.data);
+      if (val !== undefined) {
+        data.dailySettlement[row.date_key] = val;
+      }
     }
 
     // efficiencyHistory
     const ehRows = this.db.prepare("SELECT date_key, data FROM efficiency_history").all() as { date_key: string; data: string }[];
     for (const row of ehRows) {
-      data.efficiencyHistory[row.date_key] = JSON.parse(row.data);
+      const val = this._safeJsonParse(row.data);
+      if (val !== undefined) {
+        data.efficiencyHistory[row.date_key] = val;
+      }
     }
 
     // freeTimeTasks
     const ftRows = this.db.prepare("SELECT date_key, data FROM free_time_tasks").all() as { date_key: string; data: string }[];
     for (const row of ftRows) {
-      data.freeTimeTasks[row.date_key] = this._filterDeleted(JSON.parse(row.data));
+      const val = this._safeJsonParse(row.data);
+      if (val !== undefined) {
+        data.freeTimeTasks[row.date_key] = this._filterDeleted(val);
+      }
     }
 
     // bountySubmissions
     const bsRows = this.db.prepare("SELECT date_key, data FROM bounty_submissions").all() as { date_key: string; data: string }[];
     for (const row of bsRows) {
-      data.bountySubmissions[row.date_key] = this._filterDeleted(JSON.parse(row.data));
+      const val = this._safeJsonParse(row.data);
+      if (val !== undefined) {
+        data.bountySubmissions[row.date_key] = this._filterDeleted(val);
+      }
     }
 
     // bountyCompletions
     const bcRows = this.db.prepare("SELECT date_key, data FROM bounty_completions").all() as { date_key: string; data: string }[];
     for (const row of bcRows) {
-      data.bountyCompletions[row.date_key] = JSON.parse(row.data);
+      const val = this._safeJsonParse(row.data);
+      if (val !== undefined) {
+        data.bountyCompletions[row.date_key] = val;
+      }
     }
 
     return data;

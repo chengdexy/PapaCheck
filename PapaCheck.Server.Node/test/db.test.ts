@@ -67,6 +67,42 @@ describe('Database', () => {
       const data = db.getFullData();
       expect(data.homeworks['2026-06-06']).toBeUndefined();
     });
+
+    it('dailySettlement 表中 null 数据不崩溃', () => {
+      (db as any).db.prepare(
+        "INSERT OR REPLACE INTO daily_settlement (date_key, data) VALUES (?, ?)"
+      ).run('2026-06-06', 'null');
+
+      const data = db.getFullData();
+      expect(data.dailySettlement['2026-06-06']).toBeUndefined();
+    });
+
+    it('efficiencyHistory 表中非法 JSON 不崩溃', () => {
+      (db as any).db.prepare(
+        "INSERT OR REPLACE INTO efficiency_history (date_key, data) VALUES (?, ?)"
+      ).run('2026-06-06', '{broken');
+
+      expect(() => db.getFullData()).not.toThrow();
+    });
+
+    it('freeTimeTasks 表中非数组数据不崩溃', () => {
+      (db as any).db.prepare(
+        "INSERT OR REPLACE INTO free_time_tasks (date_key, data) VALUES (?, ?)"
+      ).run('2026-06-06', JSON.stringify({ bad: 'object' }));
+
+      const data = db.getFullData();
+      // _filterDeleted 会返回非数组原样，但不应崩溃
+      expect(data.freeTimeTasks['2026-06-06']).toEqual({ bad: 'object' });
+    });
+
+    it('bountyCompletions 表中 null 数据不崩溃', () => {
+      (db as any).db.prepare(
+        "INSERT OR REPLACE INTO bounty_completions (date_key, data) VALUES (?, ?)"
+      ).run('2026-06-06', 'null');
+
+      const data = db.getFullData();
+      expect(data.bountyCompletions['2026-06-06']).toBeUndefined();
+    });
   });
 
   describe('homeworks CRUD', () => {
