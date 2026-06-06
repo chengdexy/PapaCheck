@@ -140,6 +140,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   WebViewController? _controller;
   bool _isPageReady = false;
   Timer? _readyCheckTimer;
+  Timer? _offlineRetryTimer;
   BatteryMonitor? _batteryMonitor;
 
   @override
@@ -151,6 +152,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   @override
   void dispose() {
     _readyCheckTimer?.cancel();
+    _offlineRetryTimer?.cancel();
     _batteryMonitor?.stop();
     super.dispose();
   }
@@ -200,6 +202,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         });
         await _initControllerOffline(fullUrl, html);
         _startBatteryMonitor();
+        _startOfflineRetry(fullUrl, storedUrl, storedRole);
         return;
       }
     }
@@ -303,6 +306,30 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     return result;
   }
 
+  void _startOfflineRetry(String fullUrl, String baseUrl, DeviceRole? role) {
+    _offlineRetryTimer?.cancel();
+    _offlineRetryTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) async {
+        if (!mounted) {
+          _offlineRetryTimer?.cancel();
+          return;
+        }
+        final reachable = await _isServerReachable(fullUrl);
+        if (!reachable || !mounted) return;
+
+        // 服务器已恢复，加载在线模式
+        _offlineRetryTimer?.cancel();
+        _role = role;
+        _applyOrientation(role!);
+        setState(() => _url = fullUrl);
+        _initController(fullUrl);
+        _trySaveOfflineSnapshot(fullUrl);
+        if (mounted) _checkVersion(baseUrl);
+      },
+    );
+  }
+
   Future<void> _initController(String url) async {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -378,6 +405,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     String? html = await OfflineSnapshotService.load(url);
     if (html != null && mounted) {
       await _initControllerOffline(url, html);
+      _startOfflineRetry(url, _getBaseUrl(url), _role);
     } else if (mounted) {
       await _showConnectFailedDialog(url);
     }
