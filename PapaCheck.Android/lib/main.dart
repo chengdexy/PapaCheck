@@ -318,12 +318,13 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         final reachable = await _isServerReachable(fullUrl);
         if (!reachable || !mounted) return;
 
-        // 服务器已恢复，加载在线模式
+        // 服务器已恢复：不重建 WebView，直接导航到服务器 URL 以保留 IndexedDB 数据
         _offlineRetryTimer?.cancel();
         _role = role;
         _applyOrientation(role!);
-        setState(() => _url = fullUrl);
-        _initController(fullUrl);
+        setState(() => _isPageReady = false);
+        _controller?.loadRequest(Uri.parse(fullUrl));
+        _waitForPageReady();
         _trySaveOfflineSnapshot(fullUrl);
         if (mounted) _checkVersion(baseUrl);
       },
