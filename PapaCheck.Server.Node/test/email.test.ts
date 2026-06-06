@@ -29,7 +29,7 @@ let imapShouldFail = false;
 
 // Mock imap module with proper EventEmitter-based event handling
 vi.mock('imap', () => {
-  const MockIMAP = vi.fn().mockImplementation(() => {
+  const MockIMAP = vi.fn().mockImplementation(function () {
     const readyHandlers: Function[] = [];
     const errorHandlers: Function[] = [];
 
@@ -49,7 +49,6 @@ vi.mock('imap', () => {
         }, 5);
       }),
       openBox: vi.fn((_name: string, _readOnly: boolean, cb: Function) => {
-        openBoxCallback = cb;
         cb(null);
       }),
       search: vi.fn((_criteria: string[], cb: Function) => {
