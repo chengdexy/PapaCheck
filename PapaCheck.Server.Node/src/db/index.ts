@@ -691,6 +691,13 @@ export class PapaCheckDB {
     this.recordModification('redemptions', '1', new Date().toISOString());
   }
 
+  clearFulfilledRedemptions(): void {
+    const items = this._getJson('redemptions') ?? [];
+    const remaining = items.filter((r: any) => r.status !== 'fulfilled');
+    this._setJson('redemptions', remaining);
+    this.recordModification('redemptions', '1', new Date().toISOString());
+  }
+
   putRedemption(id: string, data: any): void {
     const items = this._getJson('redemptions') ?? [];
     const { index } = this._findInArray(items, id);
@@ -730,6 +737,18 @@ export class PapaCheckDB {
       items.push(data);
     }
 
+    this._setJson('reward_box', items);
+    this.recordModification('reward_box', '1', now);
+  }
+
+  deleteRewardBoxItem(id: string): void {
+    const items = this._getJson('reward_box') ?? [];
+    const { index } = this._findInArray(items, id);
+    if (index === -1) return;
+
+    const now = new Date().toISOString();
+    items[index].isDeleted = true;
+    items[index].lastModified = now;
     this._setJson('reward_box', items);
     this.recordModification('reward_box', '1', now);
   }
@@ -1159,6 +1178,45 @@ export class PapaCheckDB {
       `INSERT OR REPLACE INTO crdt_operations (id, type, table_name, resource_id, field, value, timestamp, node_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(op.id, op.type, op.table, op.resourceId, op.field, JSON.stringify(op.value), op.timestamp, op.nodeId);
+  }
+
+  applyCRDTOperation(op: CRDTOperation): void {
+    try {
+      if (op.type === 'delete') {
+        switch (op.table) {
+          case 'homeworks': this.deleteHomework(op.resourceId); break;
+          case 'shop_items': this.deleteShopItem(op.resourceId); break;
+          case 'active_buffs': this.deleteBuff(op.resourceId); break;
+          case 'bounty_tasks': this.deleteBountyTask(op.resourceId); break;
+          case 'reward_box': this.deleteRewardBoxItem(op.resourceId); break;
+        }
+      } else if (op.type === 'update' && op.value) {
+        switch (op.table) {
+          case 'homeworks': {
+            // 新增用 putHomework（创建），已有用 patchHomework（合并）
+            const existingHw = this._findRecordById('homeworks', op.resourceId);
+            if (existingHw) {
+              this.patchHomework(op.resourceId, op.value);
+            } else {
+              this.putHomework(op.resourceId, op.value);
+            }
+            break;
+          }
+          case 'shop_items': this.putShopItem(op.resourceId, op.value); break;
+          case 'bounty_tasks': this.putBountyTask(op.resourceId, op.value); break;
+          case 'bounty_submissions': this.putBountySubmission(op.resourceId, op.value); break;
+          case 'bounty_completions': this.putBountyCompletion(op.resourceId, op.value); break;
+          case 'redemptions': this.putRedemption(op.resourceId, op.value); break;
+          case 'reward_box': this.putRewardBoxItem(op.resourceId, op.value); break;
+          case 'active_buffs': this.putBuff(op.resourceId, op.value); break;
+          case 'free_time_tasks': this.putFreeTimeTask(op.resourceId, op.value); break;
+          case 'daily_settlement': this.putSettlement(op.resourceId, op.value); break;
+          case 'settings': this.putSettings(op.value); break;
+        }
+      }
+    } catch (e) {
+      // 单条操作失败不影响其他操作
+    }
   }
 
   getCRDTOperationsSince(timestamp: string): CRDTOperation[] {

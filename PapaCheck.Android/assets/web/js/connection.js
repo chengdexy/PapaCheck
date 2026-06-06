@@ -11,13 +11,13 @@ var ConnectionManager = (function () {
 
   // 测试环境可通过 window.__CM_TEST_CONFIG__ 覆盖超时参数（读取时机为每次调用）
   function _getPingTimeout() {
-    return (window.__CM_TEST_CONFIG__ && window.__CM_TEST_CONFIG__.pingTimeoutMs) || 3000;
+    return (window.__CM_TEST_CONFIG__ && window.__CM_TEST_CONFIG__.pingTimeoutMs) || 2000;
   }
   function _getReconnectTimeout() {
     return (window.__CM_TEST_CONFIG__ && window.__CM_TEST_CONFIG__.reconnectTimeoutMs) || 10000;
   }
   function _getPingInterval() {
-    return (window.__CM_TEST_CONFIG__ && window.__CM_TEST_CONFIG__.pingIntervalMs) || 3000;
+    return (window.__CM_TEST_CONFIG__ && window.__CM_TEST_CONFIG__.pingIntervalMs) || 1000;
   }
 
   async function _ping() {
@@ -47,7 +47,7 @@ var ConnectionManager = (function () {
     if (_syncing) return;
     _syncing = true;
     _mode = 'reconnecting';
-    showReconnectMask();
+    showReconnectMask('\u6b63\u5728\u540c\u6b65\u6570\u636e\u2026');
     updateConnStatus();
     try {
       var syncPromise = (async function () {
@@ -57,14 +57,10 @@ var ConnectionManager = (function () {
           try {
             crdtOk = await SyncEngine.crdtFullSync();
           } catch (crdtErr) {
-            // CRDT 同步失败，静默降级
+            // CRDT 同步失败，后续依赖本地缓存数据
           }
         }
-        // CRDT 失败或不可用时降级到 LWW fullSync
-        if (!crdtOk && typeof SyncEngine !== 'undefined' && SyncEngine.fullSync) {
-          await SyncEngine.fullSync();
-        }
-        // 从 IndexedDB 读取最新数据
+        // 从 IndexedDB 读取最新数据（CRDT 成功时已更新，失败时保留本地状态）
         if (typeof DB !== 'undefined' && DB.getFullData && typeof cachedData !== 'undefined') {
           cachedData = await DB.getFullData();
         }
@@ -114,6 +110,9 @@ var ConnectionManager = (function () {
     _pingTimer = setInterval(async function () {
       var ok = await _ping();
       if (ok) {
+        if (_failCount > 0) {
+          hideReconnectMask();
+        }
         if (_mode === 'offline' && !_syncing) {
           await _doReconnect();
         } else if (_mode === 'reconnecting') {
@@ -125,8 +124,14 @@ var ConnectionManager = (function () {
         }
       } else {
         _failCount++;
+        if (_failCount === 1 && _mode === 'online') {
+          _mode = 'reconnecting';
+          showReconnectMask('\u8fde\u63a5\u65ad\u5f00\uff0c\u6b63\u5728\u56fa\u5b9a\u6570\u636e...');
+          updateConnStatus();
+        }
         if (_failCount >= 3) {
-          var wasOnline = _mode === 'online';
+          hideReconnectMask();
+          var wasOnline = _mode === 'online' || _mode === 'reconnecting';
           _mode = 'offline';
           updateConnStatus();
           if (wasOnline && typeof showToast === 'function') {
@@ -166,9 +171,11 @@ var ConnectionManager = (function () {
     }
   }
 
-  function showReconnectMask() {
+  function showReconnectMask(text) {
     var mask = document.getElementById('reconnectMask');
     if (!mask) return;
+    var textEl = mask.querySelector('.transition-text');
+    if (textEl && text) textEl.textContent = text;
     mask.style.display = 'flex';
   }
 

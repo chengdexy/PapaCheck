@@ -219,6 +219,18 @@ const API = {
     );
   },
 
+  async clearRedemptionHistory() {
+    return await this._requestWithStrategy(
+      'online-only',
+      async () => {
+        await this._fetch('/api/redemptions/fulfilled', { method: 'DELETE' });
+        return true;
+      },
+      null,
+      {}
+    );
+  },
+
   async getRewardBox() {
     return await this._requestWithStrategy(
       'online-first',
@@ -503,32 +515,58 @@ const API = {
   // ---- 作业 (homeworks) ----
 
   async putHomework(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'homeworks', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
         await this._fetch('/api/homeworks/' + id, { method: 'PUT', body: JSON.stringify(data) });
         return true;
       },
-      async () => { /* 离线降级：在本地 DB 中创建/更新 */ return true; },
+      async () => {
+        // 离线降级：在本地 DB 中创建/更新
+        try {
+          var dk = data.dateKey || data.date || new Date().toISOString().slice(0, 10);
+          var list = await DB.getHomeworks(dk);
+          var idx = list.findIndex(function(h) { return h.id === id || h.uuid === id; });
+          if (idx !== -1) { list[idx] = data; }
+          else { list.push(data); }
+          await DB.saveHomeworks(dk, list);
+        } catch (e) { /* 非致命 */ }
+        return true;
+      },
       { allowFallback: true }
     );
   },
 
-  async patchHomework(id, fields) {
+  async patchHomework(id, fields, dateKey) {
     // 添加 CRDT 操作日志
     try { var op = { type: 'update', table: 'homeworks', resourceId: id, field: null, value: fields }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
-      'online-only',
+      'online-first',
       async () => {
         await this._fetch('/api/homeworks/' + id, { method: 'PATCH', body: JSON.stringify(fields) });
         return true;
       },
-      null,
-      {}
+      async () => {
+        // 离线降级：在本地 DB 中部分更新该作业
+        if (dateKey) {
+          try {
+            var list = await DB.getHomeworks(dateKey);
+            var idx = list.findIndex(function(h) { return h.id === id || h.uuid === id; });
+            if (idx !== -1) {
+              Object.assign(list[idx], fields);
+              await DB.saveHomeworks(dateKey, list);
+            }
+          } catch (e) { /* 非致命 */ }
+        }
+        return true;
+      },
+      { allowFallback: true }
     );
   },
 
-  async deleteHomework(id) {
+  async deleteHomework(id, dateKey) {
     // 添加 CRDT 操作日志
     try { var op = { type: 'delete', table: 'homeworks', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
@@ -537,7 +575,20 @@ const API = {
         await this._fetch('/api/homeworks/' + id, { method: 'DELETE' });
         return true;
       },
-      async () => { /* 离线降级 */ return true; },
+      async () => {
+        // 离线降级：从本地缓存中删除该作业
+        if (dateKey) {
+          try {
+            var list = await DB.getHomeworks(dateKey);
+            var idx = list.findIndex(function(h) { return h.id === id || h.uuid === id; });
+            if (idx !== -1) {
+              list.splice(idx, 1);
+              await DB.saveHomeworks(dateKey, list);
+            }
+          } catch (e) { /* 非致命 */ }
+        }
+        return true;
+      },
       { allowFallback: true }
     );
   },
@@ -564,7 +615,11 @@ const API = {
         await this._fetch('/api/settlement/' + dateKey, { method: 'PUT', body: JSON.stringify(data) });
         return true;
       },
-      async () => { /* 离线降级 */ return true; },
+      async () => {
+        // 离线降级：在本地 DB 中创建/更新
+        try { await DB.saveSettlement(dateKey, data); } catch (e) { /* 非致命 */ }
+        return true;
+      },
       { allowFallback: true }
     );
   },
@@ -610,7 +665,17 @@ const API = {
         await this._fetch('/api/shop/' + id, { method: 'PUT', body: JSON.stringify(data) });
         return true;
       },
-      async () => { /* 离线降级 */ return true; },
+      async () => {
+        // 离线降级：在本地 DB 中创建/更新
+        try {
+          var items = await DB.getShopItems();
+          var idx = items.findIndex(function(s) { return s.id === id || s.uuid === id; });
+          if (idx !== -1) items[idx] = data;
+          else items.push(data);
+          await DB.saveShopItems(items);
+        } catch (e) { /* 非致命 */ }
+        return true;
+      },
       { allowFallback: true }
     );
   },
@@ -624,7 +689,18 @@ const API = {
         await this._fetch('/api/shop/' + id, { method: 'DELETE' });
         return true;
       },
-      async () => { /* 离线降级 */ return true; },
+      async () => {
+        // 离线降级：从本地缓存中删除该商品
+        try {
+          var items = await DB.getShopItems();
+          var idx = items.findIndex(function (s) { return s.id === id || s.uuid === id; });
+          if (idx !== -1) {
+            items.splice(idx, 1);
+            await DB.saveShopItems(items);
+          }
+        } catch (e) { /* 非致命 */ }
+        return true;
+      },
       { allowFallback: true }
     );
   },
@@ -651,7 +727,17 @@ const API = {
         await this._fetch('/api/redemptions/' + id, { method: 'PUT', body: JSON.stringify(data) });
         return true;
       },
-      async () => { /* 离线降级 */ return true; },
+      async () => {
+        // 离线降级：在本地 DB 中创建/更新
+        try {
+          var items = await DB.getRedemptions();
+          var idx = items.findIndex(function(r) { return r.id === id || r.uuid === id; });
+          if (idx !== -1) items[idx] = data;
+          else items.push(data);
+          await DB.saveRedemptions(items);
+        } catch (e) { /* 非致命 */ }
+        return true;
+      },
       { allowFallback: true }
     );
   },
@@ -667,7 +753,17 @@ const API = {
         await this._fetch('/api/reward-box/' + id, { method: 'PUT', body: JSON.stringify(data) });
         return true;
       },
-      async () => { /* 离线降级 */ return true; },
+      async () => {
+        // 离线降级：在本地 DB 中创建/更新
+        try {
+          var items = await DB.getRewardBox();
+          var idx = items.findIndex(function(r) { return r.id === id || r.uuid === id; });
+          if (idx !== -1) items[idx] = data;
+          else items.push(data);
+          await DB.saveRewardBox(items);
+        } catch (e) { /* 非致命 */ }
+        return true;
+      },
       { allowFallback: true }
     );
   },
@@ -683,7 +779,11 @@ const API = {
         await this._fetch('/api/settings', { method: 'PUT', body: JSON.stringify(data) });
         return true;
       },
-      async () => { /* 离线降级 */ return true; },
+      async () => {
+        // 离线降级：在本地 DB 中创建/更新
+        try { await DB.saveSettings(data); } catch (e) { /* 非致命 */ }
+        return true;
+      },
       { allowFallback: true }
     );
   },
@@ -713,7 +813,17 @@ const API = {
         await this._fetch('/api/active-buffs/' + id, { method: 'PUT', body: JSON.stringify(data) });
         return true;
       },
-      async () => { /* 离线降级 */ return true; },
+      async () => {
+        // 离线降级：在本地 DB 中创建/更新
+        try {
+          var items = await DB.getActiveBuffs();
+          var idx = items.findIndex(function(b) { return b.id === id || b.uuid === id; });
+          if (idx !== -1) items[idx] = data;
+          else items.push(data);
+          await DB.saveActiveBuffs(items);
+        } catch (e) { /* 非致命 */ }
+        return true;
+      },
       { allowFallback: true }
     );
   },
@@ -727,7 +837,18 @@ const API = {
         await this._fetch('/api/active-buffs/' + id, { method: 'DELETE' });
         return true;
       },
-      async () => { /* 离线降级 */ return true; },
+      async () => {
+        // 离线降级：从本地缓存中删除该 Buff
+        try {
+          var buffs = await DB.getActiveBuffs();
+          var idx = buffs.findIndex(function(b) { return b.id === id || b.uuid === id; });
+          if (idx !== -1) {
+            buffs.splice(idx, 1);
+            await DB.saveActiveBuffs(buffs);
+          }
+        } catch (e) { /* 非致命 */ }
+        return true;
+      },
       { allowFallback: true }
     );
   },
@@ -743,7 +864,11 @@ const API = {
         await this._fetch('/api/efficiency/' + dateKey, { method: 'PUT', body: JSON.stringify(data) });
         return true;
       },
-      async () => { /* 离线降级 */ return true; },
+      async () => {
+        // 离线降级：在本地 DB 中创建/更新
+        try { await DB.saveEfficiency(dateKey, data); } catch (e) { /* 非致命 */ }
+        return true;
+      },
       { allowFallback: true }
     );
   },
@@ -759,7 +884,18 @@ const API = {
         await this._fetch('/api/freetime/' + id, { method: 'PUT', body: JSON.stringify(data) });
         return true;
       },
-      async () => { /* 离线降级 */ return true; },
+      async () => {
+        // 离线降级：在本地 DB 中创建/更新
+        try {
+          var dk = data.dateKey || data.date || new Date().toISOString().slice(0, 10);
+          var list = await DB.getFreeTime(dk);
+          var idx = list.findIndex(function(t) { return t.id === id || t.uuid === id; });
+          if (idx !== -1) list[idx] = data;
+          else list.push(data);
+          await DB.saveFreeTime(dk, list);
+        } catch (e) { /* 非致命 */ }
+        return true;
+      },
       { allowFallback: true }
     );
   },
@@ -775,7 +911,17 @@ const API = {
         await this._fetch('/api/bounty-tasks/' + id, { method: 'PUT', body: JSON.stringify(data) });
         return true;
       },
-      async () => { /* 离线降级 */ return true; },
+      async () => {
+        // 离线降级：在本地 DB 中创建/更新
+        try {
+          var items = await DB.getBountyTasks();
+          var idx = items.findIndex(function(t) { return t.id === id || t.uuid === id; });
+          if (idx !== -1) items[idx] = data;
+          else items.push(data);
+          await DB.saveBountyTasks(items);
+        } catch (e) { /* 非致命 */ }
+        return true;
+      },
       { allowFallback: true }
     );
   },
@@ -789,7 +935,18 @@ const API = {
         await this._fetch('/api/bounty-tasks/' + id, { method: 'DELETE' });
         return true;
       },
-      async () => { /* 离线降级 */ return true; },
+      async () => {
+        // 离线降级：从本地缓存中删除该赏金任务
+        try {
+          var tasks = await DB.getBountyTasks();
+          var idx = tasks.findIndex(function(t) { return t.id === id || t.uuid === id; });
+          if (idx !== -1) {
+            tasks.splice(idx, 1);
+            await DB.saveBountyTasks(tasks);
+          }
+        } catch (e) { /* 非致命 */ }
+        return true;
+      },
       { allowFallback: true }
     );
   },
@@ -816,7 +973,18 @@ const API = {
         await this._fetch('/api/bounty-submissions/' + id, { method: 'PUT', body: JSON.stringify(data) });
         return true;
       },
-      async () => { /* 离线降级 */ return true; },
+      async () => {
+        // 离线降级：在本地 DB 中创建/更新
+        try {
+          var dk = data.dateKey || data.date || new Date().toISOString().slice(0, 10);
+          var list = await DB.getBountySubmissions(dk);
+          var idx = list.findIndex(function(s) { return s.id === id || s.uuid === id; });
+          if (idx !== -1) list[idx] = data;
+          else list.push(data);
+          await DB.saveBountySubmissions(dk, list);
+        } catch (e) { /* 非致命 */ }
+        return true;
+      },
       { allowFallback: true }
     );
   },
@@ -832,7 +1000,11 @@ const API = {
         await this._fetch('/api/bounty-completions/' + id, { method: 'PUT', body: JSON.stringify(data) });
         return true;
       },
-      async () => { /* 离线降级 */ return true; },
+      async () => {
+        // 离线降级：在本地 DB 中创建/更新
+        try { await DB.saveBountyCompletions(id, data); } catch (e) { /* 非致命 */ }
+        return true;
+      },
       { allowFallback: true }
     );
   },

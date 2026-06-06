@@ -387,6 +387,12 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true });
   });
 
+  // 22b. DELETE /api/redemptions/fulfilled — 清空已兑现记录
+  app.delete('/api/redemptions/fulfilled', async (_request, reply) => {
+    db.clearFulfilledRedemptions();
+    return sendJson(reply, { ok: true });
+  });
+
   // 23. PUT /api/reward-box
   app.put('/api/reward-box', async (request, reply) => {
     const body = request.body as { items: unknown[] };
@@ -665,6 +671,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
     for (const op of body.operations) {
       db.saveCRDTOperation(op);
+      db.applyCRDTOperation(op);
     }
     return sendJson(reply, { ok: true });
   });
