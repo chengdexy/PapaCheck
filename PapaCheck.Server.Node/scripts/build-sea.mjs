@@ -1,19 +1,12 @@
 /**
  * SEA (Single Executable Application) 构建脚本
- * Node.js 22+ 支持 --build-sea 生成单 EXE 文件
+ * 支持 Node.js v22+（v25.5+ 使用 --build-sea，v22-v25.4 使用 postject）
  *
  * 用法: node scripts/build-sea.mjs
- *
- * 前置条件:
- *   1. npm run build (tsc 编译 TypeScript)
- *   2. esbuild 打包为单个 JS 文件
- *   3. node --experimental-sea-config 生成 SEA 配置
- *   4. node --build-sea 生成 EXE
- *   5. 签名 EXE（可选）
  */
 
 import { execSync } from 'child_process';
-import { existsSync, copyFileSync, renameSync, unlinkSync } from 'fs';
+import { existsSync, copyFileSync, unlinkSync, writeFileSync, statSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -24,6 +17,10 @@ const SEA_CONFIG = resolve(ROOT, 'sea-config.json');
 const BLOB_PATH = resolve(DIST, 'sea-prep.blob');
 const SEA_EXE = resolve(DIST, 'papacheck-server.exe');
 const NODE_EXE = process.execPath;
+
+// 检测 Node.js 主版本号
+const nodeMajor = parseInt(process.version.slice(1).split('.')[0], 10);
+const hasBuildSea = nodeMajor > 25 || (nodeMajor === 25 && parseInt(process.version.slice(1).split('.')[1], 10) >= 5);
 
 function run(cmd, cwd = ROOT) {
   console.log(`> ${cmd}`);
@@ -38,7 +35,7 @@ async function build() {
     process.exit(1);
   }
 
-  run('npx esbuild src/index.ts --bundle --platform=node --target=node22 --outfile=dist/bundle.js --external:better-sqlite3 --external:@fastify/static --external:@fastify/swagger --external:@fastify/swagger-ui');
+  run('npx esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/bundle.mjs --external:better-sqlite3 --external:@fastify/static --external:@fastify/swagger --external:@fastify/swagger-ui');
 
   console.log('\n=== Step 2: 复制 TTS 桥接脚本 ===\n');
   const scriptsDest = resolve(DIST, 'scripts');
@@ -52,7 +49,7 @@ async function build() {
 
   console.log('\n=== Step 3: 创建 SEA 配置文件 ===\n');
   const seaConfig = JSON.stringify({
-    main: resolve(DIST, 'bundle.js'),
+    main: resolve(DIST, 'bundle.mjs'),
     output: BLOB_PATH,
     disableExperimentalSEAWarning: true,
     useSnapshot: false,
@@ -61,7 +58,7 @@ async function build() {
       ttsBridge: resolve(ROOT, 'scripts', 'tts_bridge.py'),
     },
   }, null, 2);
-  require('fs').writeFileSync(SEA_CONFIG, seaConfig);
+  writeFileSync(SEA_CONFIG, seaConfig);
 
   console.log('\n=== Step 4: 生成 SEA Blob ===\n');
   run(`node --experimental-sea-config "${SEA_CONFIG}"`);
@@ -76,8 +73,12 @@ async function build() {
     console.log('  signtool 不可用或移除签名失败（非致命）');
   }
 
-  console.log('\n=== Step 7: 注入 SEA Blob ===\n');
-  run(`node --build-sea "${SEA_EXE}" "${BLOB_PATH}"`);
+  console.log(`\n=== Step 7: 注入 SEA Blob（${hasBuildSea ? '--build-sea' : 'postject'}） ===\n`);
+  if (hasBuildSea) {
+    run(`node --build-sea "${SEA_EXE}" "${BLOB_PATH}"`);
+  } else {
+    run(`npx postject "${SEA_EXE}" NODE_SEA_BLOB "${BLOB_PATH}" --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2`);
+  }
 
   console.log('\n=== Step 8: 清理临时文件 ===\n');
   if (existsSync(BLOB_PATH)) unlinkSync(BLOB_PATH);
@@ -85,7 +86,7 @@ async function build() {
 
   console.log('\n=== 构建完成! ===\n');
   console.log(`  输出: ${SEA_EXE}`);
-  console.log(`  大小: ${(existsSync(SEA_EXE) ? require('fs').statSync(SEA_EXE).size / 1024 / 1024 : 0).toFixed(1)} MB`);
+  console.log(`  大小: ${(existsSync(SEA_EXE) ? statSync(SEA_EXE).size / 1024 / 1024 : 0).toFixed(1)} MB`);
 }
 
 build().catch(err => {
