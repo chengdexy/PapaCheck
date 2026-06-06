@@ -143,6 +143,8 @@ async function initAdmin() {
 async function refreshAllData() {
   var mode = ConnectionManager.getMode();
 
+  if (mode === 'reconnecting') return;
+
   if (mode === 'online') {
     try {
       var data = await API.getData();

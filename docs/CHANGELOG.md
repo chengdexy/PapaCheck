@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### Fixed
+- 离线→在线切换的竞态窗口：ping 恢复后立即切换 `reconnecting` 状态，阻止 `pollServer`/`refreshAllData` 在 sync 完成前获取旧数据
+- 消除 `_doReconnect()` 中 `/api/data` 双重冗余调用，改用 `DB.getFullData()` 读取 fullSync 已缓存的数据
+- 统一 `connection.js` 中 `_wasOnline` 两个分支的重连路径为单一 `_doReconnect()` 调用
+- `admin.js` 的 `refreshAllData` 在 `reconnecting` 模式下跳过执行
+
 ### 修复（Fixed）
 - 推迟到明天做的作业，离线转在线模式同步后回到今天的作业列表：修改 `db.py` 的 `push_merge()` 在指定 `date_key` 找不到 UUID 时跨所有 `date_key` 搜索，防止因 `move_homework` 造成的跨天重复追加；`move_homework()` 补充调用 `record_modification()` 更新 `last_modified` 表
 - 孩子端赏金任务列表过多时超出框架且无滚动条：移除 `updateHomeworkGrid()` 中错误的 `card.style.display = 'block'`，恢复 CSS `display: flex` 弹性布局，使 `.homework-grid` 的 `overflow-y: auto` 正常生效
