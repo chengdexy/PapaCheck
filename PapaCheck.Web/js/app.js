@@ -1079,6 +1079,8 @@ async function init() {
   startPoll(5000);
 
   updateConnStatus();
+
+  try { await CRDTLog.migrateFromChangeLog(); } catch (e) { }
 }
 
 init();

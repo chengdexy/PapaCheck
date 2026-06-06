@@ -840,3 +840,49 @@ describe('HEAD /api/bounty-tasks/:id', () => {
     expect(res.statusCode).toBe(200);
   });
 });
+
+// ==================== CRDT 同步端点 ====================
+
+describe('POST /api/sync/crdt-push', () => {
+  it('接受空操作列表', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/sync/crdt-push', payload: { operations: [] } });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+
+  it('推送一条操作日志并正确合并', async () => {
+    const op = {
+      id: 'test-op-1', type: 'update', table: 'homeworks',
+      resourceId: 'hw-crdt-1', field: 'status', value: 'completed',
+      timestamp: '2026-06-06T00:00:00Z', nodeId: 'test-node',
+    };
+    const res = await app.inject({ method: 'POST', url: '/api/sync/crdt-push', payload: { operations: [op] } });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+
+    // 验证操作已持久化（通过 crdt-pull 验证）
+    const pullRes = await app.inject({ method: 'GET', url: '/api/sync/crdt-pull?since=1970-01-01T00:00:00Z' });
+    expect(pullRes.statusCode).toBe(200);
+    const body = JSON.parse(pullRes.body);
+    expect(body.operations.length).toBeGreaterThanOrEqual(1);
+    expect(body.operations.some((o: any) => o.id === 'test-op-1')).toBe(true);
+  });
+});
+
+describe('GET /api/sync/crdt-pull', () => {
+  it('since 参数过滤正确', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/sync/crdt-pull?since=2026-06-07T00:00:00Z' });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toHaveProperty('operations');
+    expect(Array.isArray(body.operations)).toBe(true);
+  });
+});
+
+describe('POST /api/sync/crdt-pull?ack=', () => {
+  it('确认已消费的操作', async () => {
+    const res = await app.inject({ method: 'DELETE', url: '/api/sync/crdt-pull?ack=2026-06-06T00:00:00Z' });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});

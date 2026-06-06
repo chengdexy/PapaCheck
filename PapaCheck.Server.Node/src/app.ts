@@ -8,6 +8,7 @@ import fastifyStatic from '@fastify/static';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { AppError, ErrorCodes } from './errors.js';
+import type { CRDTOperation } from './crdt/types.js';
 
 export interface AppOptions {
   port: number;
@@ -426,6 +427,35 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     const body = request.body as { texts: string[] };
     if (body.texts && body.texts.length > 0) {
       tts.pregenSpeech(body.texts);
+    }
+    return sendJson(reply, { ok: true });
+  });
+
+  // CRDT 同步推送
+  app.post('/api/sync/crdt-push', async (request, reply) => {
+    const body = request.body as { operations: CRDTOperation[] };
+    if (!body.operations || !Array.isArray(body.operations)) {
+      return reply.status(400).send({ error: '缺少 operations 数组', code: 'VALIDATION_ERROR' });
+    }
+    for (const op of body.operations) {
+      db.saveCRDTOperation(op);
+    }
+    return sendJson(reply, { ok: true });
+  });
+
+  // CRDT 增量拉取
+  app.get('/api/sync/crdt-pull', async (request, reply) => {
+    const query = request.query as { since?: string };
+    const since = query.since || '1970-01-01T00:00:00Z';
+    const operations = db.getCRDTOperationsSince(since);
+    return sendJson(reply, { operations });
+  });
+
+  // CRDT 确认消费
+  app.delete('/api/sync/crdt-pull', async (request, reply) => {
+    const query = request.query as { ack?: string };
+    if (query.ack) {
+      db.ackCRDTOperations(query.ack);
     }
     return sendJson(reply, { ok: true });
   });

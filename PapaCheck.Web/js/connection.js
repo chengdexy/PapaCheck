@@ -51,10 +51,20 @@ var ConnectionManager = (function () {
     updateConnStatus();
     try {
       var syncPromise = (async function () {
-        if (typeof SyncEngine !== 'undefined' && SyncEngine.fullSync) {
+        // 首先尝试 CRDT 同步
+        var crdtOk = false;
+        if (typeof SyncEngine !== 'undefined' && SyncEngine.crdtFullSync) {
+          try {
+            crdtOk = await SyncEngine.crdtFullSync();
+          } catch (crdtErr) {
+            // CRDT 同步失败，静默降级
+          }
+        }
+        // CRDT 失败或不可用时降级到 LWW fullSync
+        if (!crdtOk && typeof SyncEngine !== 'undefined' && SyncEngine.fullSync) {
           await SyncEngine.fullSync();
         }
-        // fullSync 内部已缓存最新数据到 IndexedDB，直接读取，不再调用 API.getData()
+        // 从 IndexedDB 读取最新数据
         if (typeof DB !== 'undefined' && DB.getFullData && typeof cachedData !== 'undefined') {
           cachedData = await DB.getFullData();
         }

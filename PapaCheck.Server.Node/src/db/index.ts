@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
+import type { CRDTOperation } from '../crdt/types.js';
 
 // ==================== Types ====================
 
@@ -165,6 +166,18 @@ export class PapaCheckDB {
         record_key TEXT NOT NULL,
         last_modified TEXT NOT NULL,
         PRIMARY KEY (table_name, record_key)
+      );
+
+      CREATE TABLE IF NOT EXISTS crdt_operations (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        table_name TEXT NOT NULL,
+        resource_id TEXT NOT NULL,
+        field TEXT,
+        value TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `);
 
@@ -1080,6 +1093,35 @@ export class PapaCheckDB {
     }
 
     this.db.prepare("DELETE FROM meta WHERE key = 'last_shop_reset'").run();
+  }
+
+  // ==================== CRDT Operations ====================
+
+  saveCRDTOperation(op: CRDTOperation): void {
+    this.db.prepare(
+      `INSERT OR REPLACE INTO crdt_operations (id, type, table_name, resource_id, field, value, timestamp, node_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(op.id, op.type, op.table, op.resourceId, op.field, JSON.stringify(op.value), op.timestamp, op.nodeId);
+  }
+
+  getCRDTOperationsSince(timestamp: string): CRDTOperation[] {
+    const rows = this.db.prepare(
+      "SELECT * FROM crdt_operations WHERE timestamp > ? ORDER BY timestamp ASC"
+    ).all(timestamp) as any[];
+    return rows.map(row => ({
+      id: row.id,
+      type: row.type,
+      table: row.table_name,
+      resourceId: row.resource_id,
+      field: row.field,
+      value: JSON.parse(row.value),
+      timestamp: row.timestamp,
+      nodeId: row.node_id,
+    }));
+  }
+
+  ackCRDTOperations(timestamp: string): void {
+    this.db.prepare("DELETE FROM crdt_operations WHERE timestamp <= ?").run(timestamp);
   }
 
   // ==================== Connection ====================
