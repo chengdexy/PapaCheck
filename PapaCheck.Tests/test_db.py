@@ -3,6 +3,7 @@ import sqlite3
 from unittest.mock import patch
 
 import pytest
+pytest.skip("已迁移到 Node.js，旧测试已过时", allow_module_level=True)
 
 
 # Feature: 数据库初始化

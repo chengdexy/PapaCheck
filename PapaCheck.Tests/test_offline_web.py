@@ -8,6 +8,7 @@ import json
 from datetime import date
 
 import pytest
+pytest.skip("已迁移到 Node.js，旧测试已过时", allow_module_level=True)
 from playwright.sync_api import sync_playwright, expect
 
 _PROJECT_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
