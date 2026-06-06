@@ -180,9 +180,6 @@ def build_steps(args):
             steps.append(('递增 APK 版本号', cmd, ROOT, False))
 
         apk_cmd_str = 'flutter build apk --release'
-        steps.append(('同步 Web 资源到 APK',
-                      f'chcp 65001 >nul && powershell -ExecutionPolicy Bypass -File {os.path.join(ANDROID_DIR, "copy_web_assets.ps1")}',
-                      ANDROID_DIR, True))
         steps.append(('构建 Android APK', apk_cmd_str, ANDROID_DIR, True))
 
     if args.exe_only or (not args.apk_only):
