@@ -10,6 +10,7 @@ import re
 ROOT = os.path.dirname(os.path.abspath(__file__))
 ANDROID_DIR = os.path.join(ROOT, 'PapaCheck.Android')
 WINDOWS_DIR = os.path.join(ROOT, 'PapaCheck.Windows')
+NODE_DIR = os.path.join(ROOT, 'PapaCheck.Server.Node')
 PUBSPEC = os.path.join(ANDROID_DIR, 'pubspec.yaml')
 BUILD_CONFIG = os.path.join(WINDOWS_DIR, 'build_config.json')
 APK_BUILD_OUTPUT = os.path.join(ANDROID_DIR, 'build', 'app', 'outputs',
@@ -29,9 +30,10 @@ def parse_args():
         epilog='''
 使用示例:
   python release.py                              # 交互式引导模式
-  python release.py --exe-only                   # 仅构建 Windows EXE，默认递增 patch
-  python release.py --apk-only --set-apk-ver 2.0.0  # 仅构建 APK，指定版本号
-  python release.py --bump-exe major --no-bump-apk  # 完整发布，EXE 升 major，APK 不升
+  python release.py --exe-only                              # 仅构建 Windows EXE，默认递增 patch
+  python release.py --apk-only --set-apk-ver 2.0.0          # 仅构建 APK，指定版本号
+  python release.py --node-only                             # 仅构建 Node.js SEA 单 EXE
+  python release.py --bump-exe major --no-bump-apk          # 完整发布，EXE 升 major，APK 不升
   python release.py -v 1.5.0 --no-bump-exe       # 指定 APK 版本，不升 EXE 版本
   python release.py --no-zip                     # 完整发布但不创建 ZIP 包
   python release.py --output-dir D:\\releases     # 指定输出目录
@@ -39,9 +41,11 @@ def parse_args():
 
     build_group = parser.add_mutually_exclusive_group()
     build_group.add_argument('--exe-only', action='store_true',
-                             help='仅构建 Windows EXE')
+                             help='仅构建 Windows EXE（PyInstaller）')
     build_group.add_argument('--apk-only', action='store_true',
                              help='仅构建 Android APK')
+    build_group.add_argument('--node-only', action='store_true',
+                             help='仅构建 Node.js SEA 单 EXE')
 
     parser.add_argument('--bump-exe', nargs='?', const='patch', default=None,
                         metavar='patch|minor|major',
@@ -488,8 +492,9 @@ def run_wizard():
 def main():
     args = parse_args()
 
-    need_exe = args.exe_only or not args.apk_only
-    need_apk = args.apk_only or not args.exe_only
+    need_exe = args.exe_only or not (args.apk_only or args.node_only)
+    need_apk = args.apk_only or not (args.exe_only or args.node_only)
+    need_node = args.node_only
 
     output_dir = os.path.abspath(args.output_dir)
     os.makedirs(output_dir, exist_ok=True)

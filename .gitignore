@@ -62,3 +62,9 @@ PapaCheck.Windows/version_info.txt
 # Node.js
 node_modules/
 package-lock.json
+
+# Node.js 构建产物
+PapaCheck.Server.Node/dist/
+
+# Node.js TTS 缓存
+PapaCheck.Server.Node/tts_cache/

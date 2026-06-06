@@ -1,0 +1,143 @@
+import { spawn, type SpawnOptions } from 'child_process';
+import type { Readable } from 'stream';
+import { createHash } from 'crypto';
+import { readFile, writeFile, mkdir } from 'fs/promises';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/** 可被 mock 的 spawn 函数签名 */
+export type SpawnFn = (
+  command: string,
+  args: readonly string[],
+  options: SpawnOptions,
+) => {
+  stdout: Readable;
+  stderr: Readable;
+  on(event: 'error', listener: (err: Error) => void): void;
+  on(event: 'close', listener: (code: number | null) => void): void;
+  kill(signal?: string): void;
+};
+
+export interface TTSBridgeOptions {
+  /** Python 可执行文件路径，默认 'python' */
+  pythonPath?: string;
+  /** TTS 桥接脚本路径 */
+  scriptPath?: string;
+  /** 磁盘缓存目录 */
+  cacheDir?: string;
+  /** 内部：测试用 spawn 注入 */
+  _spawn?: SpawnFn;
+}
+
+export class TTSBridge {
+  private cache: Map<string, Buffer> = new Map();
+  private pythonPath: string;
+  private scriptPath: string;
+  private cacheDir: string;
+  private spawnFn: SpawnFn;
+
+  constructor(options: TTSBridgeOptions = {}) {
+    this.pythonPath = options.pythonPath ?? 'python';
+    this.scriptPath = options.scriptPath ?? join(__dirname, '..', '..', 'scripts', 'tts_bridge.py');
+    this.cacheDir = options.cacheDir ?? join(__dirname, '..', '..', 'tts_cache');
+    this.spawnFn = options._spawn ?? spawn as unknown as SpawnFn;
+  }
+
+  /** 计算文本的 MD5 哈希作为缓存 key */
+  private md5(text: string): string {
+    return createHash('md5').update(text).digest('hex');
+  }
+
+  /** 获取内存缓存中的语音数据 */
+  getCached(text: string): Buffer | undefined {
+    return this.cache.get(text);
+  }
+
+  /** 生成语音，返回 MP3 Buffer */
+  async speak(text: string): Promise<Buffer> {
+    // 1. 检查内存缓存
+    const cached = this.cache.get(text);
+    if (cached) return cached;
+
+    const hash = this.md5(text);
+    const cachePath = join(this.cacheDir, `${hash}.mp3`);
+
+    // 2. 检查磁盘缓存
+    try {
+      const diskData = await readFile(cachePath);
+      this.cache.set(text, diskData);
+      return diskData;
+    } catch {
+      // 磁盘缓存未命中
+    }
+
+    // 3. 确保缓存目录存在
+    await mkdir(this.cacheDir, { recursive: true }).catch(() => {});
+
+    // 4. 生成语音
+    const mp3Data = await this.spawnPython(text);
+
+    // 5. 缓存结果
+    if (mp3Data.length > 0) {
+      this.cache.set(text, mp3Data);
+      writeFile(cachePath, mp3Data).catch(() => {});
+    }
+
+    return mp3Data;
+  }
+
+  /** 启动 Python 子进程生成语音 */
+  private spawnPython(text: string): Promise<Buffer> {
+    return new Promise((resolve) => {
+      const proc = this.spawnFn(this.pythonPath, [this.scriptPath, text], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+
+      const chunks: Buffer[] = [];
+      let settled = false;
+
+      const timeout = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          proc.kill();
+          resolve(Buffer.alloc(0));
+        }
+      }, 30000);
+
+      const finish = (result: Buffer) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          resolve(result);
+        }
+      };
+
+      proc.stdout.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
+
+      proc.on('error', () => {
+        finish(Buffer.alloc(0));
+      });
+
+      proc.on('close', (code) => {
+        if (code === 0) {
+          finish(Buffer.concat(chunks));
+        } else {
+          finish(Buffer.alloc(0));
+        }
+      });
+    });
+  }
+
+  /** 后台预生成一批语音 */
+  pregenSpeech(texts: string[]): void {
+    for (const text of texts) {
+      if (text && text.trim()) {
+        this.speak(text).catch(() => {});
+      }
+    }
+  }
+}
