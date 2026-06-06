@@ -138,10 +138,14 @@ async function initAdmin() {
     if ((modal && modal.classList.contains('show')) || _editingBalance || _editingSettings) return;
     renderCurrentTab();
   }, 5000);
+
+  try { await CRDTLog.migrateFromChangeLog(); } catch (e) { }
 }
 
 async function refreshAllData() {
   var mode = ConnectionManager.getMode();
+
+  if (mode === 'reconnecting') return;
 
   if (mode === 'online') {
     try {
@@ -417,15 +421,10 @@ async function saveAdminHw() {
   const basePoints = parseInt(document.getElementById('adminHwBasePoints').value) ?? 10;
 
   if (adminEditingId) {
-    const hw = adminHomeworks.find(h => h.id === adminEditingId);
-    if (hw) {
-      hw.subject = subject;
-      hw.content = content;
-      hw.suggestedDuration = suggestedDuration;
-      hw.basePoints = basePoints;
-    }
+    // 编辑已有作业：只 PATCH 改动的字段，不发整条作业
+    await API.patchHomework(adminEditingId, { subject, content, suggestedDuration, basePoints });
   } else {
-    adminHomeworks.push({
+    const newHw = {
       id: Date.now().toString(36) + Math.random().toString(36).substring(2, 7),
       subject,
       content,
@@ -437,15 +436,15 @@ async function saveAdminHw() {
       completedAt: null,
       actualDuration: null,
       completedInSchool: false,
-    });
-  }
+    };
+    adminHomeworks.push(newHw);
+    // 新增作业：只 PUT 这一条
+    await API.putHomework(newHw.id, newHw);
 
-  await API.saveHomeworks(AdminUtil.dateKey(adminDate), adminHomeworks);
-  if (!adminEditingId) {
     const dateKey = AdminUtil.dateKey(adminDate);
     const existingSettlement = cachedData?.dailySettlement?.[dateKey];
     if (!existingSettlement || !existingSettlement.rating) {
-      await API.saveSettlement(dateKey, {});
+      await API.putSettlement(dateKey, {});
     }
   }
   closeAdminModal();
@@ -464,8 +463,7 @@ async function saveAdminHw() {
 }
 
 async function deleteAdminHw(id) {
-  adminHomeworks = adminHomeworks.filter(h => h.id !== id);
-  await API.saveHomeworks(AdminUtil.dateKey(adminDate), adminHomeworks);
+  await API.deleteHomework(id);
   await refreshAllData();
   renderHomeworkTab();
   showToast('作业已删除');
@@ -487,9 +485,18 @@ async function rejectHomework(hwId) {
   hw.completedInSchool = false;
   hw.mode = 'pending';
 
-  await API.saveHomeworks(dateKey, adminHomeworks);
+  // 只 PATCH 改动的字段，不发整条作业
+  await API.patchHomework(hwId, {
+    status: 'pending',
+    rejected: true,
+    startedAt: null,
+    completedAt: null,
+    actualDuration: null,
+    completedInSchool: false,
+    mode: 'pending',
+  });
 
-  await API.saveSettlement(dateKey, {});
+  await API.putSettlement(dateKey, {});
 
   await refreshAllData();
   renderHomeworkTab();
@@ -591,7 +598,7 @@ async function submitRating(dateKey, rating) {
     settlement.finalPoints = finalPoints;
     settlement.ratedAt = timeStr;
 
-    await API.saveSettlement(dateKey, settlement);
+    await API.putSettlement(dateKey, settlement);
 
     if (finalPoints > 0) {
       await API.updatePoints('earn', finalPoints, `完成作业，评级${rating}`);
@@ -753,7 +760,9 @@ async function saveShopItem() {
     });
   }
 
-  await API.saveShopItems(adminShopItems);
+  for (var i = 0; i < adminShopItems.length; i++) {
+    await API.putShopItem(adminShopItems[i].id, adminShopItems[i]);
+  }
   closeAdminModal();
   await refreshAllData();
   renderShopTab();
@@ -765,14 +774,18 @@ async function adjustShopQty(itemId, delta) {
   const item = adminShopItems.find(i => i.id === itemId);
   if (!item) return;
   item.remainingQuantity = Math.max(0, (item.remainingQuantity ?? 0) + delta);
-  await API.saveShopItems(adminShopItems);
+  for (var i = 0; i < adminShopItems.length; i++) {
+    await API.putShopItem(adminShopItems[i].id, adminShopItems[i]);
+  }
   await refreshAllData();
   renderShopTab();
 }
 
 async function deleteShopItem(id) {
   adminShopItems = adminShopItems.filter(i => i.id !== id);
-  await API.saveShopItems(adminShopItems);
+  for (var i = 0; i < adminShopItems.length; i++) {
+    await API.putShopItem(adminShopItems[i].id, adminShopItems[i]);
+  }
   await refreshAllData();
   renderShopTab();
   showToast('商品已删除');
@@ -890,7 +903,9 @@ async function addRewardFromShop(name, type, durationMinutes) {
       createdAt: Date.now(),
     });
   }
-  await API.saveRewardBox(adminRewardBox);
+  for (var i = 0; i < adminRewardBox.length; i++) {
+    await API.putRewardBoxItem(adminRewardBox[i].id, adminRewardBox[i]);
+  }
   closeAdminModal();
   await refreshAllData();
   renderRewardBoxTab();
@@ -934,7 +949,9 @@ async function saveRewardBoxItem() {
     });
   }
 
-  await API.saveRewardBox(adminRewardBox);
+  for (var i = 0; i < adminRewardBox.length; i++) {
+    await API.putRewardBoxItem(adminRewardBox[i].id, adminRewardBox[i]);
+  }
   closeAdminModal();
   await refreshAllData();
   renderRewardBoxTab();
@@ -949,7 +966,9 @@ async function adjustRewardBoxQty(itemId, delta) {
   if (item.quantity <= 0) {
     adminRewardBox = adminRewardBox.filter(i => i.id !== itemId);
   }
-  await API.saveRewardBox(adminRewardBox);
+  for (var i = 0; i < adminRewardBox.length; i++) {
+    await API.putRewardBoxItem(adminRewardBox[i].id, adminRewardBox[i]);
+  }
   await refreshAllData();
   renderRewardBoxTab();
   if (delta > 0) pregenSpeech(['奖励箱有新奖励，快去看看吧']);
@@ -957,7 +976,9 @@ async function adjustRewardBoxQty(itemId, delta) {
 
 async function deleteRewardBoxItem(id) {
   adminRewardBox = adminRewardBox.filter(i => i.id !== id);
-  await API.saveRewardBox(adminRewardBox);
+  for (var i = 0; i < adminRewardBox.length; i++) {
+    await API.putRewardBoxItem(adminRewardBox[i].id, adminRewardBox[i]);
+  }
   await refreshAllData();
   renderRewardBoxTab();
   showToast('已删除');
@@ -1103,7 +1124,9 @@ async function saveBountyTask() {
     });
   }
 
-  await API.saveBountyTasks(adminBountyTasks);
+  for (var i = 0; i < adminBountyTasks.length; i++) {
+    await API.putBountyTask(adminBountyTasks[i].id, adminBountyTasks[i]);
+  }
   closeAdminModal();
   await refreshAllData();
   renderBountyTab();
@@ -1111,8 +1134,7 @@ async function saveBountyTask() {
 }
 
 async function deleteBountyTask(id) {
-  adminBountyTasks = adminBountyTasks.filter(i => i.id !== id);
-  await API.saveBountyTasks(adminBountyTasks);
+  await API.deleteBountyTask(id);
   await refreshAllData();
   renderBountyTab();
   showToast('赏金任务已删除');
@@ -1128,11 +1150,13 @@ async function approveBountySubmission(dateKey, taskId) {
     const idx = submissions.findIndex(s => s.taskId === taskId);
     if (idx === -1) return;
     submissions.splice(idx, 1);
-    await API.saveBountySubmissions(dateKey, submissions);
+    for (var i = 0; i < submissions.length; i++) {
+      await API.putBountySubmission(submissions[i].id, submissions[i]);
+    }
 
     if (!adminBountyCompletions._total) adminBountyCompletions._total = {};
     adminBountyCompletions._total[taskId] = (adminBountyCompletions._total[taskId] || 0) + 1;
-    await API.saveBountyCompletions('_total', adminBountyCompletions._total);
+    await API.putBountyCompletion('_total', adminBountyCompletions._total);
 
     const task = adminBountyTasks.find(t => t.id === taskId);
     if (task && task.points > 0) {
@@ -1141,7 +1165,9 @@ async function approveBountySubmission(dateKey, taskId) {
 
     if (task && task.type === 'once') {
       task.completedAt = new Date().toISOString();
-      await API.saveBountyTasks(adminBountyTasks);
+      for (var i = 0; i < adminBountyTasks.length; i++) {
+        await API.putBountyTask(adminBountyTasks[i].id, adminBountyTasks[i]);
+      }
     }
 
     pregenSpeech([(task ? task.name : '任务') + '完成，加' + (task.points || 0) + '分！']);
@@ -1161,7 +1187,9 @@ async function rejectBountySubmission(dateKey, taskId) {
 
   submission.status = 'doing';
   submission.submittedAt = null;
-  await API.saveBountySubmissions(dateKey, submissions);
+  for (var i = 0; i < submissions.length; i++) {
+    await API.putBountySubmission(submissions[i].id, submissions[i]);
+  }
 
   const task = adminBountyTasks.find(t => t.id === taskId);
   pregenSpeech([(task ? task.name : '任务') + '失败了，下次加油！']);
@@ -1232,7 +1260,9 @@ async function _handleTimeFulfillment(redemption, durationMinutes) {
     completedAt: null,
     remainingSeconds: durationMinutes * 60,
   });
-  await API.saveFreeTime(dateKey, freeTime);
+  for (var i = 0; i < freeTime.length; i++) {
+    await API.putFreeTimeTask(freeTime[i].id, freeTime[i]);
+  }
 }
 
 async function _handleBuffFulfillment(redemption, buffDuration, buffUnit) {
@@ -1244,7 +1274,9 @@ async function _handleBuffFulfillment(redemption, buffDuration, buffUnit) {
     unit: buffUnit,
     startDate: buffUnit === 'minutes' ? new Date().toISOString() : AdminUtil.dateKey(adminDate),
   });
-  await API.saveActiveBuffs(buffs);
+  for (var i = 0; i < buffs.length; i++) {
+    await API.putBuff(buffs[i].id, buffs[i]);
+  }
 }
 
 async function _fulfillFromRewardBox(redemption) {
@@ -1256,7 +1288,9 @@ async function _fulfillFromRewardBox(redemption) {
       const idx = rewardBox.indexOf(rbItem);
       if (idx !== -1) rewardBox.splice(idx, 1);
     }
-    await API.saveRewardBox(rewardBox);
+    for (var i = 0; i < rewardBox.length; i++) {
+      await API.putRewardBoxItem(rewardBox[i].id, rewardBox[i]);
+    }
   }
 
   if (redemption.itemType === 'time' && redemption.durationMinutes > 0) {
@@ -1302,7 +1336,9 @@ async function fulfillRedemption(id) {
   _fulfillingRedemption = true;
   try {
     redemption.status = 'fulfilled';
-    await API.saveRedemptions(adminRedemptions);
+    for (var i = 0; i < adminRedemptions.length; i++) {
+      await API.putRedemption(adminRedemptions[i].id, adminRedemptions[i]);
+    }
 
     if (redemption.fromRewardBox) {
       await _fulfillFromRewardBox(redemption);
@@ -1339,7 +1375,9 @@ async function clearRedemptionHistory() {
   const fulfilled = adminRedemptions.filter(r => r.status === 'fulfilled');
   if (fulfilled.length === 0) return;
   adminRedemptions = adminRedemptions.filter(r => r.status !== 'fulfilled');
-  await API.saveRedemptions(adminRedemptions);
+  for (var i = 0; i < adminRedemptions.length; i++) {
+    await API.putRedemption(adminRedemptions[i].id, adminRedemptions[i]);
+  }
   await refreshAllData();
   renderRedeemTab();
   showToast('已清空兑换历史');
@@ -1917,14 +1955,14 @@ async function toggleHolidayForDate() {
     holidays.push(_selectedCalendarDate);
     holidays.sort();
     adminSettings.customHolidays = holidays;
-    await API.saveSettings(adminSettings);
+    await API.putSettings(adminSettings);
     await refreshAllData();
     renderSettingsTab();
     showToast('已标记为假日：' + _selectedCalendarDate);
   } else {
     holidays.splice(idx, 1);
     adminSettings.customHolidays = holidays;
-    await API.saveSettings(adminSettings);
+    await API.putSettings(adminSettings);
     await refreshAllData();
     renderSettingsTab();
     showToast('已标记为工作日：' + _selectedCalendarDate);
@@ -1971,7 +2009,7 @@ async function saveAllSettings() {
     shopDefaultPoints: shopPoints,
   };
 
-  await API.saveSettings(newSettings);
+  await API.putSettings(newSettings);
   adminSettings = newSettings;
   renderSettingsTab();
   showToast('配置已保存');
@@ -1979,7 +2017,7 @@ async function saveAllSettings() {
 
 async function resetSettingsToDefaults() {
   adminSettings = {};
-  await API.saveSettings({});
+  await API.putSettings({});
   renderSettingsTab();
   showToast('已恢复默认值');
 }
@@ -2098,7 +2136,7 @@ async function confirmAdjustPoints() {
         ? '获得奖励积分：' + diff + '分'
         : '被惩罚，扣除积分：' + Math.abs(diff) + '分';
       const s = { ...(cachedData?.settings || {}), _pointsAdjustmentNote: note };
-      await API.saveSettings(s);
+      await API.putSettings(s);
       pregenSpeech([note]);
     }
     await refreshAllData();

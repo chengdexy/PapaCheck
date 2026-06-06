@@ -51,14 +51,22 @@ var ConnectionManager = (function () {
     updateConnStatus();
     try {
       var syncPromise = (async function () {
-        if (typeof SyncEngine !== 'undefined' && SyncEngine.fullSync) {
+        // 首先尝试 CRDT 同步
+        var crdtOk = false;
+        if (typeof SyncEngine !== 'undefined' && SyncEngine.crdtFullSync) {
+          try {
+            crdtOk = await SyncEngine.crdtFullSync();
+          } catch (crdtErr) {
+            // CRDT 同步失败，静默降级
+          }
+        }
+        // CRDT 失败或不可用时降级到 LWW fullSync
+        if (!crdtOk && typeof SyncEngine !== 'undefined' && SyncEngine.fullSync) {
           await SyncEngine.fullSync();
         }
-        if (typeof API !== 'undefined' && API.getData) {
-          var serverData = await API.getData();
-          if (typeof cachedData !== 'undefined') {
-            cachedData = serverData;
-          }
+        // 从 IndexedDB 读取最新数据
+        if (typeof DB !== 'undefined' && DB.getFullData && typeof cachedData !== 'undefined') {
+          cachedData = await DB.getFullData();
         }
       })();
       await Promise.race([
@@ -107,44 +115,10 @@ var ConnectionManager = (function () {
       var ok = await _ping();
       if (ok) {
         if (_mode === 'offline' && !_syncing) {
-          if (_wasOnline) {
-            await _doReconnect();
-          } else {
-            _syncing = true;
-            _mode = 'online';
-            showReconnectMask();
-            updateConnStatus();
-            try {
-              var firstSyncPromise = (async function () {
-                if (typeof SyncEngine !== 'undefined' && SyncEngine.fullSync) {
-                  await SyncEngine.fullSync();
-                }
-                if (typeof API !== 'undefined' && API.getData) {
-                  var serverData = await API.getData();
-                  if (typeof cachedData !== 'undefined') {
-                    cachedData = serverData;
-                  }
-                }
-              })();
-              await Promise.race([
-                firstSyncPromise,
-                new Promise(function (resolve) {
-                  setTimeout(function () { resolve('timeout'); }, _getReconnectTimeout());
-                })
-              ]);
-              _wasOnline = true;
-            } catch (syncErr) {
-              _mode = 'offline';
-            } finally {
-              hideReconnectMask();
-              updateConnStatus();
-              _syncing = false;
-            }
-          }
+          await _doReconnect();
         } else if (_mode === 'reconnecting') {
-          _mode = 'online';
-          hideReconnectMask();
-          updateConnStatus();
+          // 重连过程中 ping 持续成功：可能 _doReconnect() 同步超时但连接仍在，
+          // 此处不做干预，由 _doReconnect() 的 finally 块决定最终状态
         } else {
           _mode = 'online';
           updateConnStatus();

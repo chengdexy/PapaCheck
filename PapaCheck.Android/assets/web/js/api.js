@@ -61,10 +61,16 @@ const API = {
 
   async _fetch(url, options) {
     if (!options) options = {};
-    var resp = await fetch(url, {
-      headers: { 'Content-Type': 'application/json' },
-      ...options,
-    });
+    var method = options.method || 'GET';
+    var fetchOptions = { ...options };
+    // DELETE 请求没有 body，不设置 Content-Type，避免 Fastify 报空 JSON body 错误
+    if (method !== 'DELETE') {
+      if (!fetchOptions.headers) fetchOptions.headers = {};
+      if (!fetchOptions.headers['Content-Type']) {
+        fetchOptions.headers['Content-Type'] = 'application/json';
+      }
+    }
+    var resp = await fetch(url, fetchOptions);
     if (!resp.ok) throw new Error(resp.statusText);
     return await resp.json();
   },
@@ -489,6 +495,345 @@ const API = {
       },
       null,
       {}
+    );
+  },
+
+  // ========== PUT / PATCH / DELETE / HEAD ==========
+
+  // ---- 作业 (homeworks) ----
+
+  async putHomework(id, data) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/homeworks/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级：在本地 DB 中创建/更新 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async patchHomework(id, fields) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'homeworks', resourceId: id, field: null, value: fields }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-only',
+      async () => {
+        await this._fetch('/api/homeworks/' + id, { method: 'PATCH', body: JSON.stringify(fields) });
+        return true;
+      },
+      null,
+      {}
+    );
+  },
+
+  async deleteHomework(id) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'delete', table: 'homeworks', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/homeworks/' + id, { method: 'DELETE' });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async headHomework(id) {
+    var mode = ConnectionManager.getMode();
+    if (mode === 'offline') return false;
+    try {
+      var resp = await fetch('/api/homeworks/' + id, { method: 'HEAD' });
+      return resp.ok;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  // ---- 结算 (settlement) ----
+
+  async putSettlement(dateKey, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'daily_settlement', resourceId: dateKey, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/settlement/' + dateKey, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async patchSettlement(dateKey, fields) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'daily_settlement', resourceId: dateKey, field: null, value: fields }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-only',
+      async () => {
+        await this._fetch('/api/settlement/' + dateKey, { method: 'PATCH', body: JSON.stringify(fields) });
+        return true;
+      },
+      null,
+      {}
+    );
+  },
+
+  // ---- 积分 (points) ----
+
+  async patchPoints(delta) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'points', resourceId: 'points', field: null, value: delta }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-only',
+      async () => {
+        var result = await this._fetch('/api/points', { method: 'PATCH', body: JSON.stringify(delta) });
+        return result.balance;
+      },
+      null,
+      {}
+    );
+  },
+
+  // ---- 商店 (shop) ----
+
+  async putShopItem(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'shop_items', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/shop/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async deleteShopItem(id) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'delete', table: 'shop_items', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/shop/' + id, { method: 'DELETE' });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async headShopItem(id) {
+    var mode = ConnectionManager.getMode();
+    if (mode === 'offline') return false;
+    try {
+      var resp = await fetch('/api/shop/' + id, { method: 'HEAD' });
+      return resp.ok;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  // ---- 兑换 (redemptions) ----
+
+  async putRedemption(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'redemptions', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/redemptions/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  // ---- 奖励箱 (reward-box) ----
+
+  async putRewardBoxItem(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'reward_box', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/reward-box/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  // ---- 设置 (settings) ----
+
+  async putSettings(data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'settings', resourceId: 'settings', field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/settings', { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async patchSettings(fields) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'settings', resourceId: 'settings', field: null, value: fields }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-only',
+      async () => {
+        await this._fetch('/api/settings', { method: 'PATCH', body: JSON.stringify(fields) });
+        return true;
+      },
+      null,
+      {}
+    );
+  },
+
+  // ---- Buff (active-buffs) ----
+
+  async putBuff(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'active_buffs', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/active-buffs/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async deleteBuff(id) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'delete', table: 'active_buffs', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/active-buffs/' + id, { method: 'DELETE' });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  // ---- 效率 (efficiency) ----
+
+  async putEfficiency(dateKey, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'efficiency_history', resourceId: dateKey, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/efficiency/' + dateKey, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  // ---- 自由时间 (freetime) ----
+
+  async putFreeTimeTask(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'free_time_tasks', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/freetime/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  // ---- 赏金任务 (bounty-tasks) ----
+
+  async putBountyTask(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'bounty_tasks', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/bounty-tasks/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async deleteBountyTask(id) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'delete', table: 'bounty_tasks', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/bounty-tasks/' + id, { method: 'DELETE' });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async headBountyTask(id) {
+    var mode = ConnectionManager.getMode();
+    if (mode === 'offline') return false;
+    try {
+      var resp = await fetch('/api/bounty-tasks/' + id, { method: 'HEAD' });
+      return resp.ok;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  // ---- 赏金提交 (bounty-submissions) ----
+
+  async putBountySubmission(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'bounty_submissions', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/bounty-submissions/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  // ---- 赏金完成 (bounty-completions) ----
+
+  async putBountyCompletion(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'bounty_completions', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/bounty-completions/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
     );
   },
 
