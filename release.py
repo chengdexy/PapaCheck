@@ -477,6 +477,7 @@ def run_wizard():
     return argparse.Namespace(
         exe_only=exe_only,
         apk_only=apk_only,
+        node_only=False,
         bump_exe=bump_exe,
         bump_apk=bump_apk,
         set_exe_ver=set_exe_ver,
