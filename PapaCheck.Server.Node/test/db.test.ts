@@ -57,6 +57,16 @@ describe('Database', () => {
       expect(data).toHaveProperty('bountySubmissions', {});
       expect(data).toHaveProperty('bountyCompletions', {});
     });
+
+    it('homeworks 表中非数组数据不崩溃', () => {
+      // 模拟数据损坏：写入非数组数据
+      (db as any).db.prepare(
+        "INSERT OR REPLACE INTO homeworks (date_key, data) VALUES (?, ?)"
+      ).run('2026-06-06', JSON.stringify({ bad: 'not an array' }));
+
+      const data = db.getFullData();
+      expect(data.homeworks['2026-06-06']).toBeUndefined();
+    });
   });
 
   describe('homeworks CRUD', () => {

@@ -356,8 +356,10 @@ export class PapaCheckDB {
     // homeworks
     const hwRows = this.db.prepare("SELECT date_key, data FROM homeworks").all() as { date_key: string; data: string }[];
     for (const row of hwRows) {
-      const items = JSON.parse(row.data) as any[];
-      data.homeworks[row.date_key] = items.filter((h: any) => !h.isDeleted);
+      const items = JSON.parse(row.data);
+      if (Array.isArray(items)) {
+        data.homeworks[row.date_key] = items.filter((h: any) => !h.isDeleted);
+      }
     }
 
     // dailySettlement
