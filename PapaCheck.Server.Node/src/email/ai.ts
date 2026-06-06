@@ -20,7 +20,11 @@ export async function callAI(
   apiKey: string,
   apiUrl: string
 ): Promise<string> {
-  const response = await fetch(apiUrl, {
+  // 兼容用户只配置了 base URL 的情况（如 https://api.deepseek.com）
+  const endpoint = apiUrl.includes('/chat/completions')
+    ? apiUrl
+    : apiUrl.replace(/\/+$/, '') + '/v1/chat/completions';
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
