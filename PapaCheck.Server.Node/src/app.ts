@@ -5,6 +5,7 @@ import { join } from 'path';
 import { PapaCheckDB } from './db/index.js';
 import { TTSBridge } from './tts/index.js';
 import { EmailSync } from './email/index.js';
+import type { HomeworkItem } from './email/ai.js';
 import fastifyStatic from '@fastify/static';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
@@ -467,6 +468,37 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true });
   });
 
+/**
+ * 展开 AI 可能合并的多条作业内容
+ * 如 "1. 测试语文 1\n2. 测试语文 2" → [{ subject: '语文', content: '测试语文 1' }, { subject: '语文', content: '测试语文 2' }]
+ */
+function expandHomeworkContent(hw: HomeworkItem): HomeworkItem[] {
+  const items: HomeworkItem[] = [];
+
+  // 检查 content 中是否有编号列表（如 "1. X\n2. Y"）
+  const lines = hw.content.split('\n').filter((l) => l.trim());
+  const numberedLines = lines.filter((l) => /^\s*\d+[.、]/.test(l.trim()));
+
+  if (numberedLines.length >= 2) {
+    // 有多条编号项 → 拆分为独立作业
+    for (const line of numberedLines) {
+      const text = line.replace(/^\s*\d+[.、]\s*/, '').trim();
+      if (text) {
+        items.push({
+          subject: hw.subject,
+          content: text,
+          date: hw.date,
+        });
+      }
+    }
+  } else {
+    // 单条内容，保持原样
+    items.push(hw);
+  }
+
+  return items;
+}
+
   // 36. POST /api/email/sync - 触发邮件同步
   app.post('/api/email/sync', async (request, reply) => {
     const config = db.getEmailConfig();
@@ -497,7 +529,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
     // 保存解析出的作业
     if (result.homeworks && result.homeworks.length > 0) {
+      // 展开 AI 可能合并的多条内容（如 "1. 语文\n2. 数学" → 两条独立作业）
+      const expanded: HomeworkItem[] = [];
       for (const hw of result.homeworks) {
+        const items = expandHomeworkContent(hw);
+        expanded.push(...items);
+      }
+
+      for (const hw of expanded) {
         const dateKey = hw.date || new Date().toISOString().slice(0, 10);
         const hwId = `email-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         db.putHomework(hwId, {
@@ -507,6 +546,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
           dateKey,
           status: 'pending',
           source: 'email',
+          suggestedDuration: hw.suggestedDuration ?? 20,
+          basePoints: hw.basePoints ?? 10,
+          mode: 'pending',
         });
       }
     }
