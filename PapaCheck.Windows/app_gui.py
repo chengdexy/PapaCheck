@@ -1622,7 +1622,8 @@ class PapaCheckApp:
         try:
             self.root.after(0, lambda: self._append_log('正在连接邮箱...'))
 
-            server_url = cfg['server_url'].strip().rstrip('/')
+            # 使用当前服务器 URL（替换保存的旧配置，避免端口变更后指向错误服务器）
+            server_url = self._child_url_var.get().strip().rstrip('/')
 
             # 1. 保存邮箱配置到 Node.js 服务器
             email_cfg = {
@@ -1667,9 +1668,11 @@ class PapaCheckApp:
 
         except urllib.error.HTTPError as e:
             error_body = e.read().decode('utf-8', errors='replace')
-            self.root.after(0, lambda: self._append_log(f'错误: HTTP {e.code} - {error_body}'))
+            code = e.code
+            self.root.after(0, lambda c=code, b=error_body: self._append_log(f'错误: HTTP {c} - {b}'))
         except Exception as e:
-            self.root.after(0, lambda: self._append_log(f'错误: {e}'))
+            err = e
+            self.root.after(0, lambda ex=err: self._append_log(f'错误: {ex}'))
         finally:
             self.root.after(0, lambda: self._email_sync_btn.config(
                 state=tk.NORMAL, text='AI 发作业'))
