@@ -6,6 +6,19 @@
 
 ## [Unreleased]
 
+### Added
+- CRDT 同步引擎（src/crdt/）：字段级 LWW-Register、PN-Counter、OR-Set 合并函数
+- crdt_operations 数据库表存储操作日志
+- POST /api/sync/crdt-push — 批量接收并持久化 CRDT 操作
+- GET /api/sync/crdt-pull?since= — 增量拉取 CRDT 操作
+- DELETE /api/sync/crdt-pull?ack= — 确认已消费的 CRDT 操作
+- 前端 CRDTLog 操作日志模块（js/crdt-sync.js）：append / getPending / ack / migrateFromChangeLog
+- api.js 所有 PUT/PATCH/DELETE 方法调用时自动生成 CRDT 操作日志
+- sync.js 新增 crdtPush / crdtPull / crdtFullSync CRDT 同步方法
+- connection.js _doReconnect() 重连时优先走 CRDT 同步，失败降级到 LWW
+- app.js/admin.js 初始化时自动迁移旧 ChangeLog 到 CRDTLog
+- 7 个 CRDT 合并引擎单元测试 + 8 个前端 CRDT 同步测试
+
 ### Fixed
 - 修复数据同步时消耗的时间类道具被恢复的 Bug：`fullSync()` 中 `ChangeLog.clear()` 全量清空变更日志，会清除 `pushChanges()` 推送到服务器期间新产生的条目，导致这些变更丢失、服务器旧数据覆盖本地。改为 `clearUpTo(maxId)` 只清除已推送的条目（ID ≤ maxId），保留推送期间新增的条目等待下次同步
 - `ChangeLog` 新增 `clearUpTo(maxId)` 方法，按 ID 范围精确清除已推送的变更日志条目
