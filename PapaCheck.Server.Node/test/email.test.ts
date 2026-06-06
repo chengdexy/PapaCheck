@@ -32,7 +32,6 @@ vi.mock('imap', () => {
   const MockIMAP = vi.fn().mockImplementation(() => {
     const readyHandlers: Function[] = [];
     const errorHandlers: Function[] = [];
-    let openBoxCallback: Function | null = null;
 
     const api = {
       once: vi.fn((event: string, cb: Function) => {
@@ -112,14 +111,12 @@ vi.stubGlobal('fetch', vi.fn());
 
 describe('EmailSync', () => {
   let app: FastifyInstance;
-  let db: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     imapShouldFail = false;
     app = await buildApp({ port: 0, webDir: '', dbPath: ':memory:', showPollingLog: false });
     await app.listen({ port: 0, host: '127.0.0.1' });
-    db = (app as any).papaCheckDB;
   });
 
   afterEach(async () => {
