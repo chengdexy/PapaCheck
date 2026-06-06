@@ -129,11 +129,15 @@ async function initAdmin() {
 
   await ConnectionManager.start();
   await refreshAllData();
+  updateSettingsTabState();
   hideTransitionMask();
-  switchTab('homework');
+  // 恢复上次停留的标签页
+  try { var savedTab = localStorage.getItem('adminTab'); } catch (e) { /* 非致命 */ }
+  switchTab(savedTab && ['homework','shop','rewardBox','bounty','redeem','stats','settings'].indexOf(savedTab) !== -1 ? savedTab : 'homework');
 
   setInterval(async () => {
     await refreshAllData();
+    updateSettingsTabState();
     const modal = document.getElementById('adminModal');
     if ((modal && modal.classList.contains('show')) || _editingBalance || _editingSettings) return;
     renderCurrentTab();
@@ -195,11 +199,28 @@ function _applyCachedData() {
 
 // ========== Tab Switching ==========
 function switchTab(tab) {
+  if (tab === 'settings' && ConnectionManager.getMode() === 'offline') {
+    showToast('离线模式无法修改设置');
+    return;
+  }
   adminCurrentTab = tab;
+  // 持久化当前标签页，刷新后恢复
+  try { localStorage.setItem('adminTab', tab); } catch (e) { /* 非致命 */ }
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
   renderCurrentTab();
+}
+
+function updateSettingsTabState() {
+  var isOffline = ConnectionManager.getMode() === 'offline';
+  document.querySelectorAll('.tab-btn[data-tab="settings"]').forEach(function(btn) {
+    var icon = btn.querySelector('.tab-icon');
+    if (icon) {
+      icon.textContent = isOffline ? '🔒' : '⚙️';
+      btn.title = isOffline ? '离线模式无法修改设置' : '';
+    }
+  });
 }
 
 function renderCurrentTab() {
@@ -422,7 +443,8 @@ async function saveAdminHw() {
 
   if (adminEditingId) {
     // 编辑已有作业：只 PATCH 改动的字段，不发整条作业
-    await API.patchHomework(adminEditingId, { subject, content, suggestedDuration, basePoints });
+    var dateKey = AdminUtil.dateKey(adminDate);
+    await API.patchHomework(adminEditingId, { subject, content, suggestedDuration, basePoints }, dateKey);
   } else {
     const newHw = {
       id: Date.now().toString(36) + Math.random().toString(36).substring(2, 7),
@@ -463,7 +485,8 @@ async function saveAdminHw() {
 }
 
 async function deleteAdminHw(id) {
-  await API.deleteHomework(id);
+  var dateKey = AdminUtil.dateKey(adminDate);
+  await API.deleteHomework(id, dateKey);
   await refreshAllData();
   renderHomeworkTab();
   showToast('作业已删除');
@@ -494,7 +517,7 @@ async function rejectHomework(hwId) {
     actualDuration: null,
     completedInSchool: false,
     mode: 'pending',
-  });
+  }, dateKey);
 
   await API.putSettlement(dateKey, {});
 
@@ -760,8 +783,11 @@ async function saveShopItem() {
     });
   }
 
-  for (var i = 0; i < adminShopItems.length; i++) {
-    await API.putShopItem(adminShopItems[i].id, adminShopItems[i]);
+  const target = adminEditingId
+    ? adminShopItems.find(i => i.id === adminEditingId)
+    : adminShopItems[adminShopItems.length - 1];
+  if (target) {
+    await API.putShopItem(target.id, target);
   }
   closeAdminModal();
   await refreshAllData();
@@ -945,8 +971,11 @@ async function saveRewardBoxItem() {
     });
   }
 
-  for (var i = 0; i < adminRewardBox.length; i++) {
-    await API.putRewardBoxItem(adminRewardBox[i].id, adminRewardBox[i]);
+  const target = adminEditingId
+    ? adminRewardBox.find(i => i.id === adminEditingId)
+    : adminRewardBox[adminRewardBox.length - 1];
+  if (target) {
+    await API.putRewardBoxItem(target.id, target);
   }
   closeAdminModal();
   await refreshAllData();
@@ -962,9 +991,7 @@ async function adjustRewardBoxQty(itemId, delta) {
   if (item.quantity <= 0) {
     adminRewardBox = adminRewardBox.filter(i => i.id !== itemId);
   }
-  for (var i = 0; i < adminRewardBox.length; i++) {
-    await API.putRewardBoxItem(adminRewardBox[i].id, adminRewardBox[i]);
-  }
+  await API.putRewardBoxItem(item.id, item);
   await refreshAllData();
   renderRewardBoxTab();
   if (delta > 0) pregenSpeech(['奖励箱有新奖励，快去看看吧']);
@@ -972,9 +999,17 @@ async function adjustRewardBoxQty(itemId, delta) {
 
 async function deleteRewardBoxItem(id) {
   adminRewardBox = adminRewardBox.filter(i => i.id !== id);
-  for (var i = 0; i < adminRewardBox.length; i++) {
-    await API.putRewardBoxItem(adminRewardBox[i].id, adminRewardBox[i]);
-  }
+  // 记录 CRDT 删除操作（无单独 DELETE API，服务端 applyCRDTOperation 负责删除）
+  try { var op = { type: 'delete', table: 'reward_box', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+  // 同步到本地 DB
+  try {
+    var items = await DB.getRewardBox();
+    var idx = items.findIndex(function(i) { return i.id === id || i.uuid === id; });
+    if (idx !== -1) {
+      items.splice(idx, 1);
+      await DB.saveRewardBox(items);
+    }
+  } catch (e) { /* 非致命 */ }
   await refreshAllData();
   renderRewardBoxTab();
   showToast('已删除');
@@ -1120,8 +1155,11 @@ async function saveBountyTask() {
     });
   }
 
-  for (var i = 0; i < adminBountyTasks.length; i++) {
-    await API.putBountyTask(adminBountyTasks[i].id, adminBountyTasks[i]);
+  const target = adminEditingId
+    ? adminBountyTasks.find(i => i.id === adminEditingId)
+    : adminBountyTasks[adminBountyTasks.length - 1];
+  if (target) {
+    await API.putBountyTask(target.id, target);
   }
   closeAdminModal();
   await refreshAllData();
@@ -1161,9 +1199,7 @@ async function approveBountySubmission(dateKey, taskId) {
 
     if (task && task.type === 'once') {
       task.completedAt = new Date().toISOString();
-      for (var i = 0; i < adminBountyTasks.length; i++) {
-        await API.putBountyTask(adminBountyTasks[i].id, adminBountyTasks[i]);
-      }
+      await API.putBountyTask(task.id, task);
     }
 
     pregenSpeech([(task ? task.name : '任务') + '完成，加' + (task.points || 0) + '分！']);
@@ -1235,7 +1271,7 @@ function renderRedeemTab() {
           </div>
         `).join('')}
       ${hasMore || _redeemShowCount > 3 || fulfilled.length > 0 ? `<div style="text-align:center;padding:12px;display:flex;gap:8px;justify-content:center;">
-        ${fulfilled.length > 0 ? `<button onclick="clearRedemptionHistory()" style="padding:8px 24px;border:1px solid var(--danger);border-radius:8px;font-size:14px;color:var(--danger);background:transparent;cursor:pointer;">清空记录</button>` : ''}
+        ${fulfilled.length > 0 && ConnectionManager.getMode() !== 'offline' ? `<button onclick="clearRedemptionHistory()" style="padding:8px 24px;border:1px solid var(--danger);border-radius:8px;font-size:14px;color:var(--danger);background:transparent;cursor:pointer;">清空记录</button>` : ''}
         ${hasMore ? `<button class="btn-cancel" style="border:1px solid var(--text-secondary);padding:8px 24px;border-radius:8px;font-size:14px;"
           onclick="_redeemShowCount += 10; renderRedeemTab();">查看更多 (剩余${fulfilled.length - _redeemShowCount}条)</button>` : ''}
         ${_redeemShowCount > 3 ? `<button class="btn-cancel" style="border:1px solid var(--text-secondary);padding:8px 24px;border-radius:8px;font-size:14px;"
@@ -1247,7 +1283,7 @@ function renderRedeemTab() {
 async function _handleTimeFulfillment(redemption, durationMinutes) {
   const dateKey = AdminUtil.dateKey(adminDate);
   const freeTime = await API.getFreeTime(dateKey);
-  freeTime.push({
+  const newFt = {
     id: Date.now().toString(36) + Math.random().toString(36).substring(2, 7),
     name: redemption.itemName,
     durationMinutes,
@@ -1255,24 +1291,22 @@ async function _handleTimeFulfillment(redemption, durationMinutes) {
     startedAt: null,
     completedAt: null,
     remainingSeconds: durationMinutes * 60,
-  });
-  for (var i = 0; i < freeTime.length; i++) {
-    await API.putFreeTimeTask(freeTime[i].id, freeTime[i]);
-  }
+  };
+  freeTime.push(newFt);
+  await API.putFreeTimeTask(newFt.id, newFt);
 }
 
 async function _handleBuffFulfillment(redemption, buffDuration, buffUnit) {
   const buffs = await API.getActiveBuffs();
-  buffs.push({
+  const newBuff = {
     id: Date.now().toString(36) + Math.random().toString(36).substring(2, 7),
     name: redemption.itemName,
     duration: buffDuration,
     unit: buffUnit,
     startDate: buffUnit === 'minutes' ? new Date().toISOString() : AdminUtil.dateKey(adminDate),
-  });
-  for (var i = 0; i < buffs.length; i++) {
-    await API.putBuff(buffs[i].id, buffs[i]);
-  }
+  };
+  buffs.push(newBuff);
+  await API.putBuff(newBuff.id, newBuff);
 }
 
 async function _fulfillFromRewardBox(redemption) {
@@ -1283,9 +1317,12 @@ async function _fulfillFromRewardBox(redemption) {
     if (rbItem.quantity <= 0) {
       const idx = rewardBox.indexOf(rbItem);
       if (idx !== -1) rewardBox.splice(idx, 1);
-    }
-    for (var i = 0; i < rewardBox.length; i++) {
-      await API.putRewardBoxItem(rewardBox[i].id, rewardBox[i]);
+      // 无单独 DELETE API，PUT 剩余物品到服务端
+      for (var i = 0; i < rewardBox.length; i++) {
+        await API.putRewardBoxItem(rewardBox[i].id, rewardBox[i]);
+      }
+    } else {
+      await API.putRewardBoxItem(rbItem.id, rbItem);
     }
   }
 
@@ -1371,9 +1408,7 @@ async function clearRedemptionHistory() {
   const fulfilled = adminRedemptions.filter(r => r.status === 'fulfilled');
   if (fulfilled.length === 0) return;
   adminRedemptions = adminRedemptions.filter(r => r.status !== 'fulfilled');
-  for (var i = 0; i < adminRedemptions.length; i++) {
-    await API.putRedemption(adminRedemptions[i].id, adminRedemptions[i]);
-  }
+  await API.clearRedemptionHistory();
   await refreshAllData();
   renderRedeemTab();
   showToast('已清空兑换历史');
@@ -1797,6 +1832,18 @@ function calcStreak(allDates) {
 // ========== Tab 6: Settings ==========
 function renderSettingsTab() {
   const container = document.getElementById('adminContent');
+
+  // 离线时设置页不可用
+  if (ConnectionManager.getMode() === 'offline') {
+    container.innerHTML = `
+      <div class="admin-card" style="text-align:center;padding:40px 20px;">
+        <div style="font-size:48px;margin-bottom:16px;">🔒</div>
+        <div style="font-size:18px;font-weight:600;color:var(--text-secondary);">离线模式无法修改设置</div>
+        <div style="font-size:14px;color:var(--text-secondary);margin-top:8px;">请连接服务器后重试</div>
+      </div>`;
+    return;
+  }
+
   const balance = cachedData?.points?.balance ?? cachedData?.points ?? 0;
 
   if (_calendarYear === null) {

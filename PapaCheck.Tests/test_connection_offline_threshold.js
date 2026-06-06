@@ -305,14 +305,14 @@ test('[RED] 连续 2 次 ping 失败后模式仍为 online（阈值容错）', a
 
   const mode = ConnectionManager.getMode();
 
-  // 连续 2 次失败，未达阈值 3，模式应仍为 'online'
+  // 第 1 次失败后切到 reconnecting，第 2 次失败仍保持
   // 修复前（buggy）：这里 mode 会是 'offline'
   assert.notStrictEqual(
     mode,
     'offline',
     '连续 2 次 ping 失败不应切换离线（需要连续 3 次才切）'
   );
-  assert.strictEqual(mode, 'online', '模式应保持 online');
+  assert.strictEqual(mode, 'reconnecting', '第 1 次 ping 失败后应进入 reconnecting 状态');
 });
 
 // ============================================================
