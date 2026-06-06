@@ -326,6 +326,13 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         if (_controller == null) {
           _initController(fullUrl);
         } else {
+          _controller!.setNavigationDelegate(
+            NavigationDelegate(
+              onWebResourceError: (error) {
+                _handlePageLoadError(fullUrl);
+              },
+            ),
+          );
           _controller!.loadRequest(Uri.parse(fullUrl));
           _waitForPageReady();
         }
@@ -359,7 +366,14 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   Future<void> _initControllerOffline(String baseUrl, String html) async {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.white);
+      ..setBackgroundColor(Colors.white)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onWebResourceError: (error) {
+            // 离线视图中的资源错误不处理，静默降级
+          },
+        ),
+      );
 
     if (_controller!.platform is AndroidWebViewController) {
       (_controller!.platform as AndroidWebViewController)
@@ -410,6 +424,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     String? html = await OfflineSnapshotService.load(url);
     if (html != null && mounted) {
       await _initControllerOffline(url, html);
+      // 导航失败，重启离线重试定时器
       _startOfflineRetry(url, _getBaseUrl(url), _role);
     } else if (mounted) {
       await _showConnectFailedDialog(url);
