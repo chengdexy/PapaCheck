@@ -196,7 +196,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   await app.register(swaggerUi, {
-    routePrefix: '/docs',
+    routePrefix: '/api/docs',
   });
 
   // ==================== GET Endpoints ====================
