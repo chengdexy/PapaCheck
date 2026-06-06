@@ -60,7 +60,7 @@ class _SetupPageState extends State<SetupPage> {
       );
     } else {
       _ipController = TextEditingController(text: '192.168.1.');
-      _portController = TextEditingController(text: '8081');
+      _portController = TextEditingController(text: '8080');
     }
   }
 
@@ -368,7 +368,7 @@ class _SetupPageState extends State<SetupPage> {
             keyboardType: TextInputType.number,
             style: const TextStyle(
                 fontSize: 15, fontWeight: FontWeight.w500),
-            decoration: _inputDecoration('8081'),
+            decoration: _inputDecoration('8080'),
           ),
         ),
       ],
