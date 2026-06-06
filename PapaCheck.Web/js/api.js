@@ -509,6 +509,8 @@ const API = {
   },
 
   async patchHomework(id, fields) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'homeworks', resourceId: id, field: null, value: fields }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-only',
       async () => {
@@ -521,6 +523,8 @@ const API = {
   },
 
   async deleteHomework(id) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'delete', table: 'homeworks', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -546,6 +550,8 @@ const API = {
   // ---- 结算 (settlement) ----
 
   async putSettlement(dateKey, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'daily_settlement', resourceId: dateKey, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -558,6 +564,8 @@ const API = {
   },
 
   async patchSettlement(dateKey, fields) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'daily_settlement', resourceId: dateKey, field: null, value: fields }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-only',
       async () => {
@@ -572,6 +580,8 @@ const API = {
   // ---- 积分 (points) ----
 
   async patchPoints(delta) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'points', resourceId: 'points', field: null, value: delta }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-only',
       async () => {
@@ -586,6 +596,8 @@ const API = {
   // ---- 商店 (shop) ----
 
   async putShopItem(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'shop_items', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -598,6 +610,8 @@ const API = {
   },
 
   async deleteShopItem(id) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'delete', table: 'shop_items', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -623,6 +637,8 @@ const API = {
   // ---- 兑换 (redemptions) ----
 
   async putRedemption(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'redemptions', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -637,6 +653,8 @@ const API = {
   // ---- 奖励箱 (reward-box) ----
 
   async putRewardBoxItem(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'reward_box', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -651,6 +669,8 @@ const API = {
   // ---- 设置 (settings) ----
 
   async putSettings(data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'settings', resourceId: 'settings', field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -663,6 +683,8 @@ const API = {
   },
 
   async patchSettings(fields) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'settings', resourceId: 'settings', field: null, value: fields }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-only',
       async () => {
@@ -677,6 +699,8 @@ const API = {
   // ---- Buff (active-buffs) ----
 
   async putBuff(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'active_buffs', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -689,6 +713,8 @@ const API = {
   },
 
   async deleteBuff(id) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'delete', table: 'active_buffs', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -703,6 +729,8 @@ const API = {
   // ---- 效率 (efficiency) ----
 
   async putEfficiency(dateKey, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'efficiency_history', resourceId: dateKey, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -717,6 +745,8 @@ const API = {
   // ---- 自由时间 (freetime) ----
 
   async putFreeTimeTask(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'free_time_tasks', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -731,6 +761,8 @@ const API = {
   // ---- 赏金任务 (bounty-tasks) ----
 
   async putBountyTask(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'bounty_tasks', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -743,6 +775,8 @@ const API = {
   },
 
   async deleteBountyTask(id) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'delete', table: 'bounty_tasks', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -768,6 +802,8 @@ const API = {
   // ---- 赏金提交 (bounty-submissions) ----
 
   async putBountySubmission(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'bounty_submissions', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -782,6 +818,8 @@ const API = {
   // ---- 赏金完成 (bounty-completions) ----
 
   async putBountyCompletion(id, data) {
+    // 添加 CRDT 操作日志
+    try { var op = { type: 'update', table: 'bounty_completions', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
     return await this._requestWithStrategy(
       'online-first',
       async () => {

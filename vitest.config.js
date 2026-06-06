@@ -7,6 +7,7 @@ export default defineConfig({
             'PapaCheck.Tests/**/*.test.js',
             'PapaCheck.Tests/**/test_*.js',
             'PapaCheck.Server.Node/test/**/*.test.ts',
+            'PapaCheck.Web/js/__tests__/**/*.test.js',
         ],
     },
 });

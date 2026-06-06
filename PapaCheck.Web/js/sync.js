@@ -241,11 +241,107 @@ var SyncEngine = (function() {
     return _syncInProgress;
   }
 
+  // ========== CRDT 同步方法 ==========
+
+  // CRDT 同步 - 推送待同步操作日志
+  async function crdtPush() {
+    var pending = await CRDTLog.getPending();
+    if (pending.length === 0) return true;
+
+    var url = _getBaseUrl() + '/api/sync/crdt-push';
+    var resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ operations: pending })
+    });
+    if (!resp.ok) throw new Error('CRDT push failed: ' + resp.status);
+    var result = await resp.json();
+
+    // 标记已推送的操作
+    for (var i = 0; i < pending.length; i++) {
+      await CRDTLog.ack(pending[i].id);
+    }
+
+    return result.ok === true;
+  }
+
+  // CRDT 同步 - 拉取远程操作并在本地合并
+  async function crdtPull() {
+    var lastSync = await getLastSyncTime() || '1970-01-01T00:00:00.000Z';
+    var url = _getBaseUrl() + '/api/sync/crdt-pull?since=' + encodeURIComponent(lastSync);
+
+    var resp = await fetch(url, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!resp.ok) throw new Error('CRDT pull failed: ' + resp.status);
+    var result = await resp.json();
+
+    var operations = result.operations || [];
+    if (operations.length === 0) {
+      // 无远程变更时仍刷新全量数据
+      await _refreshFromServer();
+      return true;
+    }
+
+    // 在本地 IndexedDB 中应用远程操作
+    var localData = await DB.getFullData();
+    for (var i = 0; i < operations.length; i++) {
+      var op = operations[i];
+      // 根据操作类型更新本地数据
+      // applyOperation 在服务端已执行，这里只需重新读取全量数据
+    }
+    // 重新拉取全量数据（后续可优化为增量应用）
+    await _refreshFromServer();
+
+    return true;
+  }
+
+  // 内部方法：从服务器拉取全量数据并缓存到本地
+  async function _refreshFromServer() {
+    try {
+      var url = _getBaseUrl() + '/api/data';
+      var resp = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+      if (resp.ok) {
+        var serverData = await resp.json();
+        await DB.cacheFullData(serverData);
+        await CRDTLog.cleanup();
+      }
+    } catch (e) {
+      // best-effort
+    }
+  }
+
+  // CRDT 全量同步（替代旧的 fullSync）
+  async function crdtFullSync() {
+    if (_syncInProgress) return false;
+    _syncInProgress = true;
+
+    try {
+      // 1. 推送本地操作日志
+      await crdtPush();
+      // 2. 拉取远程操作日志
+      await crdtPull();
+      // 3. 更新上次同步时间
+      var serverTime = new Date().toISOString();
+      await _saveLastSyncTime(serverTime);
+      return true;
+    } catch (e) {
+      console.error('CRDT sync failed:', e);
+      return false;
+    } finally {
+      _syncInProgress = false;
+    }
+  }
+
   return {
     pushChanges: pushChanges,
     pullChanges: pullChanges,
     fullSync: fullSync,
+    crdtPush: crdtPush,
+    crdtPull: crdtPull,
+    crdtFullSync: crdtFullSync,
     getLastSyncTime: getLastSyncTime,
-    isSyncing: isSyncing
+    isSyncing: isSyncing,
   };
 })();
