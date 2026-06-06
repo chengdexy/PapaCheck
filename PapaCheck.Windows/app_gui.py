@@ -236,10 +236,12 @@ def _start_dev_node_server(db_path, web_dir, port):
         '--db-path', db_path,
     ]
 
+    creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
     process = subprocess.Popen(
         cmd,
-        stdout=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        creationflags=creationflags,
     )
 
     # 等待服务器就绪（轮询端口）
@@ -764,11 +766,32 @@ class PapaCheckApp:
         def _run():
             try:
                 self._start_node_server()
+                # 启动子进程 stdout/stderr 读取线程（输出到日志框）
+                if self._node_process and self._node_process.stdout:
+                    self._start_pipe_reader(self._node_process.stdout)
+                if self._node_process and self._node_process.stderr:
+                    self._start_pipe_reader(self._node_process.stderr)
                 self.root.after(0, self._on_server_started)
             except Exception as e:
                 self.root.after(0, self._on_server_failed, str(e))
 
         thread = threading.Thread(target=_run, daemon=True)
+        thread.start()
+
+    def _start_pipe_reader(self, pipe):
+        """在后台线程中持续读取子进程管道输出，追加到日志框"""
+        def _read():
+            try:
+                for raw_line in iter(pipe.readline, b''):
+                    if not raw_line:
+                        break
+                    text = raw_line.decode('utf-8', errors='replace').rstrip()
+                    if text:
+                        self.root.after(0, lambda t=text: self._append_log(t))
+            except:
+                pass
+
+        thread = threading.Thread(target=_read, daemon=True)
         thread.start()
 
     def _on_server_started(self):
