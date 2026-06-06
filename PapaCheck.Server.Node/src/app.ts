@@ -144,6 +144,61 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
   });
 
+  // 为所有 /api/* 路由自动添加 OpenAPI 标签，确保 Swagger 文档可见
+  app.addHook('onRoute', (routeOptions) => {
+    const url = routeOptions.url;
+    if (url.startsWith('/api/') && !url.startsWith('/api/docs')) {
+      const parts = url.replace('/api/', '').split('/');
+      const tag = parts[0] || 'other';
+      routeOptions.schema = routeOptions.schema || {};
+      if (!routeOptions.schema.tags) {
+        routeOptions.schema.tags = [tag];
+      }
+    }
+  });
+
+  // ==================== Swagger Docs（必须在路由之前注册才能捕获到路由） ====================
+
+  await app.register(swagger, {
+    openapi: {
+      info: {
+        title: 'PapaCheck API',
+        description: 'PapaCheck（爸~检查！）Node.js 服务器 API',
+        version: '1.0.0',
+      },
+      tags: [
+        { name: 'homeworks', description: '作业管理' },
+        { name: 'settlement', description: '日结/评级' },
+        { name: 'shop', description: '积分商店' },
+        { name: 'redemptions', description: '兑换记录' },
+        { name: 'reward-box', description: '奖励箱' },
+        { name: 'settings', description: '系统设置' },
+        { name: 'active-buffs', description: '活跃 Buff' },
+        { name: 'efficiency', description: '效率统计' },
+        { name: 'freetime', description: '自由时间' },
+        { name: 'bounty-tasks', description: '赏金任务' },
+        { name: 'bounty-submissions', description: '赏金提交' },
+        { name: 'bounty-completions', description: '赏金完成' },
+        { name: 'defer-homework', description: '作业延后' },
+        { name: 'email', description: '邮件同步' },
+        { name: 'sync', description: '数据同步' },
+        { name: 'data', description: '全量数据' },
+        { name: 'points', description: '积分管理' },
+        { name: 'reset-date', description: '日期重置' },
+        { name: 'pregen-speech', description: '语音预生成' },
+        { name: 'ping', description: '心跳/健康检查' },
+        { name: 'version', description: '版本信息' },
+        { name: 'speak', description: 'TTS 语音合成' },
+        { name: 'crdt-pull', description: 'CRDT 同步' },
+        { name: 'crdt-push', description: 'CRDT 推送' },
+      ],
+    },
+  });
+
+  await app.register(swaggerUi, {
+    routePrefix: '/docs',
+  });
+
   // ==================== GET Endpoints ====================
 
   // 1. GET /api/ping - 心跳
@@ -746,22 +801,6 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       prefix: '/',
     });
   }
-
-  // ==================== Swagger Docs ====================
-
-  await app.register(swagger, {
-    openapi: {
-      info: {
-        title: 'PapaCheck API',
-        description: 'PapaCheck（爸~检查！）Node.js 服务器 API',
-        version: '1.0.0',
-      },
-    },
-  });
-
-  await app.register(swaggerUi, {
-    routePrefix: '/docs',
-  });
 
   return app;
 }
