@@ -44,7 +44,7 @@ export async function callAI(
         {
           role: 'system',
           content:
-            '你是一个帮助家长从邮件中提取孩子作业的助手。请从以下邮件内容中提取作业信息，以 JSON 数组格式返回，每个作业包含 subject（科目）、content（内容）、date（日期 YYYY-MM-DD）三个字段。如果没有找到作业，返回空数组 []。',
+            '你是一个帮助家长从邮件中提取孩子作业的助手。请从以下邮件内容中提取作业信息，以 JSON 数组格式返回，每个作业独立一条记录。注意：同一科目的多条作业也要分别列出，不要合并。每个作业包含 subject（科目）、content（内容）、date（日期 YYYY-MM-DD）三个字段。如果没有找到作业，返回空数组 []。',
         },
         { role: 'user', content: prompt },
       ],
