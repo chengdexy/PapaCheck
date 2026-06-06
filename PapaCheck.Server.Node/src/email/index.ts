@@ -16,6 +16,7 @@ export interface EmailSyncResult {
   ok: boolean;
   homeworks?: HomeworkItem[];
   error?: string;
+  hasAttachments?: boolean;
 }
 
 /**
@@ -67,7 +68,10 @@ export class EmailSync {
       // 5. 解析作业
       const homeworks = parseHomework(aiResponse);
 
-      return { ok: true, homeworks };
+      // 6. 检查是否有附件
+      const hasAttachments = messages.some((m) => m.hasAttachments);
+
+      return { ok: true, homeworks, hasAttachments };
     } catch (err) {
       const message = err instanceof Error ? err.message : '未知错误';
       return { ok: false, error: message };

@@ -1660,10 +1660,11 @@ class PapaCheckApp:
 
             self.root.after(0, lambda: self._append_log(f'共解析出 {len(homeworks)} 项作业'))
 
-            # 打开附件目录
-            attach_dir = _get_attachment_dir(cfg)
-            if os.path.exists(attach_dir):
-                self.root.after(100, lambda: self._open_attach_dir())
+            # 有附件时才打开下载目录
+            if result.get('hasAttachments'):
+                attach_dir = _get_attachment_dir(cfg)
+                if os.path.exists(attach_dir):
+                    self.root.after(100, lambda: self._open_attach_dir())
 
             self.root.after(0, lambda: self._append_log('邮件作业同步完成'))
 

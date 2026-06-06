@@ -203,6 +203,7 @@ describe('EmailSync', () => {
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
       expect(body).toHaveProperty('ok', true);
+      expect(body).toHaveProperty('hasAttachments', false);
     });
 
     it('同步返回解析出的作业', async () => {
@@ -252,6 +253,7 @@ describe('EmailSync', () => {
       expect(body).toHaveProperty('homeworks');
       expect(Array.isArray(body.homeworks)).toBe(true);
       expect(body.homeworks.length).toBeGreaterThanOrEqual(1);
+      expect(body).toHaveProperty('hasAttachments', false);
     });
 
     it('IMAP 连接失败时返回错误信息', async () => {
