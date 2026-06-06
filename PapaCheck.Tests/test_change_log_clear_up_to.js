@@ -131,9 +131,9 @@ describe('ChangeLog.clearUpTo', () => {
     });
 
     // Scenario: maxId 小于所有条目的 ID 时不清除任何条目
-    //   Given ChangeLog 中有 id=5, id=6 两条变更
-    //   When  调用 clearUpTo(4)
-    //   Then  条目 5 和 6 都保留
+    //   Given ChangeLog 中有 id=1, id=2 两条变更（均大于 maxId=0）
+    //   When  调用 clearUpTo(0)
+    //   Then  条目 1 和 2 都保留
     test('maxId 小于所有条目 ID 时不清除任何条目', async () => {
         const ctx = createTestContext();
         const ChangeLog = await setupChangeLog(ctx, [
@@ -141,22 +141,16 @@ describe('ChangeLog.clearUpTo', () => {
             { type: 'update', uuid: 'y', data: { name: 'old2' } },
         ]);
 
-        // 先加两条（id=1, 2），再手动模拟 id=5, 6
-        // 直接调 clearUpTo(4) 应该不清除任何条目（因为已有条目 id=1,2 <= 4）
-        // 实际场景：先加了一些 entry，然后 clearUpTo 掉了，再重新加
-        await ChangeLog.clear();  // 清空
-        // 跳过一些 ID（通过 add/remove 方式无法控制 id，需要用直接写入的方式）
-        // 用 private 方式设置 _nextId
-        const remaining2 = await ChangeLog.getPending();
+        await ChangeLog.clear();
         await ChangeLog.add('update', 'x', { name: 'old1' }); // id=1
         await ChangeLog.add('update', 'y', { name: 'old2' }); // id=2
 
         assert.equal(await ChangeLog.count(), 2);
 
-        // maxId=4 应该清除 id=1,2（因为 1 <= 4, 2 <= 4）
-        await ChangeLog.clearUpTo(4);
+        // maxId=0 < 1,2 → clearUpTo 不应清除任何条目
+        await ChangeLog.clearUpTo(0);
 
-        assert.equal(await ChangeLog.count(), 0);
+        assert.equal(await ChangeLog.count(), 2);
     });
 
     // Scenario: maxId 大于所有条目的 ID 时清除所有条目
