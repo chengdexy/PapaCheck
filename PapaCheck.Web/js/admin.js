@@ -774,18 +774,13 @@ async function adjustShopQty(itemId, delta) {
   const item = adminShopItems.find(i => i.id === itemId);
   if (!item) return;
   item.remainingQuantity = Math.max(0, (item.remainingQuantity ?? 0) + delta);
-  for (var i = 0; i < adminShopItems.length; i++) {
-    await API.putShopItem(adminShopItems[i].id, adminShopItems[i]);
-  }
+  await API.putShopItem(item.id, item);
   await refreshAllData();
   renderShopTab();
 }
 
 async function deleteShopItem(id) {
-  adminShopItems = adminShopItems.filter(i => i.id !== id);
-  for (var i = 0; i < adminShopItems.length; i++) {
-    await API.putShopItem(adminShopItems[i].id, adminShopItems[i]);
-  }
+  await API.deleteShopItem(id);
   await refreshAllData();
   renderShopTab();
   showToast('商品已删除');
@@ -893,18 +888,18 @@ async function addRewardFromShop(name, type, durationMinutes) {
   const exists = adminRewardBox.find(i => i.name === name);
   if (exists) {
     exists.quantity = (exists.quantity || 0) + 1;
+    await API.putRewardBoxItem(exists.id, exists);
   } else {
-    adminRewardBox.push({
+    const newItem = {
       id: Date.now().toString(36) + Math.random().toString(36).substring(2, 7),
       name,
       type,
       durationMinutes: type === 'time' ? (parseInt(durationMinutes) || 0) : 0,
       quantity: 1,
       createdAt: Date.now(),
-    });
-  }
-  for (var i = 0; i < adminRewardBox.length; i++) {
-    await API.putRewardBoxItem(adminRewardBox[i].id, adminRewardBox[i]);
+    };
+    adminRewardBox.push(newItem);
+    await API.putRewardBoxItem(newItem.id, newItem);
   }
   closeAdminModal();
   await refreshAllData();
