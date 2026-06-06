@@ -273,8 +273,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true });
   });
 
-  // 18. POST /api/homeworks — 全量替换当日作业列表（body 含 dateKey + homeworks）
-  app.post('/api/homeworks', async (request, reply) => {
+  // 18. PUT /api/homeworks — 全量替换当日作业列表（body 含 dateKey + homeworks）
+  app.put('/api/homeworks', async (request, reply) => {
     const body = request.body as { dateKey?: string; homeworks: unknown[] };
     const dateKey = body.dateKey;
     if (!dateKey) {
@@ -284,87 +284,127 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true });
   });
 
-  // 19. POST /api/settlement/:date
-  app.post<{ Params: { date: string } }>('/api/settlement/:date', async (request, reply) => {
-    const body = request.body as { settlement: unknown };
-    db.saveSettlement(request.params.date, body.settlement);
+  // 共享 schema：确保 id/date 参数必填（被后面多个单资源 PUT/DELETE 路由使用）
+  const idParamSchema = {
+    params: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1 } } },
+    body: { type: 'object' },
+  };
+  const dateParamSchema = {
+    params: { type: 'object', required: ['date'], properties: { date: { type: 'string', minLength: 10 } } },
+    body: { type: 'object' },
+  };
+  const deleteParamSchema = {
+    params: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1 } } },
+  };
+
+  // 19. PUT /api/settlement/:date — 全量替换结算数据
+  app.put<{ Params: { date: string } }>('/api/settlement/:date', async (request, reply) => {
+    const body = request.body as any;
+    // 同时兼容 { settlement: data } 和直接 data 两种 payload 格式
+    db.saveSettlement(request.params.date, body.settlement ?? body);
     return sendJson(reply, { ok: true });
   });
 
-  // 20. POST /api/points - 更新积分
-  app.post('/api/points', async (request, reply) => {
-    const body = request.body as { action: 'earn' | 'spend'; amount: number; detail: string };
-    const balance = db.updatePoints(body.action, body.amount, body.detail);
+  // 20. PATCH /api/points - 更新积分
+  app.patch('/api/points', async (request, reply) => {
+    const body = request.body as any;
+    if (body.action) {
+      // 全量替换风格（原 POST /api/points）
+      const balance = db.updatePoints(body.action, body.amount, body.detail);
+      return sendJson(reply, { ok: true, balance });
+    }
+    // 增量更新风格（原 PATCH /api/points）
+    const balance = db.patchPoints(body);
     return sendJson(reply, { ok: true, balance });
   });
 
-  // 21. POST /api/shop
-  app.post('/api/shop', async (request, reply) => {
+  // 21. PUT /api/shop
+  app.put('/api/shop', async (request, reply) => {
     const body = request.body as { items: unknown[] };
     db.saveShopItems(body.items);
     return sendJson(reply, { ok: true });
   });
 
-  // 22. POST /api/redemptions
-  app.post('/api/redemptions', async (request, reply) => {
+  // 22. PUT /api/redemptions
+  app.put('/api/redemptions', async (request, reply) => {
     const body = request.body as { redemptions: unknown[] };
     db.saveRedemptions(body.redemptions);
     return sendJson(reply, { ok: true });
   });
 
-  // 23. POST /api/reward-box
-  app.post('/api/reward-box', async (request, reply) => {
+  // 23. PUT /api/reward-box
+  app.put('/api/reward-box', async (request, reply) => {
     const body = request.body as { items: unknown[] };
     db.saveRewardBox(body.items);
     return sendJson(reply, { ok: true });
   });
 
-  // 24. POST /api/settings
-  app.post('/api/settings', async (request, reply) => {
-    const body = request.body as { settings: unknown };
-    db.saveSettings(body.settings);
+  // 24. PUT /api/settings — 全量替换设置
+  app.put('/api/settings', async (request, reply) => {
+    const body = request.body as any;
+    // 同时兼容 { settings: data } 和直接 data 两种 payload 格式
+    db.saveSettings(body.settings ?? body);
     return sendJson(reply, { ok: true });
   });
 
-  // 25. POST /api/active-buffs
-  app.post('/api/active-buffs', async (request, reply) => {
+  // 25. PUT /api/active-buffs
+  app.put('/api/active-buffs', async (request, reply) => {
     const body = request.body as { buffs: unknown[] };
     db.saveActiveBuffs(body.buffs);
     return sendJson(reply, { ok: true });
   });
 
-  // 26. POST /api/efficiency/:date
-  app.post<{ Params: { date: string } }>('/api/efficiency/:date', async (request, reply) => {
-    const body = request.body as { efficiency: unknown };
-    db.saveEfficiency(request.params.date, body.efficiency);
+  // 26. PUT /api/efficiency/:date — 全量替换效率数据
+  app.put<{ Params: { date: string } }>('/api/efficiency/:date', async (request, reply) => {
+    const body = request.body as any;
+    // 同时兼容 { efficiency: data } 和直接 data 两种 payload 格式
+    db.saveEfficiency(request.params.date, body.efficiency ?? body);
     return sendJson(reply, { ok: true });
   });
 
-  // 27. POST /api/freetime/:date
-  app.post<{ Params: { date: string } }>('/api/freetime/:date', async (request, reply) => {
-    const body = request.body as { tasks: unknown[] };
-    db.saveFreeTime(request.params.date, body.tasks);
+  // 27. PUT /api/freetime — 全量替换自由时间（body 含 dateKey + tasks）
+  app.put('/api/freetime', async (request, reply) => {
+    const body = request.body as { dateKey?: string; tasks: unknown[] };
+    db.saveFreeTime(body.dateKey!, body.tasks);
     return sendJson(reply, { ok: true });
   });
 
-  // 28. POST /api/bounty-tasks
-  app.post('/api/bounty-tasks', async (request, reply) => {
+  // 27b. PUT /api/freetime/:id — 单条自由时间 upsert
+  app.put<{ Params: { id: string } }>('/api/freetime/:id', { schema: idParamSchema }, async (request, reply) => {
+    db.putFreeTimeTask(request.params.id, request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 28. PUT /api/bounty-tasks
+  app.put('/api/bounty-tasks', async (request, reply) => {
     const body = request.body as { items: unknown[] };
     db.saveBountyTasks(body.items);
     return sendJson(reply, { ok: true });
   });
 
-  // 29. POST /api/bounty-submissions/:date
-  app.post<{ Params: { date: string } }>('/api/bounty-submissions/:date', async (request, reply) => {
-    const body = request.body as { submissions: unknown[] };
-    db.saveBountySubmissions(request.params.date, body.submissions);
+  // 29. PUT /api/bounty-submissions — 全量替换赏金提交（body 含 dateKey + submissions）
+  app.put('/api/bounty-submissions', async (request, reply) => {
+    const body = request.body as { dateKey?: string; submissions: unknown[] };
+    db.saveBountySubmissions(body.dateKey!, body.submissions);
     return sendJson(reply, { ok: true });
   });
 
-  // 30. POST /api/bounty-completions/:date
-  app.post<{ Params: { date: string } }>('/api/bounty-completions/:date', async (request, reply) => {
-    const body = request.body as { completions: unknown };
-    db.saveBountyCompletions(request.params.date, body.completions);
+  // 29b. PUT /api/bounty-submissions/:id — 单条赏金提交 upsert
+  app.put<{ Params: { id: string } }>('/api/bounty-submissions/:id', { schema: idParamSchema }, async (request, reply) => {
+    db.putBountySubmission(request.params.id, request.body);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 30. PUT /api/bounty-completions — 全量替换赏金完成（body 含 dateKey + completions）
+  app.put('/api/bounty-completions', async (request, reply) => {
+    const body = request.body as { dateKey?: string; completions: unknown };
+    db.saveBountyCompletions(body.dateKey!, body.completions);
+    return sendJson(reply, { ok: true });
+  });
+
+  // 30b. PUT /api/bounty-completions/:id — 单条赏金完成 upsert
+  app.put<{ Params: { id: string } }>('/api/bounty-completions/:id', { schema: idParamSchema }, async (request, reply) => {
+    db.putBountyCompletion(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
@@ -591,31 +631,11 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true });
   });
 
-  // ==================== PUT Endpoints ====================
-
-  // 共享 schema：确保 id 参数必填
-  const idParamSchema = {
-    params: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1 } } },
-    body: { type: 'object' },
-  };
-  const dateParamSchema = {
-    params: { type: 'object', required: ['date'], properties: { date: { type: 'string', minLength: 10 } } },
-    body: { type: 'object' },
-  };
-  // DELETE 路由专用 schema：不解析 body，避免空 body 报错
-  const deleteParamSchema = {
-    params: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1 } } },
-  };
+  // ==================== PUT Endpoints（单资源 upsert） ====================
 
   // 35. PUT /api/homeworks/:id
   app.put<{ Params: { id: string } }>('/api/homeworks/:id', { schema: idParamSchema }, async (request, reply) => {
     db.putHomework(request.params.id, request.body);
-    return sendJson(reply, { ok: true });
-  });
-
-  // 36. PUT /api/settlement/:date
-  app.put<{ Params: { date: string } }>('/api/settlement/:date', { schema: dateParamSchema }, async (request, reply) => {
-    db.putSettlement(request.params.date, request.body);
     return sendJson(reply, { ok: true });
   });
 
@@ -637,45 +657,15 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true });
   });
 
-  // 40. PUT /api/settings
-  app.put('/api/settings', { schema: { body: { type: 'object' } } }, async (request, reply) => {
-    db.putSettings(request.body);
-    return sendJson(reply, { ok: true });
-  });
-
   // 41. PUT /api/active-buffs/:id
   app.put<{ Params: { id: string } }>('/api/active-buffs/:id', { schema: idParamSchema }, async (request, reply) => {
     db.putBuff(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
-  // 42. PUT /api/efficiency/:date
-  app.put<{ Params: { date: string } }>('/api/efficiency/:date', { schema: dateParamSchema }, async (request, reply) => {
-    db.putEfficiency(request.params.date, request.body);
-    return sendJson(reply, { ok: true });
-  });
-
-  // 43. PUT /api/freetime/:id
-  app.put<{ Params: { id: string } }>('/api/freetime/:id', { schema: idParamSchema }, async (request, reply) => {
-    db.putFreeTimeTask(request.params.id, request.body);
-    return sendJson(reply, { ok: true });
-  });
-
   // 44. PUT /api/bounty-tasks/:id
   app.put<{ Params: { id: string } }>('/api/bounty-tasks/:id', { schema: idParamSchema }, async (request, reply) => {
     db.putBountyTask(request.params.id, request.body);
-    return sendJson(reply, { ok: true });
-  });
-
-  // 45. PUT /api/bounty-submissions/:id
-  app.put<{ Params: { id: string } }>('/api/bounty-submissions/:id', { schema: idParamSchema }, async (request, reply) => {
-    db.putBountySubmission(request.params.id, request.body);
-    return sendJson(reply, { ok: true });
-  });
-
-  // 46. PUT /api/bounty-completions/:id
-  app.put<{ Params: { id: string } }>('/api/bounty-completions/:id', { schema: idParamSchema }, async (request, reply) => {
-    db.putBountyCompletion(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
@@ -691,13 +681,6 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.patch<{ Params: { date: string } }>('/api/settlement/:date', { schema: dateParamSchema }, async (request, reply) => {
     db.patchSettlement(request.params.date, request.body);
     return sendJson(reply, { ok: true });
-  });
-
-  // 49. PATCH /api/points - 增量更新积分
-  app.patch('/api/points', { schema: { body: { type: 'object' } } }, async (request, reply) => {
-    const body = request.body as { earn?: number; spend?: number; detail?: string };
-    const balance = db.patchPoints(body);
-    return sendJson(reply, { ok: true, balance });
   });
 
   // 50. PATCH /api/settings
