@@ -31,10 +31,6 @@ class ConnectFailedDialog extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop('config'),
           child: const Text('重新配置'),
         ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop('offline'),
-          child: const Text('离线运行'),
-        ),
         ElevatedButton(
           onPressed: () => Navigator.of(context).pop('retry'),
           child: const Text('重试'),
