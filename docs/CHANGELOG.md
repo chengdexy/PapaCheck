@@ -6,7 +6,18 @@
 
 ## [Unreleased]
 
-### Fixed
+## [1.2.0] - 2026-06-06
+
+### Added
+- Node.js 服务器骨架（PapaCheck.Server.Node/）：Fastify + better-sqlite3 + TypeScript
+- 35 个 API 端点（17 GET + 18 POST），与 Python 服务器完全兼容
+- SQLite 数据库层（better-sqlite3），兼容现有 data.db 的 17 张表
+- TTS 语音桥接：Python 子进程（edge-tts）+ 内存/磁盘双层缓存
+- 静态文件服务（@fastify/static）
+- OpenAPI 自动文档（@fastify/swagger + swagger-ui），访问 /docs 查看
+- CLI 参数解析（--port, --web-dir, --db-path, --tts-python）
+- 单 EXE 构建脚本（Node.js SEA --build-sea）
+- 83 个 Vitest 集成测试覆盖所有端点
 - 离线→在线切换的竞态窗口：ping 恢复后立即切换 `reconnecting` 状态，阻止 `pollServer`/`refreshAllData` 在 sync 完成前获取旧数据
 - 消除 `_doReconnect()` 中 `/api/data` 双重冗余调用，改用 `DB.getFullData()` 读取 fullSync 已缓存的数据
 - 统一 `connection.js` 中 `_wasOnline` 两个分支的重连路径为单一 `_doReconnect()` 调用

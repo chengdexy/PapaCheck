@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-05
+> 最后更新：2026-06-06
 
 ## 当前版本
 
-**v1.1.6**（EXE `1.1.6`，APK `1.1.6+25`）
+**v1.2.0**（Node.js 服务器 Phase 1 完成）
 
 ---
 
@@ -32,13 +32,16 @@
 ### 基础设施
 
 - [x] Python HTTP 服务器 + SQLite 数据库
-- [x] TTS 语音提醒（edge-tts）
+- [x] Node.js HTTP 服务器（Fastify + better-sqlite3 + TypeScript）
+- [x] TTS 语音提醒（edge-tts，Python 子进程桥接）
 - [x] 邮件同步（IMAP + AI 解析）
 - [x] 附件下载
 - [x] 离线支持（Service Worker + localforage）
 - [x] 增量同步（pull/push）
 - [x] 一站式发布脚本（release.py）
-- [x] 测试框架（pytest + Flutter test）
+- [x] OpenAPI 自动文档（Swagger UI）
+- [x] 单 EXE 构建（Node.js SEA）
+- [x] 测试框架（pytest + Vitest 3.x + Flutter test）
 
 ---
 
@@ -67,6 +70,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-06 | Phase 1: Node.js 服务器骨架（Fastify + better-sqlite3 + TypeScript，34 个 API 端点，81 个 Vitest 测试） |
 | 2026-06-06 | 修复：离线→在线切换的竞态窗口（ping 恢复后立即切 `reconnecting` 阻止旧数据展示、消除双重 `/api/data` 调用、统一 `_wasOnline` 分支） |
 | 2026-06-05 | 修复：推迟到明天的作业，离线转在线模式同步后回到今天的作业列表（push_merge 跨 date_key 搜索 + move_homework record_modification） |
 | 2026-06-03 | 创建项目文档体系（PRD、ARCHITECTURE、API、CHANGELOG、PROGRESS） |

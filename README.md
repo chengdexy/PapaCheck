@@ -2,7 +2,7 @@
 
 <img src="PapaCheck_ban.jpg" alt="PapaCheck Banner" width="100%" />
 
-> **v1.1.6** — 家庭作业管理从未如此轻松
+> **v1.2.0** — 家庭作业管理从未如此轻松
 
 PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和跟踪孩子的作业完成情况。支持通过转发微信群中老师布置的作业到邮件，AI 自动解析并添加到清单；孩子可以自主开始/暂停/完成作业并获得积分；家长远程评级并管理积分商店。
 
@@ -23,11 +23,23 @@ PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和�
 
 ## 🚀 快速开始
 
-### 1. 下载并启动 Windows 桌面端
+### 1. 下载并启动服务器（二选一）
+
+**方式 A：Windows 桌面端（推荐）**
 
 从 [Releases](https://github.com/chengdexy/PapaCheck/releases) 下载最新版 `PapaCheck.exe`，双击运行即可。
 
 服务默认启动在 `8080` 端口，首次运行会自动创建数据库和 TTS 语音缓存。
+
+**方式 B：Node.js 服务器（实验性）**
+
+```bash
+cd PapaCheck.Server.Node
+npm install
+npm run dev -- --port 8080 --web-dir ../PapaCheck.Web --db-path ../PapaCheck.Server/data.db
+```
+
+需要 Node.js 22+。API 与 Python 服务器完全兼容，可并行运行在不同端口。
 
 ### 2. 访问客户端（二选一）
 
