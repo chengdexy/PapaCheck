@@ -25,15 +25,13 @@ class TestGetNodeServerExe:
     """测试查找 Node.js 服务器 EXE 路径"""
 
     # Feature: 查找 Node.js 服务器 EXE
-    #   Scenario: 开发环境下返回正确的相对路径
+    #   Scenario: 开发环境下返回 None（由调用者使用 tsx 启动）
     #     Given 未处于 PyInstaller 打包环境（sys.frozen 为 False）
     #     When 调用 _get_node_server_exe
-    #     Then 返回 PapaCheck.Server.Node/dist/papacheck-server.exe 的绝对路径
-    def test_dev_env_returns_relative_path(self):
+    #     Then 返回 None
+    def test_dev_env_returns_none(self):
         exe = _get_node_server_exe()
-        assert exe.endswith('papacheck-server.exe')
-        assert 'PapaCheck.Server.Node' in exe
-        assert 'dist' in exe
+        assert exe is None
 
     # Feature: 查找 Node.js 服务器 EXE
     #   Scenario: EXE 文件不存在时抛出 FileNotFoundError
@@ -41,10 +39,12 @@ class TestGetNodeServerExe:
     #     When 调用 _get_node_server_exe
     #     Then 抛出 FileNotFoundError
     def test_raises_when_exe_not_found(self):
-        with patch('os.path.exists', return_value=False):
-            with pytest.raises(FileNotFoundError) as excinfo:
-                _get_node_server_exe()
-            assert 'papacheck-server.exe' in str(excinfo.value)
+        with patch.object(sys, 'frozen', True, create=True):
+            with patch.object(sys, '_MEIPASS', 'C:/fake/meipass', create=True):
+                with patch('os.path.exists', return_value=False):
+                    with pytest.raises(FileNotFoundError) as excinfo:
+                        _get_node_server_exe()
+                    assert 'papacheck-server.exe' in str(excinfo.value)
 
     # Feature: 查找 Node.js 服务器 EXE
     #   Scenario: PyInstaller 打包环境下返回 sys._MEIPASS 下的路径
