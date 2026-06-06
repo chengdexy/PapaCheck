@@ -328,11 +328,15 @@ async function completeHomework(id) {
 }
 
 async function saveHomeworksSilent() {
-  await API.saveHomeworks(Util.dateKey(currentDate), homeworks);
+  for (var i = 0; i < homeworks.length; i++) {
+    await API.putHomework(homeworks[i].id, homeworks[i]);
+  }
 }
 
 async function saveFreeTimeSilent() {
-  await API.saveFreeTime(Util.dateKey(currentDate), freeTimeTasks);
+  for (var i = 0; i < freeTimeTasks.length; i++) {
+    await API.putFreeTimeTask(freeTimeTasks[i].id, freeTimeTasks[i]);
+  }
 }
 
 function startFreeTime(id) {
@@ -554,7 +558,7 @@ async function calculateSettlement() {
       };
 
       window._settlement = updatedSettlement;
-      await API.saveSettlement(dateKey, updatedSettlement);
+      await API.putSettlement(dateKey, updatedSettlement);
 
       if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
       cachedData.dailySettlement[dateKey] = updatedSettlement;
@@ -570,7 +574,7 @@ async function calculateSettlement() {
         doneCount: doneHw.length,
       };
       window._settlement = updatedSettlement;
-      await API.saveSettlement(dateKey, updatedSettlement);
+      await API.putSettlement(dateKey, updatedSettlement);
       if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
       cachedData.dailySettlement[dateKey] = updatedSettlement;
     }
@@ -586,7 +590,7 @@ async function calculateSettlement() {
       ? ratios.reduce((a, b) => a + b, 0) / ratios.length
       : 0;
 
-    await API.saveEfficiency(dateKey, { averageRatio, ratios });
+    await API.putEfficiency(dateKey, { averageRatio, ratios });
 
     needsFullRender = true;
     updateBigScreen();
@@ -616,7 +620,7 @@ async function calculateSettlement() {
     submittedAt: null,
     ratedAt: null,
   };
-  await API.saveSettlement(dateKey, settlementToSave);
+  await API.putSettlement(dateKey, settlementToSave);
 
   if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
   cachedData.dailySettlement[dateKey] = settlementToSave;
@@ -631,7 +635,7 @@ async function calculateSettlement() {
     ? ratios.reduce((a, b) => a + b, 0) / ratios.length
     : 0;
 
-  await API.saveEfficiency(dateKey, { averageRatio, ratios });
+  await API.putEfficiency(dateKey, { averageRatio, ratios });
 
   needsFullRender = true;
   updateBigScreen();
@@ -659,7 +663,7 @@ async function submitForRating() {
       ratedAt: null,
     };
 
-    await API.saveSettlement(dateKey, settlementData);
+    await API.putSettlement(dateKey, settlementData);
 
     if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
     cachedData.dailySettlement[dateKey] = settlementData;
@@ -721,7 +725,9 @@ function startPoll(intervalMs) {
         }
       }
       if (buffsChanged) {
-        await API.saveActiveBuffs(remaining);
+        for (var i = 0; i < remaining.length; i++) {
+          await API.putBuff(remaining[i].id, remaining[i]);
+        }
         cachedData.activeBuffs = remaining;
         needsFullRender = true;
       }
@@ -862,7 +868,7 @@ function startPoll(intervalMs) {
         _lastPointsNote = settings._pointsAdjustmentNote;
         const cleanSettings = { ...settings };
         delete cleanSettings._pointsAdjustmentNote;
-        API.saveSettings(cleanSettings).catch(() => { });
+        API.putSettings(cleanSettings).catch(() => { });
       }
       _lastSettings = settings;
 

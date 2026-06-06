@@ -771,7 +771,9 @@ async function startBountyTask(taskId) {
     const submissions = await API.getBountySubmissions(dateKey) || [];
     if (submissions.some(s => s.taskId === taskId)) return;
     submissions.push({ taskId, status: 'doing', startedAt: new Date().toISOString(), submittedAt: null });
-    await API.saveBountySubmissions(dateKey, submissions);
+    for (var i = 0; i < submissions.length; i++) {
+      await API.putBountySubmission(submissions[i].id, submissions[i]);
+    }
     if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
     cachedData.bountySubmissions[dateKey] = submissions;
     const task = (cachedData?.bountyTasks || []).find(t => t.id === taskId);
@@ -791,7 +793,9 @@ async function abandonBountyTask(taskId) {
     const dateKey = Util.dateKey(currentDate);
     let submissions = await API.getBountySubmissions(dateKey) || [];
     submissions = submissions.filter(s => s.taskId !== taskId);
-    await API.saveBountySubmissions(dateKey, submissions);
+    for (var i = 0; i < submissions.length; i++) {
+      await API.putBountySubmission(submissions[i].id, submissions[i]);
+    }
     if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
     cachedData.bountySubmissions[dateKey] = submissions;
     needsFullRender = true;
@@ -811,7 +815,9 @@ async function submitBountyTask(taskId) {
     if (!sub || sub.status !== 'doing') return;
     sub.status = 'submitted';
     sub.submittedAt = new Date().toISOString();
-    await API.saveBountySubmissions(dateKey, submissions);
+    for (var i = 0; i < submissions.length; i++) {
+      await API.putBountySubmission(submissions[i].id, submissions[i]);
+    }
     if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
     cachedData.bountySubmissions[dateKey] = submissions;
     Voice.clear();
@@ -1018,7 +1024,9 @@ async function redeemFromRewardBox(itemId) {
       fromRewardBox: true,
       rewardBoxItemId: item.id,
     });
-    await API.saveRedemptions(redemptions);
+    for (var i = 0; i < redemptions.length; i++) {
+      await API.putRedemption(redemptions[i].id, redemptions[i]);
+    }
 
     cachedData = await API.getData();
     showMyRewards();
@@ -1041,14 +1049,18 @@ async function cancelRedemption(redemptionId) {
     }
 
     r.status = 'cancelled';
-    await API.saveRedemptions(redemptions);
+    for (var i = 0; i < redemptions.length; i++) {
+      await API.putRedemption(redemptions[i].id, redemptions[i]);
+    }
 
     if (!r.fromRewardBox) {
       const shopItems = cachedData?.shopItems || [];
       const shopItem = shopItems.find(si => si.name === r.itemName);
       if (shopItem) {
         shopItem.remainingQuantity = (shopItem.remainingQuantity ?? 0) + 1;
-        await API.saveShopItems(shopItems);
+        for (var i = 0; i < shopItems.length; i++) {
+          await API.putShopItem(shopItems[i].id, shopItems[i]);
+        }
       }
 
       await API.updatePoints('earn', r.points, '撤回兑换：' + r.itemName);
@@ -1131,7 +1143,9 @@ async function redeemItem(itemId) {
   _redeemingItem = true;
   try {
     item.remainingQuantity = remaining - 1;
-    await API.saveShopItems(items);
+    for (var i = 0; i < items.length; i++) {
+      await API.putShopItem(items[i].id, items[i]);
+    }
 
     const rewardBox = cachedData?.rewardBox || [];
     const existing = rewardBox.find(rb => rb.name === item.name);
@@ -1148,7 +1162,9 @@ async function redeemItem(itemId) {
         quantity: 1,
       });
     }
-    await API.saveRewardBox(rewardBox);
+    for (var i = 0; i < rewardBox.length; i++) {
+      await API.putRewardBoxItem(rewardBox[i].id, rewardBox[i]);
+    }
 
     await API.updatePoints('spend', item.points, '兑换：' + item.name);
 
@@ -1171,7 +1187,7 @@ async function backToMain() {
       settlement.viewedAt = Util.nowTimeStr();
       const dateKey = Util.dateKey(currentDate);
       if (isServerMode) {
-        await API.saveSettlement(dateKey, settlement);
+        await API.putSettlement(dateKey, settlement);
       }
     }
   }
