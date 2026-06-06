@@ -64,8 +64,9 @@ export function fetchUnseen(imap: Connection): Promise<EmailMessage[]> {
           return resolve([]);
         }
 
-        const fetch = imap.fetch(results, { bodies: '', markSeen: true });
+        const fetch = imap.fetch(results, { bodies: '' });
         const messages: EmailMessage[] = [];
+        const uids: number[] = [];
         let pending = results.length;
 
         fetch.on('message', (msg, seqno) => {
@@ -79,6 +80,7 @@ export function fetchUnseen(imap: Connection): Promise<EmailMessage[]> {
 
           msg.once('attributes', (attrs) => {
             const uid = attrs.uid;
+            uids.push(uid);
             msg.once('end', async () => {
               const raw = Buffer.concat(chunks);
               try {
@@ -96,8 +98,16 @@ export function fetchUnseen(imap: Connection): Promise<EmailMessage[]> {
               }
               pending -= 1;
               if (pending === 0) {
-                imap.end();
-                resolve(messages);
+                // 标记为已读后关闭连接
+                if (uids.length > 0) {
+                  imap.addFlags(uids, '\\Seen', () => {
+                    imap.end();
+                    resolve(messages);
+                  });
+                } else {
+                  imap.end();
+                  resolve(messages);
+                }
               }
             });
           });

@@ -98,6 +98,7 @@ vi.mock('imap', () => {
         return fetchEmitter;
       }),
       end: vi.fn(),
+      addFlags: vi.fn((_uids: number[], _flags: string, cb: Function) => cb()),
     };
     return api;
   });

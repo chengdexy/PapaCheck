@@ -528,9 +528,9 @@ function expandHomeworkContent(hw: HomeworkItem): HomeworkItem[] {
     }
 
     // 保存解析出的作业
+    const expanded: HomeworkItem[] = [];
     if (result.homeworks && result.homeworks.length > 0) {
       // 展开 AI 可能合并的多条内容（如 "1. 语文\n2. 数学" → 两条独立作业）
-      const expanded: HomeworkItem[] = [];
       for (const hw of result.homeworks) {
         const items = expandHomeworkContent(hw);
         expanded.push(...items);
@@ -553,7 +553,7 @@ function expandHomeworkContent(hw: HomeworkItem): HomeworkItem[] {
       }
     }
 
-    return sendJson(reply, { ok: true, homeworks: result.homeworks || [] });
+    return sendJson(reply, { ok: true, homeworks: expanded || [] });
   });
 
   // CRDT 同步推送
