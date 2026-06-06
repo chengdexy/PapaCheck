@@ -18,6 +18,12 @@
 - connection.js _doReconnect() 重连时优先走 CRDT 同步，失败降级到 LWW
 - app.js/admin.js 初始化时自动迁移旧 ChangeLog 到 CRDTLog
 - 7 个 CRDT 合并引擎单元测试 + 8 个前端 CRDT 同步测试
+- Windows 端通过子进程启动 Node.js 服务器（替换内嵌 Python 服务器）
+- Node.js 邮件同步模块（IMAP 连接 + AI 解析 + HTTP 同步端点）
+- POST /api/email/config — 保存邮箱和 AI 配置到数据库
+- POST /api/email/sync — 触发邮件同步，IMAP 获取 → AI 解析 → 作业入库
+- Windows 端构建流程更新：先构建 Node.js EXE 再打包进 PyInstaller
+- 10 个 Windows 端 Node.js 启动/停止测试 + 6 个邮件模块测试
 
 ### Fixed
 - 修复数据同步时消耗的时间类道具被恢复的 Bug：`fullSync()` 中 `ChangeLog.clear()` 全量清空变更日志，会清除 `pushChanges()` 推送到服务器期间新产生的条目，导致这些变更丢失、服务器旧数据覆盖本地。改为 `clearUpTo(maxId)` 只清除已推送的条目（ID ≤ maxId），保留推送期间新增的条目等待下次同步

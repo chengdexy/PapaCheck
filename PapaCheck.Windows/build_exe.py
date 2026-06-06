@@ -8,6 +8,7 @@ import json
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVER_DIR = os.path.join(ROOT, 'PapaCheck.Server')
 EMAIL_DIR = os.path.join(ROOT, 'PapaCheck.Email')
+NODE_DIR = os.path.join(ROOT, 'PapaCheck.Server.Node')
 WEB_DIR = os.path.join(ROOT, 'PapaCheck.Web')
 WORK_DIR = os.path.join(ROOT, 'PapaCheck.Windows')
 
@@ -64,6 +65,22 @@ else:
     print('  1. bump_version.py --target apk patch')
     print('  2. cd PapaCheck.Android && flutter build apk --release')
 
+# --- 构建 Node.js EXE ---
+print('正在构建 Node.js 服务器...')
+node_build_script = os.path.join(NODE_DIR, 'scripts', 'build-sea.mjs')
+if os.path.exists(node_build_script):
+    result = subprocess.run(['node', node_build_script], cwd=NODE_DIR)
+    if result.returncode != 0:
+        print('[警告] Node.js EXE 构建失败，继续使用预编译版本')
+else:
+    print(f'[警告] 构建脚本不存在: {node_build_script}')
+
+node_exe_path = os.path.join(NODE_DIR, 'dist', 'papacheck-server.exe')
+if not os.path.exists(node_exe_path):
+    print(f'[错误] Node.js 服务器 EXE 未找到: {node_exe_path}')
+    print('  请先执行: cd PapaCheck.Server.Node && node scripts/build-sea.mjs')
+    sys.exit(1)
+
 exe_version_tuple = tuple(int(x) for x in exe_version.split('.'))
 if len(exe_version_tuple) < 4:
     exe_version_tuple = exe_version_tuple + (0,) * (4 - len(exe_version_tuple))
@@ -108,14 +125,10 @@ cmd = [
     '--windowed',
     '--name', 'PapaCheck',
     '--icon', os.path.join(WORK_DIR, 'icon.ico'),
-    '--paths', SERVER_DIR,
-    '--paths', EMAIL_DIR,
-    '--add-data', f'{SERVER_DIR};Server',
     '--add-data', f'{WEB_DIR};Web',
     '--add-data', f'{os.path.join(WORK_DIR, "icon.ico")};.',
+    '--add-data', f'{node_exe_path};Server.Node',
     *apk_add_data,
-    '--hidden-import', 'db',
-    '--hidden-import', 'email_client',
     '--hidden-import', 'edge_tts',
     '--hidden-import', 'asyncio',
     '--noconfirm',
