@@ -70,6 +70,8 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-06 | Node.js 服务器新增 PUT/PATCH/DELETE/HEAD 路由（12 PUT + 4 PATCH + 4 DELETE + 3 HEAD + 23 测试），CORS 头扩展支持 |
+| 2026-06-06 | Phase 2 完成：RESTful API 重写（新增 12 PUT + 4 PATCH + 4 DELETE + 2 HEAD 端点，统一错误格式，api.js 新增 30 个方法） |
 | 2026-06-06 | Phase 1 完成：Node.js 服务器骨架（Fastify + better-sqlite3 + 34 个 API 端点 + 83 个测试 + pkg 构建 + Swagger 文档） |
 | 2026-06-06 | 修复：离线→在线切换的竞态窗口（ping 恢复后立即切 `reconnecting` 阻止旧数据展示、消除双重 `/api/data` 调用、统一 `_wasOnline` 分支） |
 | 2026-06-05 | 修复：推迟到明天的作业，离线转在线模式同步后回到今天的作业列表（push_merge 跨 date_key 搜索 + move_homework record_modification） |

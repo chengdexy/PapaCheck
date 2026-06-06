@@ -266,6 +266,24 @@ export class PapaCheckDB {
     return { index: -1, item: null };
   }
 
+  /** 在数组中按 id/uuid/taskId 查找（通用方法） */
+  _findInArray(data: any[], id: string): { index: number; item: any } {
+    return this._findByUuid(data, id);
+  }
+
+  /** 在 date_key 表中按 id 查找记录（跨所有 date_key 搜索） */
+  _findRecordById(table: string, id: string): { dateKey: string; index: number; item: any } | null {
+    const rows = this.db.prepare(`SELECT date_key, data FROM ${table}`).all() as { date_key: string; data: string }[];
+    for (const row of rows) {
+      const data = JSON.parse(row.data);
+      if (Array.isArray(data)) {
+        const { index, item } = this._findInArray(data, id);
+        if (item) return { dateKey: row.date_key, index, item };
+      }
+    }
+    return null;
+  }
+
   private _classifyChange(data: any): string | null {
     if (data._table) return data._table;
     if (data.subject) return 'homeworks';
@@ -436,6 +454,26 @@ export class PapaCheckDB {
     return balance;
   }
 
+  patchPoints(delta: { earn?: number; spend?: number; detail?: string }): number {
+    const row = this.db.prepare("SELECT balance FROM points WHERE id = 1").get() as { balance: number };
+    let balance = row.balance;
+
+    const earned = delta.earn ?? 0;
+    const spent = delta.spend ?? 0;
+    balance += earned - spent;
+
+    this.db.prepare("UPDATE points SET balance = ? WHERE id = 1").run(balance);
+
+    const today = new Date().toISOString().slice(0, 10);
+    this.db.prepare(
+      "INSERT INTO points_history (date, earned, spent, balance, detail) VALUES (?, ?, ?, ?, ?)"
+    ).run(today, earned, spent, balance, delta.detail ?? '');
+
+    this.recordModification('points', '1', new Date().toISOString());
+
+    return balance;
+  }
+
   // ==================== Homeworks ====================
 
   getHomeworks(dateKey: string): any[] {
@@ -468,6 +506,53 @@ export class PapaCheckDB {
     return hw;
   }
 
+  getHomeworkById(id: string): any | null {
+    const found = this._findRecordById('homeworks', id);
+    return found?.item && !found.item.isDeleted ? found.item : null;
+  }
+
+  putHomework(id: string, data: any): void {
+    const existing = this._findRecordById('homeworks', id);
+    const now = new Date().toISOString();
+    data.lastModified = data.lastModified ?? now;
+
+    if (existing) {
+      const items = this._getDateDataRaw('homeworks', existing.dateKey);
+      items[existing.index] = data;
+      this._setDateData('homeworks', existing.dateKey, items);
+      this.recordModification('homeworks', existing.dateKey, now);
+    } else {
+      const dateKey = data.dateKey ?? data.date ?? new Date().toISOString().slice(0, 10);
+      const items = this._getDateDataRaw('homeworks', dateKey) ?? [];
+      items.push(data);
+      this._setDateData('homeworks', dateKey, items);
+      this.recordModification('homeworks', dateKey, now);
+    }
+  }
+
+  patchHomework(id: string, fields: any): void {
+    const existing = this._findRecordById('homeworks', id);
+    if (!existing) return;
+
+    const now = new Date().toISOString();
+    const items = this._getDateDataRaw('homeworks', existing.dateKey);
+    items[existing.index] = { ...items[existing.index], ...fields, lastModified: now };
+    this._setDateData('homeworks', existing.dateKey, items);
+    this.recordModification('homeworks', existing.dateKey, now);
+  }
+
+  deleteHomework(id: string): void {
+    const existing = this._findRecordById('homeworks', id);
+    if (!existing) return;
+
+    const now = new Date().toISOString();
+    const items = this._getDateDataRaw('homeworks', existing.dateKey);
+    items[existing.index].isDeleted = true;
+    items[existing.index].lastModified = now;
+    this._setDateData('homeworks', existing.dateKey, items);
+    this.recordModification('homeworks', existing.dateKey, now);
+  }
+
   // ==================== Settlement ====================
 
   getSettlement(dateKey: string): any {
@@ -477,6 +562,21 @@ export class PapaCheckDB {
   saveSettlement(dateKey: string, data: any): void {
     this._setDateData('daily_settlement', dateKey, data);
     this.recordModification('daily_settlement', dateKey, new Date().toISOString());
+  }
+
+  putSettlement(dateKey: string, data: any): void {
+    const now = new Date().toISOString();
+    data.lastModified = data.lastModified ?? now;
+    this._setDateData('daily_settlement', dateKey, data);
+    this.recordModification('daily_settlement', dateKey, now);
+  }
+
+  patchSettlement(dateKey: string, fields: any): void {
+    const existing = this._getDateDataRaw('daily_settlement', dateKey) ?? {};
+    const now = new Date().toISOString();
+    const merged = { ...existing, ...fields, lastModified: now };
+    this._setDateData('daily_settlement', dateKey, merged);
+    this.recordModification('daily_settlement', dateKey, now);
   }
 
   // ==================== Shop ====================
@@ -491,6 +591,40 @@ export class PapaCheckDB {
     this.recordModification('shop_items', '1', new Date().toISOString());
   }
 
+  getShopItemById(id: string): any | null {
+    const items = this._getJson('shop_items') ?? [];
+    const { item } = this._findInArray(items, id);
+    return item && !item.isDeleted ? item : null;
+  }
+
+  putShopItem(id: string, data: any): void {
+    const items = this._getJson('shop_items') ?? [];
+    const { index } = this._findInArray(items, id);
+    const now = new Date().toISOString();
+    data.lastModified = data.lastModified ?? now;
+
+    if (index !== -1) {
+      items[index] = data;
+    } else {
+      items.push(data);
+    }
+
+    this._setJson('shop_items', items);
+    this.recordModification('shop_items', '1', now);
+  }
+
+  deleteShopItem(id: string): void {
+    const items = this._getJson('shop_items') ?? [];
+    const { index } = this._findInArray(items, id);
+    if (index === -1) return;
+
+    const now = new Date().toISOString();
+    items[index].isDeleted = true;
+    items[index].lastModified = now;
+    this._setJson('shop_items', items);
+    this.recordModification('shop_items', '1', now);
+  }
+
   // ==================== Redemptions ====================
 
   getRedemptions(): any[] {
@@ -500,6 +634,22 @@ export class PapaCheckDB {
   saveRedemptions(items: any[]): void {
     this._setJson('redemptions', items);
     this.recordModification('redemptions', '1', new Date().toISOString());
+  }
+
+  putRedemption(id: string, data: any): void {
+    const items = this._getJson('redemptions') ?? [];
+    const { index } = this._findInArray(items, id);
+    const now = new Date().toISOString();
+    data.lastModified = data.lastModified ?? now;
+
+    if (index !== -1) {
+      items[index] = data;
+    } else {
+      items.push(data);
+    }
+
+    this._setJson('redemptions', items);
+    this.recordModification('redemptions', '1', now);
   }
 
   // ==================== Reward Box ====================
@@ -513,6 +663,22 @@ export class PapaCheckDB {
     this.recordModification('reward_box', '1', new Date().toISOString());
   }
 
+  putRewardBoxItem(id: string, data: any): void {
+    const items = this._getJson('reward_box') ?? [];
+    const { index } = this._findInArray(items, id);
+    const now = new Date().toISOString();
+    data.lastModified = data.lastModified ?? now;
+
+    if (index !== -1) {
+      items[index] = data;
+    } else {
+      items.push(data);
+    }
+
+    this._setJson('reward_box', items);
+    this.recordModification('reward_box', '1', now);
+  }
+
   // ==================== Settings ====================
 
   getSettings(): any {
@@ -522,6 +688,21 @@ export class PapaCheckDB {
   saveSettings(data: any): void {
     this._setJson('settings', data);
     this.recordModification('settings', '1', new Date().toISOString());
+  }
+
+  putSettings(data: any): void {
+    const now = new Date().toISOString();
+    data.lastModified = data.lastModified ?? now;
+    this._setJson('settings', data);
+    this.recordModification('settings', '1', now);
+  }
+
+  patchSettings(fields: any): void {
+    const existing = this._getJson('settings') ?? {};
+    const now = new Date().toISOString();
+    const merged = { ...existing, ...fields, lastModified: now };
+    this._setJson('settings', merged);
+    this.recordModification('settings', '1', now);
   }
 
   // ==================== Active Buffs ====================
@@ -535,6 +716,34 @@ export class PapaCheckDB {
     this.recordModification('active_buffs', '1', new Date().toISOString());
   }
 
+  putBuff(id: string, data: any): void {
+    const items = this._getJson('active_buffs') ?? [];
+    const { index } = this._findInArray(items, id);
+    const now = new Date().toISOString();
+    data.lastModified = data.lastModified ?? now;
+
+    if (index !== -1) {
+      items[index] = data;
+    } else {
+      items.push(data);
+    }
+
+    this._setJson('active_buffs', items);
+    this.recordModification('active_buffs', '1', now);
+  }
+
+  deleteBuff(id: string): void {
+    const items = this._getJson('active_buffs') ?? [];
+    const { index } = this._findInArray(items, id);
+    if (index === -1) return;
+
+    const now = new Date().toISOString();
+    items[index].isDeleted = true;
+    items[index].lastModified = now;
+    this._setJson('active_buffs', items);
+    this.recordModification('active_buffs', '1', now);
+  }
+
   // ==================== Efficiency ====================
 
   getEfficiency(dateKey: string): any {
@@ -544,6 +753,13 @@ export class PapaCheckDB {
   saveEfficiency(dateKey: string, data: any): void {
     this._setDateData('efficiency_history', dateKey, data);
     this.recordModification('efficiency_history', dateKey, new Date().toISOString());
+  }
+
+  putEfficiency(dateKey: string, data: any): void {
+    const now = new Date().toISOString();
+    data.lastModified = data.lastModified ?? now;
+    this._setDateData('efficiency_history', dateKey, data);
+    this.recordModification('efficiency_history', dateKey, now);
   }
 
   // ==================== Free Time ====================
@@ -557,6 +773,25 @@ export class PapaCheckDB {
     this.recordModification('free_time_tasks', dateKey, new Date().toISOString());
   }
 
+  putFreeTimeTask(id: string, data: any): void {
+    const existing = this._findRecordById('free_time_tasks', id);
+    const now = new Date().toISOString();
+    data.lastModified = data.lastModified ?? now;
+
+    if (existing) {
+      const items = this._getDateDataRaw('free_time_tasks', existing.dateKey);
+      items[existing.index] = data;
+      this._setDateData('free_time_tasks', existing.dateKey, items);
+      this.recordModification('free_time_tasks', existing.dateKey, now);
+    } else {
+      const dateKey = data.dateKey ?? data.date ?? new Date().toISOString().slice(0, 10);
+      const items = this._getDateDataRaw('free_time_tasks', dateKey) ?? [];
+      items.push(data);
+      this._setDateData('free_time_tasks', dateKey, items);
+      this.recordModification('free_time_tasks', dateKey, now);
+    }
+  }
+
   // ==================== Bounty Tasks ====================
 
   getBountyTasks(): any[] {
@@ -566,6 +801,40 @@ export class PapaCheckDB {
   saveBountyTasks(items: any[]): void {
     this._setJson('bounty_tasks', items);
     this.recordModification('bounty_tasks', '1', new Date().toISOString());
+  }
+
+  getBountyTaskById(id: string): any | null {
+    const items = this._getJson('bounty_tasks') ?? [];
+    const { item } = this._findInArray(items, id);
+    return item && !item.isDeleted ? item : null;
+  }
+
+  putBountyTask(id: string, data: any): void {
+    const items = this._getJson('bounty_tasks') ?? [];
+    const { index } = this._findInArray(items, id);
+    const now = new Date().toISOString();
+    data.lastModified = data.lastModified ?? now;
+
+    if (index !== -1) {
+      items[index] = data;
+    } else {
+      items.push(data);
+    }
+
+    this._setJson('bounty_tasks', items);
+    this.recordModification('bounty_tasks', '1', now);
+  }
+
+  deleteBountyTask(id: string): void {
+    const items = this._getJson('bounty_tasks') ?? [];
+    const { index } = this._findInArray(items, id);
+    if (index === -1) return;
+
+    const now = new Date().toISOString();
+    items[index].isDeleted = true;
+    items[index].lastModified = now;
+    this._setJson('bounty_tasks', items);
+    this.recordModification('bounty_tasks', '1', now);
   }
 
   // ==================== Bounty Submissions ====================
@@ -579,6 +848,25 @@ export class PapaCheckDB {
     this.recordModification('bounty_submissions', dateKey, new Date().toISOString());
   }
 
+  putBountySubmission(id: string, data: any): void {
+    const existing = this._findRecordById('bounty_submissions', id);
+    const now = new Date().toISOString();
+    data.lastModified = data.lastModified ?? now;
+
+    if (existing) {
+      const items = this._getDateDataRaw('bounty_submissions', existing.dateKey);
+      items[existing.index] = data;
+      this._setDateData('bounty_submissions', existing.dateKey, items);
+      this.recordModification('bounty_submissions', existing.dateKey, now);
+    } else {
+      const dateKey = data.dateKey ?? data.date ?? new Date().toISOString().slice(0, 10);
+      const items = this._getDateDataRaw('bounty_submissions', dateKey) ?? [];
+      items.push(data);
+      this._setDateData('bounty_submissions', dateKey, items);
+      this.recordModification('bounty_submissions', dateKey, now);
+    }
+  }
+
   // ==================== Bounty Completions ====================
 
   getBountyCompletions(dateKey: string): any {
@@ -588,6 +876,13 @@ export class PapaCheckDB {
   saveBountyCompletions(dateKey: string, data: any): void {
     this._setDateData('bounty_completions', dateKey, data);
     this.recordModification('bounty_completions', dateKey, new Date().toISOString());
+  }
+
+  putBountyCompletion(id: string, data: any): void {
+    const now = new Date().toISOString();
+    data.lastModified = data.lastModified ?? now;
+    this._setDateData('bounty_completions', id, data);
+    this.recordModification('bounty_completions', id, now);
   }
 
   // ==================== Sync ====================

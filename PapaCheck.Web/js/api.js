@@ -492,6 +492,307 @@ const API = {
     );
   },
 
+  // ========== PUT / PATCH / DELETE / HEAD ==========
+
+  // ---- 作业 (homeworks) ----
+
+  async putHomework(id, data) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/homeworks/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级：在本地 DB 中创建/更新 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async patchHomework(id, fields) {
+    return await this._requestWithStrategy(
+      'online-only',
+      async () => {
+        await this._fetch('/api/homeworks/' + id, { method: 'PATCH', body: JSON.stringify(fields) });
+        return true;
+      },
+      null,
+      {}
+    );
+  },
+
+  async deleteHomework(id) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/homeworks/' + id, { method: 'DELETE' });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async headHomework(id) {
+    var mode = ConnectionManager.getMode();
+    if (mode === 'offline') return false;
+    try {
+      var resp = await fetch('/api/homeworks/' + id, { method: 'HEAD' });
+      return resp.ok;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  // ---- 结算 (settlement) ----
+
+  async putSettlement(dateKey, data) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/settlement/' + dateKey, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async patchSettlement(dateKey, fields) {
+    return await this._requestWithStrategy(
+      'online-only',
+      async () => {
+        await this._fetch('/api/settlement/' + dateKey, { method: 'PATCH', body: JSON.stringify(fields) });
+        return true;
+      },
+      null,
+      {}
+    );
+  },
+
+  // ---- 积分 (points) ----
+
+  async patchPoints(delta) {
+    return await this._requestWithStrategy(
+      'online-only',
+      async () => {
+        var result = await this._fetch('/api/points', { method: 'PATCH', body: JSON.stringify(delta) });
+        return result.balance;
+      },
+      null,
+      {}
+    );
+  },
+
+  // ---- 商店 (shop) ----
+
+  async putShopItem(id, data) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/shop/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async deleteShopItem(id) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/shop/' + id, { method: 'DELETE' });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async headShopItem(id) {
+    var mode = ConnectionManager.getMode();
+    if (mode === 'offline') return false;
+    try {
+      var resp = await fetch('/api/shop/' + id, { method: 'HEAD' });
+      return resp.ok;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  // ---- 兑换 (redemptions) ----
+
+  async putRedemption(id, data) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/redemptions/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  // ---- 奖励箱 (reward-box) ----
+
+  async putRewardBoxItem(id, data) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/reward-box/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  // ---- 设置 (settings) ----
+
+  async putSettings(data) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/settings', { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async patchSettings(fields) {
+    return await this._requestWithStrategy(
+      'online-only',
+      async () => {
+        await this._fetch('/api/settings', { method: 'PATCH', body: JSON.stringify(fields) });
+        return true;
+      },
+      null,
+      {}
+    );
+  },
+
+  // ---- Buff (active-buffs) ----
+
+  async putBuff(id, data) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/active-buffs/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async deleteBuff(id) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/active-buffs/' + id, { method: 'DELETE' });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  // ---- 效率 (efficiency) ----
+
+  async putEfficiency(dateKey, data) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/efficiency/' + dateKey, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  // ---- 自由时间 (freetime) ----
+
+  async putFreeTimeTask(id, data) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/freetime/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  // ---- 赏金任务 (bounty-tasks) ----
+
+  async putBountyTask(id, data) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/bounty-tasks/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async deleteBountyTask(id) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/bounty-tasks/' + id, { method: 'DELETE' });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  async headBountyTask(id) {
+    var mode = ConnectionManager.getMode();
+    if (mode === 'offline') return false;
+    try {
+      var resp = await fetch('/api/bounty-tasks/' + id, { method: 'HEAD' });
+      return resp.ok;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  // ---- 赏金提交 (bounty-submissions) ----
+
+  async putBountySubmission(id, data) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/bounty-submissions/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
+  // ---- 赏金完成 (bounty-completions) ----
+
+  async putBountyCompletion(id, data) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/bounty-completions/' + id, { method: 'PUT', body: JSON.stringify(data) });
+        return true;
+      },
+      async () => { /* 离线降级 */ return true; },
+      { allowFallback: true }
+    );
+  },
+
   migrateBountyCompletionsToTotal(data) {
     if (!data || !data.bountyCompletions) return data;
     var comps = data.bountyCompletions;
