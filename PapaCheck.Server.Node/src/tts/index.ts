@@ -2,8 +2,10 @@ import { spawn, type SpawnOptions } from 'child_process';
 import type { Readable } from 'stream';
 import { createHash } from 'crypto';
 import { readFile, writeFile, mkdir } from 'fs/promises';
+import { writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { tmpdir } from 'os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -23,12 +25,45 @@ export type SpawnFn = (
 export interface TTSBridgeOptions {
   /** Python 可执行文件路径，默认 'python' */
   pythonPath?: string;
-  /** TTS 桥接脚本路径 */
+  /** TTS 桥接脚本路径，默认自动检测（SEA 资源 → 环境变量 → 文件系统） */
   scriptPath?: string;
   /** 磁盘缓存目录 */
   cacheDir?: string;
   /** 内部：测试用 spawn 注入 */
   _spawn?: SpawnFn;
+}
+
+/**
+ * 解析 TTS 桥接脚本的路径，按优先级：
+ * 1. 显式传入的 scriptPath
+ * 2. 环境变量 PAPACHECK_TTS_SCRIPT
+ * 3. SEA 内置资源（process.getBuiltinAsset），写入临时目录
+ * 4. 文件系统默认路径（开发模式）
+ */
+function resolveScriptPath(explicit?: string): string {
+  // 1. 显式传入
+  if (explicit) return explicit;
+
+  // 2. 环境变量
+  const envPath = process.env.PAPACHECK_TTS_SCRIPT;
+  if (envPath) return envPath;
+
+  // 3. SEA 内置资源
+  if (typeof process.getBuiltinAsset === 'function') {
+    try {
+      const asset = process.getBuiltinAsset('ttsBridge') as { data: Buffer } | undefined;
+      if (asset?.data && asset.data.length > 0) {
+        const tmpPath = join(tmpdir(), `papacheck-tts-bridge-${Date.now()}.py`);
+        writeFileSync(tmpPath, asset.data);
+        return tmpPath;
+      }
+    } catch {
+      // SEA 资源不可用，继续降级
+    }
+  }
+
+  // 4. 文件系统默认路径（开发模式）
+  return join(__dirname, '..', '..', 'scripts', 'tts_bridge.py');
 }
 
 export class TTSBridge {
@@ -40,7 +75,7 @@ export class TTSBridge {
 
   constructor(options: TTSBridgeOptions = {}) {
     this.pythonPath = options.pythonPath ?? 'python';
-    this.scriptPath = options.scriptPath ?? join(__dirname, '..', '..', 'scripts', 'tts_bridge.py');
+    this.scriptPath = resolveScriptPath(options.scriptPath);
     this.cacheDir = options.cacheDir ?? join(__dirname, '..', '..', 'tts_cache');
     this.spawnFn = options._spawn ?? spawn as unknown as SpawnFn;
   }
