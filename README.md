@@ -1,6 +1,6 @@
 # PapaCheck — 爸\~检查！
 
-<img src="PapaCheck_ban.jpg" alt="PapaCheck Banner" width="100%" />
+![PapaCheck Banner](PapaCheck_ban.jpg)
 
 > **v1.2.0** — 家庭作业管理从未如此轻松
 
@@ -123,3 +123,5 @@ npx vitest run PapaCheck.Tests/test_duplicate_rating.js
 ## 📄 License
 
 GNU Affero General Public License v3.0 (AGPL-3.0)
+
+![开发历程词云](papacheck_wordcloud.png)
