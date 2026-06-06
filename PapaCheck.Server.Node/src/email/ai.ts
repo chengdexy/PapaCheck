@@ -2,6 +2,8 @@ export interface HomeworkItem {
   subject: string;
   content: string;
   date?: string;
+  suggestedDuration?: number;
+  basePoints?: number;
 }
 
 export interface AIResponse {
