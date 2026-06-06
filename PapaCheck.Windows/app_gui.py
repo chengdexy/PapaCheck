@@ -218,36 +218,43 @@ def _get_node_server_exe():
 
 
 def _start_dev_node_server(db_path, web_dir, port):
-    """开发环境：通过 npx tsx 启动 Node.js TypeScript 服务器"""
+    """开发环境：通过 node_modules/.bin/tsx.cmd 启动 Node.js TypeScript 服务器"""
     ts_entry = os.path.normpath(os.path.join(
         _CUR_DIR, '..', 'PapaCheck.Server.Node', 'src', 'index.ts'
     ))
+    tsx_cmd = os.path.normpath(os.path.join(
+        _CUR_DIR, '..', 'PapaCheck.Server.Node', 'node_modules', '.bin', 'tsx.cmd'
+    ))
+    if not os.path.exists(tsx_cmd):
+        raise FileNotFoundError(f'tsx.cmd 未找到，请确认 npm install 已执行: {tsx_cmd}')
+
     cmd = [
-        'npx', 'tsx',
+        tsx_cmd,
         ts_entry,
         '--port', str(port),
         '--web-dir', web_dir,
         '--db-path', db_path,
     ]
 
-    creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
     process = subprocess.Popen(
         cmd,
-        stdout=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
-        creationflags=creationflags,
     )
 
-    for _ in range(30):
+    # 等待服务器就绪（轮询端口）
+    for _ in range(60):
         if process.poll() is not None:
-            raise Exception('Node.js 开发服务器启动失败')
+            err = process.stderr.read().decode('utf-8', errors='replace').strip() if process.stderr else ''
+            detail = f': {err}' if err else ''
+            raise Exception(f'Node.js 开发服务器启动失败{detail}')
         try:
             with socket.socket() as s:
-                s.settimeout(1)
+                s.settimeout(0.5)
                 s.connect(('127.0.0.1', port))
             return process
         except (ConnectionRefusedError, OSError, socket.timeout):
-            time.sleep(1)
+            time.sleep(0.5)
 
     raise Exception('Node.js 开发服务器启动超时')
 
@@ -731,13 +738,12 @@ class PapaCheckApp:
         return _get_node_server_exe()
 
     def _start_node_server(self):
-        """通过子进程启动 Node.js 服务器"""
+        """通过子进程启动 Node.js 服务器（同步阻塞，由 _start_server 在后台线程调用）"""
         exe_path = self._get_node_server_exe()
         db_path = os.path.join(_DB_DIR, 'data.db')
         web_dir = _resource_path('PapaCheck.Web')
 
         if exe_path is None:
-            # 开发环境：用 npx tsx 直接启动 TypeScript
             process = _start_dev_node_server(
                 db_path=db_path,
                 web_dir=web_dir,
@@ -752,6 +758,36 @@ class PapaCheckApp:
             )
         self._node_process = process
         self.ip = self._get_local_ip()
+
+    def _start_server_thread(self):
+        """在后台线程中启动服务器，完成后通过 after() 更新 UI"""
+        def _run():
+            try:
+                self._start_node_server()
+                self.root.after(0, self._on_server_started)
+            except Exception as e:
+                self.root.after(0, self._on_server_failed, str(e))
+
+        thread = threading.Thread(target=_run, daemon=True)
+        thread.start()
+
+    def _on_server_started(self):
+        """服务器启动成功后的 UI 更新（在主线程执行）"""
+        self.running = True
+        self._set_status(True)
+        self._child_url_var.set('http://' + self.ip + ':' + str(_PORT))
+        self._parent_url_var.set('http://' + self.ip + ':' + str(_PORT) + '/admin.html')
+        self.ip_label.config(text='局域网 IP: ' + self.ip)
+        if self._apk_hint_visible:
+            self._apk_url_label.config(
+                text='http://' + self.ip + ':' + str(_PORT) + '/api/download')
+        self._append_log('服务器启动成功 (端口 ' + str(_PORT) + ', 局域网 IP: ' + self.ip + ')')
+        self.root.after(2000, self._check_still_running)
+
+    def _on_server_failed(self, error_msg):
+        """服务器启动失败后的 UI 更新（在主线程执行）"""
+        self._append_log('服务器启动失败: ' + error_msg)
+        self._handle_server_exit()
 
     def _stop_node_server(self):
         """终止 Node.js 服务器子进程"""
@@ -779,26 +815,7 @@ class PapaCheckApp:
             return
 
         self._append_log('正在启动服务器...')
-        try:
-            self._start_node_server()
-        except Exception as e:
-            self._append_log('服务器启动失败: ' + str(e))
-            self._handle_server_exit()
-            return
-
-        self.running = True
-        self._set_status(True)
-
-        self._child_url_var.set('http://' + self.ip + ':' + str(_PORT))
-        self._parent_url_var.set('http://' + self.ip + ':' + str(_PORT) + '/admin.html')
-        self.ip_label.config(text='局域网 IP: ' + self.ip)
-        if self._apk_hint_visible:
-            self._apk_url_label.config(
-                text='http://' + self.ip + ':' + str(_PORT) + '/api/download')
-
-        self._append_log('服务器启动成功 (端口 ' + str(_PORT) + ', 局域网 IP: ' + self.ip + ')')
-
-        self.root.after(2000, self._check_still_running)
+        self._start_server_thread()
 
     def _stop_server(self):
         if self._node_process:
