@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/chengdexy/PapaCheck#readme",
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.8",
     "imap": "^0.8.19",
     "jsdom": "^29.1.1",
     "mailparser": "^3.9.9",

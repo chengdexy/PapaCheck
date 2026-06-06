@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-06
+> 最后更新：2026-06-07
 
 ## 当前版本
 
-**v1.2.0**（Node.js 服务器 Phase 1 完成）
+**v1.2.1**（覆盖率提升 + 测试修复）
 
 ---
 
@@ -41,7 +41,9 @@
 - [x] 一站式发布脚本（release.py）
 - [x] OpenAPI 自动文档（Swagger UI）
 - [x] 单 EXE 构建（Node.js SEA）
-- [x] 测试框架（pytest + Vitest 3.x + Flutter test）
+- [x] 测试框架（pytest + Vitest 4.x + Flutter test）
+- [x] JS/TS 代码覆盖率 85.12%（Stmts）
+- [x] Python 代码覆盖率 18%（release.py 32%）
 
 ---
 
@@ -70,6 +72,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-07 | 覆盖率提升：JS/TS 从 79.39% → 85.12%（新增 24 个测试）、Python release.py 从 16% → 32%（新增 10 个测试）；修复 Flutter connect_failed_dialog 2 个失败测试；修复 IDE 测试发现（12 个测试文件重命名为标准 `*.test.js` 格式）；全量 363 个测试全部通过 |
 | 2026-06-06 | Phase 4 完成：Windows 端迁移至 Node.js 服务器（子进程启动 Node.js EXE、邮件同步重写为 Node.js、构建流程更新、Windows 端 10 个新测试 + Node.js 175 个测试） |
 | 2026-06-06 | Phase 3 完成：CRDT 同步引擎（字段级 LWW + PN-Counter + OR-Set 合并引擎，crdt_operations 表，crdt-push/pull 端点，前端操作日志 + CRDT 同步流程 + connection.js 重连降级） |
 | 2026-06-06 | Phase 2 完成：RESTful API 重写（新增 12 PUT + 4 PATCH + 4 DELETE + 2 HEAD 端点，统一错误格式，api.js 新增 30 个方法） |

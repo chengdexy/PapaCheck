@@ -24,12 +24,21 @@
 - POST /api/email/sync — 触发邮件同步，IMAP 获取 → AI 解析 → 作业入库
 - Windows 端构建流程更新：先构建 Node.js EXE 再打包进 PyInstaller
 - 10 个 Windows 端 Node.js 启动/停止测试 + 6 个邮件模块测试
+- **覆盖率提升**：JS/TS 代码覆盖率从 79.39% 提升至 85.12%（Stmts），新增 24 个 Vitest 测试覆盖 db/index.ts、email/ai.ts 等模块的未覆盖分支
+- **Python 覆盖率提升**：release.py 从 16% 提升至 32%，新增 10 个 pytest 测试覆盖 archive_apk、create_zips、parse_args
+- **Flutter 测试修复**：connect_failed_dialog_test 中 2 个测试因界面移除"离线运行"按钮而出错，已同步更新测试逻辑
+- **IDE 测试发现修复**：12 个前端测试文件从 `test_*.js` 重命名为 `*.test.js`（标准格式），确保 IDE 测试面板正确识别全部 297 个 Vitest 测试
+
+### Changed
+- 12 个前端测试文件重命名：`test_xxx.js` → `xxx.test.js`
+- vitest.config.js 移除 `test_*.js` 包含模式（已被 `*.test.js` 模式覆盖）
 
 ### Fixed
 - 修复数据同步时消耗的时间类道具被恢复的 Bug：`fullSync()` 中 `ChangeLog.clear()` 全量清空变更日志，会清除 `pushChanges()` 推送到服务器期间新产生的条目，导致这些变更丢失、服务器旧数据覆盖本地。改为 `clearUpTo(maxId)` 只清除已推送的条目（ID ≤ maxId），保留推送期间新增的条目等待下次同步
 - `ChangeLog` 新增 `clearUpTo(maxId)` 方法，按 ID 范围精确清除已推送的变更日志条目
 - `pushChanges()` 返回已推送条目的最大 ID，供 `fullSync()` 精确清除
 - 新增 5 个 ChangeLog.clearUpTo 单元测试
+- 修复 Flutter connect_failed_dialog_test 中 2 个测试因引用已移除的"离线运行"按钮而失败的问题
 
 ### Added
 - Node.js 服务器 PUT/PATCH/DELETE/HEAD 路由：12 个 PUT、4 个 PATCH、4 个 DELETE、3 个 HEAD 端点，使用 `sendJson()` 统一响应格式

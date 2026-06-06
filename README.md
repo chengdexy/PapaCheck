@@ -2,7 +2,7 @@
 
 ![PapaCheck Banner](./PapaCheck_ban.jpg)
 
-> **v1.2.0** — 家庭作业管理从未如此轻松
+> **v1.2.1** — 家庭作业管理从未如此轻松
 
 PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和跟踪孩子的作业完成情况。支持通过转发微信群中老师布置的作业到邮件，AI 自动解析并添加到清单；孩子可以自主开始/暂停/完成作业并获得积分；家长远程评级并管理积分商店。
 
@@ -99,11 +99,13 @@ PapaCheck/
 
 ```bash
 # 全部测试
-npm test               # 前端测试（Vitest，49 个测试用例）
-pytest                 # 后端测试（pytest）
+npm test               # 前端/服务端测试（Vitest，297 个测试用例）
+pytest                 # 后端测试（pytest，44 个测试用例）
+flutter test           # Android 端测试（18 个测试用例）
+cd PapaCheck.Android && flutter test
 
 # 单个测试文件
-npx vitest run PapaCheck.Tests/test_duplicate_rating.js
+npx vitest run PapaCheck.Tests/duplicate_rating.test.js
 ```
 
 ### 项目文档
