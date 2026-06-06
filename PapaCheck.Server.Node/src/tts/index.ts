@@ -2,12 +2,9 @@ import { spawn, type SpawnOptions } from 'child_process';
 import type { Readable } from 'stream';
 import { createHash } from 'crypto';
 import { readFile, writeFile, mkdir } from 'fs/promises';
-import { writeFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { writeFileSync, unlinkSync } from 'fs';
+import { join } from 'path';
 import { tmpdir } from 'os';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /** 可被 mock 的 spawn 函数签名 */
 export type SpawnFn = (
@@ -33,6 +30,16 @@ export interface TTSBridgeOptions {
   _spawn?: SpawnFn;
 }
 
+/** 注册进程退出时清理临时文件的回调 */
+function registerCleanup(tmpPath: string): void {
+  const cleanup = () => {
+    try { unlinkSync(tmpPath); } catch { /* 文件可能已被删除 */ }
+  };
+  process.on('exit', cleanup);
+  process.on('SIGINT', () => { cleanup(); process.exit(0); });
+  process.on('SIGTERM', () => { cleanup(); process.exit(0); });
+}
+
 /**
  * 解析 TTS 桥接脚本的路径，按优先级：
  * 1. 显式传入的 scriptPath
@@ -48,13 +55,15 @@ function resolveScriptPath(explicit?: string): string {
   const envPath = process.env.PAPACHECK_TTS_SCRIPT;
   if (envPath) return envPath;
 
-  // 3. SEA 内置资源
-  if (typeof process.getBuiltinAsset === 'function') {
+  // 3. SEA 内置资源（仅 Node.js SEA 运行时）
+  const p = process as any;
+  if (typeof p.getBuiltinAsset === 'function') {
     try {
-      const asset = process.getBuiltinAsset('ttsBridge') as { data: Buffer } | undefined;
+      const asset = p.getBuiltinAsset('ttsBridge') as { data: Buffer } | undefined;
       if (asset?.data && asset.data.length > 0) {
         const tmpPath = join(tmpdir(), `papacheck-tts-bridge-${Date.now()}.py`);
         writeFileSync(tmpPath, asset.data);
+        registerCleanup(tmpPath);
         return tmpPath;
       }
     } catch {
@@ -109,7 +118,7 @@ export class TTSBridge {
     }
 
     // 3. 确保缓存目录存在
-    await mkdir(this.cacheDir, { recursive: true }).catch(() => {});
+    await mkdir(this.cacheDir, { recursive: true }).catch(() => { });
 
     // 4. 生成语音
     const mp3Data = await this.spawnPython(text);
@@ -117,7 +126,7 @@ export class TTSBridge {
     // 5. 缓存结果
     if (mp3Data.length > 0) {
       this.cache.set(text, mp3Data);
-      writeFile(cachePath, mp3Data).catch(() => {});
+      writeFile(cachePath, mp3Data).catch(() => { });
     }
 
     return mp3Data;
@@ -171,7 +180,7 @@ export class TTSBridge {
   pregenSpeech(texts: string[]): void {
     for (const text of texts) {
       if (text && text.trim()) {
-        this.speak(text).catch(() => {});
+        this.speak(text).catch(() => { });
       }
     }
   }

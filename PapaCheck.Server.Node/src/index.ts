@@ -1,16 +1,13 @@
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { resolve } from 'path';
 import minimist from 'minimist';
 import { buildApp } from './app.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const args = minimist(process.argv.slice(2), {
   string: ['port', 'web-dir', 'db-path', 'tts-python'],
   default: {
     port: '8080',
-    'web-dir': resolve(__dirname, '..', '..', 'PapaCheck.Web'),
-    'db-path': resolve(__dirname, '..', 'data.db'),
+    'web-dir': resolve(process.cwd(), '..', 'PapaCheck.Web'),
+    'db-path': resolve(process.cwd(), 'data.db'),
     'tts-python': 'python',
   },
 });
