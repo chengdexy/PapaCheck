@@ -140,7 +140,6 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   WebViewController? _controller;
   bool _isPageReady = false;
   Timer? _readyCheckTimer;
-  Timer? _offlineRetryTimer;
   BatteryMonitor? _batteryMonitor;
 
   @override
@@ -152,7 +151,6 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   @override
   void dispose() {
     _readyCheckTimer?.cancel();
-    _offlineRetryTimer?.cancel();
     _batteryMonitor?.stop();
     super.dispose();
   }
@@ -202,7 +200,6 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         });
         await _initControllerOffline(fullUrl, html);
         _startBatteryMonitor();
-        _startOfflineRetry(fullUrl, storedUrl, storedRole);
         return;
       }
     }
@@ -306,29 +303,6 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     return result;
   }
 
-  void _startOfflineRetry(String fullUrl, String baseUrl, DeviceRole? role) {
-    _offlineRetryTimer?.cancel();
-    _offlineRetryTimer = Timer.periodic(
-      const Duration(seconds: 5),
-      (_) async {
-        if (!mounted) {
-          _offlineRetryTimer?.cancel();
-          return;
-        }
-        final reachable = await _isServerReachable(fullUrl);
-        if (!reachable || !mounted) return;
-
-        // 服务器已恢复：重建 WebView 从服务器加载，统一使用 _initController 管理 NavigationDelegate
-        _offlineRetryTimer?.cancel();
-        _role = role;
-        _applyOrientation(role!);
-        _initController(fullUrl);
-        _trySaveOfflineSnapshot(fullUrl);
-        if (mounted) _checkVersion(baseUrl);
-      },
-    );
-  }
-
   Future<void> _initController(String url) async {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -353,7 +327,14 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   Future<void> _initControllerOffline(String baseUrl, String html) async {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.white);
+      ..setBackgroundColor(Colors.white)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onWebResourceError: (error) {
+            // 离线视图中的资源错误不处理，静默降级
+          },
+        ),
+      );
 
     if (_controller!.platform is AndroidWebViewController) {
       (_controller!.platform as AndroidWebViewController)
@@ -404,8 +385,6 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     String? html = await OfflineSnapshotService.load(url);
     if (html != null && mounted) {
       await _initControllerOffline(url, html);
-      // 导航失败，重启离线重试定时器
-      _startOfflineRetry(url, _getBaseUrl(url), _role);
     } else if (mounted) {
       await _showConnectFailedDialog(url);
     }
