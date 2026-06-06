@@ -46,6 +46,9 @@ var ConnectionManager = (function () {
   async function _doReconnect() {
     if (_syncing) return;
     _syncing = true;
+    _mode = 'reconnecting';
+    showReconnectMask();
+    updateConnStatus();
     try {
       var syncPromise = (async function () {
         if (typeof SyncEngine !== 'undefined' && SyncEngine.fullSync) {
@@ -102,10 +105,6 @@ var ConnectionManager = (function () {
       var ok = await _ping();
       if (ok) {
         if (_mode === 'offline' && !_syncing) {
-          // 立即切换到 reconnecting，阻止 pollServer/refreshAllData 发起请求
-          _mode = 'reconnecting';
-          showReconnectMask();
-          updateConnStatus();
           await _doReconnect();
         } else if (_mode === 'reconnecting') {
           // 重连过程中 ping 持续成功：可能 _doReconnect() 同步超时但连接仍在，
