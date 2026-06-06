@@ -421,15 +421,10 @@ async function saveAdminHw() {
   const basePoints = parseInt(document.getElementById('adminHwBasePoints').value) ?? 10;
 
   if (adminEditingId) {
-    const hw = adminHomeworks.find(h => h.id === adminEditingId);
-    if (hw) {
-      hw.subject = subject;
-      hw.content = content;
-      hw.suggestedDuration = suggestedDuration;
-      hw.basePoints = basePoints;
-    }
+    // 编辑已有作业：只 PATCH 改动的字段，不发整条作业
+    await API.patchHomework(adminEditingId, { subject, content, suggestedDuration, basePoints });
   } else {
-    adminHomeworks.push({
+    const newHw = {
       id: Date.now().toString(36) + Math.random().toString(36).substring(2, 7),
       subject,
       content,
@@ -441,13 +436,11 @@ async function saveAdminHw() {
       completedAt: null,
       actualDuration: null,
       completedInSchool: false,
-    });
-  }
+    };
+    adminHomeworks.push(newHw);
+    // 新增作业：只 PUT 这一条
+    await API.putHomework(newHw.id, newHw);
 
-  for (var i = 0; i < adminHomeworks.length; i++) {
-    await API.putHomework(adminHomeworks[i].id, adminHomeworks[i]);
-  }
-  if (!adminEditingId) {
     const dateKey = AdminUtil.dateKey(adminDate);
     const existingSettlement = cachedData?.dailySettlement?.[dateKey];
     if (!existingSettlement || !existingSettlement.rating) {
@@ -492,9 +485,16 @@ async function rejectHomework(hwId) {
   hw.completedInSchool = false;
   hw.mode = 'pending';
 
-  for (var i = 0; i < adminHomeworks.length; i++) {
-    await API.putHomework(adminHomeworks[i].id, adminHomeworks[i]);
-  }
+  // 只 PATCH 改动的字段，不发整条作业
+  await API.patchHomework(hwId, {
+    status: 'pending',
+    rejected: true,
+    startedAt: null,
+    completedAt: null,
+    actualDuration: null,
+    completedInSchool: false,
+    mode: 'pending',
+  });
 
   await API.putSettlement(dateKey, {});
 
