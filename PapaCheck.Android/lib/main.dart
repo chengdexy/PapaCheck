@@ -318,24 +318,11 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         final reachable = await _isServerReachable(fullUrl);
         if (!reachable || !mounted) return;
 
-        // 服务器已恢复：不重建 WebView，直接导航到服务器 URL 以保留 IndexedDB 数据
+        // 服务器已恢复：重建 WebView 从服务器加载，统一使用 _initController 管理 NavigationDelegate
         _offlineRetryTimer?.cancel();
         _role = role;
         _applyOrientation(role!);
-        setState(() => _isPageReady = false);
-        if (_controller == null) {
-          _initController(fullUrl);
-        } else {
-          _controller!.setNavigationDelegate(
-            NavigationDelegate(
-              onWebResourceError: (error) {
-                _handlePageLoadError(fullUrl);
-              },
-            ),
-          );
-          _controller!.loadRequest(Uri.parse(fullUrl));
-          _waitForPageReady();
-        }
+        _initController(fullUrl);
         _trySaveOfflineSnapshot(fullUrl);
         if (mounted) _checkVersion(baseUrl);
       },
@@ -366,14 +353,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   Future<void> _initControllerOffline(String baseUrl, String html) async {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.white)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onWebResourceError: (error) {
-            // 离线视图中的资源错误不处理，静默降级
-          },
-        ),
-      );
+      ..setBackgroundColor(Colors.white);
 
     if (_controller!.platform is AndroidWebViewController) {
       (_controller!.platform as AndroidWebViewController)
