@@ -342,20 +342,6 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     }
   }
 
-  Future<String> _fetchResource(String url) async {
-    final client = HttpClient();
-    client.connectionTimeout = const Duration(seconds: 5);
-    try {
-      final request = await client.getUrl(Uri.parse(url));
-      final response = await request.close().timeout(
-            const Duration(seconds: 5),
-          );
-      return response.transform(utf8.decoder).join();
-    } finally {
-      client.close();
-    }
-  }
-
   Future<bool> _isServerReachable(String url) async {
     final client = HttpClient();
     client.connectionTimeout = const Duration(seconds: 3);
