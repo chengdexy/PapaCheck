@@ -323,8 +323,12 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         _role = role;
         _applyOrientation(role!);
         setState(() => _isPageReady = false);
-        _controller?.loadRequest(Uri.parse(fullUrl));
-        _waitForPageReady();
+        if (_controller == null) {
+          _initController(fullUrl);
+        } else {
+          _controller!.loadRequest(Uri.parse(fullUrl));
+          _waitForPageReady();
+        }
         _trySaveOfflineSnapshot(fullUrl);
         if (mounted) _checkVersion(baseUrl);
       },
