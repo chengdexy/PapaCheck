@@ -217,20 +217,30 @@ def _get_node_server_exe():
     return None
 
 
-def _start_dev_node_server(db_path, web_dir, port):
-    """开发环境：通过 node_modules/.bin/tsx.cmd 启动 Node.js TypeScript 服务器"""
-    ts_entry = os.path.normpath(os.path.join(
-        _CUR_DIR, '..', 'PapaCheck.Server.Node', 'src', 'index.ts'
-    ))
-    tsx_cmd = os.path.normpath(os.path.join(
-        _CUR_DIR, '..', 'PapaCheck.Server.Node', 'node_modules', '.bin', 'tsx.cmd'
-    ))
+def _is_noise_line(text):
+    """判断日志行是否为噪音（ASCII 艺术框、纯分割线等），不显示在日志框中"""
+    noise_prefixes = ('╔', '║', '╚', '╠')
+    return text.startswith(noise_prefixes)
+
+
+def _get_dev_node_entry():
+    """获取开发环境 Node.js 服务器入口命令（优先用编译后的 JS，更快）"""
+    node_dir = os.path.normpath(os.path.join(_CUR_DIR, '..', 'PapaCheck.Server.Node'))
+    # 优先使用 node dist/index.js（预编译，启动快）
+    dist_js = os.path.join(node_dir, 'dist', 'index.js')
+    if os.path.exists(dist_js):
+        return ['node', dist_js]
+    # 降级到 tsx 实时编译
+    tsx_cmd = os.path.join(node_dir, 'node_modules', '.bin', 'tsx.cmd')
     if not os.path.exists(tsx_cmd):
         raise FileNotFoundError(f'tsx.cmd 未找到，请确认 npm install 已执行: {tsx_cmd}')
+    return [tsx_cmd, os.path.join(node_dir, 'src', 'index.ts')]
 
-    cmd = [
-        tsx_cmd,
-        ts_entry,
+
+def _start_dev_node_server(db_path, web_dir, port):
+    """开发环境：启动 Node.js 服务器"""
+    entry = _get_dev_node_entry()
+    cmd = entry + [
         '--port', str(port),
         '--web-dir', web_dir,
         '--db-path', db_path,
@@ -786,7 +796,7 @@ class PapaCheckApp:
                     if not raw_line:
                         break
                     text = raw_line.decode('utf-8', errors='replace').rstrip()
-                    if text:
+                    if text and not _is_noise_line(text):
                         self.root.after(0, lambda t=text: self._append_log(t))
             except:
                 pass
