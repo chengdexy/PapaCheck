@@ -9,6 +9,7 @@ export type { HomeworkItem } from './ai.js';
 export interface EmailSyncConfig extends ImapConfig {
   apiKey: string;
   apiUrl: string;
+  markAsRead?: boolean;
 }
 
 export interface EmailSyncResult {
@@ -47,7 +48,7 @@ export class EmailSync {
       });
 
       // 2. 获取未读邮件
-      const messages = await fetchUnseen(imap);
+      const messages = await fetchUnseen(imap, this.config.markAsRead);
 
       if (messages.length === 0) {
         return { ok: true, homeworks: [] };

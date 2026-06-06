@@ -8,6 +8,7 @@ export interface ImapConfig {
   port: number;
   user: string;
   password: string;
+  markAsRead?: boolean;
 }
 
 export interface EmailMessage {
@@ -47,7 +48,7 @@ export function connect(config: ImapConfig): Promise<Connection> {
 /**
  * 获取未读邮件列表，解析邮件内容返回 EmailMessage[]
  */
-export function fetchUnseen(imap: Connection): Promise<EmailMessage[]> {
+export function fetchUnseen(imap: Connection, markAsRead = true): Promise<EmailMessage[]> {
   return new Promise((resolve, reject) => {
     imap.openBox('INBOX', false, (openErr) => {
       if (openErr) {
@@ -98,8 +99,7 @@ export function fetchUnseen(imap: Connection): Promise<EmailMessage[]> {
               }
               pending -= 1;
               if (pending === 0) {
-                // 标记为已读后关闭连接
-                if (uids.length > 0) {
+                if (markAsRead && uids.length > 0) {
                   imap.addFlags(uids, '\\Seen', () => {
                     imap.end();
                     resolve(messages);
