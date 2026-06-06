@@ -772,7 +772,7 @@ describe('DELETE /api/homeworks/:id', () => {
     const hw = { id: 'hw-del-1', subject: '语文', content: '删除测试', status: 'pending' };
     await app.inject({ method: 'PUT', url: '/api/homeworks/hw-del-1', payload: hw });
 
-    const res = await app.inject({ method: 'DELETE', url: '/api/homeworks/hw-del-1' });
+    const res = await app.inject({ method: 'DELETE', url: '/api/homeworks/hw-del-1', payload: {} });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toHaveProperty('ok', true);
   });
@@ -780,7 +780,7 @@ describe('DELETE /api/homeworks/:id', () => {
 
 describe('DELETE /api/shop/:id', () => {
   it('软删商品', async () => {
-    const res = await app.inject({ method: 'DELETE', url: '/api/shop/shop-put-1' });
+    const res = await app.inject({ method: 'DELETE', url: '/api/shop/shop-put-1', payload: {} });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toHaveProperty('ok', true);
   });
@@ -788,7 +788,7 @@ describe('DELETE /api/shop/:id', () => {
 
 describe('DELETE /api/active-buffs/:id', () => {
   it('软删 Buff', async () => {
-    const res = await app.inject({ method: 'DELETE', url: '/api/active-buffs/buff-put-1' });
+    const res = await app.inject({ method: 'DELETE', url: '/api/active-buffs/buff-put-1', payload: {} });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toHaveProperty('ok', true);
   });
@@ -796,7 +796,7 @@ describe('DELETE /api/active-buffs/:id', () => {
 
 describe('DELETE /api/bounty-tasks/:id', () => {
   it('软删赏金任务', async () => {
-    const res = await app.inject({ method: 'DELETE', url: '/api/bounty-tasks/bt-put-1' });
+    const res = await app.inject({ method: 'DELETE', url: '/api/bounty-tasks/bt-put-1', payload: {} });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toHaveProperty('ok', true);
   });
