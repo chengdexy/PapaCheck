@@ -55,7 +55,9 @@ def _console_ctrl_handler(dwCtrlType):
 if sys.platform == 'win32':
     _kernel32 = ctypes.windll.kernel32
     _HandlerRoutine = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_uint)
-    _kernel32.SetConsoleCtrlHandler(_HandlerRoutine(_console_ctrl_handler), True)
+    # 必须保存全局引用，否则会被垃圾回收，导致运行时访问错误
+    _console_ctrl_handler_cfunc = _HandlerRoutine(_console_ctrl_handler)
+    _kernel32.SetConsoleCtrlHandler(_console_ctrl_handler_cfunc, True)
 
 # --- 必须在任何 import db 之前设置 PAPACHECK_DB_DIR ---
 if getattr(sys, 'frozen', False):
