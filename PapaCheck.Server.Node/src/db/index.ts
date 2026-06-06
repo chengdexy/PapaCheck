@@ -1216,6 +1216,7 @@ export class PapaCheckDB {
       }
     } catch (e) {
       // 单条操作失败不影响其他操作
+      console.error('Failed to apply CRDT operation', op, e);
     }
   }
 
