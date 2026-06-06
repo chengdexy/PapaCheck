@@ -70,7 +70,8 @@
 
 | 日期 | 变更 |
 |------|------|
-| 2026-06-06 | Node.js 服务器新增 PUT/PATCH/DELETE/HEAD 路由（12 PUT + 4 PATCH + 4 DELETE + 3 HEAD + 23 测试），CORS 头扩展支持 |
+| 2026-06-06 | 修复：`fullSync()` 中 `ChangeLog.clear()` 全量清空导致推送期间新增条目丢失，消耗的时间类道具被恢复；改为 `clearUpTo(maxId)` 精确清除 |
+| 2026-06-06 | 代码审查修复：PUT/PATCH/DELETE/HEAD 端点添加 JSON Schema 校验，DELETE 统一完整 idParamSchema（HEAD 因 Fastify 限制仅 params） |
 | 2026-06-06 | Phase 2 完成：RESTful API 重写（新增 12 PUT + 4 PATCH + 4 DELETE + 2 HEAD 端点，统一错误格式，api.js 新增 30 个方法） |
 | 2026-06-06 | Phase 1 完成：Node.js 服务器骨架（Fastify + better-sqlite3 + 34 个 API 端点 + 83 个测试 + pkg 构建 + Swagger 文档） |
 | 2026-06-06 | 修复：离线→在线切换的竞态窗口（ping 恢复后立即切 `reconnecting` 阻止旧数据展示、消除双重 `/api/data` 调用、统一 `_wasOnline` 分支） |

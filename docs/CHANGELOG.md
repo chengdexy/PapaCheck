@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+### Fixed
+- 修复数据同步时消耗的时间类道具被恢复的 Bug：`fullSync()` 中 `ChangeLog.clear()` 全量清空变更日志，会清除 `pushChanges()` 推送到服务器期间新产生的条目，导致这些变更丢失、服务器旧数据覆盖本地。改为 `clearUpTo(maxId)` 只清除已推送的条目（ID ≤ maxId），保留推送期间新增的条目等待下次同步
+- `ChangeLog` 新增 `clearUpTo(maxId)` 方法，按 ID 范围精确清除已推送的变更日志条目
+- `pushChanges()` 返回已推送条目的最大 ID，供 `fullSync()` 精确清除
+- 新增 5 个 ChangeLog.clearUpTo 单元测试
+
 ### Added
 - Node.js 服务器 PUT/PATCH/DELETE/HEAD 路由：12 个 PUT、4 个 PATCH、4 个 DELETE、3 个 HEAD 端点，使用 `sendJson()` 统一响应格式
 - CORS 头新增 PUT、PATCH、DELETE、HEAD 方法支持
@@ -33,6 +39,7 @@
 - 统一错误格式：AppError 类 + 全局 setErrorHandler（`{ error, code, details? }`）
 - api.js 新增 30 个方法：put/patch/delete/head 覆盖所有数据类型
 - 更新 CORS 头支持 PUT/PATCH/DELETE/HEAD 预检请求
+- 所有 PUT/PATCH/DELETE/HEAD 端点添加 JSON Schema 参数校验
 
 ### Fixed
 - 离线→在线切换的竞态窗口：ping 恢复后立即切换 `reconnecting` 状态，阻止 `pollServer`/`refreshAllData` 在 sync 完成前获取旧数据
