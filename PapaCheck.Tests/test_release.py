@@ -3,6 +3,8 @@ import sys
 import json
 import tempfile
 import argparse
+import zipfile
+from unittest.mock import patch
 
 import pytest
 
@@ -277,3 +279,245 @@ class TestReadApkVersion:
                 assert release.read_apk_version() == '0.0.0'
             finally:
                 release.PUBSPEC = original
+
+
+class TestArchiveApk:
+
+    # Feature: 归档 APK 文件
+    #   Scenario: 将构建产物按版本号复制到归档目录
+    #     Given APK 构建产物存在于构建输出路径
+    #     When 调用 archive_apk 传入版本号 '1.2.3'
+    #     Then APK 被复制到归档目录，文件名格式为 PapaCheck-{version}.apk
+    def test_archive_apk_copies_file_with_version(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            apk_build_dir = os.path.join(tmpdir, 'build_output')
+            os.makedirs(apk_build_dir)
+            fake_apk = os.path.join(apk_build_dir, 'app-release.apk')
+            with open(fake_apk, 'w') as f:
+                f.write('fake apk content')
+
+            archive_dir = os.path.join(tmpdir, 'archive')
+
+            original_build = release.APK_BUILD_OUTPUT
+            original_archive = release.APK_ARCHIVE_DIR
+            release.APK_BUILD_OUTPUT = fake_apk
+            release.APK_ARCHIVE_DIR = archive_dir
+            try:
+                result = release.archive_apk('1.2.3')
+                expected = os.path.join(archive_dir, 'PapaCheck-1.2.3.apk')
+                assert result == expected
+                assert os.path.isfile(expected)
+            finally:
+                release.APK_BUILD_OUTPUT = original_build
+                release.APK_ARCHIVE_DIR = original_archive
+
+    # Feature: 归档 APK 文件
+    #   Scenario: 归档时自动清理除当前版本外的旧版 APK
+    #     Given 归档目录中存在旧版 APK 文件 PapaCheck-1.0.0.apk
+    #     When 调用 archive_apk 归档新版 APK (2.0.0)
+    #     Then 新版 APK 被创建，旧版 APK 被自动删除
+    def test_archive_apk_cleans_old_apks(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            apk_build_dir = os.path.join(tmpdir, 'build_output')
+            os.makedirs(apk_build_dir)
+            fake_apk = os.path.join(apk_build_dir, 'app-release.apk')
+            with open(fake_apk, 'w') as f:
+                f.write('fake apk content')
+
+            archive_dir = os.path.join(tmpdir, 'archive')
+            os.makedirs(archive_dir)
+            old_apk = os.path.join(archive_dir, 'PapaCheck-1.0.0.apk')
+            with open(old_apk, 'w') as f:
+                f.write('old apk')
+
+            original_build = release.APK_BUILD_OUTPUT
+            original_archive = release.APK_ARCHIVE_DIR
+            release.APK_BUILD_OUTPUT = fake_apk
+            release.APK_ARCHIVE_DIR = archive_dir
+            try:
+                release.archive_apk('2.0.0')
+                expected_new = os.path.join(archive_dir, 'PapaCheck-2.0.0.apk')
+                assert os.path.isfile(expected_new)
+                assert not os.path.isfile(old_apk)
+            finally:
+                release.APK_BUILD_OUTPUT = original_build
+                release.APK_ARCHIVE_DIR = original_archive
+
+    # Feature: 归档 APK 文件
+    #   Scenario: 归档时不删除非 APK 格式的文件
+    #     Given 归档目录中存在非 APK 后缀的文件
+    #     When 调用 archive_apk
+    #     Then 非 APK 文件不会被删除
+    def test_archive_apk_keeps_non_apk_files(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            apk_build_dir = os.path.join(tmpdir, 'build_output')
+            os.makedirs(apk_build_dir)
+            fake_apk = os.path.join(apk_build_dir, 'app-release.apk')
+            with open(fake_apk, 'w') as f:
+                f.write('fake apk content')
+
+            archive_dir = os.path.join(tmpdir, 'archive')
+            os.makedirs(archive_dir)
+            other_file = os.path.join(archive_dir, 'readme.txt')
+            with open(other_file, 'w') as f:
+                f.write('not an apk')
+
+            original_build = release.APK_BUILD_OUTPUT
+            original_archive = release.APK_ARCHIVE_DIR
+            release.APK_BUILD_OUTPUT = fake_apk
+            release.APK_ARCHIVE_DIR = archive_dir
+            try:
+                release.archive_apk('3.0.0')
+                assert os.path.isfile(other_file)
+            finally:
+                release.APK_BUILD_OUTPUT = original_build
+                release.APK_ARCHIVE_DIR = original_archive
+
+
+class TestCreateZips:
+
+    # Feature: 创建 ZIP 压缩包
+    #   Scenario: 同时提供 EXE 和 APK 时创建 full 和 win 两个 ZIP 文件
+    #     Given 输出目录和 dist 目录中存在对应的 EXE 和 APK 文件
+    #     When 调用 create_zips
+    #     Then full.zip 同时包含 EXE 和 APK，win.zip 仅包含 EXE
+    def test_create_zips_creates_full_and_win(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = os.path.join(tmpdir, 'output')
+            dist_dir = os.path.join(tmpdir, 'dist')
+            os.makedirs(output_dir)
+            os.makedirs(dist_dir)
+
+            exe_path = os.path.join(dist_dir, 'PapaCheck-1.0.0.exe')
+            with open(exe_path, 'w') as f:
+                f.write('fake exe')
+
+            apk_src = os.path.join(tmpdir, 'PapaCheck-2.0.0.apk')
+            with open(apk_src, 'w') as f:
+                f.write('fake apk')
+
+            full_zip, win_zip = release.create_zips(
+                output_dir, '1.0.0', '2.0.0', apk_src, dist_dir)
+
+            assert os.path.isfile(full_zip), f'缺少 full ZIP: {full_zip}'
+            assert os.path.isfile(win_zip), f'缺少 win ZIP: {win_zip}'
+            assert full_zip.endswith('PapaCheck-v1.0.0_full.zip')
+            assert win_zip.endswith('PapaCheck-v1.0.0_win.zip')
+
+            with zipfile.ZipFile(full_zip, 'r') as zf:
+                names = zf.namelist()
+                assert 'PapaCheck-1.0.0.exe' in names
+                assert 'PapaCheck-2.0.0.apk' in names
+
+            with zipfile.ZipFile(win_zip, 'r') as zf:
+                names = zf.namelist()
+                assert 'PapaCheck-1.0.0.exe' in names
+                assert 'PapaCheck-2.0.0.apk' not in names
+
+    # Feature: 创建 ZIP 压缩包
+    #   Scenario: APK 文件被复制到输出目录后仍保留原始文件
+    #     Given 输出目录和 dist 目录中存在对应的文件
+    #     When 调用 create_zips
+    #     Then APK 文件被复制到输出目录，原始 APK 源文件不变
+    def test_create_zips_copies_apk_to_output_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = os.path.join(tmpdir, 'output')
+            dist_dir = os.path.join(tmpdir, 'dist')
+            os.makedirs(output_dir)
+            os.makedirs(dist_dir)
+
+            exe_path = os.path.join(dist_dir, 'PapaCheck-1.0.0.exe')
+            with open(exe_path, 'w') as f:
+                f.write('fake exe')
+
+            apk_src = os.path.join(tmpdir, 'PapaCheck-2.0.0.apk')
+            with open(apk_src, 'w') as f:
+                f.write('fake apk')
+
+            release.create_zips(output_dir, '1.0.0', '2.0.0', apk_src, dist_dir)
+
+            apk_dst = os.path.join(output_dir, 'PapaCheck-2.0.0.apk')
+            assert os.path.isfile(apk_dst)
+            assert os.path.isfile(apk_src)
+
+
+class TestParseArgs:
+
+    # Feature: 命令行参数解析
+    #   Scenario: 完整发布模式，指定 EXE 和 APK 均递增 patch
+    #     Given 传入 --bump-exe patch 和 --bump-apk patch 参数
+    #     When 调用 parse_args
+    #     Then 返回 bump_exe='patch' 且 bump_apk='patch'
+    def test_parse_args_full_release_with_bump(self):
+        with patch('sys.argv', ['release.py', '--bump-exe', 'patch', '--bump-apk', 'patch']):
+            args = release.parse_args()
+            assert args.bump_exe == 'patch'
+            assert args.bump_apk == 'patch'
+            assert args.exe_only is False
+            assert args.apk_only is False
+
+    # Feature: 命令行参数解析
+    #   Scenario: 仅构建 EXE 模式
+    #     Given 传入 --exe-only 和 --bump-exe patch 参数
+    #     When 调用 parse_args
+    #     Then exe_only=True, apk_only=False
+    def test_parse_args_exe_only_mode(self):
+        with patch('sys.argv', ['release.py', '--exe-only', '--bump-exe', 'patch']):
+            args = release.parse_args()
+            assert args.exe_only is True
+            assert args.apk_only is False
+
+    # Feature: 命令行参数解析
+    #   Scenario: 仅构建 APK 模式
+    #     Given 传入 --apk-only 和 --bump-apk patch 参数
+    #     When 调用 parse_args
+    #     Then apk_only=True, exe_only=False
+    def test_parse_args_apk_only_mode(self):
+        with patch('sys.argv', ['release.py', '--apk-only', '--bump-apk', 'patch']):
+            args = release.parse_args()
+            assert args.apk_only is True
+            assert args.exe_only is False
+
+    # Feature: 命令行参数解析
+    #   Scenario: 直接设置 EXE 版本号
+    #     Given 传入 --set-exe-ver 2.0.0 参数
+    #     When 调用 parse_args
+    #     Then set_exe_ver='2.0.0'
+    def test_parse_args_set_exe_version(self):
+        with patch('sys.argv', ['release.py', '--set-exe-ver', '2.0.0']):
+            args = release.parse_args()
+            assert args.set_exe_ver == '2.0.0'
+
+    # Feature: 命令行参数解析
+    #   Scenario: 指定不递增 EXE 版本
+    #     Given 传入 --exe-only 和 --no-bump-exe 参数
+    #     When 调用 parse_args
+    #     Then no_bump_exe=True，且 bump_exe 保持 None
+    def test_parse_args_no_bump_exe(self):
+        with patch('sys.argv', ['release.py', '--exe-only', '--no-bump-exe']):
+            args = release.parse_args()
+            assert args.no_bump_exe is True
+            assert args.bump_exe is None
+
+
+class TestVersionRe:
+
+    # Feature: 版本号正则表达式
+    #   Scenario: 匹配正确的 X.Y.Z 格式版本号
+    #     Given 版本号 '1.2.3'
+    #     When 使用 VERSION_RE 匹配
+    #     Then 匹配成功
+    def test_version_re_matches_valid_versions(self):
+        assert release.VERSION_RE.match('1.2.3')
+        assert release.VERSION_RE.match('0.0.1')
+        assert release.VERSION_RE.match('10.20.30')
+
+    # Feature: 版本号正则表达式
+    #   Scenario: 拒绝非法格式的版本号
+    #     Given 版本号 '1.2'、'abc'、'1.2.3.4'
+    #     When 使用 VERSION_RE 匹配
+    #     Then 匹配失败
+    def test_version_re_rejects_invalid_versions(self):
+        assert not release.VERSION_RE.match('1.2')
+        assert not release.VERSION_RE.match('abc')
+        assert not release.VERSION_RE.match('1.2.3.4')

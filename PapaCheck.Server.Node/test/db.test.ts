@@ -411,6 +411,24 @@ describe('Database', () => {
       // 另一天的数据应该还在
       expect(db.getHomeworks('2026-06-07')).toHaveLength(1);
     });
+
+    // Feature: resetDate 清理 active_buffs
+    //   Scenario: 重置日期时，应清除 startDate 匹配的 buff
+    //     Given 存在多个 startDate 不同的 buff
+    //     When 调用 resetDate
+    //     Then 匹配的 buff 应被移除
+    it('resetDate 应清理 startDate 匹配的 active_buffs', () => {
+      db.saveActiveBuffs([
+        { id: 'buff1', name: '专注', startDate: '2026-06-06', duration: 30, unit: 'min' },
+        { id: 'buff2', name: '高效', startDate: '2026-06-07', duration: 30, unit: 'min' },
+      ]);
+
+      db.resetDate('2026-06-06');
+
+      const buffs = db.getActiveBuffs();
+      expect(buffs).toHaveLength(1);
+      expect(buffs[0].id).toBe('buff2');
+    });
   });
 
   describe('importFullData / getFullData roundtrip', () => {
@@ -497,6 +515,152 @@ describe('Database', () => {
       const homeworks = db.getHomeworks('2026-06-06');
       expect(homeworks).toHaveLength(1);
       expect(homeworks[0].subject).toBe('数学_修改');
+    });
+
+    // Feature: pushMerge 删除 date_key 表中的条目
+    //   Scenario: 通过 pushMerge 的 delete 类型标记作业为已删除
+    //     Given 已存在一条作业记录
+    //     When 使用 pushMerge 传入 type 为 delete
+    //     Then 该作业应被标记为已删除（getHomeworkById 返回 null）
+    it('pushMerge with type delete 应标记作业为已删除', () => {
+      const dateKey = '2026-06-06';
+      db.saveHomeworks(dateKey, [{ id: 'hw1', subject: '数学', lastModified: '2026-06-05T10:00:00Z' }]);
+
+      db.pushMerge([{
+        type: 'delete',
+        uuid: 'hw1',
+        data: { id: 'hw1', subject: '数学', date: dateKey, lastModified: '2026-06-06T10:00:00Z' },
+        timestamp: '2026-06-06T10:00:00Z',
+      }]);
+
+      const result = db.getHomeworkById('hw1');
+      expect(result).toBeNull();
+    });
+
+    // Feature: pushMerge 向已有的 date_key 表新增条目
+    //   Scenario: pushMerge 传入新 UUID 时，应推入新条目
+    //     Given 已存在一条作业记录
+    //     When 使用 pushMerge 传入不同 UUID 的新数据
+    //     Then 应返回两条记录
+    it('pushMerge with 新 UUID 应推入新条目', () => {
+      const dateKey = '2026-06-06';
+      db.saveHomeworks(dateKey, [{ id: 'hw1', subject: '数学', lastModified: '2026-06-05T10:00:00Z' }]);
+
+      db.pushMerge([{
+        type: 'update',
+        uuid: 'hw2',
+        data: { id: 'hw2', subject: '语文', date: dateKey, lastModified: '2026-06-06T10:00:00Z' },
+        timestamp: '2026-06-06T10:00:00Z',
+      }]);
+
+      const homeworks = db.getHomeworks(dateKey);
+      expect(homeworks).toHaveLength(2);
+    });
+
+    // Feature: pushMerge 处理 date_key 表中对象类型数据
+    //   Scenario: 当 existing 是非数组的对象（dict）时，不应崩溃
+    //     Given daily_settlement 表存在一条对象记录
+    //     When 使用 pushMerge 合并新数据
+    //     Then 不应崩溃，数据应被正确合并
+    it('pushMerge 处理 dict 类型的 date_key 表', () => {
+      const dateKey = '2026-06-06';
+      // 直接写入非数组 JSON 到 daily_settlement 表
+      (db as any).db.prepare(
+        "INSERT OR REPLACE INTO daily_settlement (date_key, data) VALUES (?, ?)"
+      ).run(dateKey, JSON.stringify({ rating: 'A', dailyBase: 100 }));
+
+      expect(() => {
+        db.pushMerge([{
+          type: 'update',
+          uuid: 'settlement-1',
+          data: { rating: 'A+', dailyBase: 110, date: dateKey, lastModified: '2026-06-06T10:00:00Z' },
+          timestamp: '2026-06-06T10:00:00Z',
+        }]);
+      }).not.toThrow();
+
+      const result = db.getSettlement(dateKey);
+      expect(result.rating).toBe('A+');
+    });
+  });
+
+  describe('pushMerge - single-row tables', () => {
+    // Feature: pushMerge 向单行表（shop_items）添加条目
+    //   Scenario: pushMerge 向 shop_items 添加新条目
+    //     Given shop_items 表已有数据
+    //     When 使用 pushMerge 添加新商品
+    //     Then 应包含新旧两个商品
+    it('pushMerge for shop_items 应添加新条目', () => {
+      db.saveShopItems([{ id: 's1', name: '零食', lastModified: '2026-06-05T10:00:00Z' }]);
+
+      db.pushMerge([{
+        type: 'update',
+        uuid: 's2',
+        data: { id: 's2', name: '玩具', cost: 10, baseQuantity: 1, lastModified: '2026-06-06T10:00:00Z' },
+        timestamp: '2026-06-06T10:00:00Z',
+      }]);
+
+      const items = db.getShopItems();
+      expect(items).toHaveLength(2);
+    });
+
+    // Feature: pushMerge 删除单行表中的条目
+    //   Scenario: pushMerge 传入 type 为 delete 时标记商品为已删除
+    //     Given shop_items 表存在一个商品
+    //     When 使用 pushMerge 传入 type 为 delete
+    //     Then 该商品应被标记为已删除
+    it('pushMerge for shop_items with type delete 应标记为已删除', () => {
+      db.saveShopItems([{ id: 's1', name: '零食', lastModified: '2026-06-05T10:00:00Z' }]);
+
+      db.pushMerge([{
+        type: 'delete',
+        uuid: 's1',
+        data: { id: 's1', name: '零食', cost: 10, baseQuantity: 1, lastModified: '2026-06-06T10:00:00Z' },
+        timestamp: '2026-06-06T10:00:00Z',
+      }]);
+
+      const result = db.getShopItemById('s1');
+      expect(result).toBeNull();
+    });
+
+    // Feature: pushMerge 向 bounty_tasks 添加条目
+    //   Scenario: pushMerge 向 bounty_tasks 添加新任务
+    //     Given bounty_tasks 表已有数据
+    //     When 使用 pushMerge 添加新任务
+    //     Then 应包含两个任务
+    it('pushMerge for bounty_tasks 应添加新条目', () => {
+      db.saveBountyTasks([{ id: 'bt1', name: '赏金1', points: 50, lastModified: '2026-06-05T10:00:00Z' }]);
+
+      db.pushMerge([{
+        type: 'update',
+        uuid: 'bt2',
+        data: { id: 'bt2', name: '赏金2', points: 30, createdAt: '2026-06-06T10:00:00Z', lastModified: '2026-06-06T10:00:00Z' },
+        timestamp: '2026-06-06T10:00:00Z',
+      }]);
+
+      const tasks = db.getBountyTasks();
+      expect(tasks).toHaveLength(2);
+    });
+
+    // Feature: pushMerge 在单行表中找不到条目时推入新条目
+    //   Scenario: pushMerge 时 UUID 不存在于单行表中，应推入新条目
+    //     Given shop_items 表存在两个商品
+    //     When 使用 pushMerge 传入不存在的 UUID
+    //     Then 应新增为第三条
+    it('pushMerge for single-row table 找不到条目时推入新条目', () => {
+      db.saveShopItems([
+        { id: 's1', name: '零食', lastModified: '2026-06-05T10:00:00Z' },
+        { id: 's2', name: '玩具', lastModified: '2026-06-05T10:00:00Z' },
+      ]);
+
+      db.pushMerge([{
+        type: 'update',
+        uuid: 's3',
+        data: { id: 's3', name: '图书', cost: 20, baseQuantity: 1, lastModified: '2026-06-06T10:00:00Z' },
+        timestamp: '2026-06-06T10:00:00Z',
+      }]);
+
+      const items = db.getShopItems();
+      expect(items).toHaveLength(3);
     });
   });
 
@@ -921,6 +1085,193 @@ describe('Database', () => {
       db.putBountyCompletion(dateKey, { taskId: 'bt1', completed: true });
       const result = db.getBountyCompletions(dateKey);
       expect(result.completed).toBe(true);
+    });
+  });
+
+  describe('applyCRDTOperation', () => {
+    // Feature: applyCRDTOperation 处理 delete 操作
+    //   Scenario: delete 操作应标记对应资源为已删除
+    //     Given 存在一条作业记录
+    //     When 使用 applyCRDTOperation 传入 type 为 delete
+    //     Then 该作业应被标记为已删除
+    it('applyCRDTOperation with type delete for homeworks 应标记为已删除', () => {
+      db.saveHomeworks('2026-06-06', [{ id: 'hw1', subject: '数学' }]);
+
+      (db as any).applyCRDTOperation({
+        id: 'op-1',
+        type: 'delete',
+        table: 'homeworks',
+        resourceId: 'hw1',
+        field: null,
+        value: null,
+        timestamp: '2026-06-06T10:00:00Z',
+        nodeId: 'node1',
+      });
+
+      const result = db.getHomeworkById('hw1');
+      expect(result).toBeNull();
+    });
+
+    // Feature: applyCRDTOperation 删除 shop_items
+    //   Scenario: delete 操作标记商品为已删除
+    //     Given shop_items 表存在一个商品
+    //     When 使用 applyCRDTOperation 传入 type 为 delete
+    //     Then 该商品应被标记为已删除
+    it('applyCRDTOperation with type delete for shop_items 应标记为已删除', () => {
+      db.saveShopItems([{ id: 's1', name: '零食' }]);
+
+      (db as any).applyCRDTOperation({
+        id: 'op-2',
+        type: 'delete',
+        table: 'shop_items',
+        resourceId: 's1',
+        field: null,
+        value: null,
+        timestamp: '2026-06-06T10:00:00Z',
+        nodeId: 'node1',
+      });
+
+      const result = db.getShopItemById('s1');
+      expect(result).toBeNull();
+    });
+
+    // Feature: applyCRDTOperation 删除 bounty_tasks
+    //   Scenario: delete 操作标记赏金任务为已删除
+    //     Given bounty_tasks 表存在一个任务
+    //     When 使用 applyCRDTOperation 传入 type 为 delete
+    //     Then 该任务应被标记为已删除
+    it('applyCRDTOperation with type delete for bounty_tasks 应标记为已删除', () => {
+      db.saveBountyTasks([{ id: 'bt1', name: '赏金1', points: 50 }]);
+
+      (db as any).applyCRDTOperation({
+        id: 'op-3',
+        type: 'delete',
+        table: 'bounty_tasks',
+        resourceId: 'bt1',
+        field: null,
+        value: null,
+        timestamp: '2026-06-06T10:00:00Z',
+        nodeId: 'node1',
+      });
+
+      const result = db.getBountyTaskById('bt1');
+      expect(result).toBeNull();
+    });
+
+    // Feature: applyCRDTOperation 删除 active_buffs
+    //   Scenario: delete 操作标记增益为已删除
+    //     Given active_buffs 表存在一个增益
+    //     When 使用 applyCRDTOperation 传入 type 为 delete
+    //     Then 该增益应被标记为已删除
+    it('applyCRDTOperation with type delete for active_buffs 应标记为已删除', () => {
+      db.saveActiveBuffs([{ id: 'buff1', name: '专注', duration: 30, unit: 'min' }]);
+
+      (db as any).applyCRDTOperation({
+        id: 'op-4',
+        type: 'delete',
+        table: 'active_buffs',
+        resourceId: 'buff1',
+        field: null,
+        value: null,
+        timestamp: '2026-06-06T10:00:00Z',
+        nodeId: 'node1',
+      });
+
+      const fullData = db.getFullData();
+      expect(fullData.activeBuffs.find((b: any) => b.id === 'buff1')).toBeUndefined();
+    });
+
+    // Feature: applyCRDTOperation 处理 update 操作
+    //   Scenario: update 操作应更新或创建对应资源
+    //     Given 存在一条作业记录
+    //     When 使用 applyCRDTOperation 传入 type 为 update
+    //     Then 该作业应被更新
+    it('applyCRDTOperation with type update for homeworks 应更新或创建', () => {
+      db.saveHomeworks('2026-06-06', [{ id: 'hw1', subject: '数学', lastModified: '2026-06-05T10:00:00Z' }]);
+
+      (db as any).applyCRDTOperation({
+        id: 'op-5',
+        type: 'update',
+        table: 'homeworks',
+        resourceId: 'hw1',
+        field: null,
+        value: { id: 'hw1', subject: '数学_修改', content: 'P20', lastModified: '2026-06-06T10:00:00Z', dateKey: '2026-06-06' },
+        timestamp: '2026-06-06T10:00:00Z',
+        nodeId: 'node1',
+      });
+
+      const result = db.getHomeworkById('hw1');
+      expect(result).not.toBeNull();
+      expect(result!.subject).toBe('数学_修改');
+    });
+
+    // Feature: applyCRDTOperation 更新 shop_items
+    //   Scenario: update 操作更新商品信息
+    //     Given shop_items 表存在一个商品
+    //     When 使用 applyCRDTOperation 传入 type 为 update
+    //     Then 该商品应被更新
+    it('applyCRDTOperation with type update for shop_items 应更新', () => {
+      db.saveShopItems([{ id: 's1', name: '零食' }]);
+
+      (db as any).applyCRDTOperation({
+        id: 'op-6',
+        type: 'update',
+        table: 'shop_items',
+        resourceId: 's1',
+        field: null,
+        value: { id: 's1', name: '零食（大包）' },
+        timestamp: '2026-06-06T10:00:00Z',
+        nodeId: 'node1',
+      });
+
+      const result = db.getShopItemById('s1');
+      expect(result!.name).toBe('零食（大包）');
+    });
+
+    // Feature: applyCRDTOperation 更新 bounty_tasks
+    //   Scenario: update 操作更新赏金任务
+    //     Given bounty_tasks 表存在一个任务
+    //     When 使用 applyCRDTOperation 传入 type 为 update
+    //     Then 该任务应被更新
+    it('applyCRDTOperation with type update for bounty_tasks 应更新', () => {
+      db.saveBountyTasks([{ id: 'bt1', name: '赏金1', points: 50 }]);
+
+      (db as any).applyCRDTOperation({
+        id: 'op-7',
+        type: 'update',
+        table: 'bounty_tasks',
+        resourceId: 'bt1',
+        field: null,
+        value: { id: 'bt1', name: '赏金1（修改）', points: 60 },
+        timestamp: '2026-06-06T10:00:00Z',
+        nodeId: 'node1',
+      });
+
+      const result = db.getBountyTaskById('bt1');
+      expect(result!.points).toBe(60);
+    });
+
+    // Feature: applyCRDTOperation 更新 settings
+    //   Scenario: update 操作更新设置
+    //     Given settings 表存在设置值
+    //     When 使用 applyCRDTOperation 传入 type 为 update
+    //     Then 设置应被更新
+    it('applyCRDTOperation with type update for settings 应更新', () => {
+      db.saveSettings({ dailyBasePoints: 100 });
+
+      (db as any).applyCRDTOperation({
+        id: 'op-8',
+        type: 'update',
+        table: 'settings',
+        resourceId: '1',
+        field: null,
+        value: { dailyBasePoints: 150 },
+        timestamp: '2026-06-06T10:00:00Z',
+        nodeId: 'node1',
+      });
+
+      const result = db.getSettings();
+      expect(result.dailyBasePoints).toBe(150);
     });
   });
 });
