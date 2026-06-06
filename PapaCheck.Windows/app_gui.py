@@ -206,18 +206,50 @@ def _resource_path(relative):
 # ===== Node.js 服务器子进程管理 =====
 
 def _get_node_server_exe():
-    """查找 Node.js 服务器 EXE 路径（模块级函数）"""
+    """查找 Node.js 服务器 EXE 路径（模块级函数）
+       开发环境返回 None，调用者使用 tsx 启动"""
     if getattr(sys, 'frozen', False):
-        # PyInstaller 打包环境
         exe = os.path.join(sys._MEIPASS, 'Server.Node', 'papacheck-server.exe')
-    else:
-        # 开发环境
-        exe = os.path.normpath(os.path.join(
-            _CUR_DIR, '..', 'PapaCheck.Server.Node', 'dist', 'papacheck-server.exe'
-        ))
-    if not os.path.exists(exe):
-        raise FileNotFoundError(f'Node.js 服务器未找到: {exe}')
-    return exe
+        if not os.path.exists(exe):
+            raise FileNotFoundError(f'Node.js 服务器未找到: {exe}')
+        return exe
+    # 开发环境：使用 npx tsx 直接启动
+    return None
+
+
+def _start_dev_node_server(db_path, web_dir, port):
+    """开发环境：通过 npx tsx 启动 Node.js TypeScript 服务器"""
+    ts_entry = os.path.normpath(os.path.join(
+        _CUR_DIR, '..', 'PapaCheck.Server.Node', 'src', 'index.ts'
+    ))
+    cmd = [
+        'npx', 'tsx',
+        ts_entry,
+        '--port', str(port),
+        '--web-dir', web_dir,
+        '--db-path', db_path,
+    ]
+
+    creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        creationflags=creationflags,
+    )
+
+    for _ in range(30):
+        if process.poll() is not None:
+            raise Exception('Node.js 开发服务器启动失败')
+        try:
+            with socket.socket() as s:
+                s.settimeout(1)
+                s.connect(('127.0.0.1', port))
+            return process
+        except (ConnectionRefusedError, OSError, socket.timeout):
+            time.sleep(1)
+
+    raise Exception('Node.js 开发服务器启动超时')
 
 
 def _start_node_server_process(exe_path, db_path, web_dir, port):
@@ -704,12 +736,20 @@ class PapaCheckApp:
         db_path = os.path.join(_DB_DIR, 'data.db')
         web_dir = _resource_path('PapaCheck.Web')
 
-        process = _start_node_server_process(
-            exe_path=exe_path,
-            db_path=db_path,
-            web_dir=web_dir,
-            port=_PORT,
-        )
+        if exe_path is None:
+            # 开发环境：用 npx tsx 直接启动 TypeScript
+            process = _start_dev_node_server(
+                db_path=db_path,
+                web_dir=web_dir,
+                port=_PORT,
+            )
+        else:
+            process = _start_node_server_process(
+                exe_path=exe_path,
+                db_path=db_path,
+                web_dir=web_dir,
+                port=_PORT,
+            )
         self._node_process = process
         self.ip = self._get_local_ip()
 
