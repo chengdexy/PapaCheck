@@ -73,6 +73,18 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     logger: false,
   });
 
+  // ==================== 请求日志 ====================
+
+  app.addHook('onResponse', (request, reply, done) => {
+     const url = request.url;
+     if (url === '/api/ping' || url === '/api/data') {
+       done();
+       return;
+     }
+     console.log(`${request.method} ${url} ${reply.statusCode}`);
+     done();
+   });
+
   // ==================== 全局错误处理器 ====================
 
   app.setErrorHandler((error, _request, reply) => {
@@ -85,11 +97,12 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
 
     // Fastify 内置校验错误（来自 JSON Schema）
-    if (error.validation) {
+    const fastifyErr = error as any;
+    if (fastifyErr.validation) {
       return reply.status(400).send({
         error: '请求参数校验失败',
         code: ErrorCodes.VALIDATION_ERROR,
-        details: error.validation,
+        details: fastifyErr.validation,
       });
     }
 
