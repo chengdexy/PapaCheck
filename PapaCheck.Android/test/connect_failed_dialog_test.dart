@@ -4,10 +4,10 @@ import 'package:papacheck_android/widgets/connect_failed_dialog.dart';
 
 void main() {
   /// Feature: 连接失败对话框
-  ///   Scenario: 点击退出按钮触发系统退出
+  ///   Scenario: 点击退出按钮关闭对话框
   ///     Given 连接失败对话框已显示
   ///     When 用户点击"退出"按钮
-  ///     Then 对话框关闭
+  ///     Then 对话框关闭（SystemNavigator.pop 在测试环境中静默忽略）
   testWidgets('clicking exit button closes dialog', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -33,7 +33,17 @@ void main() {
     await tester.tap(find.text('Show Dialog'));
     await tester.pumpAndSettle();
 
+    // 验证对话框已显示
     expect(find.text('退出'), findsOneWidget);
+    expect(find.text('连接失败'), findsOneWidget);
+
+    // 点击退出按钮
+    await tester.tap(find.text('退出'));
+    await tester.pumpAndSettle();
+
+    // 验证对话框已关闭（按钮文本不再显示）
+    expect(find.text('退出'), findsNothing);
+    expect(find.text('连接失败'), findsNothing);
   });
 
   /// Feature: 连接失败对话框
