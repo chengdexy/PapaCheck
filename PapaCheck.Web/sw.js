@@ -1,4 +1,4 @@
-var CACHE_NAME = 'papacheck-v1';
+var CACHE_NAME = 'papacheck-v2';
 
 var CORE_RESOURCES = [
   '/',

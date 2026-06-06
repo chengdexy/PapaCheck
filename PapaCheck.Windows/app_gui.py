@@ -18,8 +18,44 @@ import ctypes.wintypes
 import urllib.request
 import urllib.error
 import subprocess
+import atexit
+import signal
 
 _CUR_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 全局引用，确保 atexit 和 signal handler 能访问 node 进程
+_node_process_global = {'proc': None}
+
+
+def _cleanup_node_process():
+    """模块级清理函数：退出时强制终止 Node.js 子进程"""
+    proc = _node_process_global.get('proc')
+    if proc and proc.poll() is None:
+        try:
+            proc.terminate()
+            proc.wait(timeout=3)
+        except Exception:
+            try:
+                proc.kill()
+                proc.wait(timeout=2)
+            except Exception:
+                pass
+
+
+atexit.register(_cleanup_node_process)
+
+
+def _console_ctrl_handler(dwCtrlType):
+    """Windows 控制台关闭事件处理（用户关终端、Ctrl+C 等）"""
+    _cleanup_node_process()
+    return True
+
+
+# 注册控制台事件处理器（仅 Windows）
+if sys.platform == 'win32':
+    _kernel32 = ctypes.windll.kernel32
+    _HandlerRoutine = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_uint)
+    _kernel32.SetConsoleCtrlHandler(_HandlerRoutine(_console_ctrl_handler), True)
 
 # --- 必须在任何 import db 之前设置 PAPACHECK_DB_DIR ---
 if getattr(sys, 'frozen', False):
@@ -224,13 +260,9 @@ def _is_noise_line(text):
 
 
 def _get_dev_node_entry():
-    """获取开发环境 Node.js 服务器入口命令（优先用编译后的 JS，更快）"""
+    """获取开发环境 Node.js 服务器入口命令（调试模式始终用 tsx 实时编译，修改 TypeScript 后重启即生效）"""
     node_dir = os.path.normpath(os.path.join(_CUR_DIR, '..', 'PapaCheck.Server.Node'))
-    # 优先使用 node dist/index.js（预编译，启动快）
-    dist_js = os.path.join(node_dir, 'dist', 'index.js')
-    if os.path.exists(dist_js):
-        return ['node', dist_js]
-    # 降级到 tsx 实时编译
+    # 调试模式下始终使用 tsx，确保代码变更即时生效，无需手动 npm run build
     tsx_cmd = os.path.join(node_dir, 'node_modules', '.bin', 'tsx.cmd')
     if not os.path.exists(tsx_cmd):
         raise FileNotFoundError(f'tsx.cmd 未找到，请确认 npm install 已执行: {tsx_cmd}')
@@ -769,6 +801,7 @@ class PapaCheckApp:
                 port=_PORT,
             )
         self._node_process = process
+        _node_process_global['proc'] = process
         self.ip = self._get_local_ip()
 
     def _start_server_thread(self):
@@ -826,11 +859,13 @@ class PapaCheckApp:
         """终止 Node.js 服务器子进程"""
         _stop_node_server_process(self._node_process)
         self._node_process = None
+        _node_process_global['proc'] = None
 
     def _start_server(self):
         if self._node_process:
             _stop_node_server_process(self._node_process)
             self._node_process = None
+            _node_process_global['proc'] = None
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         in_use = False
@@ -878,6 +913,7 @@ class PapaCheckApp:
     def _handle_server_exit(self):
         _stop_node_server_process(self._node_process)
         self._node_process = None
+        _node_process_global['proc'] = None
         self.running = False
         self._set_status(False)
         self._append_log('服务器已停止')
@@ -1024,10 +1060,13 @@ class PapaCheckApp:
             return
         self._quitting = True
         self._disable_ui()
-        if self._node_process:
-            self._stop_server()
-        else:
-            self._do_destroy()
+        # 无论如何都尝试终止 Node.js 子进程
+        proc = self._node_process or _node_process_global.get('proc')
+        if proc:
+            _stop_node_server_process(proc)
+            self._node_process = None
+            _node_process_global['proc'] = None
+        self._do_destroy()
 
     def _disable_ui(self):
         for child in self.root.winfo_children():

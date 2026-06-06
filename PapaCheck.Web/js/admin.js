@@ -470,10 +470,7 @@ async function saveAdminHw() {
 }
 
 async function deleteAdminHw(id) {
-  adminHomeworks = adminHomeworks.filter(h => h.id !== id);
-  for (var i = 0; i < adminHomeworks.length; i++) {
-    await API.putHomework(adminHomeworks[i].id, adminHomeworks[i]);
-  }
+  await API.deleteHomework(id);
   await refreshAllData();
   renderHomeworkTab();
   showToast('作业已删除');
@@ -1137,10 +1134,7 @@ async function saveBountyTask() {
 }
 
 async function deleteBountyTask(id) {
-  adminBountyTasks = adminBountyTasks.filter(i => i.id !== id);
-  for (var i = 0; i < adminBountyTasks.length; i++) {
-    await API.putBountyTask(adminBountyTasks[i].id, adminBountyTasks[i]);
-  }
+  await API.deleteBountyTask(id);
   await refreshAllData();
   renderBountyTab();
   showToast('赏金任务已删除');

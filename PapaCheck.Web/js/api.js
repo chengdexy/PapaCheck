@@ -61,10 +61,16 @@ const API = {
 
   async _fetch(url, options) {
     if (!options) options = {};
-    var resp = await fetch(url, {
-      headers: { 'Content-Type': 'application/json' },
-      ...options,
-    });
+    var method = options.method || 'GET';
+    var fetchOptions = { ...options };
+    // DELETE 请求没有 body，不设置 Content-Type，避免 Fastify 报空 JSON body 错误
+    if (method !== 'DELETE') {
+      if (!fetchOptions.headers) fetchOptions.headers = {};
+      if (!fetchOptions.headers['Content-Type']) {
+        fetchOptions.headers['Content-Type'] = 'application/json';
+      }
+    }
+    var resp = await fetch(url, fetchOptions);
     if (!resp.ok) throw new Error(resp.statusText);
     return await resp.json();
   },
