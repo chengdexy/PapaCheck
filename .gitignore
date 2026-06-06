@@ -61,7 +61,6 @@ PapaCheck.Windows/version_info.txt
 
 # Node.js
 node_modules/
-package-lock.json
 
 # Node.js 构建产物
 PapaCheck.Server.Node/dist/
