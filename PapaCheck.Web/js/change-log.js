@@ -64,6 +64,20 @@ var ChangeLog = (function() {
     await _store.setItem('_nextId', 1);
   }
 
+  async function clearUpTo(maxId) {
+    await _ensureInit();
+    var keys = [];
+    await _store.iterate(function(value, key) {
+      if (key.indexOf('change_') === 0 && value.id <= maxId) {
+        keys.push(key);
+      }
+    });
+    for (var i = 0; i < keys.length; i++) {
+      await _store.removeItem(keys[i]);
+    }
+    // 不清除 _nextId，保留后续条目的递增 ID
+  }
+
   async function count() {
     await _ensureInit();
     var c = 0;
@@ -81,6 +95,7 @@ var ChangeLog = (function() {
     add: add,
     getPending: getPending,
     clear: clear,
+    clearUpTo: clearUpTo,
     count: count
   };
 })();

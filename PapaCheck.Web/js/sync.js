@@ -19,7 +19,9 @@ var SyncEngine = (function() {
 
   async function pushChanges() {
     var pending = await ChangeLog.getPending();
-    if (pending.length === 0) return true;
+    if (pending.length === 0) return 0;
+
+    var maxPushedId = pending[pending.length - 1].id;
 
     var url = _getBaseUrl() + '/api/sync/push';
     var resp = await fetch(url, {
@@ -29,7 +31,8 @@ var SyncEngine = (function() {
     });
     if (!resp.ok) throw new Error('Push failed: ' + resp.status);
     var result = await resp.json();
-    return result.ok === true;
+    if (result.ok !== true) throw new Error('Push response not ok');
+    return maxPushedId;
   }
 
   async function pullChanges(lastSync) {
@@ -178,11 +181,13 @@ var SyncEngine = (function() {
     _syncInProgress = true;
 
     try {
-      await pushChanges();
+      var maxPushedId = await pushChanges();
 
       var serverTime = await pullChanges(_lastSyncTime);
 
-      await ChangeLog.clear();
+      if (maxPushedId > 0) {
+        await ChangeLog.clearUpTo(maxPushedId);
+      }
 
       _lastSyncTime = serverTime || new Date().toISOString();
       await _saveLastSyncTime(_lastSyncTime);
