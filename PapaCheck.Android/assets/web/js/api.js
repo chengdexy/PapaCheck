@@ -117,7 +117,7 @@ const API = {
       'online-first',
       async () => {
         await this._fetch('/api/homeworks', {
-          method: 'POST',
+          method: 'PUT',
           body: JSON.stringify({ dateKey: dateKey, homeworks: list }),
         });
         return true;
@@ -144,7 +144,7 @@ const API = {
       'online-first',
       async () => {
         await this._fetch('/api/settlement/' + dateKey, {
-          method: 'POST',
+          method: 'PUT',
           body: JSON.stringify({ settlement: settlementData }),
         });
         return true;
@@ -162,7 +162,7 @@ const API = {
       'online-first',
       async () => {
         var result = await this._fetch('/api/points', {
-          method: 'POST',
+          method: 'PATCH',
           body: JSON.stringify({ action, amount, detail }),
         });
         try {
@@ -200,7 +200,7 @@ const API = {
       'online-first',
       async () => {
         await this._fetch('/api/redemptions', {
-          method: 'POST',
+          method: 'PUT',
           body: JSON.stringify({ redemptions: list }),
         });
         return true;
@@ -227,7 +227,7 @@ const API = {
       'online-first',
       async () => {
         await this._fetch('/api/reward-box', {
-          method: 'POST',
+          method: 'PUT',
           body: JSON.stringify({ items }),
         });
         return true;
@@ -254,7 +254,7 @@ const API = {
       'online-first',
       async () => {
         await this._fetch('/api/settings', {
-          method: 'POST',
+          method: 'PUT',
           body: JSON.stringify({ settings }),
         });
         return true;
@@ -281,7 +281,7 @@ const API = {
       'online-first',
       async () => {
         await this._fetch('/api/active-buffs', {
-          method: 'POST',
+          method: 'PUT',
           body: JSON.stringify({ buffs }),
         });
         return true;
@@ -308,7 +308,7 @@ const API = {
       'online-first',
       async () => {
         await this._fetch('/api/shop', {
-          method: 'POST',
+          method: 'PUT',
           body: JSON.stringify({ items }),
         });
         return true;
@@ -335,7 +335,7 @@ const API = {
       'online-first',
       async () => {
         await this._fetch('/api/efficiency/' + dateKey, {
-          method: 'POST',
+          method: 'PUT',
           body: JSON.stringify({ efficiency: efficiencyData }),
         });
         return true;
@@ -361,9 +361,9 @@ const API = {
     return await this._requestWithStrategy(
       'online-first',
       async () => {
-        await this._fetch('/api/freetime/' + dateKey, {
-          method: 'POST',
-          body: JSON.stringify({ tasks }),
+        await this._fetch('/api/freetime', {
+          method: 'PUT',
+          body: JSON.stringify({ dateKey, tasks }),
         });
         return true;
       },
@@ -411,7 +411,7 @@ const API = {
       'online-first',
       async () => {
         await this._fetch('/api/bounty-tasks', {
-          method: 'POST',
+          method: 'PUT',
           body: JSON.stringify({ items }),
         });
         return true;
@@ -437,9 +437,9 @@ const API = {
     return await this._requestWithStrategy(
       'online-first',
       async () => {
-        await this._fetch('/api/bounty-submissions/' + dateKey, {
-          method: 'POST',
-          body: JSON.stringify({ submissions }),
+        await this._fetch('/api/bounty-submissions', {
+          method: 'PUT',
+          body: JSON.stringify({ dateKey, submissions }),
         });
         return true;
       },
@@ -464,9 +464,9 @@ const API = {
     return await this._requestWithStrategy(
       'online-first',
       async () => {
-        await this._fetch('/api/bounty-completions/' + dateKey, {
-          method: 'POST',
-          body: JSON.stringify({ completions }),
+        await this._fetch('/api/bounty-completions', {
+          method: 'PUT',
+          body: JSON.stringify({ dateKey, completions }),
         });
         return true;
       },

@@ -217,12 +217,12 @@ describe('POST /api/data', () => {
   });
 });
 
-describe('POST /api/homeworks', () => {
+describe('PUT /api/homeworks', () => {
   it('保存作业', async () => {
     const dateKey = '2026-06-06';
     const homeworks = [{ id: 'hw_test', subject: '数学', content: '测试作业' }];
     const res = await app.inject({
-      method: 'POST',
+      method: 'PUT',
       url: '/api/homeworks',
       payload: { dateKey, homeworks },
     });
@@ -238,11 +238,11 @@ describe('POST /api/homeworks', () => {
   });
 });
 
-describe('POST /api/settlement/:date', () => {
+describe('PUT /api/settlement/:date', () => {
   it('保存日结', async () => {
     const settlement = { rating: 'A', dailyBase: 100, actualPoints: 95 };
     const res = await app.inject({
-      method: 'POST',
+      method: 'PUT',
       url: '/api/settlement/2026-06-06',
       payload: { settlement },
     });
@@ -252,10 +252,10 @@ describe('POST /api/settlement/:date', () => {
   });
 });
 
-describe('POST /api/points', () => {
+describe('PATCH /api/points', () => {
   it('增加积分', async () => {
     const res = await app.inject({
-      method: 'POST',
+      method: 'PATCH',
       url: '/api/points',
       payload: { action: 'earn', amount: 50, detail: '测试加分' },
     });
@@ -267,7 +267,7 @@ describe('POST /api/points', () => {
 
   it('消耗积分', async () => {
     const res = await app.inject({
-      method: 'POST',
+      method: 'PATCH',
       url: '/api/points',
       payload: { action: 'spend', amount: 20, detail: '测试扣分' },
     });
@@ -278,11 +278,11 @@ describe('POST /api/points', () => {
   });
 });
 
-describe('POST /api/shop', () => {
+describe('PUT /api/shop', () => {
   it('保存商品', async () => {
     const items = [{ id: 1, name: '零食', baseQuantity: 10, remainingQuantity: 10 }];
     const res = await app.inject({
-      method: 'POST',
+      method: 'PUT',
       url: '/api/shop',
       payload: { items },
     });
@@ -292,11 +292,11 @@ describe('POST /api/shop', () => {
   });
 });
 
-describe('POST /api/redemptions', () => {
+describe('PUT /api/redemptions', () => {
   it('保存兑换记录', async () => {
     const redemptions = [{ itemId: 'r1', itemName: '兑换测试', status: 'pending' }];
     const res = await app.inject({
-      method: 'POST',
+      method: 'PUT',
       url: '/api/redemptions',
       payload: { redemptions },
     });
@@ -306,11 +306,11 @@ describe('POST /api/redemptions', () => {
   });
 });
 
-describe('POST /api/reward-box', () => {
+describe('PUT /api/reward-box', () => {
   it('保存奖励箱', async () => {
     const items = [{ name: '宝箱测试', quantity: 1 }];
     const res = await app.inject({
-      method: 'POST',
+      method: 'PUT',
       url: '/api/reward-box',
       payload: { items },
     });
@@ -320,11 +320,11 @@ describe('POST /api/reward-box', () => {
   });
 });
 
-describe('POST /api/settings', () => {
+describe('PUT /api/settings', () => {
   it('保存设置', async () => {
     const settings = { dailyBasePoints: 200, ratingMultipliers: { A: 1.0, B: 0.8 } };
     const res = await app.inject({
-      method: 'POST',
+      method: 'PUT',
       url: '/api/settings',
       payload: { settings },
     });
@@ -334,11 +334,11 @@ describe('POST /api/settings', () => {
   });
 });
 
-describe('POST /api/active-buffs', () => {
+describe('PUT /api/active-buffs', () => {
   it('保存活跃增益', async () => {
     const buffs = [{ name: '专注测试', duration: 30, unit: 'min' }];
     const res = await app.inject({
-      method: 'POST',
+      method: 'PUT',
       url: '/api/active-buffs',
       payload: { buffs },
     });
@@ -348,11 +348,11 @@ describe('POST /api/active-buffs', () => {
   });
 });
 
-describe('POST /api/efficiency/:date', () => {
+describe('PUT /api/efficiency/:date', () => {
   it('保存效率数据', async () => {
     const efficiency = { efficiencyRatio: 0.9, averageRatio: 0.8 };
     const res = await app.inject({
-      method: 'POST',
+      method: 'PUT',
       url: '/api/efficiency/2026-06-06',
       payload: { efficiency },
     });
@@ -362,11 +362,11 @@ describe('POST /api/efficiency/:date', () => {
   });
 });
 
-describe('POST /api/freetime/:date', () => {
+describe('PUT /api/freetime/:date', () => {
   it('保存空闲时间', async () => {
     const tasks = [{ name: '自由活动测试', durationMinutes: 30 }];
     const res = await app.inject({
-      method: 'POST',
+      method: 'PUT',
       url: '/api/freetime/2026-06-06',
       payload: { tasks },
     });
@@ -376,11 +376,11 @@ describe('POST /api/freetime/:date', () => {
   });
 });
 
-describe('POST /api/bounty-tasks', () => {
+describe('PUT /api/bounty-tasks', () => {
   it('保存赏金任务', async () => {
     const items = [{ id: 'bt_test', name: '赏金测试', points: 100 }];
     const res = await app.inject({
-      method: 'POST',
+      method: 'PUT',
       url: '/api/bounty-tasks',
       payload: { items },
     });
@@ -390,11 +390,11 @@ describe('POST /api/bounty-tasks', () => {
   });
 });
 
-describe('POST /api/bounty-submissions/:date', () => {
+describe('PUT /api/bounty-submissions/:date', () => {
   it('保存赏金提交', async () => {
     const submissions = [{ id: 'bs_test', taskId: 'bt_test', startedAt: '2026-06-06T10:00:00Z' }];
     const res = await app.inject({
-      method: 'POST',
+      method: 'PUT',
       url: '/api/bounty-submissions/2026-06-06',
       payload: { submissions },
     });
@@ -404,11 +404,11 @@ describe('POST /api/bounty-submissions/:date', () => {
   });
 });
 
-describe('POST /api/bounty-completions/:date', () => {
+describe('PUT /api/bounty-completions/:date', () => {
   it('保存赏金完成记录', async () => {
     const completions = { taskId: 'bt_test', completed: true };
     const res = await app.inject({
-      method: 'POST',
+      method: 'PUT',
       url: '/api/bounty-completions/2026-06-06',
       payload: { completions },
     });
@@ -425,7 +425,7 @@ describe('POST /api/defer-homework', () => {
   beforeEach(async () => {
     // 确保存在一条作业
     await app.inject({
-      method: 'POST',
+      method: 'PUT',
       url: '/api/homeworks',
       payload: {
         dateKey: testDate,
@@ -621,15 +621,6 @@ describe('PUT /api/homeworks/:id', () => {
   });
 });
 
-describe('PUT /api/settlement/:date', () => {
-  it('全量更新结算', async () => {
-    const data = { rating: 'A', dailyBase: 100, actualPoints: 95 };
-    const res = await app.inject({ method: 'PUT', url: '/api/settlement/2026-06-06', payload: data });
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
-  });
-});
-
 describe('PUT /api/shop/:id', () => {
   it('全量更新商店商品', async () => {
     const item = { id: 'shop-put-1', name: '测试商品', baseQuantity: 5, remainingQuantity: 5 };
@@ -657,37 +648,10 @@ describe('PUT /api/reward-box/:id', () => {
   });
 });
 
-describe('PUT /api/settings', () => {
-  it('全量更新设置', async () => {
-    const data = { dailyBasePoints: 150, ratingMultipliers: { A: 1.0, B: 0.8 } };
-    const res = await app.inject({ method: 'PUT', url: '/api/settings', payload: data });
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
-  });
-});
-
 describe('PUT /api/active-buffs/:id', () => {
   it('全量更新 Buff', async () => {
     const data = { id: 'buff-put-1', name: '专注测试', duration: 30, unit: 'min' };
     const res = await app.inject({ method: 'PUT', url: '/api/active-buffs/buff-put-1', payload: data });
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
-  });
-});
-
-describe('PUT /api/efficiency/:date', () => {
-  it('全量更新效率', async () => {
-    const data = { efficiencyRatio: 0.9, averageRatio: 0.8 };
-    const res = await app.inject({ method: 'PUT', url: '/api/efficiency/2026-06-06', payload: data });
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
-  });
-});
-
-describe('PUT /api/freetime/:id', () => {
-  it('全量更新自由时间', async () => {
-    const data = { id: 'ft-put-1', name: '自由活动测试', durationMinutes: 30 };
-    const res = await app.inject({ method: 'PUT', url: '/api/freetime/ft-put-1', payload: data });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toHaveProperty('ok', true);
   });
@@ -702,23 +666,7 @@ describe('PUT /api/bounty-tasks/:id', () => {
   });
 });
 
-describe('PUT /api/bounty-submissions/:id', () => {
-  it('全量更新赏金提交', async () => {
-    const data = { id: 'bs-put-1', taskId: 'bt_test', startedAt: '2026-06-06T10:00:00Z' };
-    const res = await app.inject({ method: 'PUT', url: '/api/bounty-submissions/bs-put-1', payload: data });
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
-  });
-});
 
-describe('PUT /api/bounty-completions/:id', () => {
-  it('全量更新赏金完成', async () => {
-    const data = { id: 'bc-put-1', taskId: 'bt_test', completed: true };
-    const res = await app.inject({ method: 'PUT', url: '/api/bounty-completions/bc-put-1', payload: data });
-    expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body)).toHaveProperty('ok', true);
-  });
-});
 
 // ==================== PATCH Endpoints ====================
 
