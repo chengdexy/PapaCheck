@@ -18,10 +18,14 @@
 - CLI 参数解析（--port, --web-dir, --db-path, --tts-python）
 - 单 EXE 构建脚本（Node.js SEA --build-sea）
 - 83 个 Vitest 集成测试覆盖所有端点
+- pkg 单 EXE 构建脚本（兼容 node18-win-x64，61 MB 输出）
+
+### Fixed
 - 离线→在线切换的竞态窗口：ping 恢复后立即切换 `reconnecting` 状态，阻止 `pollServer`/`refreshAllData` 在 sync 完成前获取旧数据
 - 消除 `_doReconnect()` 中 `/api/data` 双重冗余调用，改用 `DB.getFullData()` 读取 fullSync 已缓存的数据
 - 统一 `connection.js` 中 `_wasOnline` 两个分支的重连路径为单一 `_doReconnect()` 调用
 - `admin.js` 的 `refreshAllData` 在 `reconnecting` 模式下跳过执行
+- `_doReconnect()` 函数内部恢复状态设置和遮罩显示，确保从任意入口调用时行为正确
 
 ### 修复（Fixed）
 - 推迟到明天做的作业，离线转在线模式同步后回到今天的作业列表：修改 `db.py` 的 `push_merge()` 在指定 `date_key` 找不到 UUID 时跨所有 `date_key` 搜索，防止因 `move_homework` 造成的跨天重复追加；`move_homework()` 补充调用 `record_modification()` 更新 `last_modified` 表
