@@ -18,6 +18,7 @@ export interface EmailMessage {
   date: string;
   text: string;
   html?: string;
+  hasAttachments: boolean;
 }
 
 /**
@@ -93,6 +94,7 @@ export function fetchUnseen(imap: Connection, markAsRead = true): Promise<EmailM
                   date: parsed.date ? parsed.date.toISOString() : '',
                   text: parsed.text || '',
                   html: parsed.html as string | undefined,
+                  hasAttachments: Array.isArray(parsed.attachments) && parsed.attachments.length > 0,
                 });
               } catch {
                 // skip parse errors

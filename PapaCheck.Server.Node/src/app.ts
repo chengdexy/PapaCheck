@@ -77,14 +77,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // ==================== 请求日志 ====================
 
   app.addHook('onResponse', (request, reply, done) => {
-     const url = request.url;
-     if (url === '/api/ping' || url === '/api/data') {
-       done();
-       return;
-     }
-     console.log(`${request.method} ${url} ${reply.statusCode}`);
-     done();
-   });
+    const url = request.url;
+    if (url === '/api/ping' || url === '/api/data') {
+      done();
+      return;
+    }
+    console.log(`${request.method} ${url} ${reply.statusCode}`);
+    done();
+  });
 
   // ==================== 全局错误处理器 ====================
 
@@ -469,36 +469,36 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true });
   });
 
-/**
- * 展开 AI 可能合并的多条作业内容
- * 如 "1. 测试语文 1\n2. 测试语文 2" → [{ subject: '语文', content: '测试语文 1' }, { subject: '语文', content: '测试语文 2' }]
- */
-function expandHomeworkContent(hw: HomeworkItem): HomeworkItem[] {
-  const items: HomeworkItem[] = [];
+  /**
+   * 展开 AI 可能合并的多条作业内容
+   * 如 "1. 测试语文 1\n2. 测试语文 2" → [{ subject: '语文', content: '测试语文 1' }, { subject: '语文', content: '测试语文 2' }]
+   */
+  function expandHomeworkContent(hw: HomeworkItem): HomeworkItem[] {
+    const items: HomeworkItem[] = [];
 
-  // 检查 content 中是否有编号列表（如 "1. X\n2. Y"）
-  const lines = hw.content.split('\n').filter((l) => l.trim());
-  const numberedLines = lines.filter((l) => /^\s*\d+[.、]/.test(l.trim()));
+    // 检查 content 中是否有编号列表（如 "1. X\n2. Y"）
+    const lines = hw.content.split('\n').filter((l) => l.trim());
+    const numberedLines = lines.filter((l) => /^\s*\d+[.、]/.test(l.trim()));
 
-  if (numberedLines.length >= 2) {
-    // 有多条编号项 → 拆分为独立作业
-    for (const line of numberedLines) {
-      const text = line.replace(/^\s*\d+[.、]\s*/, '').trim();
-      if (text) {
-        items.push({
-          subject: hw.subject,
-          content: text,
-          date: hw.date,
-        });
+    if (numberedLines.length >= 2) {
+      // 有多条编号项 → 拆分为独立作业
+      for (const line of numberedLines) {
+        const text = line.replace(/^\s*\d+[.、]\s*/, '').trim();
+        if (text) {
+          items.push({
+            subject: hw.subject,
+            content: text,
+            date: hw.date,
+          });
+        }
       }
+    } else {
+      // 单条内容，保持原样
+      items.push(hw);
     }
-  } else {
-    // 单条内容，保持原样
-    items.push(hw);
-  }
 
-  return items;
-}
+    return items;
+  }
 
   // 36. POST /api/email/sync - 触发邮件同步
   app.post('/api/email/sync', async (request, reply) => {
@@ -554,7 +554,7 @@ function expandHomeworkContent(hw: HomeworkItem): HomeworkItem[] {
       }
     }
 
-    return sendJson(reply, { ok: true, homeworks: expanded || [] });
+    return sendJson(reply, { ok: true, homeworks: expanded || [], hasAttachments: result.hasAttachments ?? false });
   });
 
   // CRDT 同步推送
@@ -587,7 +587,7 @@ function expandHomeworkContent(hw: HomeworkItem): HomeworkItem[] {
   });
 
   // ==================== PUT Endpoints ====================
- 
+
   // 共享 schema：确保 id 参数必填
   const idParamSchema = {
     params: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1 } } },
