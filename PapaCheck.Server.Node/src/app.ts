@@ -431,75 +431,85 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   // ==================== PUT Endpoints ====================
+ 
+  // 共享 schema：确保 id 参数必填
+  const idParamSchema = {
+    params: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1 } } },
+    body: { type: 'object' },
+  };
+  const dateParamSchema = {
+    params: { type: 'object', required: ['date'], properties: { date: { type: 'string', minLength: 10 } } },
+    body: { type: 'object' },
+  };
 
   // 35. PUT /api/homeworks/:id
-  app.put<{ Params: { id: string } }>('/api/homeworks/:id', async (request, reply) => {
+  app.put<{ Params: { id: string } }>('/api/homeworks/:id', { schema: idParamSchema }, async (request, reply) => {
     db.putHomework(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 36. PUT /api/settlement/:date
-  app.put<{ Params: { date: string } }>('/api/settlement/:date', async (request, reply) => {
+  app.put<{ Params: { date: string } }>('/api/settlement/:date', { schema: dateParamSchema }, async (request, reply) => {
     db.putSettlement(request.params.date, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 37. PUT /api/shop/:id
-  app.put<{ Params: { id: string } }>('/api/shop/:id', async (request, reply) => {
+  app.put<{ Params: { id: string } }>('/api/shop/:id', { schema: idParamSchema }, async (request, reply) => {
     db.putShopItem(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 38. PUT /api/redemptions/:id
-  app.put<{ Params: { id: string } }>('/api/redemptions/:id', async (request, reply) => {
+  app.put<{ Params: { id: string } }>('/api/redemptions/:id', { schema: idParamSchema }, async (request, reply) => {
     db.putRedemption(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 39. PUT /api/reward-box/:id
-  app.put<{ Params: { id: string } }>('/api/reward-box/:id', async (request, reply) => {
+  app.put<{ Params: { id: string } }>('/api/reward-box/:id', { schema: idParamSchema }, async (request, reply) => {
     db.putRewardBoxItem(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 40. PUT /api/settings
-  app.put('/api/settings', async (request, reply) => {
+  app.put('/api/settings', { schema: { body: { type: 'object' } } }, async (request, reply) => {
     db.putSettings(request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 41. PUT /api/active-buffs/:id
-  app.put<{ Params: { id: string } }>('/api/active-buffs/:id', async (request, reply) => {
+  app.put<{ Params: { id: string } }>('/api/active-buffs/:id', { schema: idParamSchema }, async (request, reply) => {
     db.putBuff(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 42. PUT /api/efficiency/:date
-  app.put<{ Params: { date: string } }>('/api/efficiency/:date', async (request, reply) => {
+  app.put<{ Params: { date: string } }>('/api/efficiency/:date', { schema: dateParamSchema }, async (request, reply) => {
     db.putEfficiency(request.params.date, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 43. PUT /api/freetime/:id
-  app.put<{ Params: { id: string } }>('/api/freetime/:id', async (request, reply) => {
+  app.put<{ Params: { id: string } }>('/api/freetime/:id', { schema: idParamSchema }, async (request, reply) => {
     db.putFreeTimeTask(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 44. PUT /api/bounty-tasks/:id
-  app.put<{ Params: { id: string } }>('/api/bounty-tasks/:id', async (request, reply) => {
+  app.put<{ Params: { id: string } }>('/api/bounty-tasks/:id', { schema: idParamSchema }, async (request, reply) => {
     db.putBountyTask(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 45. PUT /api/bounty-submissions/:id
-  app.put<{ Params: { id: string } }>('/api/bounty-submissions/:id', async (request, reply) => {
+  app.put<{ Params: { id: string } }>('/api/bounty-submissions/:id', { schema: idParamSchema }, async (request, reply) => {
     db.putBountySubmission(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 46. PUT /api/bounty-completions/:id
-  app.put<{ Params: { id: string } }>('/api/bounty-completions/:id', async (request, reply) => {
+  app.put<{ Params: { id: string } }>('/api/bounty-completions/:id', { schema: idParamSchema }, async (request, reply) => {
     db.putBountyCompletion(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
@@ -507,26 +517,26 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // ==================== PATCH Endpoints ====================
 
   // 47. PATCH /api/homeworks/:id
-  app.patch<{ Params: { id: string } }>('/api/homeworks/:id', async (request, reply) => {
+  app.patch<{ Params: { id: string } }>('/api/homeworks/:id', { schema: idParamSchema }, async (request, reply) => {
     db.patchHomework(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 48. PATCH /api/settlement/:date
-  app.patch<{ Params: { date: string } }>('/api/settlement/:date', async (request, reply) => {
+  app.patch<{ Params: { date: string } }>('/api/settlement/:date', { schema: dateParamSchema }, async (request, reply) => {
     db.patchSettlement(request.params.date, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 49. PATCH /api/points - 增量更新积分
-  app.patch('/api/points', async (request, reply) => {
+  app.patch('/api/points', { schema: { body: { type: 'object' } } }, async (request, reply) => {
     const body = request.body as { earn?: number; spend?: number; detail?: string };
     const balance = db.patchPoints(body);
     return sendJson(reply, { ok: true, balance });
   });
 
   // 50. PATCH /api/settings
-  app.patch('/api/settings', async (request, reply) => {
+  app.patch('/api/settings', { schema: { body: { type: 'object' } } }, async (request, reply) => {
     db.patchSettings(request.body);
     return sendJson(reply, { ok: true });
   });
@@ -534,25 +544,25 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // ==================== DELETE Endpoints ====================
 
   // 51. DELETE /api/homeworks/:id
-  app.delete<{ Params: { id: string } }>('/api/homeworks/:id', async (request, reply) => {
+  app.delete<{ Params: { id: string } }>('/api/homeworks/:id', { schema: { params: idParamSchema.params } }, async (request, reply) => {
     db.deleteHomework(request.params.id);
     return sendJson(reply, { ok: true });
   });
 
   // 52. DELETE /api/shop/:id
-  app.delete<{ Params: { id: string } }>('/api/shop/:id', async (request, reply) => {
+  app.delete<{ Params: { id: string } }>('/api/shop/:id', { schema: { params: idParamSchema.params } }, async (request, reply) => {
     db.deleteShopItem(request.params.id);
     return sendJson(reply, { ok: true });
   });
 
   // 53. DELETE /api/active-buffs/:id
-  app.delete<{ Params: { id: string } }>('/api/active-buffs/:id', async (request, reply) => {
+  app.delete<{ Params: { id: string } }>('/api/active-buffs/:id', { schema: { params: idParamSchema.params } }, async (request, reply) => {
     db.deleteBuff(request.params.id);
     return sendJson(reply, { ok: true });
   });
 
   // 54. DELETE /api/bounty-tasks/:id
-  app.delete<{ Params: { id: string } }>('/api/bounty-tasks/:id', async (request, reply) => {
+  app.delete<{ Params: { id: string } }>('/api/bounty-tasks/:id', { schema: { params: idParamSchema.params } }, async (request, reply) => {
     db.deleteBountyTask(request.params.id);
     return sendJson(reply, { ok: true });
   });
@@ -560,7 +570,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // ==================== HEAD Endpoints ====================
 
   // 55. HEAD /api/shop/:id
-  app.head<{ Params: { id: string } }>('/api/shop/:id', async (request, reply) => {
+  app.head<{ Params: { id: string } }>('/api/shop/:id', { schema: { params: idParamSchema.params } }, async (request, reply) => {
     const item = db.getShopItemById(request.params.id);
     if (!item) {
       return reply.status(404).send();
@@ -569,7 +579,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   // 56. HEAD /api/bounty-tasks/:id
-  app.head<{ Params: { id: string } }>('/api/bounty-tasks/:id', async (request, reply) => {
+  app.head<{ Params: { id: string } }>('/api/bounty-tasks/:id', { schema: { params: idParamSchema.params } }, async (request, reply) => {
     const item = db.getBountyTaskById(request.params.id);
     if (!item) {
       return reply.status(404).send();
