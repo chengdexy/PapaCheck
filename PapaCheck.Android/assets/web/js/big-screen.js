@@ -770,8 +770,9 @@ async function startBountyTask(taskId) {
     const dateKey = Util.dateKey(currentDate);
     const submissions = await API.getBountySubmissions(dateKey) || [];
     if (submissions.some(s => s.taskId === taskId)) return;
-    submissions.push({ taskId, status: 'doing', startedAt: new Date().toISOString(), submittedAt: null });
-    await API.saveBountySubmissions(dateKey, submissions);
+    const newSubmission = { id: Util.genId(), taskId, status: 'doing', startedAt: new Date().toISOString(), submittedAt: null };
+    submissions.push(newSubmission);
+    await API.putBountySubmission(newSubmission.id, newSubmission);
     if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
     cachedData.bountySubmissions[dateKey] = submissions;
     const task = (cachedData?.bountyTasks || []).find(t => t.id === taskId);
@@ -789,9 +790,11 @@ async function abandonBountyTask(taskId) {
   _submittingBounty = true;
   try {
     const dateKey = Util.dateKey(currentDate);
-    let submissions = await API.getBountySubmissions(dateKey) || [];
-    submissions = submissions.filter(s => s.taskId !== taskId);
-    await API.saveBountySubmissions(dateKey, submissions);
+    const submissions = await API.getBountySubmissions(dateKey) || [];
+    const sub = submissions.find(s => s.taskId === taskId);
+    if (!sub) return;
+    sub.status = 'abandoned';
+    await API.putBountySubmission(sub.id, sub);
     if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
     cachedData.bountySubmissions[dateKey] = submissions;
     needsFullRender = true;
@@ -811,7 +814,7 @@ async function submitBountyTask(taskId) {
     if (!sub || sub.status !== 'doing') return;
     sub.status = 'submitted';
     sub.submittedAt = new Date().toISOString();
-    await API.saveBountySubmissions(dateKey, submissions);
+    await API.putBountySubmission(sub.id, sub);
     if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
     cachedData.bountySubmissions[dateKey] = submissions;
     Voice.clear();
@@ -1005,7 +1008,7 @@ async function redeemFromRewardBox(itemId) {
 
   _redeemingRewardBox = true;
   try {
-    redemptions.push({
+    const newRedemption = {
       id: Util.genId(),
       itemName: item.name,
       itemType: item.type || 'item',
@@ -1017,8 +1020,9 @@ async function redeemFromRewardBox(itemId) {
       createdAt: new Date().toISOString(),
       fromRewardBox: true,
       rewardBoxItemId: item.id,
-    });
-    await API.saveRedemptions(redemptions);
+    };
+    redemptions.push(newRedemption);
+    await API.putRedemption(newRedemption.id, newRedemption);
 
     cachedData = await API.getData();
     showMyRewards();
@@ -1041,14 +1045,14 @@ async function cancelRedemption(redemptionId) {
     }
 
     r.status = 'cancelled';
-    await API.saveRedemptions(redemptions);
+    await API.putRedemption(r.id, r);
 
     if (!r.fromRewardBox) {
       const shopItems = cachedData?.shopItems || [];
       const shopItem = shopItems.find(si => si.name === r.itemName);
       if (shopItem) {
         shopItem.remainingQuantity = (shopItem.remainingQuantity ?? 0) + 1;
-        await API.saveShopItems(shopItems);
+        await API.putShopItem(shopItem.id, shopItem);
       }
 
       await API.updatePoints('earn', r.points, '撤回兑换：' + r.itemName);
@@ -1131,14 +1135,15 @@ async function redeemItem(itemId) {
   _redeemingItem = true;
   try {
     item.remainingQuantity = remaining - 1;
-    await API.saveShopItems(items);
+    await API.putShopItem(item.id, item);
 
     const rewardBox = cachedData?.rewardBox || [];
     const existing = rewardBox.find(rb => rb.name === item.name);
     if (existing) {
       existing.quantity = (existing.quantity || 0) + 1;
+      await API.putRewardBoxItem(existing.id, existing);
     } else {
-      rewardBox.push({
+      const newItem = {
         id: Util.genId(),
         name: item.name,
         type: item.type || 'item',
@@ -1146,9 +1151,10 @@ async function redeemItem(itemId) {
         buffDuration: item.buffDuration ?? 0,
         buffUnit: item.buffUnit || '',
         quantity: 1,
-      });
+      };
+      rewardBox.push(newItem);
+      await API.putRewardBoxItem(newItem.id, newItem);
     }
-    await API.saveRewardBox(rewardBox);
 
     await API.updatePoints('spend', item.points, '兑换：' + item.name);
 
@@ -1171,7 +1177,7 @@ async function backToMain() {
       settlement.viewedAt = Util.nowTimeStr();
       const dateKey = Util.dateKey(currentDate);
       if (isServerMode) {
-        await API.saveSettlement(dateKey, settlement);
+        await API.putSettlement(dateKey, settlement);
       }
     }
   }
