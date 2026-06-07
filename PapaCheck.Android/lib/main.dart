@@ -118,8 +118,8 @@ class BatteryMonitor {
   }
 
   void _onBatteryStateChanged(BatteryState state) {
-    if (_lastState != null && state == BatteryState.charging) {
-      // 检测到充电，重置阈值标记
+    if (_lastState == BatteryState.discharging && state == BatteryState.charging) {
+      // 检测到从 discharging 切换到 charging，重置阈值标记
       _alerted20 = false;
       _alerted10 = false;
     }
