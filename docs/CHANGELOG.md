@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### Changed
+- `release.py` 输出美化：去除原始命令日志（子进程输出重定向 DEVNULL），改用 `▶ [n/total] 步骤名 ... ✓` 行内动画；输出按阶段分区（清理/构建/归档/后置处理），尾部总结改用双线框；移除未使用的辅助函数
+
 ### Fixed
 - 修复 pkg EXE 中 TTS 语音不播报：build-sea.mjs 的 assets 路径 `'dist/scripts/**/*'` 相对于 dist/package.json 解析为 `dist/dist/scripts/`，导致 tts_bridge.py 未打包进 EXE，改为 `'scripts/**/*'`
 - 修复 `resolveScriptPath()` 的 `existsSync` 在 pkg 快照虚拟文件系统中失效：改用 `process.pkg` 检测 + `readFileSync` 从快照读取脚本后写入临时目录，再传给 Python 子进程
