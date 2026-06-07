@@ -371,7 +371,7 @@ function renderHomeworkTab() {
                 <div class="hw-admin-icon">${subject.icon}</div>
                 <div class="hw-admin-info">
                   <div class="hw-admin-subject">${escapeHtml(hw.subject)} - ${escapeHtml(hw.content)}${deferBadge}${completedInSchoolBadge}</div>
-                  <div class="hw-admin-meta">${modeText}${bpText}${hw.actualDuration !== null ? ' · 实际' + hw.actualDuration + '分钟' : ''}${elapsedText}</div>
+                  <div class="hw-admin-meta">${modeText}${bpText}${hw.actualDuration != null ? ' · 实际' + hw.actualDuration + '分钟' : ''}${elapsedText}</div>
                 </div>
                 <div class="hw-admin-status">${statusHtml}</div>
                 <div class="hw-admin-actions">

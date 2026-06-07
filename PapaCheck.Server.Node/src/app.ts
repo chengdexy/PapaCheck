@@ -690,6 +690,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
           suggestedDuration: hw.suggestedDuration ?? 20,
           basePoints: hw.basePoints ?? 10,
           mode: 'pending',
+          actualDuration: null,
         });
       }
 

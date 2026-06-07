@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-07 13:10
+> 最后更新：2026-06-07 15:26
 
 ## 当前版本
 
@@ -72,6 +72,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-07 | 修复邮件解析添加的作业在管理端显示"实际undefined分钟"：Node.js 邮件同步创建作业补充 `actualDuration: null`，admin.js 渲染判空改用 `!= null` |
 | 2026-06-07 | 修复 `@fastify/static` 缓存导致静态文件全部返回 304（开发模式下禁用 ETag/Last-Modified），页面无法加载新代码 |
 | 2026-06-07 | 修复 DELETE /api/notify/consumed 不符合 RESTful 规范：请求体改为 URL 查询参数 `?ids=` 传递 |
 | 2026-06-07 | 专用通知接口（notify-api）：notifications 表 + 3 个 API 端点 + 前端 api.js 3 个方法 + admin.js 10 处接入 + app.js pollServer 统一通知拉取 + 邮件同步通知 + CRDT 集成；Code review 修复 6 个 minor 问题；全量 311 个 Vitest 测试通过 |
