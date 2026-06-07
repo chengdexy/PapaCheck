@@ -240,15 +240,18 @@ def create_zips(output_dir, exe_ver, apk_ver, apk_src, dist_dir):
     apk_name = f'PapaCheck-{apk_ver}.apk'
     apk_dst = os.path.join(output_dir, apk_name)
     shutil.copy2(apk_src, apk_dst)
+    done(f'APK 复制 → {os.path.basename(apk_dst)}')
 
     full_zip = os.path.join(output_dir, f'PapaCheck-v{exe_ver}_full.zip')
     with zipfile.ZipFile(full_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
         zf.write(exe_path, os.path.basename(exe_path))
         zf.write(apk_dst, apk_name)
+    done(f'ZIP 打包 → {os.path.basename(full_zip)}')
 
     win_zip = os.path.join(output_dir, f'PapaCheck-v{exe_ver}_win.zip')
     with zipfile.ZipFile(win_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
         zf.write(exe_path, os.path.basename(exe_path))
+    done(f'ZIP 打包 → {os.path.basename(win_zip)}')
 
     return full_zip, win_zip
 
@@ -574,8 +577,6 @@ def main():
         if need_apk and need_exe:
             zips = create_zips(output_dir, exe_ver, apk_ver,
                                apk_archive_path, dist_exe_dir)
-            done(f'ZIP 打包 → {os.path.basename(zips[0])}')
-            done(f'ZIP 打包 → {os.path.basename(zips[1])}')
         elif need_exe:
             exe_path = os.path.join(dist_exe_dir,
                                     f'PapaCheck-{exe_ver}.exe')
