@@ -16,6 +16,8 @@ for p in (_PROJECT_ROOT, _WINDOWS_DIR):
 # 这些函数将在 app_gui.py 中实现为模块级函数（类方法委托调用它们）
 from app_gui import (
     _get_node_server_exe,
+    _NODE_EXE_DIR,
+    _NODE_EXE_NAME,
     _start_node_server_process,
     _stop_node_server_process,
 )
@@ -58,7 +60,6 @@ class TestGetNodeServerExe:
                 with patch.object(sys, 'frozen', True, create=True):
                     with patch.object(sys, '_MEIPASS', mock_meipass, create=True):
                         exe = _get_node_server_exe()
-                        from app_gui import _NODE_EXE_DIR, _NODE_EXE_NAME
                         assert exe == os.path.join(_NODE_EXE_DIR, _NODE_EXE_NAME)
 
 
