@@ -39,7 +39,7 @@ async function build() {
   if (existsSync(testExtSrc)) { copyFileSync(testExtSrc, testExtDst); }
 
   console.log('\n=== Step 5: 创建临时 package.json ===\n');
-  var pkgJson = { name: 'papacheck-server', version: '1.2.0', bin: 'bundle.cjs', dependencies: { 'better-sqlite3': '*', '@fastify/static': '*', '@fastify/swagger': '*', '@fastify/swagger-ui': '*' }, pkg: { assets: ['dist/scripts/**/*', '../node_modules/better-sqlite3/**/*', '../node_modules/@fastify/swagger-ui/static/**/*'], targets: ['node18-win-x64'] } };
+  var pkgJson = { name: 'papacheck-server', version: '1.2.0', bin: 'bundle.cjs', dependencies: { 'better-sqlite3': '*', '@fastify/static': '*', '@fastify/swagger': '*', '@fastify/swagger-ui': '*' }, pkg: { assets: ['scripts/**/*', '../node_modules/better-sqlite3/**/*', '../node_modules/@fastify/swagger-ui/static/**/*'], targets: ['node18-win-x64'] } };
   writeFileSync(resolve(DIST, 'package.json'), JSON.stringify(pkgJson, null, 2));
   console.log('\n=== Step 6: pkg 打包 EXE ===\n');
   try { execSync('rmdir /S /Q "' + resolve(DIST, 'node_modules') + '"', { stdio: 'ignore' }); } catch(e) {}
