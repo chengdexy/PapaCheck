@@ -17,6 +17,8 @@
 - `DELETE /api/notify/consumed` 改为通过 URL 查询参数 `?ids=` 传递通知 ID，符合 RESTful 规范（DELETE 请求体可能被代理丢弃）
 - 管理端 admin.js 所有播报操作点（调分/评级/商品/奖励箱/延后/驳回/赏金/新增作业）改为直接调用 `API.announce()`，移除 `_pointsAdjustmentNote` hack
 - 孩子端 app.js pollServer 重构：移除 8 处 diff 检测 `Voice.speak()`，改为轮询末尾统一调用 `API.getPendingNotifications()` 拉取并播报通知，保留 `needsFullRender` 和 UI 刷新逻辑
+- 通知过期时间从 1 分钟延长至 1 小时：解决桌面浏览器 Autoplay Policy 导致语音延迟播报时通知已被清理的问题
+- 移除 `Voice._unlocked` 检查：Android WebView 已设置 `setMediaPlaybackRequiresUserGesture(false)`，无需 JS 层拦截音频播放；`_playNext()` 直接调用 `audio.play()`，桌面浏览器走 `NotAllowedError` 兜底
 
 ### Removed
 - `_pointsAdjustmentNote` 跨设备通知 hack（settings 污染），替换为专用通知接口
@@ -25,12 +27,15 @@
 
 ### Fixed
 - 修复 `@fastify/static` 默认开启 ETag/Last-Modified 导致开发模式下静态文件全部返回 304，浏览器使用旧版缓存代码；在 `fastifyStatic` 注册选项中添加 `cacheControl: false`, `etag: false`, `lastModified: false`
+- 修复通知 CRDT 同步后丢失原始时间戳：`addNotification` 新增可选 `createdAt` 参数，CRDT 同步时传入 `op.value.createdAt`
+- 修复孩子端打开页面后通知语音不播报直到点击屏幕：`_playNext()` 移除 `Voice._unlocked` 提前返回
 - Code review 修复 6 个 minor 问题：移除 `GET /api/notify/pending` 中冗余的 `cleanupExpiredNotifications()` 调用（`getPendingNotifications()` 内部已清理）；移除 app.js 作业 diff 中的死代码空条件注释；清理 `_rewardBoxVoiceHandled` 死标志；移除 `getPendingNotifications()` 返回中多余的 `created_at` 蛇形字段；移除未使用的 `emailNew`/`manualNew` 变量
 
 ### Changed
 - 重写 AI 邮件解析 system prompt，仿照 email_client.py 的结构化格式（输出格式含示例、3 条规则、约束），输出改为严格按照 JSON 数组格式
 
 ### Fixed
+- 修复 Windows 端 log 框轮询日志不受"显示轮询日志"配置控制：`_write_log` 方法改为根据本地 `config.json` 的 `show_polling_log` 值过滤轮询端点日志（`/api/ping`、`/api/data`、`/api/notify/pending`），配置生效不再依赖服务端；移除之前错误的服务端过滤方案（`onResponse` 钩子读 DB + `POST /api/settings` 同步配置到服务端）
 - 修复邮件解析添加的作业在管理端显示"实际undefined分钟"：Node.js 邮件同步创建作业时补充 `actualDuration: null` 字段，admin.js 渲染判空改用 `!= null` 防御 `undefined`
 - 修复 Android APK 更新后提示"安装包损坏"：`_downloadAndInstall` 使用 `Directory.systemTemp`（系统临时目录）保存 APK，Android 10+ 下 FileProvider 的 `<cache-path>` 无法覆盖该目录，安装器读取文件失败。改为 `getTemporaryDirectory()`（应用缓存目录），提取 `UpdateService` 方便测试
 - 修复孩子端积分商店和奖励箱的滚动条回弹问题：轮询触发 `updateBigScreen()` 时 `innerHTML` 重建 DOM 导致 `scrollTop` 重置为 0，通过保存/恢复 `scrollTop` 解决

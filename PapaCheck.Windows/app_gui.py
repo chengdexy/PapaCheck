@@ -17,6 +17,7 @@ import ctypes
 import ctypes.wintypes
 import urllib.request
 import urllib.error
+import urllib.parse
 import subprocess
 import atexit
 import signal
@@ -954,6 +955,12 @@ class PapaCheckApp:
             self.root.after(250, self._poll_log_queue)
 
     def _write_log(self, text):
+        # 根据本地配置过滤轮询日志
+        cfg = _load_config()
+        if cfg and not cfg.get('show_polling_log', False):
+            polling_patterns = ('/api/ping', '/api/data', '/api/notify/pending')
+            if any(p in text for p in polling_patterns):
+                return
         timestamp = time.strftime('%H:%M:%S')
         self.log_text.config(state=tk.NORMAL)
         tag = self._log_tag(text)
@@ -962,6 +969,7 @@ class PapaCheckApp:
             stripped = line.strip()
             if stripped:
                 stripped = re.sub(r'^\s*\[\d{2}/\w{3}/\d{4}\s\d{2}:\d{2}:\d{2}\]\s*', '', stripped)
+                stripped = urllib.parse.unquote(stripped)
                 self.log_text.insert(tk.END, stripped + '\n', tag)
         self.log_text.see(tk.END)
         self.log_text.config(state=tk.DISABLED)
@@ -1458,15 +1466,6 @@ class PapaCheckApp:
                         return
 
             _save_config(new_cfg)
-
-            try:
-                url = _server_url_var.get().strip().rstrip('/') + '/api/settings'
-                payload = json.dumps({'settings': {'show_polling_log': _show_polling_log_var.get()}}).encode()
-                req = urllib.request.Request(url, data=payload, method='POST')
-                req.add_header('Content-Type', 'application/json')
-                urllib.request.urlopen(req, timeout=5)
-            except Exception:
-                pass
 
             # 保存邮箱配置到 Node.js 服务器（供 /api/email/sync 使用）
             if use_ai:

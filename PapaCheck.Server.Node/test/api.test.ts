@@ -902,7 +902,7 @@ describe('GET /api/notify/pending', () => {
     const validId = 'valid-001';
     const expiredId = 'expired-001';
     dbWrite.prepare('INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)').run(validId, '有效通知', Date.now());
-    dbWrite.prepare('INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)').run(expiredId, '过期通知', Date.now() - 120000);
+    dbWrite.prepare('INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)').run(expiredId, '过期通知', Date.now() - 7200000);
 
     const res = await app.inject({ method: 'GET', url: '/api/notify/pending' });
     expect(res.statusCode).toBe(200);

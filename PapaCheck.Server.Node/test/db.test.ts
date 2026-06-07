@@ -1325,7 +1325,7 @@ describe('Database', () => {
     it('getPendingNotifications 过滤过期通知', () => {
       (db as any).db.prepare(
         'INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)'
-      ).run('old-id', '旧通知', Date.now() - 120000);
+      ).run('old-id', '旧通知', Date.now() - 7200000);
 
       const notifications = (db as any).getPendingNotifications();
       expect(notifications).toEqual([]);
@@ -1339,7 +1339,7 @@ describe('Database', () => {
     it('cleanupExpiredNotifications 删除过期通知', () => {
       (db as any).db.prepare(
         'INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)'
-      ).run('old-id', '旧通知', Date.now() - 120000);
+      ).run('old-id', '旧通知', Date.now() - 7200000);
       const validId = (db as any).addNotification('新通知');
 
       (db as any).cleanupExpiredNotifications();
