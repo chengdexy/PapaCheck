@@ -22,6 +22,23 @@ DEFAULT_OUTPUT_DIR = os.path.join(WINDOWS_DIR, 'dist')
 
 VERSION_RE = re.compile(r'^(\d+)\.(\d+)\.(\d+)$')
 
+# ── 输出美化 ────────────────────────────────────────────
+
+SECTION_WIDTH = 56
+
+
+def section(title):
+    """打印分区标题。"""
+    print()
+    print(f'── {title} ' + '─' * (SECTION_WIDTH - len(title) - 4))
+
+
+def done(text):
+    """打印完成信息。"""
+    print(f'  ✓ {text}')
+
+# ───────────────────────────────────────────────────────
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -148,19 +165,21 @@ def read_apk_version():
     return '0.0.0'
 
 
-def run_step(desc, cmd, cwd=None, shell=False):
-    print(f'[{desc}] 执行中...')
-    rel = os.path.relpath(cwd or ROOT, ROOT) or '.'
+def run_step(n, total, desc, cmd, cwd=None, shell=False):
+    print(f'  ▶ [{n}/{total}] {desc} ... ', end='', flush=True)
     if shell:
-        print(f'  cd {rel} && {cmd}')
-        result = subprocess.run(cmd, cwd=cwd, shell=True)
+        result = subprocess.run(cmd, cwd=cwd, shell=True,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL)
     else:
-        print(f'  cd {rel} && {" ".join(cmd)}')
-        result = subprocess.run(cmd, cwd=cwd)
+        result = subprocess.run(cmd, cwd=cwd,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL)
     if result.returncode != 0:
-        print(f'[失败] {desc} (退出码: {result.returncode})')
+        print('✗')
+        print(f'  ✗ {desc} (退出码: {result.returncode})')
         sys.exit(result.returncode)
-    print(f'[完成] {desc}\n')
+    print('✓')
 
 
 def build_steps(args):
@@ -204,7 +223,7 @@ def archive_apk(apk_ver):
     os.makedirs(APK_ARCHIVE_DIR, exist_ok=True)
     dst = os.path.join(APK_ARCHIVE_DIR, f'PapaCheck-{apk_ver}.apk')
     shutil.copy2(APK_BUILD_OUTPUT, dst)
-    print(f'APK 已归档: {dst}')
+    done(f'APK 归档 → {dst}')
     for fname in os.listdir(APK_ARCHIVE_DIR):
         full = os.path.join(APK_ARCHIVE_DIR, fname)
         if os.path.isfile(full) and fname.startswith('PapaCheck-') \
@@ -221,41 +240,43 @@ def create_zips(output_dir, exe_ver, apk_ver, apk_src, dist_dir):
     apk_name = f'PapaCheck-{apk_ver}.apk'
     apk_dst = os.path.join(output_dir, apk_name)
     shutil.copy2(apk_src, apk_dst)
-    print(f'APK 已复制到输出目录: {apk_dst}')
 
     full_zip = os.path.join(output_dir, f'PapaCheck-v{exe_ver}_full.zip')
     with zipfile.ZipFile(full_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
         zf.write(exe_path, os.path.basename(exe_path))
         zf.write(apk_dst, apk_name)
-    print(f'full ZIP 已创建: {full_zip}')
 
     win_zip = os.path.join(output_dir, f'PapaCheck-v{exe_ver}_win.zip')
     with zipfile.ZipFile(win_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
         zf.write(exe_path, os.path.basename(exe_path))
-    print(f'win ZIP 已创建: {win_zip}')
 
     return full_zip, win_zip
 
 
 def print_summary(output_dir, exe_ver, apk_ver, zips, need_exe, need_apk, no_zip):
-    exe_name = f'PapaCheck-{exe_ver}.exe'
-    apk_name = f'PapaCheck-{apk_ver}.apk'
-
-    print('=' * 48)
-    print('  Release Complete!')
-    print(f'  EXE version: {exe_ver}')
-    print(f'  APK version: {apk_ver}')
-    print(f'  Output directory: {output_dir}')
     print()
-    print('  Artifacts:')
+    print('  ' + '═' * SECTION_WIDTH)
+    print('  ═══  发布完成  ═══')
+    print('  ' + '═' * SECTION_WIDTH)
+    print()
+    if need_exe or need_apk:
+        print('  版本')
+        if need_exe:
+            print(f'    EXE  {exe_ver}')
+        if need_apk:
+            print(f'    APK  {apk_ver}')
+        print()
+    print('  产物')
     if need_exe:
-        print(f'    {os.path.join(output_dir, exe_name)}')
+        print(f'    • PapaCheck-{exe_ver}.exe')
     if need_apk:
-        print(f'    {os.path.join(output_dir, apk_name)}')
+        print(f'    • PapaCheck-{apk_ver}.apk')
     if zips:
         for z in zips:
-            print(f'    {z}')
-    print('=' * 48)
+            print(f'    • {os.path.basename(z)}')
+    print()
+    print(f'  输出目录  {output_dir}')
+    print()
 
 
 def ask_int(prompt, min_val, max_val):
@@ -500,7 +521,7 @@ def check_better_sqlite3():
 
 def rebuild_better_sqlite3():
     """在 NODE_DIR 中执行 npm rebuild better-sqlite3"""
-    run_step('重建 better-sqlite3 原生模块',
+    run_step(1, 1, '重建 better-sqlite3 原生模块',
              'npm rebuild better-sqlite3', cwd=NODE_DIR, shell=True)
 
 
@@ -514,29 +535,34 @@ def main():
     output_dir = os.path.abspath(args.output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
+    # ── 清理 ──
+    section('清理')
     if need_exe:
         pyinstaller_work_dir = os.path.join(WINDOWS_DIR, 'dist', 'PapaCheck')
         if os.path.isdir(pyinstaller_work_dir):
-            print('[清理] 删除旧的 dist/PapaCheck/ ...\n')
             shutil.rmtree(pyinstaller_work_dir)
-
+            done('移除旧版 PyInstaller 构建目录')
     if need_apk and os.path.exists(APK_BUILD_OUTPUT):
-        print('[清理] 删除旧的 app-release.apk ...\n')
         os.remove(APK_BUILD_OUTPUT)
+        done('移除旧版 APK 构建产物')
 
+    # ── 构建 ──
+    section('构建')
     steps = build_steps(args)
     for i, (desc, cmd, cwd, shell) in enumerate(steps, 1):
-        print(f'[{i}/{len(steps)}] ', end='')
-        run_step(desc, cmd, cwd=cwd, shell=shell)
+        run_step(i, len(steps), desc, cmd, cwd=cwd, shell=shell)
 
-    if need_apk:
-        if not os.path.isfile(APK_BUILD_OUTPUT):
-            print(f'[错误] APK 构建产物未找到: {APK_BUILD_OUTPUT}')
-            sys.exit(1)
+    if need_apk and not os.path.isfile(APK_BUILD_OUTPUT):
+        print()
+        print(f'  ✗ APK 构建产物未找到: {APK_BUILD_OUTPUT}')
+        sys.exit(1)
 
+    # ── 版本号 ──
     exe_ver = read_exe_version() if need_exe else ''
     apk_ver = read_apk_version() if need_apk else ''
 
+    # ── 归档 ──
+    section('归档')
     apk_archive_path = None
     if need_apk:
         apk_archive_path = archive_apk(apk_ver)
@@ -548,6 +574,8 @@ def main():
         if need_apk and need_exe:
             zips = create_zips(output_dir, exe_ver, apk_ver,
                                apk_archive_path, dist_exe_dir)
+            done(f'ZIP 打包 → {os.path.basename(zips[0])}')
+            done(f'ZIP 打包 → {os.path.basename(zips[1])}')
         elif need_exe:
             exe_path = os.path.join(dist_exe_dir,
                                     f'PapaCheck-{exe_ver}.exe')
@@ -556,16 +584,18 @@ def main():
             os.makedirs(output_dir, exist_ok=True)
             with zipfile.ZipFile(win_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
                 zf.write(exe_path, os.path.basename(exe_path))
-            print(f'win ZIP 已创建: {win_zip}')
+            done(f'ZIP 打包 → {os.path.basename(win_zip)}')
             zips = [win_zip]
-        elif need_apk:
-            print('[提示] 仅构建 APK，跳过 ZIP 打包')
+    else:
+        done('跳过 ZIP 打包')
 
+    # ── 后置处理 ──
+    section('后置处理')
     if check_better_sqlite3():
-        print('[post-release] better-sqlite3 需要重建，正在执行 npm rebuild...')
+        done('better-sqlite3 需要重建')
         rebuild_better_sqlite3()
     else:
-        print('[post-release] better-sqlite3 已就绪，无需重建')
+        done('better-sqlite3 已就绪，无需重建')
 
     print_summary(output_dir, exe_ver, apk_ver, zips,
                   need_exe, need_apk, args.no_zip)
