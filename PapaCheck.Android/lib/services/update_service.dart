@@ -20,13 +20,8 @@ class UpdateService {
   /// 获取 APK 下载目标路径
   ///
   /// 返回应用缓存目录下的 `PapaCheck.apk` 全路径。
-  /// 若父目录不存在，自动创建。
   static Future<String> getDownloadPath() async {
     final cacheDir = _testDirectory ?? await getTemporaryDirectory();
-    final downloadDir = Directory(cacheDir.path);
-    if (!await downloadDir.exists()) {
-      await downloadDir.create(recursive: true);
-    }
     return '${cacheDir.path}/PapaCheck.apk';
   }
 
