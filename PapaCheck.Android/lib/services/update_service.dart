@@ -24,9 +24,7 @@ class UpdateService {
   static Future<String> getDownloadPath() async {
     final cacheDir = _testDirectory ?? await getTemporaryDirectory();
     final downloadDir = Directory(cacheDir.path);
-    if (!await downloadDir.exists()) {
-      await downloadDir.create(recursive: true);
-    }
+    await downloadDir.create(recursive: true);
     return '${cacheDir.path}/PapaCheck.apk';
   }
 
