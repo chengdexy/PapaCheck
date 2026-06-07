@@ -73,7 +73,7 @@
 | 日期 | 变更 |
 |------|------|
 | 2026-06-07 | 修复通知语音不播报：移除 `Voice._unlocked` 检查（Android WebView 无需手势）；通知 TTL 1min→1h；`addNotification` 支持 CRDT 原始时间戳 |
-| 2026-06-07 | 修复 Windows 端 log 框轮询日志不受"显示轮询日志"配置控制：改为 Windows 客户端 `_write_log` 根据本地 `config.json` 过滤轮询日志（`/api/ping`、`/api/data`、`/api/notify/pending`），服务端不做过滤 |
+| 2026-06-07 | 日志染色重构：六级逐行染色（API 状态码+方法类型 / 中文关键字），日志框增加行间距+滚动条+URL解码，配置缓存避免每次读磁盘 |
 | 2026-06-07 | 修复邮件解析添加的作业在管理端显示"实际undefined分钟"：Node.js 邮件同步创建作业补充 `actualDuration: null`，admin.js 渲染判空改用 `!= null` |
 | 2026-06-07 | 修复 `@fastify/static` 缓存导致静态文件全部返回 304（开发模式下禁用 ETag/Last-Modified），页面无法加载新代码 |
 | 2026-06-07 | 修复 DELETE /api/notify/consumed 不符合 RESTful 规范：请求体改为 URL 查询参数 `?ids=` 传递 |

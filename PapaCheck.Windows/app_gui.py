@@ -131,22 +131,30 @@ def _credential_delete(name):
 # --- 配置路径 ---
 _CONFIG_DIR = os.path.join(os.environ['APPDATA'], 'PapaCheck')
 _CONFIG_PATH = os.path.join(_CONFIG_DIR, 'config.json')
+# 配置缓存，避免每次 _write_log 都读磁盘
+_config_cache = None
 
 
 def _load_config():
+    global _config_cache
+    if _config_cache is not None:
+        return _config_cache
     if not os.path.exists(_CONFIG_PATH):
         return None
     try:
         with open(_CONFIG_PATH, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            _config_cache = json.load(f)
+            return _config_cache
     except Exception:
         return None
 
 
 def _save_config(data):
+    global _config_cache
     os.makedirs(_CONFIG_DIR, exist_ok=True)
     with open(_CONFIG_PATH, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+    _config_cache = data
 
 
 def _ensure_config():
@@ -588,12 +596,19 @@ class PapaCheckApp:
         self.log_text = tk.Text(log_frame, bg='#020617', fg='#94a3b8',
                                 font=('Consolas', 9), wrap=tk.WORD, state=tk.DISABLED,
                                 bd=0, padx=10, pady=8, highlightthickness=0)
-        self.log_text.pack(fill=tk.BOTH, expand=True)
-        self.log_text.tag_config('success', foreground='#4ade80')
-        self.log_text.tag_config('error', foreground='#f87171')
-        self.log_text.tag_config('warning', foreground='#fbbf24')
-        self.log_text.tag_config('info', foreground='#94a3b8')
-        self.log_text.tag_config('highlight', foreground='#60a5fa')
+        self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # 添加日志滚动条
+        log_scrollbar = tk.Scrollbar(log_frame, command=self.log_text.yview)
+        log_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.log_text.config(yscrollcommand=log_scrollbar.set)
+        # 六级染色：重要程度从高到低
+        spacing = 2  # 行前间距，增加呼吸感
+        self.log_text.tag_config('error', foreground='#f87171', spacing1=spacing)
+        self.log_text.tag_config('warn', foreground='#fbbf24', spacing1=spacing)
+        self.log_text.tag_config('success', foreground='#4ade80', spacing1=spacing)
+        self.log_text.tag_config('system', foreground='#22d3ee', spacing1=spacing)
+        self.log_text.tag_config('highlight', foreground='#60a5fa', spacing1=spacing)
+        self.log_text.tag_config('info', foreground='#94a3b8', spacing1=spacing)
 
         # --- 按钮行：打开孩子端/管理端（左）+ 开机自启动/启动服务器（右） ---
         btn_frame = tk.Frame(self.root, bg=bg)
@@ -963,31 +978,63 @@ class PapaCheckApp:
                 return
         timestamp = time.strftime('%H:%M:%S')
         self.log_text.config(state=tk.NORMAL)
-        tag = self._log_tag(text)
-        self.log_text.insert(tk.END, '[' + timestamp + '] ', 'info')
         for line in text.split('\n'):
             stripped = line.strip()
             if stripped:
                 stripped = re.sub(r'^\s*\[\d{2}/\w{3}/\d{4}\s\d{2}:\d{2}:\d{2}\]\s*', '', stripped)
                 stripped = urllib.parse.unquote(stripped)
+                tag = self._classify_line(stripped)
+                self.log_text.insert(tk.END, '[' + timestamp + '] ', 'info')
                 self.log_text.insert(tk.END, stripped + '\n', tag)
         self.log_text.see(tk.END)
         self.log_text.config(state=tk.DISABLED)
 
     @staticmethod
-    def _log_tag(text):
-        err_kw = ('错误', '失败', '拒绝', '已被占用')
-        if any(k in text for k in err_kw):
+    def _classify_line(line):
+        """按重要程度逐行分类，返回 tag_name
+        
+        先尝试匹配服务端 API 日志格式: METHOD URL STATUS_CODE
+        失败则按关键字匹配。
+        """
+        # Step 1: 尝试解析 API 日志格式 "METHOD /path STATUS"
+        m = re.match(r'^(GET|POST|PUT|PATCH|DELETE|HEAD)\s+\S+\s+(\d{3})$', line)
+        if m:
+            method = m.group(1)
+            status = int(m.group(2))
+            if status >= 500:
+                return 'error'
+            elif status >= 400:
+                return 'warn'
+            elif status >= 200:
+                if method in ('POST', 'PUT', 'PATCH', 'DELETE'):
+                    return 'success'
+                else:
+                    return 'info'
+            return 'info'
+
+        # Step 2: 非 API 日志，按关键字匹配
+        err_kw = ('错误', '失败', '拒绝', '已被占用', 'Error:', 'error:')
+        if any(k in line for k in err_kw):
             return 'error'
+
         warn_kw = ('请先', '未找到', '未匹配', '不存在', '无读写', 'AI 未解析')
-        if any(k in text for k in warn_kw):
-            return 'warning'
-        succ_kw = ('成功', '完成', '已复制', '已添加', '已保存', '已清除')
-        if any(k in text for k in succ_kw):
+        if any(k in line for k in warn_kw):
+            return 'warn'
+
+        sys_kw = ('正在启动', '正在停止', '正在连接', '开始', '已启动', '已停止',
+                  '服务器已停止', '托盘图标已创建', '系统托盘已启动',
+                  '服务配置已保存', '已清除', '已复制')
+        if any(k in line for k in sys_kw):
+            return 'system'
+
+        succ_kw = ('成功', '完成', '已添加', '已保存')
+        if any(k in line for k in succ_kw):
             return 'success'
+
         high_kw = ('服务器启动成功', '下载了')
-        if any(k in text for k in high_kw):
+        if any(k in line for k in high_kw):
             return 'highlight'
+
         return 'info'
 
     # ===== 窗口 & 托盘 =====
