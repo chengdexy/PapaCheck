@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import tempfile
+import subprocess
 import argparse
 import zipfile
 from unittest.mock import patch
@@ -18,6 +19,7 @@ def _make_args(**kwargs):
     defaults = {
         'exe_only': False,
         'apk_only': False,
+        'node_only': False,
         'bump_exe': None,
         'bump_apk': None,
         'set_exe_ver': None,
@@ -521,3 +523,119 @@ class TestVersionRe:
         assert not release.VERSION_RE.match('1.2')
         assert not release.VERSION_RE.match('abc')
         assert not release.VERSION_RE.match('1.2.3.4')
+
+
+class TestBetterSqlite3Rebuild:
+
+    # Feature: 自动检测 better-sqlite3
+    #   Scenario: better-sqlite3 可正常加载时无需重建
+    #     Given better-sqlite3 可以正常 require 加载
+    #     When 调用 check_better_sqlite3
+    #     Then 返回 False，表示不需要重建
+    def test_check_returns_false_when_module_works(self):
+        with patch('release.subprocess.run') as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0)
+            result = release.check_better_sqlite3()
+            assert result is False
+
+    # Feature: 自动检测 better-sqlite3
+    #   Scenario: better-sqlite3 无法加载时触发重建
+    #     Given better-sqlite3 require 失败
+    #     When 调用 check_better_sqlite3
+    #     Then 返回 True，表示需要重建
+    def test_check_returns_true_when_module_fails(self):
+        with patch('release.subprocess.run') as mock_run:
+            mock_run.side_effect = subprocess.CalledProcessError(
+                returncode=1, cmd=[])
+            result = release.check_better_sqlite3()
+            assert result is True
+
+    # Feature: 自动检测 better-sqlite3
+    #   Scenario: check 在 NODE_DIR 中执行 node -e require
+    #     Given 调用 check_better_sqlite3
+    #     When 检查传入 subprocess.run 的参数
+    #     Then 命令应为 node -e "require('better-sqlite3')"，cwd 为 NODE_DIR
+    def test_check_runs_correct_command_in_node_dir(self):
+        with patch('release.subprocess.run') as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0)
+            release.check_better_sqlite3()
+            mock_run.assert_called_once()
+            args, kwargs = mock_run.call_args
+            assert 'node' in args[0]
+            assert "require('better-sqlite3')" in args[0]
+            assert kwargs['cwd'] == release.NODE_DIR
+
+    # Feature: 重建 better-sqlite3
+    #   Scenario: rebuild_better_sqlite3 执行 npm rebuild
+    #     Given 需要重新构建 better-sqlite3
+    #     When 调用 rebuild_better_sqlite3
+    #     Then 在 NODE_DIR 目录下执行 npm rebuild better-sqlite3
+    def test_rebuild_runs_npm_rebuild(self):
+        with patch('release.subprocess.run') as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0)
+            release.rebuild_better_sqlite3()
+            mock_run.assert_called_once()
+            args, kwargs = mock_run.call_args
+            cmd = kwargs.get('args', args[0] if args else '')
+            cmd_str = cmd if isinstance(cmd, str) else ' '.join(cmd)
+            assert 'npm' in cmd_str
+            assert 'rebuild' in cmd_str
+            assert 'better-sqlite3' in cmd_str
+            assert kwargs['cwd'] == release.NODE_DIR
+            assert kwargs['shell'] is True
+
+    # Feature: 重建 better-sqlite3
+    #   Scenario: rebuild 失败时退出进程
+    #     Given npm rebuild 执行失败, 退出码为 1
+    #     When 调用 rebuild_better_sqlite3
+    #     Then run_step 检测到非零退出码并调用 sys.exit(1)
+    def test_rebuild_exits_on_failure(self):
+        with patch('release.subprocess.run') as mock_run, \
+             patch('release.sys.exit') as mock_exit:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=1)
+            release.rebuild_better_sqlite3()
+            mock_exit.assert_called_once_with(1)
+
+    # Feature: main() 中自动检查并 rebuild
+    #   Scenario: better-sqlite3 需要重建时自动调用 rebuild
+    #     Given release 主流程执行完毕（EXE only 模式，跳过 APK 产物检查）
+    #     When check_better_sqlite3 返回 True
+    #     Then main() 会调用 rebuild_better_sqlite3
+    def test_main_rebuilds_when_check_says_true(self):
+        with patch('release.parse_args') as mock_parse, \
+             patch('release.build_steps', return_value=[]), \
+             patch('release.run_step'), \
+             patch('release.read_exe_version', return_value='1.0.0'), \
+             patch('release.read_apk_version', return_value='1.0.0'), \
+             patch('release.check_better_sqlite3', return_value=True) as mock_check, \
+             patch('release.rebuild_better_sqlite3') as mock_rebuild, \
+             patch('release.print_summary'):
+            mock_parse.return_value = _make_args(
+                exe_only=True, no_bump_exe=True, no_zip=True)
+            release.main()
+            mock_check.assert_called_once()
+            mock_rebuild.assert_called_once()
+
+    # Feature: main() 中自动检查并 rebuild
+    #   Scenario: better-sqlite3 正常时不执行 rebuild
+    #     Given release 主流程执行完毕（EXE only 模式，跳过 APK 产物检查）
+    #     When check_better_sqlite3 返回 False
+    #     Then main() 跳过 rebuild_better_sqlite3
+    def test_main_skips_rebuild_when_check_says_false(self):
+        with patch('release.parse_args') as mock_parse, \
+             patch('release.build_steps', return_value=[]), \
+             patch('release.run_step'), \
+             patch('release.read_exe_version', return_value='1.0.0'), \
+             patch('release.read_apk_version', return_value='1.0.0'), \
+             patch('release.check_better_sqlite3', return_value=False) as mock_check, \
+             patch('release.rebuild_better_sqlite3') as mock_rebuild, \
+             patch('release.print_summary'):
+            mock_parse.return_value = _make_args(
+                exe_only=True, no_bump_exe=True, no_zip=True)
+            release.main()
+            mock_check.assert_called_once()
+            mock_rebuild.assert_not_called()
