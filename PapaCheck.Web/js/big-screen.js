@@ -887,12 +887,6 @@ function updateSettlementPage() {
       </div>
     </div >
     `;
-
-  // 恢复滚动位置
-  const newGrid = container.querySelector('.shop-grid');
-  if (newGrid && savedScrollTop > 0) {
-    newGrid.scrollTop = savedScrollTop;
-  }
 }
 
 // ========== Rated Page ==========
@@ -1132,6 +1126,12 @@ async function updateShopPage() {
       <button class="btn-cancel" style="margin-top:20px;padding:14px 24px;border:none;border-radius:14px;font-size:20px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--text);" onclick="backToMain()">返回</button>
     </div >
     `;
+
+  // 恢复滚动位置
+  const newGrid = container.querySelector('.shop-grid');
+  if (newGrid && savedScrollTop > 0) {
+    newGrid.scrollTop = savedScrollTop;
+  }
 }
 
 async function redeemItem(itemId) {
