@@ -7,6 +7,17 @@
 ## [Unreleased]
 
 ### Added
+- `release.py` 新增 `check_better_sqlite3()` 和 `rebuild_better_sqlite3()`：在发布流程末尾自动检测 better-sqlite3 是否需要重建（`node -e "require(...)"`），按需执行 `npm rebuild`
+- `build_exe.py` 新增 `restore_better_sqlite3()`：SEA 构建（`build-sea.mjs`）将 better-sqlite3 编译为 Node 18 目标后，立即恢复为系统 Node 版本
+- 新增 9 个 pytest 测试覆盖 rebuild 自动化逻辑（release.py 7 个 + build_exe.py 2 个）
+
+### Changed
+- `build_exe.py` 重构：模块级代码移至 `main()` 函数，添加 `if __name__ == '__main__':` 保护，方便测试导入
+
+### Fixed
+- 修复 `build_exe.py` 中 `restore_better_sqlite3()` 未使用 `shell=True` 导致 Windows 下找不到 npm 命令的问题
+
+### Added
 - 专用通知接口（notify-api）：`notifications` SQLite 表、POST /api/notify（创建通知）、GET /api/notify/pending（拉取待消费通知，自动 1 分钟过期清理）、DELETE /api/notify/consumed（批量消费通知）
 - 前端 api.js 新增 `announce(text)`（带 CRDT 日志 + online-first 策略）、`getPendingNotifications()`、`consumeNotifications(ids)` 方法
 - CRDT 同步支持 `notifications` 表：`_classifyChange` 识别、`applyCRDTOperation` 分支、`announce` CRDT 日志合并

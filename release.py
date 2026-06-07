@@ -487,6 +487,23 @@ def run_wizard():
     )
 
 
+def check_better_sqlite3():
+    """检查 better-sqlite3 是否需要重建，返回 True 表示需要重建"""
+    try:
+        subprocess.run(
+            ['node', '-e', "require('better-sqlite3')"],
+            cwd=NODE_DIR, capture_output=True, check=True)
+        return False
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return True
+
+
+def rebuild_better_sqlite3():
+    """在 NODE_DIR 中执行 npm rebuild better-sqlite3"""
+    run_step('重建 better-sqlite3 原生模块',
+             'npm rebuild better-sqlite3', cwd=NODE_DIR, shell=True)
+
+
 def main():
     args = parse_args()
 
@@ -543,6 +560,12 @@ def main():
             zips = [win_zip]
         elif need_apk:
             print('[提示] 仅构建 APK，跳过 ZIP 打包')
+
+    if check_better_sqlite3():
+        print('[post-release] better-sqlite3 需要重建，正在执行 npm rebuild...')
+        rebuild_better_sqlite3()
+    else:
+        print('[post-release] better-sqlite3 已就绪，无需重建')
 
     print_summary(output_dir, exe_ver, apk_ver, zips,
                   need_exe, need_apk, args.no_zip)
