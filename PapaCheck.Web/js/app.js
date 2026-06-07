@@ -53,7 +53,6 @@ let _lastBountySubmissions = null;
 let _lastBountyCompletions = null;
 window._recentNewRewardIds = new Set();
 let _lastRatingInfo = null;
-let _lastPointsNote = null;
 let _lastSettings = null;
 
 // ========== Utility ==========
@@ -736,9 +735,6 @@ function startPoll(intervalMs) {
         const prevBuffs = _lastBuffs || [];
         const newBuffs = cachedData.activeBuffs || [];
         const added = newBuffs.filter(b => !prevBuffs.some(p => p.name === b.name && p.startDate === b.startDate));
-        for (const b of added) {
-          Voice.speak(b.name + '已生效');
-        }
         _lastBuffs = newBuffs;
         needsFullRender = true;
       }
@@ -749,10 +745,6 @@ function startPoll(intervalMs) {
       const shopItems = cachedData.shopItems || [];
       const prevShop = _lastShopItems || [];
       if (_lastShopItems !== null && JSON.stringify(shopItems) !== JSON.stringify(prevShop)) {
-        const added = shopItems.filter(s => !prevShop.some(p => p.id === s.id));
-        if (added.length > 0) {
-          Voice.speak('积分商店上新啦');
-        }
         _lastShopItems = shopItems.concat();
       }
       if (_lastShopItems === null) {
@@ -764,11 +756,6 @@ function startPoll(intervalMs) {
       if (_lastRewardBox !== null && JSON.stringify(rb) !== JSON.stringify(prevRb)) {
         const addedRb = rb.filter(r => !prevRb.some(p => p.name === r.name) || (r.quantity || 0) > (prevRb.find(p => p.name === r.name)?.quantity || 0));
         if (addedRb.length > 0) {
-          if (window._rewardBoxVoiceHandled) {
-            window._rewardBoxVoiceHandled = false;
-          } else {
-            Voice.speak('奖励箱有新奖励，快去看看吧');
-          }
           addedRb.forEach(r => window._recentNewRewardIds.add(r.id));
         }
         _lastRewardBox = rb.concat();
@@ -781,31 +768,6 @@ function startPoll(intervalMs) {
       const oldHwJson = JSON.stringify(homeworks);
       const newHwJson = JSON.stringify(newHw);
       if (oldHwJson !== newHwJson) {
-        const oldDeferred = homeworks.filter(h => h.deferRequest && h.deferRequest.status === 'pending');
-        const newDeferred = newHw.filter(h => h.deferRequest && h.deferRequest.status === 'pending');
-        for (const dh of oldDeferred) {
-          const stillThere = newHw.find(h => h.id === dh.id);
-          if (!stillThere) {
-            Voice.speak(dh.subject + '的延后申请已批准，明天再做');
-          } else if (!stillThere.deferRequest) {
-            Voice.speak(dh.subject + '的延后申请未通过，今天完成吧');
-          }
-        }
-
-        const newItems = newHw.filter(h => !homeworks.find(oh => oh.id === h.id));
-        if (newItems.length > 0) {
-          const emailNew = newItems.filter(h => h.source === 'email');
-          const manualNew = newItems.filter(h => h.source !== 'email');
-          if (emailNew.length > 0) Voice.speak('收到云端作业，请查看');
-          if (manualNew.length > 0) Voice.speak('收到新作业，请查看');
-        }
-
-        const oldDoneIds = new Set(homeworks.filter(h => h.status === 'done').map(h => h.id));
-        const newlyRejected = newHw.filter(h => h.status === 'pending' && h.rejected && oldDoneIds.has(h.id));
-        if (newlyRejected.length > 0) {
-          Voice.speak('作业被驳回，请查看');
-        }
-
         if (!_completingHomework && !_startingHomework) {
           homeworks = newHw;
           needsFullRender = true;
@@ -854,22 +816,13 @@ function startPoll(intervalMs) {
         }
       }
 
-      if (ratingChanged) {
-        const info = _lastRatingInfo;
-        Voice.speak('今天作业获得的评价是……' + info.rating + '！');
-      }
+
 
       const settings = cachedData?.settings || {};
       if (_lastSettings !== null && JSON.stringify(settings) !== JSON.stringify(_lastSettings)) {
         needsFullRender = true;
       }
-      if (settings._pointsAdjustmentNote && settings._pointsAdjustmentNote !== _lastPointsNote) {
-        Voice.speak(settings._pointsAdjustmentNote);
-        _lastPointsNote = settings._pointsAdjustmentNote;
-        const cleanSettings = { ...settings };
-        delete cleanSettings._pointsAdjustmentNote;
-        API.putSettings(cleanSettings).catch(() => { });
-      }
+
       _lastSettings = settings;
 
       const newBountySubs = (cachedData.bountySubmissions?.[key] || []).filter(s => !s.isDeleted);
@@ -882,8 +835,6 @@ function startPoll(intervalMs) {
           const nv = typeof newVal === 'number' ? newVal : (newVal ? 1 : 0);
           const pv = typeof prevVal === 'number' ? prevVal : (prevVal ? 1 : 0);
           if (nv > pv) {
-            const task = (cachedData.bountyTasks || []).find(t => t.id === tid);
-            Voice.speak((task ? task.name : '任务') + '完成，加' + (task ? task.points || 0 : 0) + '分！');
             needsFullRender = true;
             if (typeof backToMain === 'function') backToMain();
             break;
@@ -897,8 +848,6 @@ function startPoll(intervalMs) {
         for (const newSub of newBountySubs) {
           const prevSub = prevBountySubs.find(s => s.taskId === newSub.taskId);
           if (prevSub && prevSub.status === 'submitted' && newSub.status === 'doing') {
-            const task = (cachedData.bountyTasks || []).find(t => t.id === newSub.taskId);
-            Voice.speak((task ? task.name : '任务') + '失败了，下次加油！');
             needsFullRender = true;
           }
         }
@@ -911,6 +860,18 @@ function startPoll(intervalMs) {
       for (const dk of Object.keys(cachedData.bountySubmissions || {})) {
         _lastBountySubmissions[dk] = (cachedData.bountySubmissions[dk] || []).map(s => ({ ...s }));
       }
+
+      // 统一消费通知
+      try {
+        const result = await API.getPendingNotifications();
+        const items = result.items || [];
+        for (const item of items) {
+          Voice.speak(item.text);
+        }
+        if (items.length > 0) {
+          await API.consumeNotifications(items.map((i) => i.id));
+        }
+      } catch (e) { /* 非致命 */ }
 
       if (needsFullRender) {
         updateBigScreen();

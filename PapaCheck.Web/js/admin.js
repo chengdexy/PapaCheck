@@ -468,6 +468,7 @@ async function saveAdminHw() {
     if (!existingSettlement || !existingSettlement.rating) {
       await API.putSettlement(dateKey, {});
     }
+    try { await API.announce('收到新作业，请查看'); } catch (e) { /* 非致命 */ }
   }
   closeAdminModal();
   await refreshAllData();
@@ -521,6 +522,7 @@ async function rejectHomework(hwId) {
 
   await API.putSettlement(dateKey, {});
 
+  try { await API.announce('作业被驳回，请查看'); } catch (e) { /* 非致命 */ }
   await refreshAllData();
   renderHomeworkTab();
   showToast('已驳回：' + hw.subject + ' - ' + hw.content);
@@ -533,6 +535,7 @@ async function approveDeferHomework(hwId, requestedAt) {
   const dateKey = AdminUtil.dateKey(adminDate);
   await API.deferHomework(dateKey, hwId, 'approve', requestedAt);
 
+  try { await API.announce(hw.subject + '的延后申请已批准，明天再做'); } catch (e) { /* 非致命 */ }
   await refreshAllData();
   renderHomeworkTab();
   pregenSpeech([hw.subject + '的延后申请已批准，明天再做']);
@@ -546,6 +549,7 @@ async function rejectDeferHomework(hwId) {
   const dateKey = AdminUtil.dateKey(adminDate);
   await API.deferHomework(dateKey, hwId, 'reject', '');
 
+  try { await API.announce(hw.subject + '的延后申请未通过，今天完成吧'); } catch (e) { /* 非致命 */ }
   await refreshAllData();
   renderHomeworkTab();
   pregenSpeech([hw.subject + '的延后申请未通过，今天完成吧']);
@@ -628,6 +632,7 @@ async function submitRating(dateKey, rating) {
     }
 
     closeAdminModal();
+    try { await API.announce('今天作业获得的评价是……' + rating + '！'); } catch (e) { /* 非致命 */ }
     await refreshAllData();
     renderHomeworkTab();
     // 预生成评级语音
@@ -789,6 +794,7 @@ async function saveShopItem() {
   if (target) {
     await API.putShopItem(target.id, target);
   }
+  try { await API.announce('积分商店上新啦'); } catch (e) { /* 非致命 */ }
   closeAdminModal();
   await refreshAllData();
   renderShopTab();
@@ -977,6 +983,7 @@ async function saveRewardBoxItem() {
   if (target) {
     await API.putRewardBoxItem(target.id, target);
   }
+  try { await API.announce('奖励箱有新奖励，快去看看吧'); } catch (e) { /* 非致命 */ }
   closeAdminModal();
   await refreshAllData();
   renderRewardBoxTab();
@@ -1202,7 +1209,10 @@ async function approveBountySubmission(dateKey, taskId) {
       await API.putBountyTask(task.id, task);
     }
 
-    pregenSpeech([(task ? task.name : '任务') + '完成，加' + (task.points || 0) + '分！']);
+    const taskName = task ? task.name : '任务';
+    const points = task ? task.points || 0 : 0;
+    try { await API.announce(taskName + '完成，加' + points + '分！'); } catch (e) { /* 非致命 */ }
+    pregenSpeech([taskName + '完成，加' + points + '分！']);
     await refreshAllData();
 
     renderBountyTab();
@@ -1224,7 +1234,9 @@ async function rejectBountySubmission(dateKey, taskId) {
   }
 
   const task = adminBountyTasks.find(t => t.id === taskId);
-  pregenSpeech([(task ? task.name : '任务') + '失败了，下次加油！']);
+  const taskName = task ? task.name : '任务';
+  try { await API.announce(taskName + '失败了，下次加油！'); } catch (e) { /* 非致命 */ }
+  pregenSpeech([taskName + '失败了，下次加油！']);
   await refreshAllData();
   renderBountyTab();
   showToast('赏金任务已退回' + (task ? '：' + task.name : ''));
@@ -2178,8 +2190,7 @@ async function confirmAdjustPoints() {
       const note = diff > 0
         ? '获得奖励积分：' + diff + '分'
         : '被惩罚，扣除积分：' + Math.abs(diff) + '分';
-      const s = { ...(cachedData?.settings || {}), _pointsAdjustmentNote: note };
-      await API.putSettings(s);
+      try { await API.announce(note); } catch (e) { /* 非致命 */ }
       pregenSpeech([note]);
     }
     await refreshAllData();

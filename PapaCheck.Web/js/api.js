@@ -1031,4 +1031,45 @@ const API = {
     }
     return data;
   },
+
+  // ---- 通知 (notifications) ----
+
+  async announce(text) {
+    try { var op = { type: 'update', table: 'notifications', resourceId: crypto.randomUUID(), field: null, value: { text, createdAt: Date.now() } }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        var result = await this._fetch('/api/notify', { method: 'POST', body: JSON.stringify({ text }) });
+        return result;
+      },
+      async () => {
+        // 离线模式：CRDT 日志已记录，不需要额外操作
+        return { ok: true };
+      },
+      { allowFallback: true }
+    );
+  },
+
+  async getPendingNotifications() {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => await this._fetch('/api/notify/pending'),
+      async () => ({ items: [] }),
+      { allowFallback: true }
+    );
+  },
+
+  async consumeNotifications(ids) {
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        var result = await this._fetch('/api/notify/consumed', { method: 'DELETE', body: JSON.stringify({ ids }) });
+        return result;
+      },
+      async () => {
+        return { ok: true };
+      },
+      { allowFallback: true }
+    );
+  },
 };

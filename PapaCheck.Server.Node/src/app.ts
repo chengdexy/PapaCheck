@@ -191,6 +191,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         { name: 'version', description: '版本信息' },
         { name: 'speak', description: 'TTS 语音合成' },
         { name: 'crdt-pull', description: 'CRDT 同步' },
+        { name: 'notifications', description: '通知管理' },
         { name: 'crdt-push', description: 'CRDT 推送' },
       ],
     },
@@ -691,9 +692,40 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
           mode: 'pending',
         });
       }
+
+      // 添加通知：有新作业来自云端
+      db.addNotification('收到云端作业，请查看');
     }
 
     return sendJson(reply, { ok: true, homeworks: expanded || [], hasAttachments: result.hasAttachments ?? false });
+  });
+
+  // 通知：创建通知
+  app.post('/api/notify', async (request, reply) => {
+    const body = request.body as { text?: string };
+    if (!body.text || !body.text.trim()) {
+      return reply.status(400).send({
+        error: '通知内容不能为空',
+        code: 'VALIDATION_ERROR',
+      });
+    }
+    const id = db.addNotification(body.text.trim());
+    return sendJson(reply, { ok: true, id });
+  });
+
+  // 通知：拉取待消费通知（自动清理过期）
+  app.get('/api/notify/pending', async (_request, reply) => {
+    const items = db.getPendingNotifications();
+    return sendJson(reply, { items });
+  });
+
+  // 通知：消费通知
+  app.delete('/api/notify/consumed', async (request, reply) => {
+    const body = request.body as { ids?: string[] };
+    if (body.ids && body.ids.length > 0) {
+      db.consumeNotifications(body.ids);
+    }
+    return sendJson(reply, { ok: true });
   });
 
   // CRDT 同步推送
