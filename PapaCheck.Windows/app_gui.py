@@ -252,16 +252,69 @@ def _resource_path(relative):
 
 # ===== Node.js 服务器子进程管理 =====
 
+_NODE_EXE_DIR = os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), 'PapaCheck')
+_NODE_EXE_NAME = 'papacheck-server.exe'
+
+
 def _get_node_server_exe():
-    """查找 Node.js 服务器 EXE 路径（模块级函数）
-       开发环境返回 None，调用者使用 tsx 启动"""
+    """获取 Node.js 服务器 EXE 路径（固定路径）。
+       打包模式：复制到 %LOCALAPPDATA%/PapaCheck/ 下，返回固定路径。
+       开发模式：返回 None，调用者使用 tsx 启动。"""
     if getattr(sys, 'frozen', False):
-        exe = os.path.join(sys._MEIPASS, 'Server.Node', 'papacheck-server.exe')
-        if not os.path.exists(exe):
-            raise FileNotFoundError(f'Node.js 服务器未找到: {exe}')
-        return exe
-    # 开发环境：使用 npx tsx 直接启动
+        src_exe = os.path.join(sys._MEIPASS, 'Server.Node', _NODE_EXE_NAME)
+        if not os.path.exists(src_exe):
+            raise FileNotFoundError(f'Node.js 服务器未找到: {src_exe}')
+        fixed_exe = os.path.join(_NODE_EXE_DIR, _NODE_EXE_NAME)
+        # 首次运行或版本更新时复制（检查文件大小不一致则覆盖）
+        if not os.path.exists(fixed_exe) or os.path.getsize(fixed_exe) != os.path.getsize(src_exe):
+            os.makedirs(_NODE_EXE_DIR, exist_ok=True)
+            shutil.copy2(src_exe, fixed_exe)
+        return fixed_exe
     return None
+
+
+_FIREWALL_RULE_NAME = 'PapaCheck Server'
+
+
+def _ensure_firewall_rule(exe_path):
+    """添加 Windows 防火墙规则（阻塞同步调用）。
+       首次运行弹 UAC 提权（仅一次），通过 powershell Start-Process -Wait 等待提权完成，
+       确保防火墙规则添加后再启动服务器，避免竞争条件。"""
+    if not exe_path or not os.path.exists(exe_path):
+        return
+    try:
+        # 先检查规则是否已存在（普通权限即可查询，不弹窗）
+        check = subprocess.run(
+            ['netsh', 'advfirewall', 'firewall', 'show', 'rule',
+             'name=' + _FIREWALL_RULE_NAME],
+            capture_output=True, text=True, timeout=5,
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+        if 'No rules match' in check.stdout or '没有匹配' in check.stdout:
+            # 规则不存在 → 提权添加（弹 UAC，阻塞等待完成）
+            # 使用 PowerShell Start-Process -Wait 确保添加完再继续
+            net_args = (
+                'advfirewall firewall add rule '
+                'name="' + _FIREWALL_RULE_NAME + '" '
+                'dir=in '
+                'program="' + exe_path + '" '
+                'action=allow '
+                'protocol=tcp '
+                'localport=' + str(_PORT) + ' '
+                'description="PapaCheck Server"'
+            )
+            ps_cmd = (
+                'Start-Process -FilePath netsh -Verb RunAs '
+                '-WindowStyle Hidden -Wait '
+                "-ArgumentList '" + net_args + "'"
+            )
+            subprocess.run(
+                ['powershell', '-Command', ps_cmd],
+                capture_output=True, text=True, timeout=30,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+    except Exception:
+        pass  # 防火墙规则添加失败不影响服务器启动
 
 
 def _is_noise_line(text):
@@ -901,6 +954,10 @@ class PapaCheckApp:
             self._append_log('请先停止其他 PapaCheck 服务器后再启动')
             self._handle_server_exit()
             return
+
+        # 同步添加 Windows 防火墙规则（首次会弹 UAC，后续跳过）
+        # 在服务器启动前执行，避免防火墙弹窗
+        _ensure_firewall_rule(self._get_node_server_exe())
 
         self._append_log('正在启动服务器...')
         self._start_server_thread()

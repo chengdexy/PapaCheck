@@ -1006,17 +1006,7 @@ async function adjustRewardBoxQty(itemId, delta) {
 
 async function deleteRewardBoxItem(id) {
   adminRewardBox = adminRewardBox.filter(i => i.id !== id);
-  // 记录 CRDT 删除操作（无单独 DELETE API，服务端 applyCRDTOperation 负责删除）
-  try { var op = { type: 'delete', table: 'reward_box', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
-  // 同步到本地 DB
-  try {
-    var items = await DB.getRewardBox();
-    var idx = items.findIndex(function(i) { return i.id === id || i.uuid === id; });
-    if (idx !== -1) {
-      items.splice(idx, 1);
-      await DB.saveRewardBox(items);
-    }
-  } catch (e) { /* 非致命 */ }
+  await API.deleteRewardBoxItem(id);
   await refreshAllData();
   renderRewardBoxTab();
   showToast('已删除');

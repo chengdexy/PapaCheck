@@ -841,7 +841,7 @@ def reset_date(date_key):
 
 def get_reward_box():
     with _db() as conn:
-        return _get_json(conn, 'reward_box')
+        return _filter_deleted(_get_json(conn, 'reward_box'))
 
 
 def save_reward_box(items):
@@ -849,3 +849,17 @@ def save_reward_box(items):
         _set_json(conn, 'reward_box', items)
         conn.commit()
     record_modification('reward_box', '1', datetime.datetime.now().isoformat())
+
+
+def delete_reward_box_item(item_id):
+    with _db() as conn:
+        items = _get_json(conn, 'reward_box')
+        now = datetime.datetime.now().isoformat()
+        for item in items:
+            if item.get('id') == item_id or item.get('uuid') == item_id:
+                item['isDeleted'] = True
+                item['lastModified'] = now
+                break
+        _set_json(conn, 'reward_box', items)
+        conn.commit()
+    record_modification('reward_box', '1', now)

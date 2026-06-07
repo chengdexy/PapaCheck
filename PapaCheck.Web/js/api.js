@@ -768,6 +768,31 @@ const API = {
     );
   },
 
+  async deleteRewardBoxItem(id) {
+    // 添加 CRDT 删除操作日志
+    try { var op = { type: 'delete', table: 'reward_box', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    return await this._requestWithStrategy(
+      'online-first',
+      async () => {
+        await this._fetch('/api/reward-box/' + id, { method: 'DELETE' });
+        return true;
+      },
+      async () => {
+        // 离线降级：在本地 DB 中删除
+        try {
+          var items = await DB.getRewardBox();
+          var idx = items.findIndex(function(r) { return r.id === id || r.uuid === id; });
+          if (idx !== -1) {
+            items.splice(idx, 1);
+            await DB.saveRewardBox(items);
+          }
+        } catch (e) { /* 非致命 */ }
+        return true;
+      },
+      { allowFallback: true }
+    );
+  },
+
   // ---- 设置 (settings) ----
 
   async putSettings(data) {
