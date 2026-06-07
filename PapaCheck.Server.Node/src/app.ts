@@ -874,6 +874,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     await app.register(fastifyStatic, {
       root: options.webDir,
       prefix: '/',
+      cacheControl: false,
+      etag: false,
+      lastModified: false,
     });
   }
 
