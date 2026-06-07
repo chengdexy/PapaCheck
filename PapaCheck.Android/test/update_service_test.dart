@@ -32,19 +32,30 @@ void main() {
   });
 
   /// Feature: Android APK 更新下载
-  ///   Scenario: 下载目录不存在时自动创建
-  ///     Given 应用缓存目录不存在（如首次启动或被清除）
+  ///   Scenario: 已存在的缓存目录下返回正确路径
+  ///     Given 应用缓存目录已存在
   ///     When 获取 APK 下载路径
-  ///     Then 父目录被自动创建，路径以 PapaCheck.apk 结尾
-  test('下载目录不存在时自动创建', () async {
-    final subDir = await Directory.systemTemp.createTemp('nonexistent_test_');
+  ///     Then 返回的路径以 PapaCheck.apk 结尾
+  test('已存在的缓存目录下返回正确路径', () async {
+    final path = await UpdateService.getDownloadPath();
+
+    expect(path, contains('PapaCheck.apk'));
+    expect(File(path).parent.path, equals(testCacheDir.path));
+  });
+
+  /// Feature: Android APK 更新下载
+  ///   Scenario: 通过 setTestDirectory 可注入自定义路径
+  ///     Given 使用 setTestDirectory 注入一个深层路径
+  ///     When 获取 APK 下载路径
+  ///     Then 返回的路径包含注入的深层目录和 PapaCheck.apk
+  test('可注入自定义路径', () async {
+    final subDir = await Directory.systemTemp.createTemp('custom_path_test_');
     final deepPath = '${subDir.path}/deep/nested/dir';
     UpdateService.setTestDirectory(Directory(deepPath));
 
     final path = await UpdateService.getDownloadPath();
-    final file = File(path);
 
-    expect(await file.parent.exists(), isTrue);
+    expect(path, contains('deep/nested/dir'));
     expect(path, contains('PapaCheck.apk'));
   });
 }
