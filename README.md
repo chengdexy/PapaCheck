@@ -2,7 +2,7 @@
 
 ![PapaCheck Banner](./docs/imgs/_banner.jpg)
 
-> **v1.2.1** — 家庭作业管理从未如此轻松
+> **v1.2.8** — 家庭作业管理从未如此轻松
 
 PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和跟踪孩子的作业完成情况。支持通过转发微信群中老师布置的作业到邮件，AI 自动解析并添加到清单；孩子可以自主开始/暂停/完成作业并获得积分；家长远程评级并管理积分商店。
 
@@ -23,34 +23,34 @@ PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和�
 
 ## 🚀 快速开始
 
-### 1. 下载并启动服务器（二选一）
+### 1. 启动服务器
 
 **方式 A：Windows 桌面端（推荐）**
 
-从 [Releases](https://github.com/chengdexy/PapaCheck/releases) 下载最新版 `PapaCheck.exe`，双击运行即可。
+从 [Releases](https://github.com/chengdexy/PapaCheck/releases) 下载最新版 `PapaCheck-{version}.exe`，双击运行即可。
 
 服务默认启动在 `8080` 端口，首次运行会自动创建数据库和 TTS 语音缓存。
 
-**方式 B：Node.js 服务器（实验性）**
+**方式 B：Node.js 服务器（开发调试）**
 
 ```bash
 cd PapaCheck.Server.Node
 npm install
-npm run dev -- --port 8080 --web-dir ../PapaCheck.Web --db-path ../PapaCheck.Server/data.db
+npm run dev -- --port 8080
 ```
 
-需要 Node.js 22+。API 与 Python 服务器完全兼容，可并行运行在不同端口。
+需要 Node.js 18+。
 
-### 2. 访问客户端（二选一）
+### 2. 访问客户端
 
-**方式一：浏览器（任何设备）**
+**浏览器（任何设备）**
 
 在浏览器中访问 `http://192.x.x.x:8080`：
 
 - 孩子端：`http://192.x.x.x:8080/`
 - 管理端：`http://192.x.x.x:8080/admin.html`
 
-**方式二：Android 平板/手机**
+**Android 平板/手机**
 
 访问 `http://192.x.x.x:8080/api/download` 下载并安装最新 APK。
 
@@ -58,40 +58,32 @@ npm run dev -- --port 8080 --web-dir ../PapaCheck.Web --db-path ../PapaCheck.Ser
 
 ### 3. 邮件同步（可选）
 
-在 Windows 端菜单栏选择 **服务配置**，填写 IMAP 邮箱信息、接收作业的邮箱地址和 API Key （用于解析邮件内容）。点击 **邮件作业同步** 按钮，AI 会自动拉取邮件、解析作业并发布。
-
-### 4. 生成测试数据（可选）
-
-```bash
-python gen_test_data.py -d 90
-```
-
-向数据库写入 90 天的模拟数据，方便验证管理端图表功能。
+在 Windows 端菜单栏选择 **服务配置**，填写 IMAP 邮箱信息、接收作业的邮箱地址和 API Key（用于解析邮件内容）。点击 **邮件作业同步** 按钮，AI 会自动拉取邮件、解析作业并发布。
 
 ## 🏗 项目结构
 
 ```
 PapaCheck/
-├── PapaCheck.Server/     # 服务端 (Python HTTP + SQLite + TTS)
-├── PapaCheck.Web/        # Web 端 (孩子大屏端 & 管理端 admin.html)
-├── PapaCheck.Windows/    # Windows 桌面管理端 (tkinter GUI)
-├── PapaCheck.Email/      # 邮件收取 & AI 解析
-├── PapaCheck.Android/    # Android 端 (Flutter WebView 混合应用)
-├── PapaCheck.Tests/      # 测试 (pytest + Vitest)
-└── docs/                 # 项目文档
+├── PapaCheck.Server/        # [已废弃] Python 服务端（保留参考，不再维护）
+├── PapaCheck.Server.Node/   # 服务端（Node.js + Fastify + better-sqlite3）
+├── PapaCheck.Web/           # Web 前端（孩子大屏 & 管理端 admin.html）
+├── PapaCheck.Windows/       # Windows 桌面端（PyInstaller 单 EXE，内嵌 Node.js 服务器）
+├── PapaCheck.Android/       # Android 端（Flutter WebView 混合应用）
+├── PapaCheck.Tests/         # 测试（Vitest + pytest）
+└── docs/                    # 项目文档
 ```
 
 ## 🛠 技术栈
 
-| 模块              | 技术                                               |
-| --------------- | ------------------------------------------------ |
-| **Server**      | Python 3, `http.server`, SQLite, edge-tts        |
-| **Web 前端**      | 原生 HTML/CSS/JS, SVG 图表, Service Worker           |
-| **Windows 桌面端** | Python, tkinter, Windows Credential Manager      |
-| **Email 模块**    | IMAP4\_SSL, LLM API（邮件解析）                      |
-| **Android 端**   | Flutter, `webview_flutter`                       |
-| **测试**          | Vitest（前端）、pytest（后端）、Flutter test（Android）      |
-| **构建发布**        | PyInstaller（EXE）、release.py（一站式：EXE + APK + ZIP） |
+| 模块              | 技术                                                    |
+| ----------------- | ------------------------------------------------------- |
+| **Server**        | Node.js, Fastify, better-sqlite3, edge-tts (`tts_bridge.py`) |
+| **Web 前端**      | 原生 HTML/CSS/JS, SVG 图表, Service Worker              |
+| **Windows 桌面端** | Python, tkinter, 内嵌 Node.js 子进程（pkg SEA 单 EXE） |
+| **邮件同步**      | Node.js IMAP 模块（内置于服务端）                       |
+| **Android 端**    | Flutter, `webview_flutter`                              |
+| **测试**          | Vitest（前端/服务端 311 测试）、pytest（Python 53 测试） |
+| **构建发布**      | release.py（一站式：EXE + APK + ZIP）                    |
 
 ## 🔧 开发
 
@@ -99,10 +91,8 @@ PapaCheck/
 
 ```bash
 # 全部测试
-npm test               # 前端/服务端测试（Vitest，297 个测试用例）
-pytest                 # 后端测试（pytest，44 个测试用例）
-flutter test           # Android 端测试（18 个测试用例）
-cd PapaCheck.Android && flutter test
+npm test                   # 前端 + 服务端测试（Vitest，311 个测试用例）
+cd PapaCheck.Android && flutter test  # Android 端测试
 
 # 单个测试文件
 npx vitest run PapaCheck.Tests/duplicate_rating.test.js
@@ -111,12 +101,12 @@ npx vitest run PapaCheck.Tests/duplicate_rating.test.js
 ### 项目文档
 
 | 文档                                   | 说明       |
-| ------------------------------------ | -------- |
-| [PRD](docs/PRD.md)                   | 产品需求文档   |
-| [ARCHITECTURE](docs/ARCHITECTURE.md) | 技术架构文档   |
-| [API](docs/API.md)                   | API 接口文档 |
-| [CHANGELOG](docs/CHANGELOG.md)       | 变更日志     |
-| [PROGRESS](docs/PROGRESS.md)         | 进度记录     |
+| -------------------------------------- | ---------- |
+| [PRD](docs/PRD.md)                     | 产品需求文档 |
+| [ARCHITECTURE](docs/ARCHITECTURE.md)   | 技术架构文档 |
+| [API](docs/API.md)                     | API 接口文档 |
+| [CHANGELOG](docs/CHANGELOG.md)         | 变更日志    |
+| [PROGRESS](docs/PROGRESS.md)           | 进度记录    |
 
 ### 测试驱动开发
 
