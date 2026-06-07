@@ -11,6 +11,9 @@
 - 修复 Windows 端每次启动弹出防火墙提示：将 `papacheck-server.exe` 从临时目录复制到 `%LOCALAPPDATA%/PapaCheck/` 固定路径后启动，首次运行通过 `PowerShell Start-Process -Verb RunAs -Wait` 提权添加防火墙规则（UAC 弹一次，后续跳过）
 
 ### Changed
+- 清理项目根目录：删除已废弃的 `release.bat`、`RELEASE_USAGE.md`、`sync-mask-not-showing.env`、覆盖率缓存等文件
+- 清理 `.trae/`：删除已完成的 18 个 spec 方案文件夹和 60+ 个过期方案文档
+- 将 `PapaCheck_ban.jpg`、`papacheck_wordcloud.png`、`docs/favicon.png` 移至 `docs/imgs/` 并统一命名，更新 README / docs/index.html / package.json 中的引用路径
 - `release.py` 输出美化：去除原始命令日志（子进程输出重定向 DEVNULL），改用 `▶ [n/total] 步骤名 ... ✓` 行内动画；输出按阶段分区（清理/构建/归档/后置处理），尾部总结改用双线框；移除未使用的辅助函数
 
 ### Fixed

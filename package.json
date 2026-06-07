@@ -1,7 +1,7 @@
 {
   "name": "papacheck",
   "version": "1.0.0",
-  "description": "<img src=\"PapaCheck_ban.jpg\" alt=\"PapaCheck Banner\" width=\"100%\" />",
+  "description": "PapaCheck（爸~检查！）- 亲子作业管理与积分激励系统",
   "main": "index.js",
   "directories": {
     "doc": "docs"

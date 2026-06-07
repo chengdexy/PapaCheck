@@ -1,6 +1,6 @@
 # PapaCheck — 爸\~检查！
 
-![PapaCheck Banner](./PapaCheck_ban.jpg)
+![PapaCheck Banner](./docs/imgs/_banner.jpg)
 
 > **v1.2.1** — 家庭作业管理从未如此轻松
 
@@ -126,4 +126,4 @@ npx vitest run PapaCheck.Tests/duplicate_rating.test.js
 
 GNU Affero General Public License v3.0 (AGPL-3.0)
 
-![开发历程词云](./papacheck_wordcloud.png)
+![开发历程词云](./docs/imgs/_worldCloud.png)
