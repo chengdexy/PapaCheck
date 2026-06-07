@@ -4,7 +4,7 @@
 
 ## 当前版本
 
-**v1.2.1**（覆盖率提升 + 测试修复）
+**v1.2.2**（Android APK 更新修复）
 
 ---
 
@@ -72,6 +72,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-07 | 修复 Android APK 更新"安装包损坏"Bug：`Directory.systemTemp` → `getTemporaryDirectory()`，提取 `UpdateService`（2 个 Flutter 测试）；全量 466 个测试全部通过 |
 | 2026-06-07 | 覆盖率提升：JS/TS 从 79.39% → 85.12%（新增 24 个测试）、Python release.py 从 16% → 32%（新增 10 个测试）；修复 Flutter connect_failed_dialog 2 个失败测试；修复 IDE 测试发现（12 个测试文件重命名为标准 `*.test.js` 格式）；全量 363 个测试全部通过 |
 | 2026-06-06 | Phase 4 完成：Windows 端迁移至 Node.js 服务器（子进程启动 Node.js EXE、邮件同步重写为 Node.js、构建流程更新、Windows 端 10 个新测试 + Node.js 175 个测试） |
 | 2026-06-06 | Phase 3 完成：CRDT 同步引擎（字段级 LWW + PN-Counter + OR-Set 合并引擎，crdt_operations 表，crdt-push/pull 端点，前端操作日志 + CRDT 同步流程 + connection.js 重连降级） |
