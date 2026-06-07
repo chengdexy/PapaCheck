@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:battery_plus/battery_plus.dart';
 
 // BatteryMonitor 在 main.dart 中定义，通过 evaluateAlert 静态方法暴露纯逻辑
 // 为避免导入整个 main.dart 带来的依赖问题，此处内联一个等价的参考实现
@@ -7,6 +8,21 @@ String? evaluateAlert(int batteryLevel, bool alerted20, bool alerted10) {
   if (batteryLevel <= 10 && !alerted10) return '10';
   if (batteryLevel <= 20 && !alerted20) return '20';
   return null;
+}
+
+/// 模拟 _onBatteryStateChanged 的行为。
+/// 只在 discharging → charging 转换时重置标记，重复 charging 事件忽略。
+(bool alerted20, bool alerted10, BatteryState? lastState) onBatteryStateChanged(
+  BatteryState? lastState,
+  BatteryState state,
+  bool alerted20,
+  bool alerted10,
+) {
+  if (lastState == BatteryState.discharging && state == BatteryState.charging) {
+    alerted20 = false;
+    alerted10 = false;
+  }
+  return (alerted20, alerted10, state);
 }
 
 void main() {
@@ -93,6 +109,49 @@ void main() {
     test('充电重置后从10%阈值也可以重新检测', () {
       expect(evaluateAlert(8, true, true), isNull);  // 已触发，不重复
       expect(evaluateAlert(8, false, false), equals('10'));  // 重置后重新触发
+    });
+  });
+
+  // Feature: 电池状态变化事件处理
+  //   验证 _onBatteryStateChanged 只在 discharging → charging 转换时重置标记
+  group('充电事件防抖', () {
+    // Scenario: 重复 charging 事件不应反复重置标记
+    //   Given 已触发 20% 提醒，_checkAndAlert 已将 alerted20 设为 true
+    //   And _lastState 为 charging（设备已在充电中）
+    //   When 再次收到 charging 事件（系统重复广播）
+    //   Then 标记不应被重置，避免下次轮询再次播报
+    test('重复charging事件不应反复重置标记', () {
+      bool alerted20 = true;   // _checkAndAlert 已设为 true
+      bool alerted10 = false;
+      BatteryState? lastState = BatteryState.charging; // 已在充电中
+
+      // 再次收到 charging 事件（系统重复广播）
+      (alerted20, alerted10, lastState) = onBatteryStateChanged(
+        lastState, BatteryState.charging, alerted20, alerted10,
+      );
+
+      // 修复后：标记应维持已触发状态
+      expect(evaluateAlert(15, alerted20, alerted10), isNull);
+    });
+
+    // Scenario: discharging → charging 转换时可以重置
+    //   Given 已触发 20% 提醒
+    //   When 状态从 discharging 变更为 charging（真正的插入充电器）
+    //   Then 标记被重置，允许下次提醒
+    test('discharging到charging转换时正确重置标记', () {
+      bool alerted20 = true;
+      bool alerted10 = false;
+      BatteryState? lastState = BatteryState.discharging;
+
+      // 插入充电器：discharging → charging
+      (alerted20, alerted10, lastState) = onBatteryStateChanged(
+        lastState, BatteryState.charging, alerted20, alerted10,
+      );
+
+      expect(alerted20, isFalse);
+      expect(alerted10, isFalse);
+      // 重置后应能再次触发
+      expect(evaluateAlert(15, alerted20, alerted10), equals('20'));
     });
   });
 }
