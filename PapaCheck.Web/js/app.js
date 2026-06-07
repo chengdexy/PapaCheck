@@ -942,7 +942,7 @@ function showScreenSaver() {
   saver.classList.add('active');
   updateSaverTime();
   saverTimeInterval = setInterval(updateSaverTime, 1000);
-  startPoll(60000);
+  startPoll(5000);
 }
 
 function wakeUp() {
