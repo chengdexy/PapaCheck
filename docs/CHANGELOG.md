@@ -24,6 +24,7 @@
 - `_rewardBoxVoiceHandled` 死代码标志
 
 ### Fixed
+- 修复 `@fastify/static` 默认开启 ETag/Last-Modified 导致开发模式下静态文件全部返回 304，浏览器使用旧版缓存代码；在 `fastifyStatic` 注册选项中添加 `cacheControl: false`, `etag: false`, `lastModified: false`
 - Code review 修复 6 个 minor 问题：移除 `GET /api/notify/pending` 中冗余的 `cleanupExpiredNotifications()` 调用（`getPendingNotifications()` 内部已清理）；移除 app.js 作业 diff 中的死代码空条件注释；清理 `_rewardBoxVoiceHandled` 死标志；移除 `getPendingNotifications()` 返回中多余的 `created_at` 蛇形字段；移除未使用的 `emailNew`/`manualNew` 变量
 
 ### Changed
