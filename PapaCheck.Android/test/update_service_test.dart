@@ -44,17 +44,19 @@ void main() {
   });
 
   /// Feature: Android APK 更新下载
-  ///   Scenario: 通过 setTestDirectory 可注入自定义路径
-  ///     Given 使用 setTestDirectory 注入一个深层路径
+  ///   Scenario: 注入深层不存在路径时自动创建父目录
+  ///     Given 使用 setTestDirectory 注入一个深层不存在路径
   ///     When 获取 APK 下载路径
-  ///     Then 返回的路径包含注入的深层目录和 PapaCheck.apk
-  test('可注入自定义路径', () async {
-    final subDir = await Directory.systemTemp.createTemp('custom_path_test_');
+  ///     Then 父目录被自动创建，路径以 PapaCheck.apk 结尾
+  test('注入深层不存在路径时自动创建父目录', () async {
+    final subDir = await Directory.systemTemp.createTemp('auto_create_test_');
     final deepPath = '${subDir.path}/deep/nested/dir';
     UpdateService.setTestDirectory(Directory(deepPath));
 
     final path = await UpdateService.getDownloadPath();
+    final file = File(path);
 
+    expect(await file.parent.exists(), isTrue);
     expect(path, contains('deep/nested/dir'));
     expect(path, contains('PapaCheck.apk'));
   });
