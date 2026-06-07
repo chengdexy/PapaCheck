@@ -72,6 +72,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-07 | 修复 DELETE /api/notify/consumed 不符合 RESTful 规范：请求体改为 URL 查询参数 `?ids=` 传递 |
 | 2026-06-07 | 专用通知接口（notify-api）：notifications 表 + 3 个 API 端点 + 前端 api.js 3 个方法 + admin.js 10 处接入 + app.js pollServer 统一通知拉取 + 邮件同步通知 + CRDT 集成；Code review 修复 6 个 minor 问题；全量 311 个 Vitest 测试通过 |
 | 2026-06-07 | 修复 Android APK 更新"安装包损坏"Bug：`Directory.systemTemp` → `getTemporaryDirectory()`，提取 `UpdateService`（2 个 Flutter 测试）；全量 466 个测试全部通过 |
 | 2026-06-07 | 重构 AI 邮件解析 prompt 仿照 email_client.py 重做（结构化输出格式+规则+约束）；恢复 markdown 代码块回退解析逻辑，提高鲁棒性 |

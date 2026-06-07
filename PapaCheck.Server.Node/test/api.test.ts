@@ -934,7 +934,7 @@ describe('DELETE /api/notify/consumed', () => {
     // Feature: 消费通知
     // Scenario: 按 ids 批量删除
     // Given 数据库中有两条通知
-    // When DELETE /api/notify/consumed 发送 { ids: [id1] }
+    // When DELETE /api/notify/consumed?ids=id1
     // Then 指定通知被删除，其余保留
     const dbWrite = (db as any).db;
     const id1 = 'del-001';
@@ -944,8 +944,7 @@ describe('DELETE /api/notify/consumed', () => {
 
     const res = await app.inject({
       method: 'DELETE',
-      url: '/api/notify/consumed',
-      body: { ids: [id1] },
+      url: '/api/notify/consumed?ids=' + id1,
     });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
@@ -960,7 +959,6 @@ describe('DELETE /api/notify/consumed', () => {
     const res = await app.inject({
       method: 'DELETE',
       url: '/api/notify/consumed',
-      body: { ids: [] },
     });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
