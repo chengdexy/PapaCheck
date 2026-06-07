@@ -14,7 +14,10 @@
 - 服务端 7 个通知数据库测试 + 7 个 API 端点测试
 
 ### Changed
-- `DELETE /api/notify/consumed` 改为通过 URL 查询参数 `?ids=` 传递通知 ID，符合 RESTful 规范（DELETE 请求体可能被代理丢弃）
+- 日志染色重构：`_log_tag` 替换为 `_classify_line` 逐行独立染色；API 日志按状态码+方法类型染色（5xx→红、4xx→黄、写操作2xx→绿、读操作2xx→灰），中文日志按关键字匹配染色（错误/失败→红、未找到→黄、成功/完成→绿、系统事件→青、服务器启动成功→亮蓝）
+- 日志排版优化：6 级 tag 增加 `spacing1=2` 行间距，日志框添加垂直滚动条
+- 日志框 URL 编码日志自动解码为中文显示
+- `_load_config` 添加模块级缓存，`_write_log` 不再每次读磁盘；`_save_config` 同步更新缓存
 - 管理端 admin.js 所有播报操作点（调分/评级/商品/奖励箱/延后/驳回/赏金/新增作业）改为直接调用 `API.announce()`，移除 `_pointsAdjustmentNote` hack
 - 孩子端 app.js pollServer 重构：移除 8 处 diff 检测 `Voice.speak()`，改为轮询末尾统一调用 `API.getPendingNotifications()` 拉取并播报通知，保留 `needsFullRender` 和 UI 刷新逻辑
 - 通知过期时间从 1 分钟延长至 1 小时：解决桌面浏览器 Autoplay Policy 导致语音延迟播报时通知已被清理的问题
