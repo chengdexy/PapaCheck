@@ -789,6 +789,12 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true });
   });
 
+  // 40. DELETE /api/reward-box/:id
+  app.delete<{ Params: { id: string } }>('/api/reward-box/:id', { schema: deleteParamSchema }, async (request, reply) => {
+    db.deleteRewardBoxItem(request.params.id);
+    return sendJson(reply, { ok: true });
+  });
+
   // 41. PUT /api/active-buffs/:id
   app.put<{ Params: { id: string } }>('/api/active-buffs/:id', { schema: idParamSchema }, async (request, reply) => {
     db.putBuff(request.params.id, request.body);

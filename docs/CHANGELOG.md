@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### Fixed
+- 修复管理端无法删除奖励箱物品：添加 Node.js/Python 服务端 `DELETE /api/reward-box/:id` 端点，前端 `api.js` 添加 `deleteRewardBoxItem` 方法，`admin.js` `deleteRewardBoxItem` 改为调用 HTTP API（之前仅本地删除+CRDT 日志，`refreshAllData()` 从服务端重新拉取后未删除物品"复活"）
+- 修复 Windows 端每次启动弹出防火墙提示：将 `papacheck-server.exe` 从临时目录复制到 `%LOCALAPPDATA%/PapaCheck/` 固定路径后启动，首次运行通过 `PowerShell Start-Process -Verb RunAs -Wait` 提权添加防火墙规则（UAC 弹一次，后续跳过）
+
 ### Changed
 - `release.py` 输出美化：去除原始命令日志（子进程输出重定向 DEVNULL），改用 `▶ [n/total] 步骤名 ... ✓` 行内动画；输出按阶段分区（清理/构建/归档/后置处理），尾部总结改用双线框；移除未使用的辅助函数
 
