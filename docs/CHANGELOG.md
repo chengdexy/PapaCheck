@@ -13,6 +13,8 @@
 - 修复 Android APK 更新后提示"安装包损坏"：`_downloadAndInstall` 使用 `Directory.systemTemp`（系统临时目录）保存 APK，Android 10+ 下 FileProvider 的 `<cache-path>` 无法覆盖该目录，安装器读取文件失败。改为 `getTemporaryDirectory()`（应用缓存目录），提取 `UpdateService` 方便测试
 - 修复孩子端积分商店和奖励箱的滚动条回弹问题：轮询触发 `updateBigScreen()` 时 `innerHTML` 重建 DOM 导致 `scrollTop` 重置为 0，通过保存/恢复 `scrollTop` 解决
 - 恢复 parseHomework markdown 代码块回退解析逻辑，防止 AI 模型返回代码块包裹 JSON 时解析失败丢失作业数据
+- 修复 `updateSettlementPage()` 中引用未定义变量 `savedScrollTop`（滚动恢复代码误放入结算页），并补上 `updateShopPage()` 缺失的滚动恢复代码
+- 修复孩子端屏保模式轮询间隔被设为 60s 的 Bug：`showScreenSaver()` 中 `startPoll(60000)` 改为 `startPoll(5000)`，与正常模式保持一致
 
 ### Added
 - CRDT 同步引擎（src/crdt/）：字段级 LWW-Register、PN-Counter、OR-Set 合并函数
