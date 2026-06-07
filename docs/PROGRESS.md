@@ -72,6 +72,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-08 | 项目清理：删除废弃文件（release.bat/RELEASE_USAGE.md/sync-mask-not-showing.env/覆盖率缓存），清理 `.trae/` 过期方案文档，图片移至 docs/imgs/ |
 | 2026-06-07 | 修复管理端无法删除奖励箱物品 + Windows 防火墙弹窗优化（固定路径 + 提权添加防火墙规则） |
 | 2026-06-07 | release.py 输出美化：去除命令日志，改用行内动画 + 阶段分区 + 双线框尾部总结；全量 311 个测试通过 |
 | 2026-06-07 | 修复 pkg EXE 中 TTS 语音不播报：assets 路径错导致 tts_bridge.py 未打包 + existsSync 在快照虚拟文件系统失效 + Python 子进程访问不了快照路径（提取到临时目录解决）+ spawnPython 静默吞 stderr（添加 [TTS] 诊断日志）+ Voice.speak blob URL Range 请求失败（恢复原始方案）+ unlockAudio 只解锁 AudioContext 未解锁 HTMLAudioElement（添加 silent Audio.play()）+ 静态文件无反缓存头 + crypto 全局变量在 pkg 中未定义 |
