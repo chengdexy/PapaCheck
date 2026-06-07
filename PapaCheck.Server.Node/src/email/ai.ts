@@ -88,6 +88,7 @@ export async function callAI(
  * 解析 AI 回复内容，提取作业项列表
  */
 export function parseHomework(text: string): HomeworkItem[] {
+  // 优先尝试直接解析纯 JSON
   try {
     const parsed = JSON.parse(text);
     if (Array.isArray(parsed)) {
@@ -98,6 +99,21 @@ export function parseHomework(text: string): HomeworkItem[] {
     }
     return [];
   } catch {
+    // 部分 AI 模型可能仍返回 markdown 代码块包裹，回退提取
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1].trim());
+        if (Array.isArray(parsed)) {
+          return parsed.filter(
+            (item: any) =>
+              item && typeof item.subject === 'string' && typeof item.content === 'string'
+          );
+        }
+      } catch {
+        // ignore
+      }
+    }
     return [];
   }
 }
