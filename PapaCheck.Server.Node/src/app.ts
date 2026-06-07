@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import { createReadStream } from 'fs';
 import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import { PapaCheckDB } from './db/index.js';
@@ -232,6 +233,38 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       }
     }
     return sendJson(reply, { clientVersion });
+  });
+
+  // 2b. GET /api/download - 下载最新 APK
+  app.get('/api/download', async (_request, reply) => {
+    if (!options.webDir) {
+      return reply.status(404).send({ error: 'APK not found', code: ErrorCodes.NOT_FOUND });
+    }
+    const apkDir = join(options.webDir, 'apk');
+    try {
+      const apkDirStat = await stat(apkDir);
+      if (!apkDirStat.isDirectory()) {
+        return reply.status(404).send({ error: 'APK not found', code: ErrorCodes.NOT_FOUND });
+      }
+      const files = await readdir(apkDir);
+      const apkFiles = files
+        .filter(f => f.startsWith('PapaCheck-') && f.endsWith('.apk'))
+        .sort()
+        .reverse();
+      if (apkFiles.length === 0) {
+        return reply.status(404).send({ error: 'APK not found', code: ErrorCodes.NOT_FOUND });
+      }
+      const apkName = apkFiles[0];
+      const apkPath = join(apkDir, apkName);
+      const apkStat = await stat(apkPath);
+      reply.header('Content-Type', 'application/vnd.android.package-archive');
+      reply.header('Content-Length', apkStat.size);
+      reply.header('Content-Disposition', `attachment; filename="${apkName}"`);
+      return reply.send(createReadStream(apkPath));
+    } catch (err) {
+      console.error('[/api/download 错误]', err);
+      return reply.status(404).send({ error: 'APK not found', code: ErrorCodes.NOT_FOUND });
+    }
   });
 
   // 3. GET /api/data - 完整数据

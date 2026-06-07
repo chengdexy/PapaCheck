@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- 修复 Android APK 更新后提示"安装包损坏"：`_downloadAndInstall` 使用 `Directory.systemTemp`（系统临时目录）保存 APK，Android 10+ 下 FileProvider 的 `<cache-path>` 无法覆盖该目录，安装器读取文件失败。改为 `getTemporaryDirectory()`（应用缓存目录），提取 `UpdateService` 方便测试
+
 ### Added
 - CRDT 同步引擎（src/crdt/）：字段级 LWW-Register、PN-Counter、OR-Set 合并函数
 - crdt_operations 数据库表存储操作日志

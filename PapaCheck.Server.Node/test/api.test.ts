@@ -672,8 +672,8 @@ describe('PUT /api/bounty-tasks/:id', () => {
 
 describe('PATCH /api/homeworks/:id', () => {
   it('部分更新作业状态', async () => {
-    // 先创建一条作业
-    const hw = { id: 'hw-patch-1', subject: '英语', content: '测试', status: 'pending' };
+    // 先创建一条作业（指定 dateKey，确保与后续查询的日期一致）
+    const hw = { id: 'hw-patch-1', subject: '英语', content: '测试', status: 'pending', dateKey: '2026-06-06' };
     await app.inject({ method: 'PUT', url: '/api/homeworks/hw-patch-1', payload: hw });
 
     const res = await app.inject({ method: 'PATCH', url: '/api/homeworks/hw-patch-1', payload: { status: 'in_progress' } });

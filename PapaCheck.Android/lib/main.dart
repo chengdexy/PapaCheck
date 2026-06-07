@@ -7,12 +7,12 @@ import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
-import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:battery_plus/battery_plus.dart';
 
 import 'services/config_service.dart';
 import 'services/offline_snapshot_service.dart';
+import 'services/update_service.dart';
 import 'widgets/connect_failed_dialog.dart';
 import 'widgets/setup_page.dart';
 
@@ -505,19 +505,12 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
       ),
     );
 
-    final client = HttpClient();
     try {
-      final request = await client.getUrl(Uri.parse(url));
-      final response = await request.close();
-      final file = File('${Directory.systemTemp.path}/PapaCheck.apk');
-      await response.pipe(file.openWrite());
+      await UpdateService.downloadAndInstall(url);
       if (!mounted) return;
       Navigator.of(context).pop();
-      await OpenFilex.open(file.path);
     } catch (e) {
       if (mounted) Navigator.of(context).pop();
-    } finally {
-      client.close();
     }
   }
 
