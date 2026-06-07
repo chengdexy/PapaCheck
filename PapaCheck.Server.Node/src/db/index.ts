@@ -491,7 +491,7 @@ export class PapaCheckDB {
   }
 
   getPendingNotifications(): NotificationItem[] {
-    const cutoff = Date.now() - 60000;
+    const cutoff = Date.now() - 3600000;
     // Also clean up expired
     this.db.prepare('DELETE FROM notifications WHERE created_at < ?').run(cutoff);
     
@@ -507,7 +507,7 @@ export class PapaCheckDB {
   }
 
   cleanupExpiredNotifications(): void {
-    const cutoff = Date.now() - 60000;
+    const cutoff = Date.now() - 3600000;
     this.db.prepare('DELETE FROM notifications WHERE created_at < ?').run(cutoff);
   }
 

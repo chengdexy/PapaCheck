@@ -79,10 +79,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   app.addHook('onResponse', (request, reply, done) => {
     const url = request.url;
-    if (url === '/api/ping' || url === '/api/data') {
-      done();
-      return;
-    }
+    // 服务端不做日志过滤，由 Windows 客户端根据本地配置决定是否显示
     console.log(`${request.method} ${url} ${reply.statusCode}`);
     done();
   });
