@@ -346,6 +346,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       return reply.status(400).send({ error: 'Missing text' });
     }
     const mp3Data = await tts.speak(text);
+    if (mp3Data.length === 0) {
+      const lastError = (tts as any)._lastError || 'TTS 返回空数据';
+      return reply.status(500).send({ error: lastError, code: 'TTS_EMPTY' });
+    }
     reply.header('Content-Type', 'audio/mpeg');
     reply.header('Content-Length', mp3Data.length);
     return reply.send(mp3Data);
@@ -875,6 +879,11 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       cacheControl: false,
       etag: false,
       lastModified: false,
+      setHeaders(res) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      },
     });
   }
 

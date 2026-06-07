@@ -113,6 +113,12 @@ const Voice = {
         const resp = await fetch(url);
         if (!resp.ok) throw new Error('speak fail');
         const blob = await resp.blob();
+        console.log('TTS blob size:', blob.size, 'type:', blob.type);
+        if (blob.size === 0) {
+          showToast('语音数据为空: ' + text);
+          this._playNext();
+          return;
+        }
         const blobUrl = URL.createObjectURL(blob);
         if (this._cache.size >= 50) {
           const firstKey = this._cache.keys().next().value;
@@ -123,31 +129,43 @@ const Voice = {
         audio = new Audio(blobUrl);
       }
       audio.onended = () => this._playNext();
-      audio.onerror = () => this._playNext();
+      audio.onerror = (e) => {
+        console.error('Voice playback error:', e, 'text:', text, 'audio.error:', audio.error?.message);
+        showToast('语音播放失败(' + (audio.error?.message || '未知') + '): ' + text);
+        this._playNext();
+      };
       await audio.play();
     } catch (e) {
+      console.error('Voice._playNext error:', e);
       if (e.name === 'NotAllowedError') {
         this._queue.unshift(text);
         this._playing = false;
         return;
       }
+      showToast('语音异常: ' + (e.message || e));
       this._playNext();
     }
   },
 };
 
-// 解锁音频自动播放（Android WebView 已禁用手势要求，此处为桌面浏览器兜底）
+// 解锁音频自动播放
 (function () {
   var _unlockDone = false;
   function unlockAudio() {
     if (_unlockDone) return;
+    // 解锁 AudioContext（Web Audio API 用）
     var ctx = new (window.AudioContext || window.webkitAudioContext)();
-    ctx.resume().then(function () {
-      _unlockDone = true;
-      document.removeEventListener('touchstart', unlockAudio);
-      document.removeEventListener('click', unlockAudio);
-      document.removeEventListener('visibilitychange', unlockAudio);
-    });
+    ctx.resume();
+    // 解锁 HTMLAudioElement（Voice.speak 用）
+    try {
+      var silent = new Audio();
+      silent.volume = 0;
+      silent.play();
+    } catch(e) {}
+    _unlockDone = true;
+    document.removeEventListener('touchstart', unlockAudio);
+    document.removeEventListener('click', unlockAudio);
+    document.removeEventListener('visibilitychange', unlockAudio);
   }
   document.addEventListener('touchstart', unlockAudio, { once: false });
   document.addEventListener('click', unlockAudio, { once: false });

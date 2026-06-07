@@ -2,7 +2,7 @@ import { spawn, type SpawnOptions } from 'child_process';
 import type { Readable } from 'stream';
 import { createHash } from 'crypto';
 import { readFile, writeFile, mkdir } from 'fs/promises';
-import { writeFileSync, unlinkSync } from 'fs';
+import { writeFileSync, unlinkSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
@@ -54,7 +54,9 @@ function registerCleanup(tmpPath: string): void {
  * 1. 显式传入的 scriptPath
  * 2. 环境变量 PAPACHECK_TTS_SCRIPT
  * 3. SEA 内置资源（process.getBuiltinAsset），写入临时目录
- * 4. 文件系统默认路径（开发模式）
+ * 4. 文件系统路径：
+ *    a. dist/scripts/tts_bridge.py（pkg/SEA 打包后）
+ *    b. scripts/tts_bridge.py（开发模式，相对项目根目录）
  */
 function resolveScriptPath(explicit?: string): string {
   // 1. 显式传入
@@ -80,7 +82,21 @@ function resolveScriptPath(explicit?: string): string {
     }
   }
 
-  // 4. 文件系统默认路径（开发模式）
+  // 4. pkg 环境：脚本在快照虚拟文件系统中，子进程无法访问，需提取到临时目录
+  if ((process as any).pkg) {
+    const snapshotPath = join(_moduleDirname, 'scripts', 'tts_bridge.py');
+    try {
+      const content = readFileSync(snapshotPath);
+      const tmpPath = join(tmpdir(), `papacheck-tts-bridge-${Date.now()}.py`);
+      writeFileSync(tmpPath, content);
+      registerCleanup(tmpPath);
+      return tmpPath;
+    } catch {
+      // 快照中读取失败，降级到临时目录硬编码
+    }
+  }
+
+  // 5. 开发模式：scripts/tts_bridge.py（_moduleDirname = src/tts/）
   return join(_moduleDirname, '..', '..', 'scripts', 'tts_bridge.py');
 }
 
@@ -90,6 +106,8 @@ export class TTSBridge {
   private scriptPath: string;
   private cacheDir: string;
   private spawnFn: SpawnFn;
+  /** 上次 TTS 失败的错误信息（供 API 端点读取） */
+  _lastError: string = '';
 
   constructor(options: TTSBridgeOptions = {}) {
     this.pythonPath = options.pythonPath ?? 'python';
@@ -144,17 +162,20 @@ export class TTSBridge {
   /** 启动 Python 子进程生成语音 */
   private spawnPython(text: string): Promise<Buffer> {
     return new Promise((resolve) => {
+      console.log(`[TTS] spawning: ${this.pythonPath} ${this.scriptPath} text="${text.slice(0, 30)}..."`);
       const proc = this.spawnFn(this.pythonPath, [this.scriptPath, text], {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
 
       const chunks: Buffer[] = [];
+      const errChunks: Buffer[] = [];
       let settled = false;
 
       const timeout = setTimeout(() => {
         if (!settled) {
           settled = true;
           proc.kill();
+          console.error(`[TTS] timeout (30s) for text: "${text.slice(0, 30)}..."`);
           resolve(Buffer.alloc(0));
         }
       }, 30000);
@@ -171,14 +192,22 @@ export class TTSBridge {
         chunks.push(chunk);
       });
 
-      proc.on('error', () => {
+      proc.stderr.on('data', (chunk: Buffer) => {
+        errChunks.push(chunk);
+      });
+
+      proc.on('error', (err) => {
+        console.error('[TTS] process error:', err.message);
         finish(Buffer.alloc(0));
       });
 
       proc.on('close', (code) => {
+        const stderr = Buffer.concat(errChunks).toString('utf-8').trim();
         if (code === 0) {
+          if (stderr) console.log('[TTS] stderr:', stderr);
           finish(Buffer.concat(chunks));
         } else {
+          console.error(`[TTS] exit code=${code} stderr="${stderr}"`);
           finish(Buffer.alloc(0));
         }
       });

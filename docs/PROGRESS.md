@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-07 15:40
+> 最后更新：2026-06-07 17:10
 
 ## 当前版本
 
@@ -72,7 +72,7 @@
 
 | 日期 | 变更 |
 |------|------|
-| 2026-06-07 | release.py/build_exe.py 自动 rebuild better-sqlite3：SEA 构建将模块编译为 Node 18 后立即恢复为系统 Node 版本；release.py 末尾保留安全网检测；新增 9 个 pytest 测试 |
+| 2026-06-07 | 修复 pkg EXE 中 TTS 语音不播报：assets 路径错导致 tts_bridge.py 未打包 + existsSync 在快照虚拟文件系统失效 + Python 子进程访问不了快照路径（提取到临时目录解决）+ spawnPython 静默吞 stderr（添加 [TTS] 诊断日志）+ Voice.speak blob URL Range 请求失败（恢复原始方案）+ unlockAudio 只解锁 AudioContext 未解锁 HTMLAudioElement（添加 silent Audio.play()）+ 静态文件无反缓存头 + crypto 全局变量在 pkg 中未定义 |
 | 2026-06-07 | 日志染色重构：六级逐行染色（API 状态码+方法类型 / 中文关键字），日志框增加行间距+滚动条+URL解码，配置缓存避免每次读磁盘 |
 | 2026-06-07 | 修复邮件解析添加的作业在管理端显示"实际undefined分钟"：Node.js 邮件同步创建作业补充 `actualDuration: null`，admin.js 渲染判空改用 `!= null` |
 | 2026-06-07 | 修复 `@fastify/static` 缓存导致静态文件全部返回 304（开发模式下禁用 ETag/Last-Modified），页面无法加载新代码 |

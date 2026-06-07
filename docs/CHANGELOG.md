@@ -6,10 +6,17 @@
 
 ## [Unreleased]
 
+### Fixed
+- 修复 pkg EXE 中 TTS 语音不播报：build-sea.mjs 的 assets 路径 `'dist/scripts/**/*'` 相对于 dist/package.json 解析为 `dist/dist/scripts/`，导致 tts_bridge.py 未打包进 EXE，改为 `'scripts/**/*'`
+- 修复 `resolveScriptPath()` 的 `existsSync` 在 pkg 快照虚拟文件系统中失效：改用 `process.pkg` 检测 + `readFileSync` 从快照读取脚本后写入临时目录，再传给 Python 子进程
+- 修复 `spawnPython()` 静默吞掉 Python stderr/退出码：添加 stderr 收集和 `[TTS]` 日志输出
+- 修复 `GET /api/speak` 返回空数据时仍返回 200 状态码：改为返回 500 + TTS 错误信息，前端 toast 显示具体原因
+- 修复 Voice.speak 在 Chromium 内核浏览器中因 blob URL Range 请求失败而无法播放：恢复原始 blob URL + HTMLAudioElement 方案；修复 `unlockAudio()` 只解锁 AudioContext 未解锁 HTMLAudioElement，添加 silent Audio.play() 解锁 HTMLAudioElement 自动播放
+- 修复静态文件无反缓存头导致 WebView 使用旧版 JS：添加 `Cache-Control: no-cache, no-store, must-revalidate`
+- 修复 `db/index.ts` 中 `crypto` 全局变量在 pkg 快照中未定义：添加 `import crypto from 'node:crypto'`
+
 ### Added
-- `release.py` 新增 `check_better_sqlite3()` 和 `rebuild_better_sqlite3()`：在发布流程末尾自动检测 better-sqlite3 是否需要重建（`node -e "require(...)"`），按需执行 `npm rebuild`
-- `build_exe.py` 新增 `restore_better_sqlite3()`：SEA 构建（`build-sea.mjs`）将 better-sqlite3 编译为 Node 18 目标后，立即恢复为系统 Node 版本
-- 新增 9 个 pytest 测试覆盖 rebuild 自动化逻辑（release.py 7 个 + build_exe.py 2 个）
+- `spawnPython()` 添加 stderr 收集和 `[TTS]` 诊断日志：输出脚本路径、Python 退出码和错误信息
 
 ### Changed
 - `build_exe.py` 重构：模块级代码移至 `main()` 函数，添加 `if __name__ == '__main__':` 保护，方便测试导入
