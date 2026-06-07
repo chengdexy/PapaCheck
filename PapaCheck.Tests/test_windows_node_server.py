@@ -47,17 +47,19 @@ class TestGetNodeServerExe:
                     assert 'papacheck-server.exe' in str(excinfo.value)
 
     # Feature: 查找 Node.js 服务器 EXE
-    #   Scenario: PyInstaller 打包环境下返回 sys._MEIPASS 下的路径
+    #   Scenario: PyInstaller 打包环境下返回固定路径（%LOCALAPPDATA%/PapaCheck/）
     #     Given sys.frozen 为 True 且 sys._MEIPASS 存在
     #     When 调用 _get_node_server_exe
-    #     Then 返回 sys._MEIPASS/Server.Node/papacheck-server.exe
-    def test_frozen_env_returns_meipass_path(self):
+    #     Then 复制到固定路径后返回该路径
+    def test_frozen_env_returns_fixed_path(self):
         mock_meipass = 'C:/fake/meipass'
         with patch('os.path.exists', return_value=True):
-            with patch.object(sys, 'frozen', True, create=True):
-                with patch.object(sys, '_MEIPASS', mock_meipass, create=True):
-                    exe = _get_node_server_exe()
-                    assert exe == os.path.join(mock_meipass, 'Server.Node', 'papacheck-server.exe')
+            with patch('os.path.getsize', return_value=12345):
+                with patch.object(sys, 'frozen', True, create=True):
+                    with patch.object(sys, '_MEIPASS', mock_meipass, create=True):
+                        exe = _get_node_server_exe()
+                        from app_gui import _NODE_EXE_DIR, _NODE_EXE_NAME
+                        assert exe == os.path.join(_NODE_EXE_DIR, _NODE_EXE_NAME)
 
 
 class TestStartNodeServerProcess:
