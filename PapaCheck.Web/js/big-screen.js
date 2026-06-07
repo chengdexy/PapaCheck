@@ -887,6 +887,12 @@ function updateSettlementPage() {
       </div>
     </div >
     `;
+
+  // 恢复滚动位置
+  const newGrid = container.querySelector('.shop-grid');
+  if (newGrid && savedScrollTop > 0) {
+    newGrid.scrollTop = savedScrollTop;
+  }
 }
 
 // ========== Rated Page ==========
@@ -949,6 +955,10 @@ function showMyRewards() {
   const now = Date.now();
   const sorted = [...rewardBox].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
+  // 保存滚动位置，防止重建 DOM 时回弹
+  const card = overlay.querySelector('.my-rewards-card');
+  const savedScrollTop = card ? card.scrollTop : 0;
+
   if (sorted.length === 0) {
     content.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:18px;">你还没有获得奖励，<br>快去获取积分兑换吧！</div>';
   } else {
@@ -981,6 +991,12 @@ function showMyRewards() {
     `;
       }).join('');
     }
+  }
+
+  // 恢复滚动位置
+  const newCard = overlay.querySelector('.my-rewards-card');
+  if (newCard && savedScrollTop > 0) {
+    newCard.scrollTop = savedScrollTop;
   }
 
   overlay.style.display = 'flex';
@@ -1079,6 +1095,10 @@ function showShopPage() {
 async function updateShopPage() {
   const container = document.getElementById('shopContainer');
   container.style.display = 'flex';
+
+  // 保存滚动位置，防止轮询重建 DOM 时回弹
+  const oldGrid = container.querySelector('.shop-grid');
+  const savedScrollTop = oldGrid ? oldGrid.scrollTop : 0;
 
   const shopItems = cachedData?.shopItems || [];
   const points = cachedData?.points?.balance ?? cachedData?.points ?? 0;
