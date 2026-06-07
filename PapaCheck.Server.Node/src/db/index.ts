@@ -39,6 +39,12 @@ export interface ModifiedEntry {
   last_modified: string;
 }
 
+export interface NotificationItem {
+  id: string;
+  text: string;
+  createdAt: number;
+}
+
 /** date_key 表：以日期为主键，存储 JSON 数据 */
 const DATE_KEY_TABLES = new Set([
   'homeworks',
@@ -165,6 +171,12 @@ export class PapaCheckDB {
       CREATE TABLE IF NOT EXISTS bounty_completions (
         date_key TEXT PRIMARY KEY,
         data TEXT NOT NULL DEFAULT '{}'
+      );
+
+      CREATE TABLE IF NOT EXISTS notifications (
+        id TEXT PRIMARY KEY,
+        text TEXT NOT NULL,
+        created_at INTEGER NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS last_modified (
@@ -465,6 +477,44 @@ export class PapaCheckDB {
     this._setJson('settings', data.settings ?? {});
     this._setJson('active_buffs', data.activeBuffs ?? []);
     this._setJson('bounty_tasks', data.bountyTasks ?? []);
+  }
+
+  // ==================== Notifications ====================
+
+  addNotification(text: string): string {
+    const id = crypto.randomUUID();
+    const now = Date.now();
+    this.db.prepare(
+      'INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)'
+    ).run(id, text, now);
+    return id;
+  }
+
+  getPendingNotifications(): NotificationItem[] {
+    const cutoff = Date.now() - 60000;
+    // Also clean up expired
+    this.db.prepare('DELETE FROM notifications WHERE created_at < ?').run(cutoff);
+    
+    const rows = this.db.prepare(
+      'SELECT id, text, created_at FROM notifications WHERE created_at >= ? ORDER BY created_at ASC'
+    ).all(cutoff) as any[];
+    
+    return rows.map(row => ({
+      id: row.id,
+      text: row.text,
+      createdAt: row.created_at,
+    }));
+  }
+
+  cleanupExpiredNotifications(): void {
+    const cutoff = Date.now() - 60000;
+    this.db.prepare('DELETE FROM notifications WHERE created_at < ?').run(cutoff);
+  }
+
+  consumeNotifications(ids: string[]): void {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => '?').join(',');
+    this.db.prepare(`DELETE FROM notifications WHERE id IN (${placeholders})`).run(...ids);
   }
 
   // ==================== Points ====================
@@ -1212,6 +1262,9 @@ export class PapaCheckDB {
           case 'free_time_tasks': this.putFreeTimeTask(op.resourceId, op.value); break;
           case 'daily_settlement': this.putSettlement(op.resourceId, op.value); break;
           case 'settings': this.putSettings(op.value); break;
+          case 'notifications':
+            this.addNotification(op.value.text);
+            break;
         }
       }
     } catch (e) {

@@ -6,6 +6,25 @@
 
 ## [Unreleased]
 
+### Added
+- 专用通知接口（notify-api）：`notifications` SQLite 表、POST /api/notify（创建通知）、GET /api/notify/pending（拉取待消费通知，自动 1 分钟过期清理）、DELETE /api/notify/consumed（批量消费通知）
+- 前端 api.js 新增 `announce(text)`（带 CRDT 日志 + online-first 策略）、`getPendingNotifications()`、`consumeNotifications(ids)` 方法
+- CRDT 同步支持 `notifications` 表：`_classifyChange` 识别、`applyCRDTOperation` 分支、`announce` CRDT 日志合并
+- 邮件同步完成后调用 `db.addNotification('收到云端作业，请查看')`
+- 服务端 7 个通知数据库测试 + 7 个 API 端点测试
+
+### Changed
+- 管理端 admin.js 所有播报操作点（调分/评级/商品/奖励箱/延后/驳回/赏金/新增作业）改为直接调用 `API.announce()`，移除 `_pointsAdjustmentNote` hack
+- 孩子端 app.js pollServer 重构：移除 8 处 diff 检测 `Voice.speak()`，改为轮询末尾统一调用 `API.getPendingNotifications()` 拉取并播报通知，保留 `needsFullRender` 和 UI 刷新逻辑
+
+### Removed
+- `_pointsAdjustmentNote` 跨设备通知 hack（settings 污染），替换为专用通知接口
+- app.js `_lastPointsNote` 变量、`_pointsAdjustmentNote` 检测/播报/清理代码块
+- `_rewardBoxVoiceHandled` 死代码标志
+
+### Fixed
+- Code review 修复 6 个 minor 问题：移除 `GET /api/notify/pending` 中冗余的 `cleanupExpiredNotifications()` 调用（`getPendingNotifications()` 内部已清理）；移除 app.js 作业 diff 中的死代码空条件注释；清理 `_rewardBoxVoiceHandled` 死标志；移除 `getPendingNotifications()` 返回中多余的 `created_at` 蛇形字段；移除未使用的 `emailNew`/`manualNew` 变量
+
 ### Changed
 - 重写 AI 邮件解析 system prompt，仿照 email_client.py 的结构化格式（输出格式含示例、3 条规则、约束），输出改为严格按照 JSON 数组格式
 

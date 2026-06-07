@@ -1274,4 +1274,128 @@ describe('Database', () => {
       expect(result.dailyBasePoints).toBe(150);
     });
   });
+
+  describe('通知专用接口', () => {
+    let db: any;
+    let dbPath: string;
+    let tmpDir: string;
+
+    beforeEach(() => {
+      tmpDir = mkdtempSync(join(tmpdir(), 'papacheck-test-notify-'));
+      dbPath = join(tmpDir, 'test.db');
+      db = new (Database)(dbPath);
+    });
+
+    afterEach(() => {
+      db.close();
+      rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    // Feature: 通知创建
+    //   Scenario: 写入通知
+    //     Given 数据库已初始化
+    //     When 调用 addNotification('测试通知')
+    //     Then 返回的 id 是有效的 UUID 字符串
+    //     And 通知被正确写入数据库
+    it('addNotification 写入通知并返回 id', () => {
+      const id = (db as any).addNotification('测试通知');
+      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    });
+
+    // Feature: 拉取通知
+    //   Scenario: 返回有效期内通知
+    //     Given 数据库中有两条通知（先后写入）
+    //     When 调用 getPendingNotifications()
+    //     Then 返回包含两条通知的数组
+    //     And 按 created_at 升序排列
+    it('getPendingNotifications 返回未过期通知', () => {
+      (db as any).addNotification('通知一');
+      (db as any).addNotification('通知二');
+
+      const notifications = (db as any).getPendingNotifications();
+      expect(notifications).toHaveLength(2);
+      expect(notifications[0].createdAt).toBeLessThanOrEqual(notifications[1].createdAt);
+    });
+
+    // Feature: 过期过滤
+    //   Scenario: 超过 1 分钟的通知不返回
+    //     Given 数据库中有一条 2 分钟前的通知（通过修改 created_at 模拟）
+    //     When 调用 getPendingNotifications()
+    //     Then 返回空数组
+    it('getPendingNotifications 过滤过期通知', () => {
+      (db as any).db.prepare(
+        'INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)'
+      ).run('old-id', '旧通知', Date.now() - 120000);
+
+      const notifications = (db as any).getPendingNotifications();
+      expect(notifications).toEqual([]);
+    });
+
+    // Feature: 过期清理
+    //   Scenario: 删除过期通知
+    //     Given 数据库中有一条过期通知和一条有效通知
+    //     When 调用 cleanupExpiredNotifications()
+    //     Then 过期通知被删除，有效通知保留
+    it('cleanupExpiredNotifications 删除过期通知', () => {
+      (db as any).db.prepare(
+        'INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)'
+      ).run('old-id', '旧通知', Date.now() - 120000);
+      const validId = (db as any).addNotification('新通知');
+
+      (db as any).cleanupExpiredNotifications();
+
+      const remaining = (db as any).getPendingNotifications();
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].id).toBe(validId);
+    });
+
+    // Feature: 消费通知
+    //   Scenario: 按 ids 删除
+    //     Given 数据库中有多条通知
+    //     When 调用 consumeNotifications([id1, id2])
+    //     Then 指定的两条通知被删除，其余保留
+    it('consumeNotifications 按 ids 批量删除', () => {
+      const id1 = (db as any).addNotification('通知一');
+      const id2 = (db as any).addNotification('通知二');
+      const id3 = (db as any).addNotification('通知三');
+
+      (db as any).consumeNotifications([id1, id2]);
+
+      const remaining = (db as any).getPendingNotifications();
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].id).toBe(id3);
+    });
+
+    // Feature: CRDT 分类
+    //   Scenario: 识别 notifications
+    //     Given 一个 data 对象包含 _table: 'notifications'
+    //     When 调用 _classifyChange(data)
+    //     Then 返回 'notifications'
+    it('_classifyChange 识别 notifications 类型', () => {
+      const result = (db as any)._classifyChange({ _table: 'notifications' });
+      expect(result).toBe('notifications');
+    });
+
+    // Feature: CRDT 操作应用
+    //   Scenario: notifications 的 update 操作
+    //     Given 一个 CRDT update 操作，table 为 'notifications'
+    //     When 调用 applyCRDTOperation(op)
+    //     Then 通知被成功创建
+    it('applyCRDTOperation 的 notifications 分支能创建通知', () => {
+      (db as any).applyCRDTOperation({
+        id: 'op-notify-1',
+        type: 'update',
+        table: 'notifications',
+        resourceId: 'notify-1',
+        field: null,
+        value: { id: 'notify-1', text: 'CRDT通知' },
+        timestamp: '2026-06-06T10:00:00Z',
+        nodeId: 'node1',
+      });
+
+      const notifications = (db as any).getPendingNotifications();
+      expect(notifications).toHaveLength(1);
+      expect(notifications[0].text).toBe('CRDT通知');
+    });
+  });
 });

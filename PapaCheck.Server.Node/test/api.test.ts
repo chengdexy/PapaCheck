@@ -1,7 +1,7 @@
 // Feature: API 端点完整测试
 //   Scenario: 所有 34 个 API 端点均返回正确的状态码和数据结构
 
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { buildApp } from '../src/app.js';
 import type { FastifyInstance } from 'fastify';
 
@@ -834,5 +834,136 @@ describe('POST /api/sync/crdt-pull?ack=', () => {
     const res = await app.inject({ method: 'DELETE', url: '/api/sync/crdt-pull?ack=2026-06-06T00:00:00Z' });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toHaveProperty('ok', true);
+  });
+});
+
+// ==================== 通知端点 ====================
+
+function cleanNotifications() {
+  const dbWrite = (db as any).db;
+  dbWrite.prepare('DELETE FROM notifications').run();
+}
+
+describe('POST /api/notify', () => {
+  beforeEach(() => cleanNotifications());
+  it('接收有效 text 时返回 { ok, id }', async () => {
+    // Feature: 创建通知
+    // Scenario: 发送有效通知请求
+    // Given 一个有效的通知文本
+    // When POST /api/notify 发送 { text: '测试通知' }
+    // Then 返回 { ok: true, id: 'uuid-...' }
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/notify',
+      body: { text: '测试通知' },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toEqual({ ok: true, id: expect.any(String) });
+    // Verify stored in db
+    const notifications = (db as any).getPendingNotifications();
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].text).toBe('测试通知');
+  });
+
+  it('收到空 text 时返回 400', async () => {
+    // Feature: 参数校验
+    // Scenario: 空文本请求
+    // Given 空的 text
+    // When POST /api/notify 发送 { text: '' }
+    // Then 返回 400
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/notify',
+      body: { text: '' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('缺失 text 时返回 400', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/notify',
+      body: {},
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+describe('GET /api/notify/pending', () => {
+  beforeEach(() => cleanNotifications());
+  it('返回未过期通知列表，过期通知被自动清理', async () => {
+    // Feature: 拉取待消费通知
+    // Scenario: 有效和过期通知混合
+    // Given 数据库中有 1 条有效通知和 1 条过期通知
+    // When GET /api/notify/pending
+    // Then 只返回有效通知，过期通知被清理
+    const dbWrite = (db as any).db;
+    const validId = 'valid-001';
+    const expiredId = 'expired-001';
+    dbWrite.prepare('INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)').run(validId, '有效通知', Date.now());
+    dbWrite.prepare('INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)').run(expiredId, '过期通知', Date.now() - 120000);
+
+    const res = await app.inject({ method: 'GET', url: '/api/notify/pending' });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0].id).toBe(validId);
+
+    // Verify expired was cleaned up
+    const remaining = dbWrite.prepare('SELECT COUNT(*) as cnt FROM notifications').get() as any;
+    expect(remaining.cnt).toBe(1);
+  });
+
+  it('无通知时返回 { "items": [] }', async () => {
+    // Feature: 空列表
+    // Scenario: 数据库无通知
+    // Given 数据库空
+    // When GET /api/notify/pending
+    // Then 返回 { items: [] }
+    const res = await app.inject({ method: 'GET', url: '/api/notify/pending' });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toEqual({ items: [] });
+  });
+});
+
+describe('DELETE /api/notify/consumed', () => {
+  beforeEach(() => cleanNotifications());
+  it('按 ids 正确删除通知', async () => {
+    // Feature: 消费通知
+    // Scenario: 按 ids 批量删除
+    // Given 数据库中有两条通知
+    // When DELETE /api/notify/consumed 发送 { ids: [id1] }
+    // Then 指定通知被删除，其余保留
+    const dbWrite = (db as any).db;
+    const id1 = 'del-001';
+    const id2 = 'del-002';
+    dbWrite.prepare('INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)').run(id1, '通知1', Date.now());
+    dbWrite.prepare('INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)').run(id2, '通知2', Date.now());
+
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/api/notify/consumed',
+      body: { ids: [id1] },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toEqual({ ok: true });
+
+    const remaining = dbWrite.prepare('SELECT id FROM notifications ORDER BY id').all() as any[];
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].id).toBe(id2);
+  });
+
+  it('空 ids 列表时返回 ok', async () => {
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/api/notify/consumed',
+      body: { ids: [] },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toEqual({ ok: true });
   });
 });
