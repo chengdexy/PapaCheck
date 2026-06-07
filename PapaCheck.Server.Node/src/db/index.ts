@@ -481,9 +481,9 @@ export class PapaCheckDB {
 
   // ==================== Notifications ====================
 
-  addNotification(text: string): string {
+  addNotification(text: string, createdAt?: number): string {
     const id = crypto.randomUUID();
-    const now = Date.now();
+    const now = createdAt ?? Date.now();
     this.db.prepare(
       'INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)'
     ).run(id, text, now);
@@ -1263,7 +1263,7 @@ export class PapaCheckDB {
           case 'daily_settlement': this.putSettlement(op.resourceId, op.value); break;
           case 'settings': this.putSettings(op.value); break;
           case 'notifications':
-            this.addNotification(op.value.text);
+            this.addNotification(op.value.text, op.value.createdAt);
             break;
         }
       }

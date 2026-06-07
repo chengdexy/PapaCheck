@@ -17,7 +17,7 @@ var ConnectionManager = (function () {
     return (window.__CM_TEST_CONFIG__ && window.__CM_TEST_CONFIG__.reconnectTimeoutMs) || 10000;
   }
   function _getPingInterval() {
-    return (window.__CM_TEST_CONFIG__ && window.__CM_TEST_CONFIG__.pingIntervalMs) || 1000;
+    return (window.__CM_TEST_CONFIG__ && window.__CM_TEST_CONFIG__.pingIntervalMs) || 3000;
   }
 
   async function _ping() {
