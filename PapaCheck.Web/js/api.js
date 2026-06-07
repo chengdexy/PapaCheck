@@ -1063,7 +1063,7 @@ const API = {
     return await this._requestWithStrategy(
       'online-first',
       async () => {
-        var result = await this._fetch('/api/notify/consumed', { method: 'DELETE', body: JSON.stringify({ ids }) });
+        var result = await this._fetch('/api/notify/consumed?ids=' + encodeURIComponent(ids.join(',')), { method: 'DELETE' });
         return result;
       },
       async () => {

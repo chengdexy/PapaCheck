@@ -14,6 +14,7 @@
 - 服务端 7 个通知数据库测试 + 7 个 API 端点测试
 
 ### Changed
+- `DELETE /api/notify/consumed` 改为通过 URL 查询参数 `?ids=` 传递通知 ID，符合 RESTful 规范（DELETE 请求体可能被代理丢弃）
 - 管理端 admin.js 所有播报操作点（调分/评级/商品/奖励箱/延后/驳回/赏金/新增作业）改为直接调用 `API.announce()`，移除 `_pointsAdjustmentNote` hack
 - 孩子端 app.js pollServer 重构：移除 8 处 diff 检测 `Voice.speak()`，改为轮询末尾统一调用 `API.getPendingNotifications()` 拉取并播报通知，保留 `needsFullRender` 和 UI 刷新逻辑
 

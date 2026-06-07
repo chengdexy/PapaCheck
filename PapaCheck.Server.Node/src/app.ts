@@ -721,9 +721,12 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   // 通知：消费通知
   app.delete('/api/notify/consumed', async (request, reply) => {
-    const body = request.body as { ids?: string[] };
-    if (body.ids && body.ids.length > 0) {
-      db.consumeNotifications(body.ids);
+    const query = request.query as { ids?: string };
+    if (query.ids) {
+      const ids = query.ids.split(',').filter(Boolean);
+      if (ids.length > 0) {
+        db.consumeNotifications(ids);
+      }
     }
     return sendJson(reply, { ok: true });
   });
