@@ -893,5 +893,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     });
   }
 
+  // 启动时后台预生成固定短语（不阻塞启动）
+  tts.pregenAllFixed().catch(() => {});
+
   return app;
 }

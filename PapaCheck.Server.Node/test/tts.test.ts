@@ -13,9 +13,11 @@ vi.mock('fs/promises', () => ({
   readFile: vi.fn(),
   writeFile: vi.fn(),
   mkdir: vi.fn(),
+  readdir: vi.fn(),
+  unlink: vi.fn(),
 }));
 
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import { readFile, writeFile, mkdir, readdir, unlink } from 'fs/promises';
 
 function createMockProcess() {
   const proc = new EventEmitter() as any;
@@ -187,6 +189,87 @@ describe('TTSBridge', () => {
       expect(speakSpy).toHaveBeenCalledTimes(2);
       expect(speakSpy).toHaveBeenCalledWith('你好');
       expect(speakSpy).toHaveBeenCalledWith('世界');
+    });
+
+    it('无参调用时默认使用 FIXED_TEXTS', () => {
+      bridge = new TTSBridge({ _spawn: mockSpawn as unknown as SpawnFn });
+      const speakSpy = vi.spyOn(bridge, 'speak').mockResolvedValue(Buffer.alloc(0));
+
+      bridge.pregenSpeech();
+
+      expect(speakSpy).toHaveBeenCalledTimes(45);
+      expect(speakSpy).toHaveBeenCalledWith(TTSBridge.FIXED_TEXTS[0]);
+    });
+  });
+
+  describe('FIXED_TEXTS', () => {
+    it('包含 45 条固定短语', () => {
+      expect(TTSBridge.FIXED_TEXTS.length).toBe(45);
+    });
+
+    it('包含 24 条整点报时', () => {
+      const hourTexts = TTSBridge.FIXED_TEXTS.filter(t => t.startsWith('现在是'));
+      expect(hourTexts.length).toBe(24);
+      expect(hourTexts[0]).toBe('现在是0点');
+      expect(hourTexts[23]).toBe('现在是23点');
+    });
+
+    it('所有文本非空', () => {
+      expect(TTSBridge.FIXED_TEXTS.every(t => t.trim().length > 0)).toBe(true);
+    });
+  });
+
+  describe('pregenAllFixed', () => {
+    it('对所有固定短语调用 speak', async () => {
+      bridge = new TTSBridge({ _spawn: mockSpawn as unknown as SpawnFn });
+      const speakSpy = vi.spyOn(bridge, 'speak').mockResolvedValue(Buffer.alloc(0));
+      
+      await bridge.pregenAllFixed();
+      
+      expect(speakSpy).toHaveBeenCalledTimes(45);
+      // 验证第一个和最后一个调用
+      expect(speakSpy).toHaveBeenCalledWith('已申请延后，等待审核');
+      expect(speakSpy).toHaveBeenCalledWith('现在是23点');
+    });
+
+    it('控制台输出开始/完成日志', async () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      bridge = new TTSBridge({ _spawn: mockSpawn as unknown as SpawnFn });
+      vi.spyOn(bridge, 'speak').mockResolvedValue(Buffer.alloc(0));
+      
+      await bridge.pregenAllFixed();
+      
+      expect(consoleSpy).toHaveBeenNthCalledWith(1, '[TTS] 开始预生成TTS固定短语mp3...');
+      expect(consoleSpy).toHaveBeenLastCalledWith('[TTS] 预生成TTS固定短语45条完成');
+    });
+
+    it('清理陈旧缓存文件', async () => {
+      (readdir as any).mockResolvedValue(['abc123.mp3', 'stale.mp3']);
+      (unlink as any).mockResolvedValue(undefined);
+      bridge = new TTSBridge({ _spawn: mockSpawn as unknown as SpawnFn });
+      
+      // 模拟所有的 speak 调用都成功
+      vi.spyOn(bridge, 'speak').mockResolvedValue(Buffer.from('data'));
+      
+      await bridge.pregenAllFixed();
+      
+      // stale.mp3 不在 FIXED_TEXTS 中，应该被删除
+      expect(unlink).toHaveBeenCalledWith(expect.stringMatching(/stale\.mp3$/));
+    });
+
+    it('不删除属于固定短语的缓存文件', async () => {
+      // 生成一个属于 FIXED_TEXTS 中第一条短语的 hash 文件
+      const crypto = await import('crypto');
+      const firstHash = crypto.createHash('md5').update(TTSBridge.FIXED_TEXTS[0]).digest('hex') + '.mp3';
+      (readdir as any).mockResolvedValue([firstHash]);
+      
+      bridge = new TTSBridge({ _spawn: mockSpawn as unknown as SpawnFn });
+      vi.spyOn(bridge, 'speak').mockResolvedValue(Buffer.from('data'));
+      
+      await bridge.pregenAllFixed();
+      
+      // 有效的缓存文件不应该被删除
+      expect(unlink).not.toHaveBeenCalledWith(expect.stringMatching(new RegExp(firstHash.replace(/\./g, '\\.'))));
     });
   });
 
