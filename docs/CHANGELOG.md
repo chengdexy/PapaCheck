@@ -10,7 +10,9 @@
 - 离线遮罩显示时机优化：第一次 ping 失败时不显示遮罩，第二次 ping 失败时才显示，降低偶发网络抖动的无用遮罩闪烁；全量 362 测试通过
 
 ### Fixed
-- 修复初始 ping 失败时应用启动即离线场景的 UI 反馈缺失问题：放宽 interval 失败路径的遮罩显示条件（`_failCount === 2` 不再要求 `_mode === 'reconnecting'`），使第 2 次总失败即可显示遮罩；全量 362 测试通过
+- 修复 Windows 调试模式点击"停止服务器"再点"启动服务器"提示端口 8081 已被占用的问题：`_stop_node_server_process()` 在 Windows 上先尝试优雅退出（`taskkill /T` 发送关闭信号，Node.js 端 `SIGTERM` 处理器调用 `app.close()` 释放端口），优雅退出超时后兜底强制杀进程树（`taskkill /F /T`），确保 debug 模式下 `tsx.cmd` 的子进程 `node.exe` 也被正确终止；全量 362 测试通过
+- Node.js 端（index.ts）添加优雅关闭处理器：`SIGTERM`/`SIGINT` 时调用 `app.close()` 后退出
+- 修复初始 ping 失败时（如应用启动时已离线），`_mode` 未过渡到 `reconnecting`，导致离线遮罩和 toast 均不显示、用户收不到任何反馈的问题；全量 362 测试通过
 - 修复 Windows 端开机自启动配置未生效 + 注册表旧版本残留无清除机制的问题：
   - `_is_autostart()` 改为读取注册表值并用 `os.path.isfile()` 验证可执行文件是否存在，而非仅检查键名存在
   - 新增 `_cleanup_stale_autostart()` 启动时自动清理无效/旧版本注册表条目

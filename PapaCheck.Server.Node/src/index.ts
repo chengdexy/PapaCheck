@@ -17,6 +17,22 @@ const webDir = resolve(process.cwd(), args['web-dir']);
 const dbPath = resolve(process.cwd(), args['db-path']);
 const ttsPython = args['tts-python'];
 
+let shuttingDown = false;
+const gracefulShutdown = (app: Awaited<ReturnType<typeof buildApp>>, signal: string) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log('[Server] 收到 ' + signal + '，正在优雅关闭...');
+  app.close()
+    .then(() => {
+      console.log('[Server] 服务器已关闭');
+      process.exit(0);
+    })
+    .catch((err: Error) => {
+      console.error('[Server] 关闭出错:', err);
+      process.exit(1);
+    });
+};
+
 async function main(): Promise<void> {
   const app = await buildApp({
     port,
@@ -24,6 +40,12 @@ async function main(): Promise<void> {
     dbPath,
     ttsPython,
   });
+
+  // 替换已有的 SIGTERM/SIGINT 处理器（TTS bridge 有自注册的 process.exit(0) 处理器）
+  process.removeAllListeners('SIGTERM');
+  process.removeAllListeners('SIGINT');
+  process.on('SIGTERM', () => gracefulShutdown(app, 'SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown(app, 'SIGINT'));
 
   await app.listen({ port, host: '0.0.0.0' });
 

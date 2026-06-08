@@ -402,9 +402,42 @@ def _start_node_server_process(exe_path, db_path, web_dir, port):
 
 
 def _stop_node_server_process(process):
-    """终止 Node.js 服务器子进程"""
+    """终止 Node.js 服务器子进程
+    1. Windows 上先尝试优雅退出（taskkill /T，Node.js 收到 SIGTERM 后调用 app.close()）
+    2. 优雅退出超时则强制杀进程树（taskkill /F /T）
+    3. 兜底：terminate / kill"""
     if process is None:
         return
+
+    if sys.platform == 'win32':
+        # 第一步：优雅退出（taskkill 不加 /F，让 Node.js 走 SIGTERM 处理器 → app.close()）
+        try:
+            subprocess.run(
+                ['taskkill', '/T', '/PID', str(process.pid)],
+                capture_output=True, timeout=3,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            try:
+                process.wait(timeout=5)
+                return  # 优雅退出成功
+            except subprocess.TimeoutExpired:
+                pass  # 超时，进程未退出 → 强制杀
+        except Exception:
+            pass  # taskkill 失败，回退到 terminate/kill
+
+        # 第二步：强制杀进程树（兜底）
+        try:
+            subprocess.run(
+                ['taskkill', '/F', '/T', '/PID', str(process.pid)],
+                capture_output=True, timeout=5, check=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            process.wait(timeout=3)
+            return
+        except Exception:
+            pass  # 强制杀失败，回退到 terminate/kill
+
+    # 非 Windows 或以上步骤全部失败的最终兜底
     process.terminate()
     try:
         process.wait(timeout=5)
