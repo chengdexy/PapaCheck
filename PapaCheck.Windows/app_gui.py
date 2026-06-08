@@ -823,7 +823,7 @@ class PapaCheckApp:
         """清理注册表中无效或旧版本的 PapaCheck 自启动条目"""
         try:
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, AUTORUN_KEY, 0,
-                                 winreg.KEY_READ | winreg.KEY_SET_VALUE)
+                                 winreg.KEY_QUERY_VALUE | winreg.KEY_SET_VALUE)
             try:
                 value, reg_type = winreg.QueryValueEx(key, APP_NAME)
                 path = value.strip('"\' ')
