@@ -1031,11 +1031,19 @@ class PapaCheckApp:
         if self._node_process:
             self._append_log('正在停止服务器...')
             self.start_btn.config(state=tk.DISABLED)
-            self._stop_node_server()
-            self._handle_server_exit()
-            self.start_btn.config(state=tk.NORMAL)
-            if self._quitting:
-                self._do_destroy()
+            threading.Thread(target=self._stop_server_worker, daemon=True).start()
+
+    def _stop_server_worker(self):
+        """后台线程：执行停止操作（taskkill + process.wait 会阻塞，不能放在 UI 线程）"""
+        self._stop_node_server()
+        self.root.after(0, self._on_server_stopped)
+
+    def _on_server_stopped(self):
+        """主线程：停止完成后更新 UI"""
+        self._handle_server_exit()
+        self.start_btn.config(state=tk.NORMAL)
+        if self._quitting:
+            self._do_destroy()
 
     def _toggle_server(self):
         if self.running:
