@@ -73,6 +73,7 @@
 | 日期 | 变更 |
 |------|------|
 | 2026-06-08 | 修复自由时间轮询回退 Bug：`saveFreeTimeSilent()`（全量 PUT 所有自由时间）改为 `API.putFreeTimeTask()`（只 PUT 当前任务）+ pollServer 状态保护；新增 TDD 测试 5 个；全量 349 测试通过 |
+| 2026-06-08 | 修复 TTS 常驻进程 Windows 启动崩溃（asyncio pipe IOCP → run_in_executor 线程读取 stdin） |
 | 2026-06-08 | 修复 `startPoll` 使用 `setInterval` 导致 poll 重叠触发的问题：改为 `setTimeout` 递归链 + `finally` 块确保前一次执行完成后才调度下一轮；`stopPoll` 同步改为 `clearTimeout`；修复兑换成功时重复播报；新增 TDD 测试 3 个；全量 349 测试通过 |
 | 2026-06-08 | 修复孩子端轮询同步时最后一项作业被延后后不自动弹出评级界面 Bug：作业列表变化后全部为 done 时自动调用 `calculateSettlement()`；新增 TDD 测试 3 个；全量 341 测试通过 |
 | 2026-06-08 | 修复积分商店每日数量不重置 Bug：Node.js 服务端 `_resetDailyShopQuantity()` 检查 `dailyLimit`/`dailySold` 字段与前端 `baseQuantity`/`remainingQuantity` 模型不匹配，新增 `baseQuantity → remainingQuantity` 重置逻辑；新增 TDD 测试 3 个；全量 327 测试通过 |
