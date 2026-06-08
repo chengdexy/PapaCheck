@@ -6,6 +6,14 @@
 
 ## [Unreleased]
 
+### Added
+- Android 端更新版本后自动清空本地缓存（WebView 缓存 + 离线快照），保留服务器 URL 和角色配置，确保每次更新后从服务端下载最新资源
+  - 新增 `ConfigService.setLastVersion()` / `getLastVersion()` 版本号存储
+  - 新增 `OfflineSnapshotService.clearAll()` 离线快照清理
+  - 新增 `shouldClearCache()` 版本变更检测决策函数
+  - `_startup()` 启动流程集成：版本变更 → 清 WebView 缓存 → 删除离线快照 → 记录新版本 → 加载最新页面
+  - TDD 驱动：新增 7 个 Flutter 测试，全量 30 测试通过
+
 ### Fixed
 - 修复 `updateMainClock` 中 `saverDate` 潜在空指针异常：`document.getElementById('saverDate')` 添加空检查，与 `saverTimeEl` 保持一致
 - 修复离线模式客户端时钟停止：`tickInterval`（同时负责时钟+任务计时器）在离线模式下因 `pollServer()` 提前返回无法恢复，导致时钟冻结。将时钟更新拆分为独立 `clockInterval`（30 秒间隔，永不停止），屏保时钟合并到 `updateMainClock` 统一更新，消除 `updateSaverTime` 独立定时器
