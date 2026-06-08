@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-08 18:02
+> 最后更新：2026-06-08 18:18
 
 ## 当前版本
 
@@ -72,6 +72,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-08 | 修复 Windows 端开机自启动未生效 + 注册表旧版本残留无清除机制；`_is_autostart()` 路径有效性校验；新增 `_cleanup_stale_autostart()`；启动时自动清理；全量 372 测试通过 |
 | 2026-06-08 | 修复孩子端无限 PUT settlement/efficiency + 奖励箱新奖励未播报 + efficiency 幂等性补全；新增 TDD 测试 6 个；全量 362 测试通过 |
 | 2026-06-08 | 修复提交评级后 pollServer 覆写 `submittedAt` 卡在提交界面 + 通知重复播放 + TTS cache 持久化 + SEA daemon 回退到 spawnPython；全量 356 测试通过 |
 | 2026-06-08 | 修复语音自动播放三连 Bug（假解锁锁死 / NotAllowedError 插队 / 通知提前消费）；全量 356 测试通过 |

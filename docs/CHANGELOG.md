@@ -7,6 +7,11 @@
 ## [Unreleased]
 
 ### Fixed
+- 修复 Windows 端开机自启动配置未生效 + 注册表旧版本残留无清除机制的问题：
+  - `_is_autostart()` 改为读取注册表值并用 `os.path.isfile()` 验证可执行文件是否存在，而非仅检查键名存在
+  - 新增 `_cleanup_stale_autostart()` 启动时自动清理无效/旧版本注册表条目
+  - `_set_autostart()` 写入前后自动清理残留条目并增加操作日志
+  - 启动时（`__init__`）自动执行注册表残留清理
 - 修复孩子端无限 PUT `/api/settlement/:date` 和 `/api/efficiency/:date` 的问题：`calculateSettlement()` 添加 re-entrant guard（`_calculatingSettlement` 防止并发重复执行）+ `_putSettlementIdempotent`/`_putEfficiencyIdempotent` 数据快照对比（相同数据跳过 PUT），消除轮询触发的无限 PUT 循环
 - 修复奖励箱新增奖励未播报的问题：`pollServer` 检测到奖励箱物品新增或数量增加时调用 `Voice.speak('奖励箱有新奖励，快去看看吧')`
   - 新增 TDD 测试 6 个（362 全量测试通过）
