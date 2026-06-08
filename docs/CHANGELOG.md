@@ -7,6 +7,9 @@
 ## [Unreleased]
 
 ### Fixed
+- 修复离线模式客户端时钟停止：`tickInterval`（同时负责时钟+任务计时器）在离线模式下因 `pollServer()` 提前返回无法恢复，导致时钟冻结。将时钟更新拆分为独立 `clockInterval`（30 秒间隔，永不停止），屏保时钟合并到 `updateMainClock` 统一更新，消除 `updateSaverTime` 独立定时器
+  - 新增 TDD 测试 7 个（356 全量测试通过）
+- 修复 Windows log 框显示 Node.js 弃用警告：`package.json` overrides 锁定 `glob@8.1.0`（npm 标记为 deprecated），移除 overrides 后升级到 glob@10.x 非弃用版本；添加 `_write_log()` 对 `(node:` / `(Use \`` 开头的防御性过滤
 - 修复 TTS 常驻进程在 Windows 下启动崩溃：`asyncio.connect_read_pipe` + `StreamReader` 在 Python 3.14 ProactorEventLoop 中因 IOCP pipe 句柄无效而报 `WinError 6`，改用 `loop.run_in_executor(None, sys.stdin.buffer.readline)` 在线程池中读取 stdin
 - 修复 `startPoll` 使用 `setInterval` 导致 poll 函数重叠触发的问题：改为 `setTimeout` 递归链 + `finally` 块确保前一次执行完成后才调度下一轮，消除异步竞态；`stopPoll` 同步改为 `clearTimeout`
   - 新增 TDD 测试 3 个（349 全量测试通过）

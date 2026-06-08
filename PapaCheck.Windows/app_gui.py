@@ -1036,6 +1036,9 @@ class PapaCheckApp:
         # 过滤 TTS 预生成的逐条 spawn 日志（对用户无用，仅诊断用）
         if '[TTS] spawning:' in text:
             return
+        # 过滤 Node.js 弃用警告（如 (node:...) DeprecationWarning），不应显示在日志框
+        if text.startswith('(node:') or text.startswith('(Use `'):
+            return
         timestamp = time.strftime('%H:%M:%S')
         self.log_text.config(state=tk.NORMAL)
         for line in text.split('\n'):

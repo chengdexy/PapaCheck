@@ -43,8 +43,8 @@ function escapeHtml(str) {
 }
 let screenSaverTimer = null;
 let isScreenSaverActive = false;
-let saverTimeInterval = null;
 let tickInterval = null;
+let clockInterval = null;
 let pollInterval = null;
 let _lastBuffs = null;
 let _lastRewardBox = null;
@@ -461,6 +461,34 @@ function stopTickTimer() {
   if (tickInterval) {
     clearInterval(tickInterval);
     tickInterval = null;
+  }
+}
+
+// ---- Clock display (independent from task timer, never stopped) ----
+let lastHourChime = null;
+function startClockTimer() {
+  if (clockInterval) return;
+  updateMainClock();
+  clockInterval = setInterval(updateMainClock, 30000);
+}
+function updateMainClock() {
+  const now = new Date();
+  // 主界面时钟
+  document.getElementById('bigDate').textContent = Util.formatDate(now);
+  document.getElementById('bigTime').textContent = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  // 屏保时钟（屏保激活时这些元素可见）
+  const saverTimeEl = document.getElementById('saverTime');
+  if (saverTimeEl) {
+    saverTimeEl.textContent = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('saverDate').textContent = Util.formatDate(now);
+  }
+  // 整点报时（防重由 lastHourChime 保证）
+  if (now.getMinutes() === 0) {
+    const hourKey = now.getHours();
+    if (lastHourChime !== hourKey) {
+      lastHourChime = hourKey;
+      Voice.speak('现在是' + hourKey + '点');
+    }
   }
 }
 
@@ -953,35 +981,16 @@ function showScreenSaver() {
   isScreenSaverActive = true;
   const saver = document.getElementById('screenSaver');
   saver.classList.add('active');
-  updateSaverTime();
-  saverTimeInterval = setInterval(updateSaverTime, 1000);
   startPoll(5000);
 }
 
 function wakeUp() {
   isScreenSaverActive = false;
   document.getElementById('screenSaver').classList.remove('active');
-  clearInterval(saverTimeInterval);
   startScreenSaverTimer();
   pollServer();
   startPoll(5000);
   Voice.speak('屏幕已唤醒');
-}
-
-let lastHourChime = null;
-
-function updateSaverTime() {
-  const now = new Date();
-  document.getElementById('saverTime').textContent = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-  document.getElementById('saverDate').textContent = Util.formatDate(now);
-
-  if (now.getMinutes() === 0 && now.getSeconds() === 0) {
-    const hourKey = now.getHours();
-    if (lastHourChime !== hourKey) {
-      lastHourChime = hourKey;
-      Voice.speak('现在是' + hourKey + '点');
-    }
-  }
 }
 
 // ========== Init ==========
@@ -1089,6 +1098,7 @@ async function init() {
 
   updateBigScreen();
   startTickTimer();
+  startClockTimer();
 
   startScreenSaverTimer();
 

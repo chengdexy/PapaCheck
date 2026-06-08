@@ -31,12 +31,8 @@ function isTomorrowHoliday() {
   return holidays.includes(key);
 }
 
-// ---- Lightweight per-second tick: clock + active timers ----
+// ---- Lightweight per-second tick: active timers ----
 function tickFrame() {
-  const now = new Date();
-  document.getElementById('bigDate').textContent = Util.formatDate(now);
-  document.getElementById('bigTime').textContent = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-
   if (isAnyTaskPaused()) return;
 
   const activeHw = getActiveHomework();
