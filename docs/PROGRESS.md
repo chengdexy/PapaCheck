@@ -72,6 +72,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-08 | 修复 TTS 预生成 unsafe monkey patching：改用 Windows 客户端过滤 `[TTS] spawning` 日志；全量 321 个测试通过 |
 | 2026-06-08 | Node.js 端启动时自动预生成 45 条固定短语的 TTS MP3 缓存（`FIXED_TEXTS` + `pregenAllFixed()` + 陈旧缓存清理），`pregenSpeech()` 支持无参调用 |
 | 2026-06-08 | 项目清理：删除废弃文件（release.bat/RELEASE_USAGE.md/sync-mask-not-showing.env/覆盖率缓存），清理 `.trae/` 过期方案文档，图片移至 docs/imgs/ |
 | 2026-06-07 | 修复管理端无法删除奖励箱物品 + Windows 防火墙弹窗优化（固定路径 + 提权添加防火墙规则） |

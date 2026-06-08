@@ -1033,6 +1033,9 @@ class PapaCheckApp:
             polling_patterns = ('/api/ping', '/api/data', '/api/notify/pending')
             if any(p in text for p in polling_patterns):
                 return
+        # 过滤 TTS 预生成的逐条 spawn 日志（对用户无用，仅诊断用）
+        if '[TTS] spawning:' in text:
+            return
         timestamp = time.strftime('%H:%M:%S')
         self.log_text.config(state=tk.NORMAL)
         for line in text.split('\n'):
