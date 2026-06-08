@@ -1061,7 +1061,8 @@ async function init() {
       isServerMode = true;
       hideTransitionMask();
       // 立即缓存到本地 DB，确保离线时可用（与 admin.js 的 refreshAllData 保持一致）
-      try { await DB.cacheFullData(cachedData); } catch (e) { }
+      // 深拷贝后传给 cacheFullData，防止 ensureSyncFields 原地修改 lastModified/uuid 污染 cachedData
+      try { await DB.cacheFullData(JSON.parse(JSON.stringify(cachedData))); } catch (e) { }
     } catch (e) {
       // CM 检测到在线，但实际请求时网络已断，降级到本地 DB
       try {
