@@ -109,13 +109,14 @@ const Voice = {
       }
       let audio;
       if (this._cache.has(text)) {
+        console.log('[Voice] cache hit:', text);
         audio = new Audio(this._cache.get(text));
       } else {
         const url = '/api/speak?' + new URLSearchParams({ text });
         const resp = await fetch(url);
         if (!resp.ok) throw new Error('speak fail');
         const blob = await resp.blob();
-        console.log('TTS blob size:', blob.size, 'type:', blob.type);
+        console.log('[Voice] fetch OK:', text, 'size:', blob.size);
         if (blob.size === 0) {
           showToast('语音数据为空: ' + text);
           this._playNext();
@@ -153,21 +154,18 @@ const Voice = {
 // 解锁音频自动播放
 (function () {
   var _unlockDone = false;
+  var _ctx = null;
   function unlockAudio() {
     if (_unlockDone) return;
-    // 解锁 AudioContext（Web Audio API 用）
-    var ctx = new (window.AudioContext || window.webkitAudioContext)();
-    ctx.resume();
-    // 解锁 HTMLAudioElement（Voice.speak 用）
-    try {
-      var silent = new Audio();
-      silent.volume = 0;
-      silent.play();
-    } catch (e) { }
-    _unlockDone = true;
-    document.removeEventListener('touchstart', unlockAudio);
-    document.removeEventListener('click', unlockAudio);
-    document.removeEventListener('visibilitychange', unlockAudio);
+    // 创建并唤醒 AudioContext，用 Promise 判断是否真正解锁
+    if (!_ctx) _ctx = new (window.AudioContext || window.webkitAudioContext)();
+    _ctx.resume().then(function () {
+      _unlockDone = true;
+      document.removeEventListener('touchstart', unlockAudio);
+      document.removeEventListener('click', unlockAudio);
+    }).catch(function () {
+      // 解锁失败，不设 _unlockDone，下次交互继续尝试
+    });
   }
   document.addEventListener('touchstart', unlockAudio, { once: false });
   document.addEventListener('click', unlockAudio, { once: false });
@@ -604,8 +602,8 @@ async function calculateSettlement() {
   // 检查当天是否已有 settlement 并已评级
   const existingSettlement = cachedData?.dailySettlement?.[dateKey];
 
-  if (existingSettlement && existingSettlement.rating) {
-    // 当天已评级：只计算新增作业的分数，不含每日基础分
+  if (existingSettlement && (existingSettlement.rating || existingSettlement.submittedAt)) {
+    // 当天已评级 或 已提交等待评级：只处理追加作业，不覆写 submittedAt
     const prevHomeworkBonus = existingSettlement.homeworkBonus || 0;
 
     const currentHomeworkBonus = challengeSuccess.reduce(
@@ -950,7 +948,10 @@ function startPoll(intervalMs) {
         const items = result.items || [];
         const currentIds = new Set(items.map(i => i.id));
         for (const item of items) {
-          Voice.speak(item.text);
+          // 只在通知首次出现时播报，后续轮次跳过（延迟消费期间不再重复播报）
+          if (!_lastNotifIds || !_lastNotifIds.has(item.id)) {
+            Voice.speak(item.text);
+          }
         }
         // 消费"上一轮就在"的通知（Voice 有一整轮时间播报）
         // 本轮有 items 时取交集（两轮都在的才算"持久"），本轮无 items 时全部消费（已播完已消失）
@@ -961,6 +962,8 @@ function startPoll(intervalMs) {
           }
           if (staleIds.length > 0) {
             await API.consumeNotifications(staleIds);
+            // 已消费的 ID 从 currentIds 中移除，防止 _lastNotifIds 保留导致下轮重复消费
+            staleIds.forEach(function(id) { currentIds.delete(id); });
           }
         }
         _lastNotifIds = currentIds;

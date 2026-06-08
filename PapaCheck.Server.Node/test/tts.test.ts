@@ -412,6 +412,9 @@ describe('TTSBridge', () => {
       const mp3Data = Buffer.from('daemon-mp3-output');
       const promise = (bridge as any)._talkToDaemon('你好');
 
+      // 等待 _daemonLock 链注册好 stdout 监听器
+      await new Promise(resolve => setImmediate(resolve));
+
       // daemon 返回长度前缀的响应
       const header = Buffer.alloc(4);
       header.writeUInt32LE(mp3Data.length, 0);
@@ -428,6 +431,9 @@ describe('TTSBridge', () => {
       bridge = new TTSBridge({ _spawn: mockSpawn as unknown as SpawnFn });
 
       const promise = (bridge as any)._talkToDaemon('');
+
+      // 等待 _daemonLock 链注册好 stdout 监听器
+      await new Promise(resolve => setImmediate(resolve));
 
       // daemon 返回长度为 0 的响应
       const header = Buffer.alloc(4);
@@ -485,82 +491,60 @@ describe('TTSBridge', () => {
       expect((bridge as any)._daemonProc).toBeNull();  // daemon 被标记为失效
     });
 
-    // ----- speak 优先走常驻进程 -----
+    // ----- speak 现在直接走 spawnPython（不再通过 daemon） -----
 
-    it('speak 优先走常驻进程，成功后不调用 spawnPython', async () => {
-      mockSpawn.mockReturnValue(daemonProc);
+    it('speak 直接调用 spawnPython 生成语音', async () => {
+      const mp3Data = Buffer.from('spawn-output');
+      const proc = createMockProcess();
+      mockSpawn.mockReturnValue(proc);
       (readFile as any).mockRejectedValue(new Error('not found'));
       (mkdir as any).mockResolvedValue(undefined);
       (writeFile as any).mockResolvedValue(undefined);
       bridge = new TTSBridge({ scriptPath: '/fake/tts_bridge.py', _spawn: mockSpawn as unknown as SpawnFn });
 
-      const mp3Data = Buffer.from('daemon-ok');
       const promise = bridge.speak('你好');
 
-      // 等待 speak() 越过 await readFile / await mkdir 进入 _talkToDaemon
-      await new Promise(resolve => setImmediate(resolve));
-
-      // daemon 正常响应
-      const header = Buffer.alloc(4);
-      header.writeUInt32LE(mp3Data.length, 0);
-      daemonProc.stdout.emit('data', header);
-      daemonProc.stdout.emit('data', mp3Data);
+      await new Promise(process.nextTick);
+      proc.stdout.emit('data', mp3Data);
+      proc.emit('close', 0);
 
       const result = await promise;
       expect(result).toEqual(mp3Data);
-
-      // 只调用了 daemon spawn，没有直接调用 spawnPython
-      expect(mockSpawn).toHaveBeenCalledTimes(1);
       expect(mockSpawn).toHaveBeenCalledWith(
         'python',
-        ['/fake/tts_bridge.py', '--daemon'],
+        ['/fake/tts_bridge.py', '你好'],
         expect.any(Object),
       );
     });
 
-    it('speak 在常驻进程超时后自动退化到 spawnPython', async () => {
-      vi.useFakeTimers();
-      const fallbackProc = createMockProcess();
-
-      mockSpawn.mockReturnValueOnce(daemonProc).mockReturnValueOnce(fallbackProc);
+    it('speak spawnPython 失败时返回空 Buffer', async () => {
+      const proc = createMockProcess();
+      mockSpawn.mockReturnValue(proc);
       (readFile as any).mockRejectedValue(new Error('not found'));
       (mkdir as any).mockResolvedValue(undefined);
-      (writeFile as any).mockResolvedValue(undefined);
       bridge = new TTSBridge({ scriptPath: '/fake/tts_bridge.py', _spawn: mockSpawn as unknown as SpawnFn });
 
       const promise = bridge.speak('你好');
 
-      // 走到 _talkToDaemon 的超时
-      await vi.advanceTimersByTimeAsync(30000);
-      expect(daemonProc.kill).toHaveBeenCalled();
-      expect((bridge as any)._daemonProc).toBeNull();
-
-      // fallback spawnPython 执行完毕
       await new Promise(process.nextTick);
-      fallbackProc.stdout.emit('data', Buffer.from('fallback'));
-      fallbackProc.emit('close', 0);
+      proc.emit('close', 1);
 
       const result = await promise;
-      expect(result).toEqual(Buffer.from('fallback'));
-      // daemon spawn (1) + fallback spawn (1) = 2 次
-      expect(mockSpawn).toHaveBeenCalledTimes(2);
+      expect(result).toEqual(Buffer.alloc(0));
     });
 
-    it('speak 在常驻进程返回空时也做磁盘缓存（空 Buffer 不缓存）', async () => {
-      mockSpawn.mockReturnValue(daemonProc);
+    it('speak spawnPython 返回空时不做磁盘缓存', async () => {
+      const proc = createMockProcess();
+      mockSpawn.mockReturnValue(proc);
       (readFile as any).mockRejectedValue(new Error('not found'));
       (mkdir as any).mockResolvedValue(undefined);
       bridge = new TTSBridge({ _spawn: mockSpawn as unknown as SpawnFn });
 
       const promise = bridge.speak('你好');
 
-      // 等待 speak() 越过 await readFile / await mkdir 进入 _talkToDaemon
-      await new Promise(resolve => setImmediate(resolve));
-
-      // daemon 返回空数据
-      const header = Buffer.alloc(4);
-      header.writeUInt32LE(0, 0);
-      daemonProc.stdout.emit('data', header);
+      await new Promise(process.nextTick);
+      proc.stdout.emit('data', Buffer.from(''));
+      proc.emit('close', 0);
 
       const result = await promise;
       expect(result).toEqual(Buffer.alloc(0));
