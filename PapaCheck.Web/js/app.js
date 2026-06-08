@@ -369,7 +369,7 @@ async function saveFreeTimeSilent() {
   }
 }
 
-function startFreeTime(id) {
+async function startFreeTime(id) {
   if (isAnyTaskActive()) {
     showToast('请先完成当前任务');
     return;
@@ -383,7 +383,7 @@ function startFreeTime(id) {
   ft.status = 'doing';
   ft.startedAt = new Date().toISOString();
   ft.remainingSeconds = ft.durationMinutes * 60;
-  API.putFreeTimeTask(ft.id, ft);
+  await API.putFreeTimeTask(ft.id, ft);
 
   Voice.speak('开始' + ft.name);
   startTickTimer();
