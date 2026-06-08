@@ -809,9 +809,9 @@ function startPoll(intervalMs) {
         if (!_completingHomework && !_startingHomework) {
           homeworks = newHw;
           needsFullRender = true;
+          const allDone = newHw.length > 0 && newHw.every(h => h.status === 'done');
           const settlement = getSettlementData();
           if (settlement && !settlement.rating) {
-            const allDone = newHw.every(h => h.status === 'done');
             if (!allDone) {
               cachedData._settlement = null;
               window._settlement = null;
@@ -819,7 +819,7 @@ function startPoll(intervalMs) {
             }
           }
           // BUG FIX: 作业列表变化后全部已完成时（如最后一项被延后审批通过），自动触发结算
-          if (newHw.length > 0 && newHw.every(h => h.status === 'done')) {
+          if (allDone) {
             calculateSettlement();
           }
         }
