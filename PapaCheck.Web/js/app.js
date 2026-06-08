@@ -952,9 +952,13 @@ function startPoll(intervalMs) {
         for (const item of items) {
           Voice.speak(item.text);
         }
-        // 消费"上一轮就在、本轮还在"的通知（Voice 有一整轮时间播报）
-        if (_lastNotifIds && _lastNotifIds.size > 0 && items.length > 0) {
-          const staleIds = [..._lastNotifIds].filter(id => currentIds.has(id));
+        // 消费"上一轮就在"的通知（Voice 有一整轮时间播报）
+        // 本轮有 items 时取交集（两轮都在的才算"持久"），本轮无 items 时全部消费（已播完已消失）
+        if (_lastNotifIds && _lastNotifIds.size > 0) {
+          let staleIds = [..._lastNotifIds];
+          if (items.length > 0) {
+            staleIds = staleIds.filter(id => currentIds.has(id));
+          }
           if (staleIds.length > 0) {
             await API.consumeNotifications(staleIds);
           }
