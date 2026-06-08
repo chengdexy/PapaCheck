@@ -15,6 +15,9 @@
   - TDD 驱动：新增 7 个 Flutter 测试，全量 30 测试通过
 
 ### Fixed
+- 修复语音自动播放解锁锁死：删除 `setTimeout(unlockAudio, 100)` 页面加载 100ms 后的假解锁尝试（`silent.play()` 被浏览器拦截后设 `_unlockDone = true` 导致真实用户交互无法再解锁），解锁完全依赖 click/touchstart/visibilitychange 用户事件
+- 修复 `NotAllowedError` 时用 `unshift` 插回队首导致过时语音插队的问题：改为 `push` 放回队尾
+- 修复通知在语音播报前被消费的问题：pollServer 通知消费改为"延迟一轮"策略（首轮只播不删，第二轮确认持久后再删），给 Voice 至少 5 秒时间完成播报
 - 修复 `updateMainClock` 中 `saverDate` 潜在空指针异常：`document.getElementById('saverDate')` 添加空检查，与 `saverTimeEl` 保持一致
 - 修复离线模式客户端时钟停止：`tickInterval`（同时负责时钟+任务计时器）在离线模式下因 `pollServer()` 提前返回无法恢复，导致时钟冻结。将时钟更新拆分为独立 `clockInterval`（30 秒间隔，永不停止），屏保时钟合并到 `updateMainClock` 统一更新，消除 `updateSaverTime` 独立定时器
   - 新增 TDD 测试 7 个（356 全量测试通过）

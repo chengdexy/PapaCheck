@@ -54,6 +54,8 @@ let _lastBountyCompletions = null;
 window._recentNewRewardIds = new Set();
 let _lastRatingInfo = null;
 let _lastSettings = null;
+/** 上一轮 poll 中出现的通知 ID 集合（用于延迟消费） */
+let _lastNotifIds = null;
 
 // ========== Utility ==========
 const Util = {
@@ -942,16 +944,22 @@ function startPoll(intervalMs) {
         _lastBountySubmissions[dk] = (cachedData.bountySubmissions[dk] || []).map(s => ({ ...s }));
       }
 
-      // 统一消费通知
+      // 统一消费通知（延迟一轮：首轮只播不删，第二轮才删）
       try {
         const result = await API.getPendingNotifications();
         const items = result.items || [];
+        const currentIds = new Set(items.map(i => i.id));
         for (const item of items) {
           Voice.speak(item.text);
         }
-        if (items.length > 0) {
-          await API.consumeNotifications(items.map((i) => i.id));
+        // 消费"上一轮就在、本轮还在"的通知（Voice 有一整轮时间播报）
+        if (_lastNotifIds && _lastNotifIds.size > 0 && items.length > 0) {
+          const staleIds = [..._lastNotifIds].filter(id => currentIds.has(id));
+          if (staleIds.length > 0) {
+            await API.consumeNotifications(staleIds);
+          }
         }
+        _lastNotifIds = currentIds;
       } catch (e) { /* 非致命 */ }
 
       if (needsFullRender) {
