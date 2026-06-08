@@ -818,6 +818,10 @@ function startPoll(intervalMs) {
               if (cachedData.dailySettlement) cachedData.dailySettlement[key] = null;
             }
           }
+          // BUG FIX: 作业列表变化后全部已完成时（如最后一项被延后审批通过），自动触发结算
+          if (newHw.length > 0 && newHw.every(h => h.status === 'done')) {
+            calculateSettlement();
+          }
         }
       }
 

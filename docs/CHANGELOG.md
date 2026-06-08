@@ -7,10 +7,10 @@
 ## [Unreleased]
 
 ### Fixed
+- 修复孩子端轮询同步时最后一项作业被延后到明天后不自动弹出评级界面的问题：作业列表变化后全部为 done 时自动调用 `calculateSettlement()`，不再依赖触发变化的具体原因
+  - 新增 TDD 测试 3 个（341 全量测试通过）
 - 修复积分商店商品每日数量在次日不再重置的问题：`_resetDailyShopQuantity()` 检查 `dailyLimit`/`dailySold` 字段名与前端使用的 `baseQuantity`/`remainingQuantity` 模型不匹配，导致重置逻辑实际未执行；新增 `baseQuantity → remainingQuantity` 重置逻辑，同时保留旧字段兼容
   - 新增 TDD 测试 3 个（327 全量测试通过）
-
-### Fixed
 - 修复孩子端作业操作（开始/暂停/继续/完成）后轮询可能回退状态的问题：将 `saveHomeworksSilent()`（全量 PUT 所有作业）改为 `API.patchHomework()`（只 PATCH 变更字段到被操作的作业），消除 TOCTOU 竞态条件并减少请求开销
   - 开始作业：PATCH 仅含 `status`/`startedAt`/`mode`
   - 暂停作业：PATCH 仅含 `paused`/`wasPaused`/`_pausedElapsed`
@@ -21,6 +21,9 @@
   - 新增 TDD 测试 5 个（324 全量测试通过）
 
 ### Added
+- TTS 常驻 Python 子进程：`tts_bridge.py --daemon` 通过 stdin/stdout 长连接通信，消除每次 TTS 播报的 Python 冷启动开销（~1-3s）
+  - `TTSBridge._ensureDaemon()` + `_talkToDaemon()` 管理常驻进程生命周期
+  - 长度前缀协议（4 字节 LE + MP3 数据），30s 超时自动退化到 `spawnPython()`
 - Node.js 端启动时自动预生成 45 条固定短语的 TTS MP3 缓存（含清理陈旧缓存），消除首次播报时调用 edge-tts 的卡顿
   - `TTSBridge.FIXED_TEXTS` 静态常量（21 条常用短语 + 24 条整点报时）
   - `TTSBridge.pregenAllFixed()` 方法：后台异步生成 + MD5 hash 校验 + 陈旧缓存清理
