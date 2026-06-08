@@ -100,6 +100,7 @@ var ConnectionManager = (function () {
           _failCount = 0;
         } else {
           _failCount++;
+          _mode = 'reconnecting';
         }
         hideReconnectMask();
         updateConnStatus();
