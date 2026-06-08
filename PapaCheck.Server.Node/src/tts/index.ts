@@ -245,15 +245,7 @@ export class TTSBridge {
     const validHashes = new Set(TTSBridge.FIXED_TEXTS.map(t => this.md5(t) + '.mp3'));
 
     console.log('[TTS] 开始预生成TTS固定短语mp3...');
-
-    // 预生成期间静默 console.log，避免大量 [TTS] spawning 日志污染客户端 log 框
-    const origLog = console.log;
-    console.log = () => {};
-    try {
-      await Promise.allSettled(TTSBridge.FIXED_TEXTS.map(t => this.speak(t)));
-    } finally {
-      console.log = origLog;
-    }
+    await Promise.allSettled(TTSBridge.FIXED_TEXTS.map(t => this.speak(t)));
 
     // 清理不在列表中的旧 mp3
     try {

@@ -14,6 +14,7 @@
   - `pregenSpeech()` 支持无参调用，默认使用 `FIXED_TEXTS`
 
 ### Fixed
+- 修复 TTS 预生成使用 monkey patching 修改全局 `console.log` 的不安全做法：改为由 Windows 客户端 `_write_log()` 直接过滤 `[TTS] spawning` 前缀的日志，服务器端保持正常日志输出
 - 修复管理端无法删除奖励箱物品：添加 Node.js/Python 服务端 `DELETE /api/reward-box/:id` 端点，前端 `api.js` 添加 `deleteRewardBoxItem` 方法，`admin.js` `deleteRewardBoxItem` 改为调用 HTTP API（之前仅本地删除+CRDT 日志，`refreshAllData()` 从服务端重新拉取后未删除物品"复活"）
 - 修复 Windows 端每次启动弹出防火墙提示：将 `papacheck-server.exe` 从临时目录复制到 `%LOCALAPPDATA%/PapaCheck/` 固定路径后启动，首次运行通过 `PowerShell Start-Process -Verb RunAs -Wait` 提权添加防火墙规则（UAC 弹一次，后续跳过）
 
