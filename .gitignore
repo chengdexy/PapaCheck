@@ -13,6 +13,7 @@ data.db-*
 .vscode/
 .idea/
 .trae/
+.superpowers/
 *.swp
 *.swo
 
