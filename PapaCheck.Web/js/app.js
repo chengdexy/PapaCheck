@@ -21,7 +21,7 @@ function showTransitionMask(text) {
   document.getElementById('transitionText').textContent = text;
   mask.style.display = 'flex';
   clearTimeout(mask._timeout);
-  mask._timeout = setTimeout(function() { mask.style.display = 'none'; }, 5000);
+  mask._timeout = setTimeout(function () { mask.style.display = 'none'; }, 5000);
 }
 function hideTransitionMask() {
   var mask = document.getElementById('transitionMask');
@@ -161,7 +161,7 @@ const Voice = {
       var silent = new Audio();
       silent.volume = 0;
       silent.play();
-    } catch(e) {}
+    } catch (e) { }
     _unlockDone = true;
     document.removeEventListener('touchstart', unlockAudio);
     document.removeEventListener('click', unlockAudio);
@@ -242,7 +242,11 @@ async function startHomework(id, mode) {
     hw.mode = hw.rejected ? 'timer' : (mode || 'timer');
     hw.status = 'doing';
     hw.startedAt = new Date().toISOString();
-    await saveHomeworksSilent();
+    await API.patchHomework(hw.id, {
+      status: 'doing',
+      startedAt: hw.startedAt,
+      mode: hw.mode,
+    }, Util.dateKey(currentDate));
 
     if (mode === 'challenge') {
       Voice.speak('开始' + hw.content + '，挑战' + hw.suggestedDuration + '分钟');
@@ -276,7 +280,14 @@ async function completeInSchool(hwId, deps) {
     deps.updateBigScreen();
     if (deps.speak) deps.speak('在学校提前完成，好样的！');
   } else {
-    await saveHomeworksSilent();
+    await API.patchHomework(hw.id, {
+      status: 'done',
+      mode: 'challenge',
+      completedInSchool: true,
+      actualDuration: hw.actualDuration,
+      startedAt: hw.startedAt,
+      completedAt: hw.completedAt,
+    }, Util.dateKey(currentDate));
     await checkAllDone();
     needsFullRender = true;
     updateBigScreen();
@@ -329,7 +340,13 @@ async function completeHomework(id) {
       Voice.speak(hw.subject + '作业完成！');
     }
     stopTickTimer();
-    await saveHomeworksSilent();
+    await API.patchHomework(hw.id, {
+      status: 'done',
+      completedAt: hw.completedAt,
+      actualDuration: hw.actualDuration,
+      mode: hw.mode,
+      _animClass: hw._animClass,
+    }, Util.dateKey(currentDate));
 
     await checkAllDone();
     needsFullRender = true;
@@ -400,7 +417,11 @@ async function pauseActiveTask() {
   if (task.startedAt && task.status === 'doing') {
     task._pausedElapsed = Math.floor((new Date() - new Date(task.startedAt)) / 1000);
   }
-  if (task.subject) await saveHomeworksSilent();
+  if (task.subject) await API.patchHomework(task.id, {
+    paused: true,
+    wasPaused: true,
+    _pausedElapsed: task._pausedElapsed,
+  }, Util.dateKey(currentDate));
   else await saveFreeTimeSilent();
   needsFullRender = true;
   updateBigScreen();
@@ -415,7 +436,10 @@ async function resumeActiveTask() {
     task.startedAt = new Date(new Date() - pausedSeconds * 1000).toISOString();
     delete task._pausedElapsed;
   }
-  if (task.subject) await saveHomeworksSilent();
+  if (task.subject) await API.patchHomework(task.id, {
+    paused: false,
+    startedAt: task.startedAt,
+  }, Util.dateKey(currentDate));
   else await saveFreeTimeSilent();
   Voice.speak('任务已继续');
   startTickTimer();

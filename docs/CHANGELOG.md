@@ -6,6 +6,16 @@
 
 ## [Unreleased]
 
+### Fixed
+- 修复孩子端作业操作（开始/暂停/继续/完成）后轮询可能回退状态的问题：将 `saveHomeworksSilent()`（全量 PUT 所有作业）改为 `API.patchHomework()`（只 PATCH 变更字段到被操作的作业），消除 TOCTOU 竞态条件并减少请求开销
+  - 开始作业：PATCH 仅含 `status`/`startedAt`/`mode`
+  - 暂停作业：PATCH 仅含 `paused`/`wasPaused`/`_pausedElapsed`
+  - 继续作业：PATCH 仅含 `paused`/`startedAt`
+  - 完成作业：PATCH 仅含 `status`/`completedAt`/`actualDuration`/`mode`/`_animClass`
+  - 在校完成：PATCH 仅含 `status`/`mode`/`completedInSchool`/`actualDuration`/`startedAt`/`completedAt`
+  - 服务器 `patchHomework` 自动更新 `lastModified` 为当前时间（PUT 用的是客户端旧值）
+  - 新增 TDD 测试 5 个（324 全量测试通过）
+
 ### Added
 - Node.js 端启动时自动预生成 45 条固定短语的 TTS MP3 缓存（含清理陈旧缓存），消除首次播报时调用 edge-tts 的卡顿
   - `TTSBridge.FIXED_TEXTS` 静态常量（21 条常用短语 + 24 条整点报时）
