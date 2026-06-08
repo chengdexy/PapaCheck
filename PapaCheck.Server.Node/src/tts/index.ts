@@ -1,7 +1,7 @@
 import { spawn, type SpawnOptions } from 'child_process';
 import type { Readable } from 'stream';
 import { createHash } from 'crypto';
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import { readFile, writeFile, mkdir, readdir, unlink } from 'fs/promises';
 import { writeFileSync, unlinkSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -101,6 +101,32 @@ function resolveScriptPath(explicit?: string): string {
 }
 
 export class TTSBridge {
+  /** 启动时预生成的固定短语列表 */
+  static readonly FIXED_TEXTS: string[] = [
+    '已申请延后，等待审核',
+    '任务已暂停',
+    '任务已继续',
+    '还剩5分钟',
+    '还剩1分钟',
+    '已超时，请尽快完成',
+    '全部作业已完成，等待评级',
+    '屏幕已唤醒',
+    '已提交',
+    '已提交申请，等待确认',
+    '兑换成功！',
+    '奖励箱有新奖励，快去看看吧',
+    '在学校提前完成，好样的！',
+    '收到云端作业，请查看',
+    '收到新作业，请查看',
+    '作业被驳回，请查看',
+    '积分商店上新啦',
+    '今天作业获得的评价是……优！',
+    '今天作业获得的评价是……良！',
+    '今天作业获得的评价是……可！',
+    '今天作业获得的评价是……差！',
+    ...Array.from({ length: 24 }, (_, h) => `现在是${h}点`),
+  ];
+
   private cache: Map<string, Buffer> = new Map();
   private pythonPath: string;
   private scriptPath: string;
@@ -214,9 +240,35 @@ export class TTSBridge {
     });
   }
 
+  /** 启动时预生成所有固定短语并清理陈旧缓存 */
+  async pregenAllFixed(): Promise<void> {
+    const validHashes = new Set(TTSBridge.FIXED_TEXTS.map(t => this.md5(t) + '.mp3'));
+
+    console.log('[TTS] 开始预生成TTS固定短语mp3...');
+
+    // 预生成期间静默 console.log，避免大量 [TTS] spawning 日志污染客户端 log 框
+    const origLog = console.log;
+    console.log = () => {};
+    try {
+      await Promise.allSettled(TTSBridge.FIXED_TEXTS.map(t => this.speak(t)));
+    } finally {
+      console.log = origLog;
+    }
+
+    // 清理不在列表中的旧 mp3
+    try {
+      const files = await readdir(this.cacheDir);
+      const stale = files.filter(f => f.endsWith('.mp3') && !validHashes.has(f));
+      await Promise.allSettled(stale.map(f => unlink(join(this.cacheDir, f))));
+    } catch { /* cacheDir 可能还不存在 */ }
+
+    console.log(`[TTS] 预生成TTS固定短语${TTSBridge.FIXED_TEXTS.length}条完成`);
+  }
+
   /** 后台预生成一批语音 */
-  pregenSpeech(texts: string[]): void {
-    for (const text of texts) {
+  pregenSpeech(texts?: string[]): void {
+    const target = texts ?? TTSBridge.FIXED_TEXTS;
+    for (const text of target) {
       if (text && text.trim()) {
         this.speak(text).catch(() => { });
       }
