@@ -15,6 +15,7 @@
   - TDD 驱动：新增 7 个 Flutter 测试，全量 30 测试通过
 
 ### Fixed
+- 修复 `_talkToDaemon` 缺少 `proc.removeListener('close', onClose)` 导致内存泄漏：超时/空响应/正常收完/异常四路提前退出路径均添加移除监听器
 - 修复提交评级后 pollServer 覆写 `submittedAt` 导致页面卡在提交界面：`calculateSettlement()` 判断条件增加 `submittedAt` 检查，已提交未评级的 settlement 不会被重置
 - 修复通知延迟消费导致重复播放：只在通知首次出现时播报，延迟消费轮次跳过已见过的通知；消费后从 `_lastNotifIds` 移除已删 ID 防止重复 DELETE
 - 修复 TTS 预生成文件写入 SEA 虚拟目录不持久的问题：`cacheDir` 跟随 `dbPath` 到 `%LOCALAPPDATA%/PapaCheck/Server/tts_cache`
