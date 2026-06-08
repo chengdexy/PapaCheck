@@ -173,23 +173,26 @@ class TestStartNodeServerProcess:
 class TestStopNodeServerProcess:
     """测试停止 Node.js 服务器子进程"""
 
-    # Feature: 停止 Node.js 服务器
+    # ===== 非 Windows 路径（terminate/kill 兜底） =====
+
+    # Feature: 停止 Node.js 服务器（非 Windows）
     #   Scenario: 正常停止时调用 terminate
-    #     Given 子进程正在运行
+    #     Given 子进程正在运行，系统为非 Windows
     #     When 调用 _stop_node_server_process
     #     Then 调用 process.terminate() 且 process.wait(timeout=5) 成功
     def test_terminates_process(self):
         mock_process = MagicMock()
         mock_process.poll.return_value = None
 
-        _stop_node_server_process(mock_process)
+        with patch('sys.platform', 'linux'):
+            _stop_node_server_process(mock_process)
 
         mock_process.terminate.assert_called_once()
         mock_process.wait.assert_called_once_with(timeout=5)
 
-    # Feature: 停止 Node.js 服务器
+    # Feature: 停止 Node.js 服务器（非 Windows）
     #   Scenario: 进程不响应 terminate 时强制 kill
-    #     Given 子进程在 terminate 后 5 秒内未退出
+    #     Given 子进程在 terminate 后 5 秒内未退出，系统为非 Windows
     #     When 调用 _stop_node_server_process
     #     Then 先 terminate 再 kill，然后 wait(timeout=3)
     def test_kills_on_timeout(self):
@@ -200,7 +203,8 @@ class TestStopNodeServerProcess:
             None,  # kill 后正常
         ]
 
-        _stop_node_server_process(mock_process)
+        with patch('sys.platform', 'linux'):
+            _stop_node_server_process(mock_process)
 
         mock_process.terminate.assert_called_once()
         mock_process.kill.assert_called_once()
@@ -213,3 +217,71 @@ class TestStopNodeServerProcess:
     #     Then 不执行任何操作
     def test_noop_when_process_none(self):
         _stop_node_server_process(None)  # 不应抛出异常
+
+    # ===== Windows 路径（先优雅退出，再强制杀） =====
+
+    # Feature: 停止 Node.js 服务器（Windows 优雅退出）
+    #   Scenario: 优雅退出成功
+    #     Given Windows 系统，子进程正在运行
+    #     When 调用 _stop_node_server_process
+    #     Then 先 taskkill /T（优雅退出），进程等待 5 秒后退出，不触发强制杀
+    def test_windows_graceful_shutdown_success(self):
+        mock_process = MagicMock()
+        mock_process.poll.return_value = None
+        mock_process.wait.return_value = 0  # 进程正常退出
+
+        with patch('sys.platform', 'win32'):
+            with patch('subprocess.run') as mock_run:
+                _stop_node_server_process(mock_process)
+
+        # 只调用一次 taskkill（无 /F）
+        assert mock_run.call_count == 1
+        first_args = mock_run.call_args[0][0]
+        assert '/F' not in first_args
+        assert '/T' in first_args
+        assert '/PID' in first_args
+        mock_process.terminate.assert_not_called()
+
+    # Feature: 停止 Node.js 服务器（Windows 优雅退出超时）
+    #   Scenario: 优雅退出超时后强制杀进程树
+    #     Given Windows 系统，子进程不响应优雅关闭
+    #     When 调用 _stop_node_server_process
+    #     Then 先 taskkill /T（优雅退出），超时后 taskkill /F /T（强制杀）
+    def test_windows_graceful_timeout_then_force(self):
+        mock_process = MagicMock()
+        mock_process.poll.return_value = None
+
+        with patch('sys.platform', 'win32'):
+            with patch('subprocess.run') as mock_run:
+                # 第一次 wait(timeout=5) 优雅退出超时
+                # 第二次 wait(timeout=3) 强制杀后进程正常退出
+                mock_process.wait.side_effect = [
+                    subprocess.TimeoutExpired('cmd', 5),
+                    None,
+                ]
+                _stop_node_server_process(mock_process)
+
+        # 调用两次 taskkill：第一次无 /F，第二次有 /F
+        assert mock_run.call_count == 2
+        first_args = mock_run.call_args_list[0][0][0]
+        second_args = mock_run.call_args_list[1][0][0]
+        assert '/F' not in first_args
+        assert '/F' in second_args
+        assert '/T' in second_args
+
+    # Feature: 停止 Node.js 服务器（Windows taskkill 全失败）
+    #   Scenario: taskkill 优雅退出和强制杀都失败时回退到 terminate
+    #     Given Windows 系统，子进程存在，但 taskkill 命令全部失败
+    #     When 调用 _stop_node_server_process
+    #     Then 最终回退到 process.terminate()
+    def test_windows_taskkill_all_fail_fallsback_to_terminate(self):
+        mock_process = MagicMock()
+        mock_process.poll.return_value = None
+
+        with patch('sys.platform', 'win32'):
+            with patch('subprocess.run', side_effect=Exception('taskkill not found')):
+                _stop_node_server_process(mock_process)
+
+        # taskkill 全部失败，回退到 terminate/kill
+        mock_process.terminate.assert_called_once()
+        mock_process.wait.assert_called_once_with(timeout=5)
