@@ -72,6 +72,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-08 | 修复 `updateMainClock` 中 `saverDate` 潜在空指针异常：添加空检查 |
 | 2026-06-08 | 修复离线模式客户端时钟停止：`tickInterval`（时钟+任务计时器合并）拆分为独立 `clockInterval`（30 秒间隔，永不停止）和 `tickInterval`（仅任务计时器）；屏保时钟合并到 `updateMainClock` 统一更新；全量 356 测试通过 |
 | 2026-06-08 | 修复 log 框显示 Node.js 弃用警告：移除 `package.json` overrides 中 `glob: "^8.1.0"`（glob 升级到 10.x 非弃用版本），添加 `_write_log()` '(node:' / '(Use `' 防御性过滤；全量 349 测试通过 |
 | 2026-06-08 | 修复自由时间轮询回退 Bug：`saveFreeTimeSilent()`（全量 PUT 所有自由时间）改为 `API.putFreeTimeTask()`（只 PUT 当前任务）+ pollServer 状态保护；新增 TDD 测试 5 个；全量 349 测试通过 |

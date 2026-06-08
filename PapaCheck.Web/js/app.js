@@ -480,7 +480,10 @@ function updateMainClock() {
   const saverTimeEl = document.getElementById('saverTime');
   if (saverTimeEl) {
     saverTimeEl.textContent = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-    document.getElementById('saverDate').textContent = Util.formatDate(now);
+    const saverDateEl = document.getElementById('saverDate');
+    if (saverDateEl) {
+      saverDateEl.textContent = Util.formatDate(now);
+    }
   }
   // 整点报时（防重由 lastHourChime 保证）
   if (now.getMinutes() === 0) {
