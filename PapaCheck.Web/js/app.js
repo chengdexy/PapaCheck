@@ -60,6 +60,8 @@ let _lastNotifIds = null;
 let _calculatingSettlement = false;
 /** calculateSettlement 幂等性：上次保存的数据快照（跳过重复 PUT） */
 let _lastSettlementSnapshot = null;
+/** calculateSettlement 幂等性：上次保存的效率数据快照（跳过重复 PUT） */
+let _lastEfficiencySnapshot = null;
 
 // ========== Utility ==========
 const Util = {
@@ -607,6 +609,17 @@ async function _putSettlementIdempotent(dateKey, data) {
   return true;
 }
 
+/** 幂等性 PUT efficiency，相同数据跳过 */
+async function _putEfficiencyIdempotent(dateKey, data) {
+  const snap = { dateKey, dataJson: JSON.stringify(data) };
+  if (_lastEfficiencySnapshot && _lastEfficiencySnapshot.dateKey === dateKey && _lastEfficiencySnapshot.dataJson === snap.dataJson) {
+    return false;
+  }
+  await API.putEfficiency(dateKey, data);
+  _lastEfficiencySnapshot = snap;
+  return true;
+}
+
 async function calculateSettlement() {
   if (_calculatingSettlement) return;
   _calculatingSettlement = true;
@@ -676,7 +689,7 @@ async function calculateSettlement() {
         ? ratios.reduce((a, b) => a + b, 0) / ratios.length
         : 0;
 
-      await API.putEfficiency(dateKey, { averageRatio, ratios });
+      await _putEfficiencyIdempotent(dateKey, { averageRatio, ratios });
 
       needsFullRender = true;
       updateBigScreen();
@@ -721,7 +734,7 @@ async function calculateSettlement() {
       ? ratios.reduce((a, b) => a + b, 0) / ratios.length
       : 0;
 
-    await API.putEfficiency(dateKey, { averageRatio, ratios });
+    await _putEfficiencyIdempotent(dateKey, { averageRatio, ratios });
 
     needsFullRender = true;
     updateBigScreen();
