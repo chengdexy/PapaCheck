@@ -238,7 +238,10 @@ export class TTSBridge {
           if (stderr) console.log('[TTS] stderr:', stderr);
           finish(Buffer.concat(chunks));
         } else {
-          console.error(`[TTS] exit code=${code} stderr="${stderr}"`);
+          // 只取 stderr 最后一行（实际错误信息），省略 Python 完整堆栈
+          const lines = stderr.split('\n').filter(l => l.trim());
+          const errMsg = lines.length > 0 ? lines[lines.length - 1] : stderr;
+          console.error(`[TTS] exit code=${code} ${errMsg}`);
           finish(Buffer.alloc(0));
         }
       });
