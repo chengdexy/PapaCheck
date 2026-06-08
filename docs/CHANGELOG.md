@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Fixed
+- 修复自由时间起始播报重复时长：`Voice.speak('开始' + ft.name + '，' + ft.durationMinutes + '分钟')` 中 `durationMinutes` 冗余（家长已在商品名称中写明了时长），改为 `Voice.speak('开始' + ft.name)`
 - 修复孩子端轮询同步时最后一项作业被延后到明天后不自动弹出评级界面的问题：作业列表变化后全部为 done 时自动调用 `calculateSettlement()`，不再依赖触发变化的具体原因
   - 新增 TDD 测试 3 个（341 全量测试通过）
 - 修复积分商店商品每日数量在次日不再重置的问题：`_resetDailyShopQuantity()` 检查 `dailyLimit`/`dailySold` 字段名与前端使用的 `baseQuantity`/`remainingQuantity` 模型不匹配，导致重置逻辑实际未执行；新增 `baseQuantity → remainingQuantity` 重置逻辑，同时保留旧字段兼容

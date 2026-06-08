@@ -385,7 +385,7 @@ function startFreeTime(id) {
   ft.remainingSeconds = ft.durationMinutes * 60;
   saveFreeTimeSilent();
 
-  Voice.speak('开始' + ft.name + '，' + ft.durationMinutes + '分钟');
+  Voice.speak('开始' + ft.name);
   startTickTimer();
   needsFullRender = true;
   updateBigScreen();
