@@ -506,6 +506,8 @@ class PapaCheckApp:
         self.log_redirector = LogRedirector(self.log_queue)
 
         self._auto_start_var = tk.BooleanVar(value=self._is_autostart())
+        # 启动时清理无效/旧版本的开机自启动注册表条目
+        self._cleanup_stale_autostart()
 
         try:
             self.root.iconbitmap(ICON_TBAR)
@@ -802,32 +804,62 @@ class PapaCheckApp:
     # ===== 开机自启动 =====
 
     def _is_autostart(self):
+        """检查注册表中自启动条目是否存在且路径有效"""
         try:
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, AUTORUN_KEY, 0, winreg.KEY_READ)
-            winreg.QueryValueEx(key, APP_NAME)
+            value, _ = winreg.QueryValueEx(key, APP_NAME)
             winreg.CloseKey(key)
-            return True
+            # 去掉可能的外层引号，验证可执行文件是否真实存在
+            path = value.strip('"\' ')
+            if not path:
+                return False
+            return os.path.isfile(path)
         except FileNotFoundError:
             return False
         except Exception:
             return False
 
+    def _cleanup_stale_autostart(self):
+        """清理注册表中无效或旧版本的 PapaCheck 自启动条目"""
+        try:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, AUTORUN_KEY, 0,
+                                 winreg.KEY_READ | winreg.KEY_SET_VALUE)
+            try:
+                value, reg_type = winreg.QueryValueEx(key, APP_NAME)
+                path = value.strip('"\' ')
+                if path and not os.path.isfile(path):
+                    winreg.DeleteValue(key, APP_NAME)
+                    self._append_log('已清理无效的开机自启动路径: ' + path)
+            except FileNotFoundError:
+                pass  # 条目不存在，无需清理
+            except Exception as e:
+                self._append_log('清理自启动注册表时出错: ' + str(e))
+            finally:
+                winreg.CloseKey(key)
+        except Exception:
+            pass  # 无法打开注册表时静默忽略
+
     def _set_autostart(self, enable):
         try:
+            # 无论是启用还是禁用，先清理无效条目
+            self._cleanup_stale_autostart()
+
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, AUTORUN_KEY, 0, winreg.KEY_SET_VALUE)
             if enable:
                 exe_path = sys.executable
                 script_path = os.path.abspath(__file__)
                 if getattr(sys, 'frozen', False):
-                    winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, '"' + exe_path + '"')
+                    target = '"' + exe_path + '"'
                 else:
-                    winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ,
-                                      '"' + exe_path + '" "' + script_path + '"')
+                    target = '"' + exe_path + '" "' + script_path + '"'
+                winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, target)
+                self._append_log('开机自启动已设置: ' + target)
             else:
                 try:
                     winreg.DeleteValue(key, APP_NAME)
+                    self._append_log('开机自启动已取消')
                 except FileNotFoundError:
-                    pass
+                    pass  # 条目不存在，无需删除
             winreg.CloseKey(key)
         except Exception as e:
             self._append_log('开机自启动设置失败: ' + str(e))
