@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-08 21:06
+> 最后更新：2026-06-08 21:40
 
 ## 当前版本
 
@@ -73,6 +73,7 @@
 | 日期 | 变更 |
 |------|------|
 | 2026-06-08 | 修复孩子端 PUT settlement 每 5 秒发送 + 服务器重启时多发一次：`getData()` 和 `init()` 均使用深拷贝后传给 `DB.cacheFullData`，防止 `ensureSyncFields` 原地改 `lastModified`/uuid 污染 `cachedData`；全量 362 测试通过 |
+| 2026-06-08 | TTS 错误日志简化：非零退出时只取 stderr 最后一行，省略 Python 完整堆栈；`.gitignore` 补充 `PapaCheck.Web/tts_cache/` 并清理遗留 MP3 |
 | 2026-06-08 | 修复退出时阻塞 Windows 主界面：`_quit_app()` 改为后台线程停止服务器；按钮显示"⏹ 正在关闭..."状态；全量 362 测试通过 |
 | 2026-06-08 | 修复管理端赏金任务通过后审核状态未切换：`splice` 移除提交后未在数据库标记删除，添加 `isDeleted: true`；全量 362 测试通过 |
 | 2026-06-08 | 修复停止服务器阻塞 Windows 主界面：`_stop_server()` 改为后台线程执行，通过 `after()` 回调更新 UI；全量 362 测试通过 |

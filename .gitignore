@@ -71,6 +71,7 @@ PapaCheck.Server.Node/dist/
 
 # Node.js TTS 缓存
 PapaCheck.Server.Node/tts_cache/
+PapaCheck.Web/tts_cache/
 
 # 覆盖率报告
 .coverage

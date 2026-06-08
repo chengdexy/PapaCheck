@@ -8,6 +8,7 @@
 
 ### Changed
 - 离线遮罩显示时机优化：第一次 ping 失败时不显示遮罩，第二次 ping 失败时才显示，降低偶发网络抖动的无用遮罩闪烁；全量 362 测试通过
+- TTS 错误日志简化：`spawnPython` 非零退出时只显示 stderr 最后一行实际错误信息，省略 Python 完整堆栈；`.gitignore` 补充 `PapaCheck.Web/tts_cache/` 并清理遗留的 MP3 缓存文件
 
 ### Fixed
 - 修复管理端点击赏金任务"通过"按钮后，词条赏金任务审核状态未切换的问题：`approveBountySubmission()` 中 `splice` 移除提交后未在数据库中标记删除，导致 `refreshAllData()` 后已通过提交重新出现；添加 `isDeleted: true` 标记并保存到数据库；全量 362 测试通过
