@@ -1180,7 +1180,11 @@ async function approveBountySubmission(dateKey, taskId) {
     const submissions = (adminBountySubmissions[dateKey] || []).slice();
     const idx = submissions.findIndex(s => s.taskId === taskId);
     if (idx === -1) return;
+    const approvedSubmission = submissions[idx];
     submissions.splice(idx, 1);
+    // 标记已通过的提交为删除状态，避免 refreshAllData 后重新出现
+    approvedSubmission.isDeleted = true;
+    await API.putBountySubmission(approvedSubmission.id, approvedSubmission);
     for (var i = 0; i < submissions.length; i++) {
       await API.putBountySubmission(submissions[i].id, submissions[i]);
     }

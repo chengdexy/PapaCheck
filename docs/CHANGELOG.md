@@ -10,6 +10,7 @@
 - 离线遮罩显示时机优化：第一次 ping 失败时不显示遮罩，第二次 ping 失败时才显示，降低偶发网络抖动的无用遮罩闪烁；全量 362 测试通过
 
 ### Fixed
+- 修复管理端点击赏金任务"通过"按钮后，词条赏金任务审核状态未切换的问题：`approveBountySubmission()` 中 `splice` 移除提交后未在数据库中标记删除，导致 `refreshAllData()` 后已通过提交重新出现；添加 `isDeleted: true` 标记并保存到数据库；全量 362 测试通过
 - 修复点击"停止服务器"阻塞 Windows 主界面的问题：`_stop_server()` 改为后台线程执行（`_stop_server_worker`），停止完成后通过 `self.root.after(0, _on_server_stopped)` 回调更新 UI，避免 tkinter 因 `process.wait()` 卡死；全量 362 测试通过
 - 修复 Windows 调试模式点击"停止服务器"再点"启动服务器"提示端口 8081 已被占用的问题：`_stop_node_server_process()` 在 Windows 上先尝试优雅退出（`taskkill /T` 发送关闭信号，Node.js 端 `SIGTERM` 处理器调用 `app.close()` 释放端口），优雅退出超时后兜底强制杀进程树（`taskkill /F /T`），确保 debug 模式下 `tsx.cmd` 的子进程 `node.exe` 也被正确终止；全量 362 测试通过
 - Node.js 端（index.ts）添加优雅关闭处理器：`SIGTERM`/`SIGINT` 时调用 `app.close()` 后退出
