@@ -7,6 +7,9 @@
 ## [Unreleased]
 
 ### Fixed
+- 修复 `startPoll` 使用 `setInterval` 导致 poll 函数重叠触发的问题：改为 `setTimeout` 递归链 + `finally` 块确保前一次执行完成后才调度下一轮，消除异步竞态；`stopPoll` 同步改为 `clearTimeout`
+  - 新增 TDD 测试 3 个（349 全量测试通过）
+- 修复兑换成功时重复播报："奖励箱有新奖励，快去看看吧" 与 "兑换成功！" 连续播报导致语音重叠
 - 修复自由时间起始播报重复时长：`Voice.speak('开始' + ft.name + '，' + ft.durationMinutes + '分钟')` 中 `durationMinutes` 冗余（家长已在商品名称中写明了时长），改为 `Voice.speak('开始' + ft.name)`
 - 修复孩子端轮询同步时最后一项作业被延后到明天后不自动弹出评级界面的问题：作业列表变化后全部为 done 时自动调用 `calculateSettlement()`，不再依赖触发变化的具体原因
   - 新增 TDD 测试 3 个（341 全量测试通过）
