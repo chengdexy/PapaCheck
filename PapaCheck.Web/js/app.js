@@ -383,7 +383,7 @@ function startFreeTime(id) {
   ft.status = 'doing';
   ft.startedAt = new Date().toISOString();
   ft.remainingSeconds = ft.durationMinutes * 60;
-  saveFreeTimeSilent();
+  API.putFreeTimeTask(ft.id, ft);
 
   Voice.speak('开始' + ft.name);
   startTickTimer();
@@ -402,7 +402,7 @@ async function completeFreeTime(id) {
 
   stopTickTimer();
   Voice.speak(ft.name + '时间到！');
-  await saveFreeTimeSilent();
+  await API.putFreeTimeTask(ft.id, ft);
   needsFullRender = true;
   updateBigScreen();
 }
@@ -422,7 +422,7 @@ async function pauseActiveTask() {
     wasPaused: true,
     _pausedElapsed: task._pausedElapsed,
   }, Util.dateKey(currentDate));
-  else await saveFreeTimeSilent();
+  else await API.putFreeTimeTask(task.id, task);
   needsFullRender = true;
   updateBigScreen();
 }
@@ -440,7 +440,7 @@ async function resumeActiveTask() {
     paused: false,
     startedAt: task.startedAt,
   }, Util.dateKey(currentDate));
-  else await saveFreeTimeSilent();
+  else await API.putFreeTimeTask(task.id, task);
   Voice.speak('任务已继续');
   startTickTimer();
   needsFullRender = true;
@@ -829,8 +829,16 @@ function startPoll(intervalMs) {
       const oldFtJson = JSON.stringify(freeTimeTasks);
       const newFtJson = JSON.stringify(newFreeTime);
       if (oldFtJson !== newFtJson) {
-        freeTimeTasks = newFreeTime;
-        needsFullRender = true;
+        var _fts = function (s) { return s === 'done' ? 2 : s === 'doing' ? 1 : 0; };
+        var hasActiveFt = freeTimeTasks.some(function (ft) {
+          if (ft.status === 'pending') return false;
+          var sft = newFreeTime.find(function (t) { return t.id === ft.id; });
+          return sft && _fts(ft.status) > _fts(sft.status);
+        });
+        if (!hasActiveFt) {
+          freeTimeTasks = newFreeTime;
+          needsFullRender = true;
+        }
       }
 
       const hasActive = getActiveHomework() || getActiveFreeTime();
@@ -919,14 +927,16 @@ function startPoll(intervalMs) {
         updateBigScreen();
       }
     } catch (e) {
+    } finally {
+      if (pollInterval !== null) pollInterval = setTimeout(pollServer, intervalMs);
     }
   };
-  pollInterval = setInterval(() => pollServer(), intervalMs);
+  pollInterval = setTimeout(pollServer, intervalMs);
 }
 
 function stopPoll() {
   if (pollInterval) {
-    clearInterval(pollInterval);
+    clearTimeout(pollInterval);
     pollInterval = null;
   }
 }
