@@ -7,6 +7,10 @@
 ## [Unreleased]
 
 ### Fixed
+- 修复积分商店商品每日数量在次日不再重置的问题：`_resetDailyShopQuantity()` 检查 `dailyLimit`/`dailySold` 字段名与前端使用的 `baseQuantity`/`remainingQuantity` 模型不匹配，导致重置逻辑实际未执行；新增 `baseQuantity → remainingQuantity` 重置逻辑，同时保留旧字段兼容
+  - 新增 TDD 测试 3 个（327 全量测试通过）
+
+### Fixed
 - 修复孩子端作业操作（开始/暂停/继续/完成）后轮询可能回退状态的问题：将 `saveHomeworksSilent()`（全量 PUT 所有作业）改为 `API.patchHomework()`（只 PATCH 变更字段到被操作的作业），消除 TOCTOU 竞态条件并减少请求开销
   - 开始作业：PATCH 仅含 `status`/`startedAt`/`mode`
   - 暂停作业：PATCH 仅含 `paused`/`wasPaused`/`_pausedElapsed`

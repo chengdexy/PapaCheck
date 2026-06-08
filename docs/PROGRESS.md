@@ -72,6 +72,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-08 | 修复积分商店每日数量不重置 Bug：Node.js 服务端 `_resetDailyShopQuantity()` 检查 `dailyLimit`/`dailySold` 字段与前端 `baseQuantity`/`remainingQuantity` 模型不匹配，新增 `baseQuantity → remainingQuantity` 重置逻辑；新增 TDD 测试 3 个；全量 327 测试通过 |
 | 2026-06-08 | 修复孩子端作业状态轮询回退 Bug：`saveHomeworksSilent()`（全量 PUT 所有作业）改为 `API.patchHomework()`（只 PATCH 变更字段）；新增 TDD 测试 5 个；全量 324 测试通过 |
 | 2026-06-08 | 修复 TTS 预生成 unsafe monkey patching：改用 Windows 客户端过滤 `[TTS] spawning` 日志；全量 321 个测试通过 |
 | 2026-06-08 | Node.js 端启动时自动预生成 45 条固定短语的 TTS MP3 缓存（`FIXED_TEXTS` + `pregenAllFixed()` + 陈旧缓存清理），`pregenSpeech()` 支持无参调用 |
