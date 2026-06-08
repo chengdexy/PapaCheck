@@ -126,8 +126,11 @@ var ConnectionManager = (function () {
         _failCount++;
         if (_failCount === 1 && _mode === 'online') {
           _mode = 'reconnecting';
-          showReconnectMask('\u8fde\u63a5\u65ad\u5f00\uff0c\u6b63\u5728\u56fa\u5b9a\u6570\u636e...');
+          // 第一次 ping 不通时不显示遮罩，第二次 ping 时再显示，降低用户等待体验
           updateConnStatus();
+        }
+        if (_failCount === 2 && _mode === 'reconnecting') {
+          showReconnectMask('\u8fde\u63a5\u65ad\u5f00\uff0c\u6b63\u5728\u56fa\u5b9a\u6570\u636e...');
         }
         if (_failCount >= 3) {
           hideReconnectMask();
