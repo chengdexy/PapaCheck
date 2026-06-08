@@ -32,4 +32,16 @@ class OfflineSnapshotService {
     }
     return null;
   }
+
+  static Future<void> clearAll() async {
+    final dir = await _getDir();
+    await for (final entity in dir.list()) {
+      if (entity is File) {
+        final name = entity.uri.pathSegments.last;
+        if (name.startsWith('offline_snapshot_') && name.endsWith('.html')) {
+          await entity.delete();
+        }
+      }
+    }
+  }
 }

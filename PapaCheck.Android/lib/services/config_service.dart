@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const String _keyUrl = 'child_web_url';
 const String _keyRole = 'device_role';
+const String _keyVersion = 'last_version';
 
 enum DeviceRole { child, parent }
 
@@ -30,5 +31,15 @@ class ConfigService {
       _keyRole,
       role == DeviceRole.parent ? 'parent' : 'child',
     );
+  }
+
+  static Future<void> setLastVersion(String version) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyVersion, version);
+  }
+
+  static Future<String?> getLastVersion() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyVersion);
   }
 }

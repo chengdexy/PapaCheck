@@ -79,4 +79,50 @@ void main() {
 
     expect(loaded, equals('<html>new</html>'));
   });
+
+  /// Feature: 离线快照清理
+  ///   Scenario: 清理后所有快照文件被删除
+  ///     Given 目录中有 2 个离线快照文件
+  ///     When 调用 clearAll()
+  ///     Then 所有快照文件被删除
+  test('clearAll 删除所有快照文件', () async {
+    const url1 = 'http://192.168.1.100:8080/page1.html';
+    const url2 = 'http://192.168.1.100:8080/page2.html';
+
+    await OfflineSnapshotService.save(url1, '<html>page1</html>');
+    await OfflineSnapshotService.save(url2, '<html>page2</html>');
+    await OfflineSnapshotService.clearAll();
+    final loaded1 = await OfflineSnapshotService.load(url1);
+    final loaded2 = await OfflineSnapshotService.load(url2);
+
+    expect(loaded1, isNull);
+    expect(loaded2, isNull);
+  });
+
+  /// Feature: 离线快照清理
+  ///   Scenario: 清理不影响其他文件
+  ///     Given 目录中有 1 个快照文件和 1 个非快照文件（如 config.json）
+  ///     When 调用 clearAll()
+  ///     Then 快照文件被删除，非快照文件保留
+  test('clearAll 不影响非快照文件', () async {
+    const snapshotUrl = 'http://192.168.1.100:8080/index.html';
+    const configContent = '{"theme": "dark"}';
+
+    await OfflineSnapshotService.save(snapshotUrl, '<html>snapshot</html>');
+
+    // 直接写一个非快照文件到测试目录
+    const configFileName = 'config.json';
+    final configFile = File('${testDir.path}/$configFileName');
+    await configFile.writeAsString(configContent);
+
+    await OfflineSnapshotService.clearAll();
+
+    // 快照文件应被删除
+    final loaded = await OfflineSnapshotService.load(snapshotUrl);
+    expect(loaded, isNull);
+
+    // config.json 应保留
+    expect(await configFile.exists(), isTrue);
+    expect(await configFile.readAsString(), equals(configContent));
+  });
 }

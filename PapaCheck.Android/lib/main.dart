@@ -10,6 +10,9 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:battery_plus/battery_plus.dart';
 
+import 'package:path_provider/path_provider.dart';
+
+import 'services/cache_clear_helper.dart';
 import 'services/config_service.dart';
 import 'services/offline_snapshot_service.dart';
 import 'services/update_service.dart';
@@ -164,6 +167,14 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
       if (!mounted) return;
       final result = await SetupPage.show(context);
       if (result != null && mounted) {
+        // 首次安装记录版本号
+        try {
+          final packageInfo = await PackageInfo.fromPlatform();
+          final currentVersion =
+              '${packageInfo.version}+${packageInfo.buildNumber}';
+          await ConfigService.setLastVersion(currentVersion);
+        } catch (_) {}
+
         _applyOrientation(result.role);
         final fullUrl = _buildFullUrl(result.url, result.role);
         setState(() {
@@ -180,6 +191,35 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     _role = storedRole;
     _applyOrientation(storedRole);
     final fullUrl = _buildFullUrl(storedUrl, storedRole);
+
+    // 版本检测与缓存清理
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      final currentVersion =
+          '${packageInfo.version}+${packageInfo.buildNumber}';
+      if (await shouldClearCache(currentVersion)) {
+        // 清理 WebView HTTP 缓存：删除应用缓存目录下 webview 子目录
+        try {
+          final cacheDir = await getTemporaryDirectory();
+          final webviewCacheDir = Directory('${cacheDir.path}/webview');
+          if (await webviewCacheDir.exists()) {
+            await webviewCacheDir.delete(recursive: true);
+          }
+        } catch (_) {
+          // 非致命：清理 WebView 缓存失败不影响启动
+        }
+        // 清理离线快照
+        await OfflineSnapshotService.clearAll();
+        // 记录新版本号
+        await ConfigService.setLastVersion(currentVersion);
+      } else if (await ConfigService.getLastVersion() == null) {
+        // 首次安装后启动（已有配置表明是从 SetupPage 回来的）
+        // 只记录版本号，不清理缓存
+        await ConfigService.setLastVersion(currentVersion);
+      }
+    } catch (_) {
+      // 版本检测失败不阻塞启动
+    }
 
     final reachable = await _isServerReachable(fullUrl);
     if (reachable && mounted) {
