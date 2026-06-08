@@ -276,6 +276,7 @@ export class TTSBridge {
     return new Promise((resolve, reject) => {
       this._daemonLock = this._daemonLock.then(() => new Promise<void>((innerResolve) => {
         const timeout = setTimeout(() => {
+          proc.removeListener('close', onClose);
           proc.kill();
           this._daemonProc = null;
           console.error(`[TTS] daemon timeout (30s) for text: "${text.slice(0, 30)}..."`);
@@ -292,6 +293,7 @@ export class TTSBridge {
             const len = headerBuf.readUInt32LE(0);
             if (len === 0) {
               clearTimeout(timeout);
+              proc.removeListener('close', onClose);
               innerResolve();
               resolve(Buffer.alloc(0));
               return;
@@ -303,6 +305,7 @@ export class TTSBridge {
               if (dataBuf.length >= len) {
                 proc.stdout.removeListener('data', onData);
                 clearTimeout(timeout);
+                proc.removeListener('close', onClose);
                 innerResolve();
                 resolve(dataBuf.subarray(0, len));
               }
@@ -327,6 +330,7 @@ export class TTSBridge {
         } catch (e) {
           clearTimeout(timeout);
           proc.stdout.removeListener('data', onHeader);
+          proc.removeListener('close', onClose);
           this._daemonProc = null;
           innerResolve();
           resolve(this.spawnPython(text));
