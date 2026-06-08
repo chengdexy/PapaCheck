@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Fixed
+- 修复 TTS 常驻进程在 Windows 下启动崩溃：`asyncio.connect_read_pipe` + `StreamReader` 在 Python 3.14 ProactorEventLoop 中因 IOCP pipe 句柄无效而报 `WinError 6`，改用 `loop.run_in_executor(None, sys.stdin.buffer.readline)` 在线程池中读取 stdin
 - 修复 `startPoll` 使用 `setInterval` 导致 poll 函数重叠触发的问题：改为 `setTimeout` 递归链 + `finally` 块确保前一次执行完成后才调度下一轮，消除异步竞态；`stopPoll` 同步改为 `clearTimeout`
   - 新增 TDD 测试 3 个（349 全量测试通过）
 - 修复兑换成功时重复播报："奖励箱有新奖励，快去看看吧" 与 "兑换成功！" 连续播报导致语音重叠

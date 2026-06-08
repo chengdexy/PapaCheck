@@ -21,14 +21,16 @@ def _write_response(data: bytes):
 
 
 async def _daemon_loop():
-    """Read text lines from stdin, write MP3 responses to stdout"""
+    """Read text lines from stdin, write MP3 responses to stdout
+    
+    使用 run_in_executor 在线程中读取 stdin，避免 Windows
+    ProactorEventLoop 下 connect_read_pipe 的 IOCP 管道句柄无效问题。
+    """
     loop = asyncio.get_event_loop()
-    reader = asyncio.StreamReader()
-    protocol = asyncio.StreamReaderProtocol(reader)
-    await loop.connect_read_pipe(lambda: protocol, sys.stdin)
 
     while True:
-        line = await reader.readline()
+        # 在线程中读取一行 stdin（Windows pipe 兼容）
+        line = await loop.run_in_executor(None, sys.stdin.buffer.readline)
         if not line:  # EOF
             break
         text = line.decode('utf-8').strip()
