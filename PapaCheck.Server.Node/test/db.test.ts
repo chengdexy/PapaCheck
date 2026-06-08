@@ -904,6 +904,66 @@ describe('Database', () => {
     });
   });
 
+  describe('每日数量重置', () => {
+    it('当日期变更时，getShopItems 应重置 remainingQuantity 为 baseQuantity', () => {
+      const items = [
+        { id: 's1', name: '零食', baseQuantity: 3, remainingQuantity: 0 },
+        { id: 's2', name: '玩具', baseQuantity: 5, remainingQuantity: 2 },
+        { id: 's3', name: '图书', baseQuantity: 1, remainingQuantity: 1 },
+      ];
+      db.saveShopItems(items);
+
+      // 将 last_shop_reset 设为昨天，模拟日期变更
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      (db as any).db.prepare(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES ('last_shop_reset', ?)"
+      ).run(yesterday);
+
+      const result = db.getShopItems();
+
+      expect(result.find((r: any) => r.id === 's1').remainingQuantity).toBe(3);
+      expect(result.find((r: any) => r.id === 's2').remainingQuantity).toBe(5);
+      expect(result.find((r: any) => r.id === 's3').remainingQuantity).toBe(1);
+    });
+
+    it('同一天多次调用不重复重置', () => {
+      const items = [
+        { id: 's1', name: '零食', baseQuantity: 3, remainingQuantity: 0 },
+      ];
+      db.saveShopItems(items);
+
+      // 第一次触发应重置
+      const result1 = db.getShopItems();
+      expect(result1.find((r: any) => r.id === 's1').remainingQuantity).toBe(3);
+
+      // 手动扣减
+      const s1 = result1.find((r: any) => r.id === 's1');
+      s1.remainingQuantity = 0;
+      db.putShopItem('s1', s1);
+
+      // 第二次获取不应再次重置（同一天）
+      const result2 = db.getShopItems();
+      expect(result2.find((r: any) => r.id === 's1').remainingQuantity).toBe(0);
+    });
+
+    it('没有 baseQuantity 的商品不触发重置（向后兼容）', () => {
+      const items = [
+        { id: 's1', name: '旧商品', dailyLimit: 3, dailySold: 3 },
+      ];
+      db.saveShopItems(items);
+
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      (db as any).db.prepare(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES ('last_shop_reset', ?)"
+      ).run(yesterday);
+
+      const result = db.getShopItems();
+      const item = result.find((r: any) => r.id === 's1');
+      expect(item.dailySold).toBe(0);
+      expect(item.dailyLimit).toBe(3);
+    });
+  });
+
   describe('redemptions 单资源方法', () => {
     it('putRedemption 创建新兑换记录', () => {
       db.putRedemption('r1', { id: 'r1', itemId: 'r1', itemName: '兑换1', status: 'pending' });

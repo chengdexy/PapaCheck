@@ -285,12 +285,19 @@ export class PapaCheckDB {
       const items = this._safeJsonParse(itemsRow.data);
       if (!Array.isArray(items)) return;
       for (const item of items) {
-        if (item && typeof item === 'object' && item._originalDailyLimit !== undefined) {
-          item.dailyLimit = item._originalDailyLimit;
-          delete item._originalDailyLimit;
-        }
-        if (item && typeof item === 'object' && item.dailyLimit !== undefined && typeof item.dailySold === 'number') {
-          item.dailySold = 0;
+        if (item && typeof item === 'object') {
+          // 兼容旧版 dailyLimit/dailySold 字段
+          if (item._originalDailyLimit !== undefined) {
+            item.dailyLimit = item._originalDailyLimit;
+            delete item._originalDailyLimit;
+          }
+          if (item.dailyLimit !== undefined && typeof item.dailySold === 'number') {
+            item.dailySold = 0;
+          }
+          // 重置 baseQuantity/remainingQuantity 模型的每日数量
+          if (typeof item.baseQuantity === 'number' && typeof item.remainingQuantity === 'number') {
+            item.remainingQuantity = item.baseQuantity;
+          }
         }
       }
       this._setJson('shop_items', items);
@@ -495,11 +502,11 @@ export class PapaCheckDB {
     const cutoff = Date.now() - 3600000;
     // Also clean up expired
     this.db.prepare('DELETE FROM notifications WHERE created_at < ?').run(cutoff);
-    
+
     const rows = this.db.prepare(
       'SELECT id, text, created_at FROM notifications WHERE created_at >= ? ORDER BY created_at ASC'
     ).all(cutoff) as any[];
-    
+
     return rows.map(row => ({
       id: row.id,
       text: row.text,
