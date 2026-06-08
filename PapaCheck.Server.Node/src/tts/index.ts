@@ -134,6 +134,8 @@ export class TTSBridge {
   private spawnFn: SpawnFn;
   /** 上次 TTS 失败的错误信息（供 API 端点读取） */
   _lastError: string = '';
+  /** 常驻子进程引用 */
+  private _daemonProc: any = null;
 
   constructor(options: TTSBridgeOptions = {}) {
     this.pythonPath = options.pythonPath ?? 'python';
@@ -173,8 +175,13 @@ export class TTSBridge {
     // 3. 确保缓存目录存在
     await mkdir(this.cacheDir, { recursive: true }).catch(() => { });
 
-    // 4. 生成语音
-    const mp3Data = await this.spawnPython(text);
+    // 4. 优先走常驻进程
+    let mp3Data: Buffer;
+    try {
+      mp3Data = await this._talkToDaemon(text);
+    } catch {
+      mp3Data = await this.spawnPython(text);
+    }
 
     // 5. 缓存结果
     if (mp3Data.length > 0) {
@@ -237,6 +244,78 @@ export class TTSBridge {
           finish(Buffer.alloc(0));
         }
       });
+    });
+  }
+
+  /** 确保常驻进程已启动（懒加载） */
+  private _ensureDaemon(): void {
+    if (this._daemonProc) return;
+    const proc = this.spawnFn(this.pythonPath, [this.scriptPath, '--daemon'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    proc.stderr.on('data', (chunk: Buffer) => {
+      const lines = chunk.toString('utf-8').trim().split('\n');
+      for (const line of lines) {
+        if (line) console.log(`[TTS] daemon: ${line}`);
+      }
+    });
+    proc.on('close', () => {
+      this._daemonProc = null;
+    });
+    this._daemonProc = proc;
+    console.log('[TTS] daemon 启动完成');
+  }
+
+  /** 通过常驻进程合成语音，失败时退化到 spawnPython */
+  private async _talkToDaemon(text: string): Promise<Buffer> {
+    this._ensureDaemon();
+    const proc = this._daemonProc;
+    if (!proc) return this.spawnPython(text);
+
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        proc.kill();
+        this._daemonProc = null;
+        console.error(`[TTS] daemon timeout (30s) for text: "${text.slice(0, 30)}..."`);
+        resolve(this.spawnPython(text));
+      }, 30000);
+
+      // 读取 4 字节长度前缀
+      let headerBuf = Buffer.alloc(0);
+      const onHeader = (chunk: Buffer) => {
+        headerBuf = Buffer.concat([headerBuf, chunk]);
+        if (headerBuf.length >= 4) {
+          proc.stdout.removeListener('data', onHeader);
+          const len = headerBuf.readUInt32LE(0);
+          if (len === 0) {
+            clearTimeout(timeout);
+            resolve(Buffer.alloc(0));
+            return;
+          }
+          // 读取 MP3 数据
+          let dataBuf = Buffer.alloc(0);
+          const onData = (chunk: Buffer) => {
+            dataBuf = Buffer.concat([dataBuf, chunk]);
+            if (dataBuf.length >= len) {
+              proc.stdout.removeListener('data', onData);
+              clearTimeout(timeout);
+              resolve(dataBuf.subarray(0, len));
+            }
+          };
+          proc.stdout.on('data', onData);
+        }
+      };
+      proc.stdout.on('data', onHeader);
+
+      // 写入请求
+      try {
+        proc.stdin.write(text + '\n');
+      } catch (e) {
+        clearTimeout(timeout);
+        proc.stdout.removeListener('data', onHeader);
+        this._daemonProc = null;
+        resolve(this.spawnPython(text));
+      }
     });
   }
 
