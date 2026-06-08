@@ -56,6 +56,10 @@ let _lastRatingInfo = null;
 let _lastSettings = null;
 /** 上一轮 poll 中出现的通知 ID 集合（用于延迟消费） */
 let _lastNotifIds = null;
+/** calculateSettlement 幂等性：防止重入 */
+let _calculatingSettlement = false;
+/** calculateSettlement 幂等性：上次保存的数据快照（跳过重复 PUT） */
+let _lastSettlementSnapshot = null;
 
 // ========== Utility ==========
 const Util = {
@@ -592,62 +596,121 @@ async function checkAllDone() {
   }
 }
 
+/** 幂等性 PUT settlement，相同数据跳过 */
+async function _putSettlementIdempotent(dateKey, data) {
+  const snap = { dateKey, dataJson: JSON.stringify(data) };
+  if (_lastSettlementSnapshot && _lastSettlementSnapshot.dateKey === dateKey && _lastSettlementSnapshot.dataJson === snap.dataJson) {
+    return false;
+  }
+  await API.putSettlement(dateKey, data);
+  _lastSettlementSnapshot = snap;
+  return true;
+}
+
 async function calculateSettlement() {
-  const doneHw = homeworks.filter(h => h.status === 'done');
-  const challengeSuccess = doneHw.filter(h => h.mode === 'challenge' && !h.rejected);
-  const efficiencyHw = doneHw.filter(h => !h.rejected);
+  if (_calculatingSettlement) return;
+  _calculatingSettlement = true;
+  try {
+    const doneHw = homeworks.filter(h => h.status === 'done');
+    const challengeSuccess = doneHw.filter(h => h.mode === 'challenge' && !h.rejected);
+    const efficiencyHw = doneHw.filter(h => !h.rejected);
 
-  const dateKey = Util.dateKey(currentDate);
+    const dateKey = Util.dateKey(currentDate);
 
-  // 检查当天是否已有 settlement 并已评级
-  const existingSettlement = cachedData?.dailySettlement?.[dateKey];
+    // 检查当天是否已有 settlement 并已评级
+    const existingSettlement = cachedData?.dailySettlement?.[dateKey];
 
-  if (existingSettlement && (existingSettlement.rating || existingSettlement.submittedAt)) {
-    // 当天已评级 或 已提交等待评级：只处理追加作业，不覆写 submittedAt
-    const prevHomeworkBonus = existingSettlement.homeworkBonus || 0;
+    if (existingSettlement && (existingSettlement.rating || existingSettlement.submittedAt)) {
+      // 当天已评级 或 已提交等待评级：只处理追加作业，不覆写 submittedAt
+      const prevHomeworkBonus = existingSettlement.homeworkBonus || 0;
 
-    const currentHomeworkBonus = challengeSuccess.reduce(
+      const currentHomeworkBonus = challengeSuccess.reduce(
+        (sum, h) => sum + (h.basePoints ?? cachedData?.settings?.homeworkBonusPerTask ?? 10), 0
+      );
+
+      const newHomeworkBonus = currentHomeworkBonus - prevHomeworkBonus;
+
+      if (newHomeworkBonus > 0) {
+        // 用已有倍率计算新增积分（不含每日基础分）
+        const multiplier = existingSettlement.multiplier;
+        const additionalPoints = Math.round(newHomeworkBonus * multiplier);
+
+        const updatedSettlement = {
+          ...existingSettlement,
+          homeworkBonus: currentHomeworkBonus,
+          totalBeforeRating: existingSettlement.dailyBase + currentHomeworkBonus,
+          doneCount: doneHw.length,
+          finalPoints: (existingSettlement.finalPoints || 0) + additionalPoints,
+        };
+
+        window._settlement = updatedSettlement;
+        await _putSettlementIdempotent(dateKey, updatedSettlement);
+
+        if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
+        cachedData.dailySettlement[dateKey] = updatedSettlement;
+
+        if (additionalPoints > 0) {
+          await API.updatePoints('earn', additionalPoints,
+            `追加完成作业，按${existingSettlement.rating}评级倍率计算`);
+        }
+      } else {
+        // 没有新作业加分，只更新 doneCount
+        const updatedSettlement = {
+          ...existingSettlement,
+          doneCount: doneHw.length,
+        };
+        window._settlement = updatedSettlement;
+        await _putSettlementIdempotent(dateKey, updatedSettlement);
+        if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
+        cachedData.dailySettlement[dateKey] = updatedSettlement;
+      }
+
+      // 保存 efficiency 数据
+      const ratios = [];
+      efficiencyHw.forEach(hw => {
+        if (hw.actualDuration !== null && hw.suggestedDuration > 0) {
+          ratios.push(hw.actualDuration / hw.suggestedDuration);
+        }
+      });
+      const averageRatio = ratios.length > 0
+        ? ratios.reduce((a, b) => a + b, 0) / ratios.length
+        : 0;
+
+      await API.putEfficiency(dateKey, { averageRatio, ratios });
+
+      needsFullRender = true;
+      updateBigScreen();
+      return;
+    }
+
+    // 当天未评级：正常计算结算
+    const dailyBase = cachedData?.settings?.dailyBasePoints ?? 50;
+    const homeworkBonus = challengeSuccess.reduce(
       (sum, h) => sum + (h.basePoints ?? cachedData?.settings?.homeworkBonusPerTask ?? 10), 0
     );
 
-    const newHomeworkBonus = currentHomeworkBonus - prevHomeworkBonus;
+    const settlementData = {
+      dailyBase,
+      homeworkBonus,
+      totalBeforeRating: dailyBase + homeworkBonus,
+      doneCount: doneHw.length,
+    };
 
-    if (newHomeworkBonus > 0) {
-      // 用已有倍率计算新增积分（不含每日基础分）
-      const multiplier = existingSettlement.multiplier;
-      const additionalPoints = Math.round(newHomeworkBonus * multiplier);
+    window._settlement = settlementData;
 
-      const updatedSettlement = {
-        ...existingSettlement,
-        homeworkBonus: currentHomeworkBonus,
-        totalBeforeRating: existingSettlement.dailyBase + currentHomeworkBonus,
-        doneCount: doneHw.length,
-        finalPoints: (existingSettlement.finalPoints || 0) + additionalPoints,
-      };
+    const settlementToSave = {
+      ...settlementData,
+      rating: null,
+      multiplier: null,
+      finalPoints: null,
+      submittedAt: null,
+      ratedAt: null,
+    };
+    await _putSettlementIdempotent(dateKey, settlementToSave);
 
-      window._settlement = updatedSettlement;
-      await API.putSettlement(dateKey, updatedSettlement);
+    if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
+    cachedData.dailySettlement[dateKey] = settlementToSave;
 
-      if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
-      cachedData.dailySettlement[dateKey] = updatedSettlement;
-
-      if (additionalPoints > 0) {
-        await API.updatePoints('earn', additionalPoints,
-          `追加完成作业，按${existingSettlement.rating}评级倍率计算`);
-      }
-    } else {
-      // 没有新作业加分，只更新 doneCount
-      const updatedSettlement = {
-        ...existingSettlement,
-        doneCount: doneHw.length,
-      };
-      window._settlement = updatedSettlement;
-      await API.putSettlement(dateKey, updatedSettlement);
-      if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
-      cachedData.dailySettlement[dateKey] = updatedSettlement;
-    }
-
-    // 保存 efficiency 数据
     const ratios = [];
     efficiencyHw.forEach(hw => {
       if (hw.actualDuration !== null && hw.suggestedDuration > 0) {
@@ -662,51 +725,9 @@ async function calculateSettlement() {
 
     needsFullRender = true;
     updateBigScreen();
-    return;
+  } finally {
+    _calculatingSettlement = false;
   }
-
-  // 当天未评级：正常计算结算
-  const dailyBase = cachedData?.settings?.dailyBasePoints ?? 50;
-  const homeworkBonus = challengeSuccess.reduce(
-    (sum, h) => sum + (h.basePoints ?? cachedData?.settings?.homeworkBonusPerTask ?? 10), 0
-  );
-
-  const settlementData = {
-    dailyBase,
-    homeworkBonus,
-    totalBeforeRating: dailyBase + homeworkBonus,
-    doneCount: doneHw.length,
-  };
-
-  window._settlement = settlementData;
-
-  const settlementToSave = {
-    ...settlementData,
-    rating: null,
-    multiplier: null,
-    finalPoints: null,
-    submittedAt: null,
-    ratedAt: null,
-  };
-  await API.putSettlement(dateKey, settlementToSave);
-
-  if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
-  cachedData.dailySettlement[dateKey] = settlementToSave;
-
-  const ratios = [];
-  efficiencyHw.forEach(hw => {
-    if (hw.actualDuration !== null && hw.suggestedDuration > 0) {
-      ratios.push(hw.actualDuration / hw.suggestedDuration);
-    }
-  });
-  const averageRatio = ratios.length > 0
-    ? ratios.reduce((a, b) => a + b, 0) / ratios.length
-    : 0;
-
-  await API.putEfficiency(dateKey, { averageRatio, ratios });
-
-  needsFullRender = true;
-  updateBigScreen();
 }
 
 let _submittingRating = false;
@@ -826,6 +847,7 @@ function startPoll(intervalMs) {
         const addedRb = rb.filter(r => !prevRb.some(p => p.name === r.name) || (r.quantity || 0) > (prevRb.find(p => p.name === r.name)?.quantity || 0));
         if (addedRb.length > 0) {
           addedRb.forEach(r => window._recentNewRewardIds.add(r.id));
+          Voice.speak('奖励箱有新奖励，快去看看吧');
         }
         _lastRewardBox = rb.concat();
       }
