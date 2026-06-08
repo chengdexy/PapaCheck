@@ -1254,14 +1254,25 @@ class PapaCheckApp:
         if self._quitting:
             return
         self._quitting = True
+        # 先更新按钮状态（如果有服务器运行中），再禁用界面
+        if self._node_process:
+            self.start_btn.config(text=f'{SYMBOL_STOP} 正在关闭...', state=tk.DISABLED,
+                                  bg='#ef4444', activebackground='#dc2626')
         self._disable_ui()
-        # 无论如何都尝试终止 Node.js 子进程
+        # 无论如何都尝试终止 Node.js 子进程（后台执行，防止阻塞 UI）
         proc = self._node_process or _node_process_global.get('proc')
         if proc:
-            _stop_node_server_process(proc)
-            self._node_process = None
-            _node_process_global['proc'] = None
-        self._do_destroy()
+            self._append_log('正在停止服务器...')
+            threading.Thread(target=self._quit_worker, args=(proc,), daemon=True).start()
+        else:
+            self._do_destroy()
+
+    def _quit_worker(self, proc):
+        """后台线程：退出时停止服务器进程"""
+        _stop_node_server_process(proc)
+        self._node_process = None
+        _node_process_global['proc'] = None
+        self.root.after(0, self._do_destroy)
 
     def _disable_ui(self):
         for child in self.root.winfo_children():
