@@ -84,7 +84,8 @@ const API = {
       var result = await this._fetch('/api/data');
       isServerMode = true;
       cachedData = result;
-      try { await DB.cacheFullData(result); } catch (e) { }
+      // 深拷贝后传给 cacheFullData，防止原地修改 lastModified/uuid 污染 cachedData
+      try { await DB.cacheFullData(JSON.parse(JSON.stringify(result))); } catch (e) { }
       return result;
     } catch (e) {
       var localData = await DB.getFullData();

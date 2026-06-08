@@ -22,6 +22,7 @@
   - `_set_autostart()` 写入前后自动清理残留条目并增加操作日志
   - 启动时（`__init__`）自动执行注册表残留清理
 - 修复孩子端无限 PUT `/api/settlement/:date` 和 `/api/efficiency/:date` 的问题：`calculateSettlement()` 添加 re-entrant guard（`_calculatingSettlement` 防止并发重复执行）+ `_putSettlementIdempotent`/`_putEfficiencyIdempotent` 数据快照对比（相同数据跳过 PUT），消除轮询触发的无限 PUT 循环
+- 修复上一轮修复遗漏的根因：`api.js` 中 `DB.cacheFullData(result)` 原地修改 `cachedData` 对象，`db.js` 的 `ensureSyncFields()` 每次覆盖 `lastModified`/生成新 `uuid`，导致 `pollServer` 的作业列表 JSON 比较始终认为有变化 → 每轮 poll 都触发 `calculateSettlement()` → 即使幂等性检查也因 `lastModified` 每轮不同而失效。修复：`getData()` 和 `init()` 中均使用深拷贝后传给 `cacheFullData`，防止污染运行时 `cachedData`
 - 修复奖励箱新增奖励未播报的问题：`pollServer` 检测到奖励箱物品新增或数量增加时调用 `Voice.speak('奖励箱有新奖励，快去看看吧')`
   - 新增 TDD 测试 6 个（362 全量测试通过）
 
