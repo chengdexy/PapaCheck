@@ -72,6 +72,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-08 | 修复语音自动播放三连 Bug（假解锁锁死 / NotAllowedError 插队 / 通知提前消费）；全量 356 测试通过 |
 | 2026-06-08 | Android 端更新版本后自动清空本地缓存（WebView 缓存 + 离线快照），保留 URL 和角色配置，确保从服务端下载最新资源；TDD 新增 7 个 Flutter 测试 |
 | 2026-06-08 | 修复 `updateMainClock` 中 `saverDate` 潜在空指针异常：添加空检查 |
 | 2026-06-08 | 修复离线模式客户端时钟停止：`tickInterval`（时钟+任务计时器合并）拆分为独立 `clockInterval`（30 秒间隔，永不停止）和 `tickInterval`（仅任务计时器）；屏保时钟合并到 `updateMainClock` 统一更新；全量 356 测试通过 |
