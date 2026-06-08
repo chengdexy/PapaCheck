@@ -30,7 +30,11 @@ async def _daemon_loop():
 
     while True:
         # 在线程中读取一行 stdin（Windows pipe 兼容）
-        line = await loop.run_in_executor(None, sys.stdin.buffer.readline)
+        try:
+            line = await loop.run_in_executor(None, sys.stdin.buffer.readline)
+        except Exception as e:
+            print(f"[TTS] stdin read error: {e}", file=sys.stderr)
+            break
         if not line:  # EOF
             break
         text = line.decode('utf-8').strip()
