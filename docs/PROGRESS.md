@@ -72,6 +72,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-08 | 修复提交评级后 pollServer 覆写 `submittedAt` 卡在提交界面 + 通知重复播放 + TTS cache 持久化 + SEA daemon 回退到 spawnPython；全量 356 测试通过 |
 | 2026-06-08 | 修复语音自动播放三连 Bug（假解锁锁死 / NotAllowedError 插队 / 通知提前消费）；全量 356 测试通过 |
 | 2026-06-08 | Android 端更新版本后自动清空本地缓存（WebView 缓存 + 离线快照），保留 URL 和角色配置，确保从服务端下载最新资源；TDD 新增 7 个 Flutter 测试 |
 | 2026-06-08 | 修复 `updateMainClock` 中 `saverDate` 潜在空指针异常：添加空检查 |

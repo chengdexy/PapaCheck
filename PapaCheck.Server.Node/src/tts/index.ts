@@ -136,8 +136,11 @@ export class TTSBridge {
   _lastError: string = '';
   /** 常驻子进程引用 */
   private _daemonProc: any = null;
+  /** daemon 通信串行锁（Promise 链，同一时间只允许一个请求通过 stdin/stdout） */
+  private _daemonLock: Promise<void>;
 
   constructor(options: TTSBridgeOptions = {}) {
+    this._daemonLock = Promise.resolve();
     this.pythonPath = options.pythonPath ?? 'python';
     this.scriptPath = resolveScriptPath(options.scriptPath);
     this.cacheDir = options.cacheDir ?? join(_moduleDirname, '..', '..', 'tts_cache');
@@ -175,13 +178,8 @@ export class TTSBridge {
     // 3. 确保缓存目录存在
     await mkdir(this.cacheDir, { recursive: true }).catch(() => { });
 
-    // 4. 优先走常驻进程
-    let mp3Data: Buffer;
-    try {
-      mp3Data = await this._talkToDaemon(text);
-    } catch {
-      mp3Data = await this.spawnPython(text);
-    }
+    // 4. 生成语音（直接 spawn 一次性 Python 进程，SEA 环境下 stdin pipe 不可用）
+    const mp3Data = await this.spawnPython(text);
 
     // 5. 缓存结果
     if (mp3Data.length > 0) {
@@ -262,6 +260,8 @@ export class TTSBridge {
     proc.on('close', () => {
       this._daemonProc = null;
     });
+    // 防止 stdin 在 daemon 退出后 emit 'error' 事件导致 Node.js 崩溃
+    proc.stdin.on('error', () => { });
     this._daemonProc = proc;
     console.log('[TTS] daemon 启动完成');
   }
@@ -272,50 +272,66 @@ export class TTSBridge {
     const proc = this._daemonProc;
     if (!proc) return this.spawnPython(text);
 
-    return new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        proc.kill();
-        this._daemonProc = null;
-        console.error(`[TTS] daemon timeout (30s) for text: "${text.slice(0, 30)}..."`);
-        resolve(this.spawnPython(text));
-      }, 30000);
+    // 串行化：同一时间只允许一个请求通过 stdin/stdout
+    return new Promise((resolve, reject) => {
+      this._daemonLock = this._daemonLock.then(() => new Promise<void>((innerResolve) => {
+        const timeout = setTimeout(() => {
+          proc.kill();
+          this._daemonProc = null;
+          console.error(`[TTS] daemon timeout (30s) for text: "${text.slice(0, 30)}..."`);
+          innerResolve();
+          resolve(this.spawnPython(text));
+        }, 30000);
 
-      // 读取 4 字节长度前缀
-      let headerBuf = Buffer.alloc(0);
-      const onHeader = (chunk: Buffer) => {
-        headerBuf = Buffer.concat([headerBuf, chunk]);
-        if (headerBuf.length >= 4) {
-          proc.stdout.removeListener('data', onHeader);
-          const len = headerBuf.readUInt32LE(0);
-          if (len === 0) {
-            clearTimeout(timeout);
-            resolve(Buffer.alloc(0));
-            return;
-          }
-          // 读取 MP3 数据
-          let dataBuf = Buffer.alloc(0);
-          const onData = (chunk: Buffer) => {
-            dataBuf = Buffer.concat([dataBuf, chunk]);
-            if (dataBuf.length >= len) {
-              proc.stdout.removeListener('data', onData);
+        // 读取 4 字节长度前缀
+        let headerBuf = Buffer.alloc(0);
+        const onHeader = (chunk: Buffer) => {
+          headerBuf = Buffer.concat([headerBuf, chunk]);
+          if (headerBuf.length >= 4) {
+            proc.stdout.removeListener('data', onHeader);
+            const len = headerBuf.readUInt32LE(0);
+            if (len === 0) {
               clearTimeout(timeout);
-              resolve(dataBuf.subarray(0, len));
+              innerResolve();
+              resolve(Buffer.alloc(0));
+              return;
             }
-          };
-          proc.stdout.on('data', onData);
-        }
-      };
-      proc.stdout.on('data', onHeader);
+            // 读取 MP3 数据
+            let dataBuf = Buffer.alloc(0);
+            const onData = (chunk: Buffer) => {
+              dataBuf = Buffer.concat([dataBuf, chunk]);
+              if (dataBuf.length >= len) {
+                proc.stdout.removeListener('data', onData);
+                clearTimeout(timeout);
+                innerResolve();
+                resolve(dataBuf.subarray(0, len));
+              }
+            };
+            proc.stdout.on('data', onData);
+          }
+        };
+        proc.stdout.on('data', onHeader);
+        // daemon 进程退出时立即退化，不等 30s 超时
+        const onClose = () => {
+          clearTimeout(timeout);
+          proc.stdout.removeListener('data', onHeader);
+          this._daemonProc = null;
+          innerResolve();
+          resolve(this.spawnPython(text));
+        };
+        proc.on('close', onClose);
 
-      // 写入请求
-      try {
-        proc.stdin.write(text + '\n');
-      } catch (e) {
-        clearTimeout(timeout);
-        proc.stdout.removeListener('data', onHeader);
-        this._daemonProc = null;
-        resolve(this.spawnPython(text));
-      }
+        // 写入请求
+        try {
+          proc.stdin.write(text + '\n');
+        } catch (e) {
+          clearTimeout(timeout);
+          proc.stdout.removeListener('data', onHeader);
+          this._daemonProc = null;
+          innerResolve();
+          resolve(this.spawnPython(text));
+        }
+      }));
     });
   }
 

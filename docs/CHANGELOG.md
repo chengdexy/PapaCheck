@@ -15,6 +15,10 @@
   - TDD 驱动：新增 7 个 Flutter 测试，全量 30 测试通过
 
 ### Fixed
+- 修复提交评级后 pollServer 覆写 `submittedAt` 导致页面卡在提交界面：`calculateSettlement()` 判断条件增加 `submittedAt` 检查，已提交未评级的 settlement 不会被重置
+- 修复通知延迟消费导致重复播放：只在通知首次出现时播报，延迟消费轮次跳过已见过的通知；消费后从 `_lastNotifIds` 移除已删 ID 防止重复 DELETE
+- 修复 TTS 预生成文件写入 SEA 虚拟目录不持久的问题：`cacheDir` 跟随 `dbPath` 到 `%LOCALAPPDATA%/PapaCheck/Server/tts_cache`
+- 修复 SEA 环境下 daemon stdin pipe 不可用导致崩溃：放弃 daemon，回退到经检验的 `spawnPython`（argv 传参）; 添加 stdin error 处理器和 close 退化逻辑防止 Node.js 崩溃
 - 修复语音自动播放解锁锁死：删除 `setTimeout(unlockAudio, 100)` 页面加载 100ms 后的假解锁尝试（`silent.play()` 被浏览器拦截后设 `_unlockDone = true` 导致真实用户交互无法再解锁），解锁完全依赖 click/touchstart/visibilitychange 用户事件
 - 修复 `NotAllowedError` 时用 `unshift` 插回队首导致过时语音插队的问题：改为 `push` 放回队尾
 - 修复通知在语音播报前被消费的问题：pollServer 通知消费改为"延迟一轮"策略（首轮只播不删，第二轮确认持久后再删），给 Voice 至少 5 秒时间完成播报

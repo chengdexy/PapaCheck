@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { createReadStream } from 'fs';
 import { readdir, stat } from 'fs/promises';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { PapaCheckDB } from './db/index.js';
 import { TTSBridge } from './tts/index.js';
 import { EmailSync } from './email/index.js';
@@ -124,6 +124,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   const db = new PapaCheckDB(options.dbPath);
   const tts = new TTSBridge({
     pythonPath: options.ttsPython ?? 'python',
+    cacheDir: join(dirname(options.dbPath ?? join(_moduleDirname, '..', 'data.db')), 'tts_cache'),
   });
 
   // 暴露给测试使用
@@ -894,7 +895,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   }
 
   // 启动时后台预生成固定短语（不阻塞启动）
-  tts.pregenAllFixed().catch(() => {});
+  tts.pregenAllFixed().catch(() => { });
 
   return app;
 }

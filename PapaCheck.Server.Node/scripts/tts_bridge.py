@@ -20,38 +20,39 @@ def _write_response(data: bytes):
     sys.stdout.buffer.flush()
 
 
-async def _daemon_loop():
-    """Read text lines from stdin, write MP3 responses to stdout
-    
-    使用 run_in_executor 在线程中读取 stdin，避免 Windows
-    ProactorEventLoop 下 connect_read_pipe 的 IOCP 管道句柄无效问题。
-    """
-    loop = asyncio.get_event_loop()
+def _daemon_loop():
+    """Synchronous stdin/stdout loop.
 
+    使用 os.read(0) 直接从文件描述符读取 stdin，绕过 Python
+    的缓冲 IO 层，避免 Windows pipe 下 readline 不返回的问题。
+    """
+    buf = b''
     while True:
-        # 在线程中读取一行 stdin（Windows pipe 兼容）
         try:
-            line = await loop.run_in_executor(None, sys.stdin.buffer.readline)
-        except Exception as e:
+            chunk = os.read(0, 65536)
+        except OSError as e:
             print(f"[TTS] stdin read error: {e}", file=sys.stderr)
             break
-        if not line:  # EOF
+        if not chunk:  # EOF
             break
-        text = line.decode('utf-8').strip()
-        if not text:
-            _write_response(b'')
-            continue
-        try:
-            mp3_data = await generate(text)
-            _write_response(mp3_data)
-        except Exception as e:
-            print(f"[TTS] error: {e}", file=sys.stderr)
-            _write_response(b'')
+        buf += chunk
+        while b'\n' in buf:
+            line, buf = buf.split(b'\n', 1)
+            text = line.decode('utf-8').strip()
+            if not text:
+                _write_response(b'')
+                continue
+            try:
+                mp3_data = asyncio.run(generate(text))
+                _write_response(mp3_data)
+            except Exception as e:
+                print(f"[TTS] error: {e}", file=sys.stderr)
+                _write_response(b'')
 
 
 if __name__ == '__main__':
     if '--daemon' in sys.argv:
-        asyncio.run(_daemon_loop())
+        _daemon_loop()
     else:
         # CLI mode (backward compatible)
         text = sys.argv[1] if len(sys.argv) > 1 else sys.stdin.read().strip()
