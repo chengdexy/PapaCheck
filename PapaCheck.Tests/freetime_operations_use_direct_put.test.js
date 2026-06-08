@@ -51,13 +51,15 @@ function extractNonAsync(name) {
 }
 
 test('RED: startFreeTime 调用 API.putFreeTimeTask 而非 saveFreeTimeSilent', async () => {
-  var fnCode = extractNonAsync('startFreeTime');
+  var fnCode = extractFunction('startFreeTime');
   assert.ok(fnCode, 'startFreeTime 应存在于 app.js');
   assert.ok(fnCode.includes('API.putFreeTimeTask'),
     '应调用 API.putFreeTimeTask，当前使用: ' +
     (fnCode.includes('saveFreeTimeSilent') ? 'saveFreeTimeSilent' : '其他'));
   assert.ok(!fnCode.includes('saveFreeTimeSilent'),
     '不应调用 saveFreeTimeSilent');
+  assert.ok(fnCode.includes('await '),
+    '应包含 await');
 });
 
 test('RED: completeFreeTime 调用 API.putFreeTimeTask 而非 saveFreeTimeSilent', async () => {

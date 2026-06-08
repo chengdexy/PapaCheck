@@ -23,7 +23,7 @@
   - 在校完成：PATCH 仅含 `status`/`mode`/`completedInSchool`/`actualDuration`/`startedAt`/`completedAt`
   - 服务器 `patchHomework` 自动更新 `lastModified` 为当前时间（PUT 用的是客户端旧值）
   - 新增 TDD 测试 5 个（324 全量测试通过）
-- 修复自由时间操作（开始/暂停/继续/完成）后轮询可能回退状态的问题：将 `saveFreeTimeSilent()`（全量 PUT 所有自由时间）改为 `API.putFreeTimeTask()`（只 PUT 当前操作的任务），消除 TOCTOU 竞态；同时 pollServer 增加 `freeTimeTasks` 状态等级保护（pending<doing<done）
+- 修复自由时间操作（开始/暂停/继续/完成）后轮询可能回退状态的问题：将 `saveFreeTimeSilent()`（全量 PUT 所有自由时间）改为 `API.putFreeTimeTask()`（只 PUT 当前操作的任务），消除 TOCTOU 竞态；同时 pollServer 增加 `freeTimeTasks` 状态等级保护（pending<doing<done）；修复 `startFreeTime` 缺少 `await` 导致异步竞态
   - 新增 TDD 测试 5 个（349 全量测试通过）
 
 ### Added
