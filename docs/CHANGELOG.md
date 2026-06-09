@@ -8,6 +8,7 @@
 
 ### Added
 - 新增回顾页（review.html）：孩子端滚动叙事战绩回顾，从生产数据库提取数据，以 15 屏全屏滚动展示 22 天的完整学习历程，包含坚持天数、时间投入、效率分析、评级荣耀、积分经济、兑换榜、赏金任务等维度，每屏配数字 count-up 动画和意义解读
+- 新增微信公众号周报 Skill（PapaCheck.WeChat）：AI 根据 CHANGELOG + git log 自动生成亲子风开发周报，包含 wechat-api（草稿 API 封装）、gen-weekly（Markdown→微信 HTML 转换）、skill.md（Skill 定义）；补齐历史三期周报并上线 GitHub Pages
 
 ### Changed
 - 离线遮罩显示时机优化：第一次 ping 失败时不显示遮罩，第二次 ping 失败时才显示，降低偶发网络抖动的无用遮罩闪烁；全量 362 测试通过
