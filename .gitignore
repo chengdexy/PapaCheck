@@ -75,6 +75,9 @@ PapaCheck.Server.Node/dist/
 PapaCheck.Server.Node/tts_cache/
 PapaCheck.Web/tts_cache/
 
+# WeChat本地临时HTML（正式版在docs/）
+PapaCheck.WeChat/*.html
+
 # 覆盖率报告
 .coverage
 coverage/
