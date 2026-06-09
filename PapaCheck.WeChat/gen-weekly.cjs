@@ -50,15 +50,25 @@ function markdownToWeChat(md) {
   return `<style>${WECHAT_CSS}</style><section>${html}</section>`;
 }
 
-// CLI: read markdown from stdin, output HTML to stdout
+// CLI: read markdown from file or stdin, output HTML to stdout
 function main() {
-  let input = '';
+  const filePath = process.argv[2];
+  if (filePath) {
+    const fs = require('fs');
+    const md = fs.readFileSync(filePath, 'utf-8');
+    const html = markdownToWeChat(md.trim());
+    process.stdout.write(html);
+    return;
+  }
+
+  const chunks = [];
   process.stdin.setEncoding('utf-8');
-  process.stdin.on('data', chunk => input += chunk);
+  process.stdin.on('data', chunk => chunks.push(chunk));
   process.stdin.on('end', () => {
-    const html = markdownToWeChat(input.trim());
+    const html = markdownToWeChat(chunks.join('').trim());
     process.stdout.write(html);
   });
+  process.stdin.resume();
 }
 
 if (require.main === module) {
