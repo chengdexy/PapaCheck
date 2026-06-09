@@ -25,6 +25,7 @@ Thumbs.db
 *.md
 !README.md
 !RELEASE_USAGE.md
+!PapaCheck.WeChat/skill.md
 
 # 日志
 *.log
