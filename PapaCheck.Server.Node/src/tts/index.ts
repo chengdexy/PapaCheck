@@ -1,4 +1,5 @@
 import { spawn, type SpawnOptions } from 'child_process';
+import type { Writable } from 'stream';
 import type { Readable } from 'stream';
 import { createHash } from 'crypto';
 import { readFile, writeFile, mkdir, readdir, unlink } from 'fs/promises';
@@ -21,6 +22,7 @@ export type SpawnFn = (
   args: readonly string[],
   options: SpawnOptions,
 ) => {
+  stdin: Writable;
   stdout: Readable;
   stderr: Readable;
   on(event: 'error', listener: (err: Error) => void): void;
