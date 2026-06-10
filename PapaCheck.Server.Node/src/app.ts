@@ -5,7 +5,7 @@ import { createReadStream } from 'fs';
 import { readdir, stat, readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { PapaCheckDB } from './db/index.js';
-import { TTSBridge } from './tts/index.js';
+import { TTSBridge, _moduleDirname } from './tts/index.js';
 import { EmailSync } from './email/index.js';
 import type { HomeworkItem } from './email/ai.js';
 import fastifyStatic from '@fastify/static';

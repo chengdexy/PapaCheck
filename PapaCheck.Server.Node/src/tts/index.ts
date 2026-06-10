@@ -11,7 +11,7 @@ import { tmpdir } from 'os';
 const _moduleFilename = typeof __filename !== 'undefined'
   ? __filename
   : fileURLToPath(import.meta.url);
-const _moduleDirname = typeof __dirname !== 'undefined'
+export const _moduleDirname = typeof __dirname !== 'undefined'
   ? __dirname
   : dirname(_moduleFilename);
 
