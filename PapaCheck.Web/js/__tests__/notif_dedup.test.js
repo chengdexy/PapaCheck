@@ -1,6 +1,9 @@
 /**
  * notif_dedup.test.js - "收到新作业"通知去重合并测试
  *
+ * 从 app.js 动态提取 dedupNewHomeworkNotifications 函数进行测试，
+ * 避免两份实现不一致导致测试失效。
+ *
  * Feature: 作业通知去重
  *   Scenario: 多条"收到新作业"去重
  *     Given items 包含多条 text 为 "收到新作业，请查看" 的通知
@@ -28,24 +31,27 @@
  *     Then 返回空数组
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import fs from 'fs';
+import path from 'path';
+import vm from 'vm';
 
-/**
- * 对"收到新作业，请查看"通知去重：多条同文本只保留最后一条
- */
-function dedupNewHomeworkNotifications(items) {
-  const SEEN_TEXT = '收到新作业，请查看';
-  let found = false;
-  const result = [];
-  for (let i = items.length - 1; i >= 0; i--) {
-    if (items[i].text === SEEN_TEXT) {
-      if (found) continue;
-      found = true;
-    }
-    result.unshift(items[i]);
-  }
-  return result;
-}
+let dedupNewHomeworkNotifications;
+
+beforeAll(() => {
+  const appJsCode = fs.readFileSync(
+    path.join(__dirname, '..', 'app.js'),
+    'utf8'
+  );
+  // 从 app.js 中提取 dedupNewHomeworkNotifications 函数体，保持唯一真源
+  const match = appJsCode.match(
+    /(function dedupNewHomeworkNotifications\([\s\S]*?\n\})/
+  );
+  if (!match) throw new Error('无法从 app.js 提取 dedupNewHomeworkNotifications');
+  const ctx = vm.createContext({});
+  vm.runInContext(match[1], ctx);
+  dedupNewHomeworkNotifications = ctx.dedupNewHomeworkNotifications;
+});
 
 describe('dedupNewHomeworkNotifications', () => {
   it('多条"收到新作业"去重，只保留最后一条', () => {
