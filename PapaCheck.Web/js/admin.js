@@ -1531,7 +1531,7 @@ function calcLOESS(data, span = 0.5) {
 function renderSvgLineChart(data, options) {
   const {
     width = 600, height = 180, color = 'var(--success)', medianColor = 'var(--accent)',
-    unit = '', yMax, showLOESS = false, loessColor = '#a78bfa',
+    unit = '', yMax, showLOESS = false, loessColor = 'var(--danger)',
   } = options;
   const pad = { top: 20, right: 20, bottom: 25, left: 40 };
   const chartW = width - pad.left - pad.right;
@@ -1595,10 +1595,10 @@ function renderSvgLineChart(data, options) {
   return `
     <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:${height}px;">
       ${yLabels.join('')}
-      <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>
-      ${circles}
       ${medianLine}
       ${loessSvg}
+      <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>
+      ${circles}
       ${valuesTxt}
       ${labels}
     </svg>`;
@@ -2081,7 +2081,8 @@ function renderSettingsTab() {
       </div>
       <div class="subject-mgmt-add">
         <input type="text" id="subjectAddInput" placeholder="输入新科目名称" maxlength="10"
-          onkeydown="if(event.key==='Enter') addSubjectAction()">
+          onfocus="_editingSettings=true" onblur="_editingSettings=false"
+          onkeydown="if(event.key==='Enter') { addSubjectAction(); }">
         <button onclick="addSubjectAction()">添加</button>
       </div>
       <div id="subjectMissingDefaults" style="display:none;margin-top:8px;">

@@ -20,6 +20,7 @@
 
 ### Fixed
 - 修复科目管理卡片删除和恢复按钮的 XSS 风险：`onclick` 内联事件改为 `data-*` 属性 + 事件委托；全量 400 测试通过
+- 修复新增科目输入框被轮询打断：输入框添加 `onfocus/_editingSettings` 守卫，输入中跳过设置页重建
 
 ### Added
 - 管理端统计页折线图新增 LOESS 局部加权平滑曲线（月视图和总计视图），采用 tricube 核加权线性回归，span=0.5，实线细线 stroke-width=1.5 淡紫色渲染；新增 `calcLOESS` 纯函数 + TDD 14 个测试；全量 382 测试通过
