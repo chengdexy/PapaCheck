@@ -1866,3 +1866,101 @@ input[type="number"] {
   align-items: center; justify-content: center;
   color: #fff; font-size: 20px; font-weight: 600;
 }
+
+/* Subject Management */
+.subject-mgmt-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-color, #eee);
+}
+
+.subject-mgmt-icon {
+  font-size: 20px;
+  width: 32px;
+  text-align: center;
+}
+
+.subject-mgmt-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.subject-mgmt-delete {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+
+.subject-mgmt-delete:hover {
+  opacity: 1;
+  background: rgba(255, 0, 0, 0.1);
+}
+
+.subject-mgmt-add {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.subject-mgmt-add input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--text-secondary);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.subject-mgmt-add button,
+.btn-subject-restore,
+.btn-subject-reset {
+  padding: 6px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.subject-mgmt-add button:hover,
+.btn-subject-restore:hover,
+.btn-subject-reset:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.subject-mgmt-restore-list {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.subject-mgmt-restore-btn {
+  padding: 4px 12px;
+  border: 1px dashed var(--text-secondary);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.subject-mgmt-restore-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.05);
+}

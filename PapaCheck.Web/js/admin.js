@@ -65,6 +65,13 @@ const SETTINGS_DEFAULTS = {
   homeworkDefaultSuggestedDuration: 20,
   ratingMultipliers: { '优': 2.0, '良': 1.5, '可': 1.2, '差': 0 },
   shopDefaultPoints: 50,
+  subjects: [
+    { id: '语文', icon: '📖', color: '#f87171' },
+    { id: '数学', icon: '🔢', color: '#60a5fa' },
+    { id: '英语', icon: '🔤', color: '#fbbf24' },
+    { id: '科学', icon: '🔬', color: '#4ade80' },
+    { id: '其他', icon: '📚', color: '#a78bfa' },
+  ],
 };
 
 function getSetting(key) {
@@ -77,13 +84,40 @@ function getSettingsRatingMultipliers() {
   return adminSettings.ratingMultipliers || SETTINGS_DEFAULTS.ratingMultipliers;
 }
 
-const ADMIN_SUBJECTS = [
-  { id: '语文', icon: '📖' },
-  { id: '数学', icon: '🔢' },
-  { id: '英语', icon: '🔤' },
-  { id: '科学', icon: '🔬' },
-  { id: '其他', icon: '📚' },
-];
+/** 预设 emoji 映射表 */
+const SUBJECT_ICON_PRESETS = {
+  '道德与法治': '⚖️', '道法': '⚖️',
+  '物理': '⚛️', '化学': '🧪', '生物': '🧬',
+  '历史': '📜', '地理': '🌍',
+  '音乐': '🎵', '美术': '🎨', '体育': '⚽',
+  '信息': '💻', '信息科技': '💻', '编程': '🤖',
+  '书法': '✍️', '劳动': '🧹', '心理': '🧠',
+};
+
+/** 获取活跃科目列表 */
+function getActiveSubjects(settings) {
+  return settings?.subjects || SETTINGS_DEFAULTS.subjects;
+}
+
+/** 添加新科目到列表（纯函数） */
+function addSubject(subjects, id, icon, color) {
+  return [...subjects, { id, icon, color }];
+}
+
+/** 从列表中移除科目（纯函数） */
+function removeSubject(subjects, id) {
+  return subjects.filter(s => s.id !== id);
+}
+
+/** 获取不在当前列表中的默认科目 */
+function getMissingDefaults(currentSubjects) {
+  return SETTINGS_DEFAULTS.subjects.filter(d => !currentSubjects.some(s => s.id === d.id));
+}
+
+/** 智能匹配 emoji */
+function matchSubjectIcon(name) {
+  return SUBJECT_ICON_PRESETS[name] || '📝';
+}
 
 function showToast(msg) {
   const toast = document.getElementById('toast');
@@ -195,6 +229,9 @@ function _applyCachedData() {
   adminBountySubmissions = cachedData.bountySubmissions || {};
   adminBountyCompletions = cachedData.bountyCompletions || {};
   adminSettings = cachedData.settings || {};
+  if (!adminSettings.subjects || adminSettings.subjects.length === 0) {
+    adminSettings.subjects = SETTINGS_DEFAULTS.subjects.map(s => ({ ...s }));
+  }
 }
 
 // ========== Tab Switching ==========
@@ -398,7 +435,7 @@ function openHwModal(mode, hwId) {
     <div class="form-group">
       <label>科目</label>
       <div class="subject-selector" id="adminSubjectSelector">
-        ${ADMIN_SUBJECTS.map(s => `
+        ${getActiveSubjects(adminSettings).map(s => `
           <button class="subject-option ${(hw?.subject || '语文') === s.id ? 'selected' : ''}"
             data-subject="${s.id}">${s.icon} ${s.id}</button>
         `).join('')}
@@ -2015,6 +2052,32 @@ function renderSettingsTab() {
         <button onclick="saveAllSettings()" style="flex:1;padding:12px;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;background:var(--accent);color:var(--bg);">保存配置</button>
       </div>
     </div>
+
+    <div class="admin-card" id="subjectMgmtCard">
+      <div class="admin-card-title">📚 科目管理</div>
+      <div id="subjectList">
+        ${getActiveSubjects(adminSettings).map(s => `
+          <div class="subject-mgmt-row" data-subject-id="${s.id}">
+            <span class="subject-mgmt-icon">${s.icon}</span>
+            <span class="subject-mgmt-name">${s.id}</span>
+            <button class="subject-mgmt-delete" onclick="confirmRemoveSubject('${s.id}')" title="删除">🗑️</button>
+          </div>
+        `).join('')}
+      </div>
+      <div class="subject-mgmt-add">
+        <input type="text" id="subjectAddInput" placeholder="输入新科目名称" maxlength="10"
+          onkeydown="if(event.key==='Enter') addSubjectAction()">
+        <button onclick="addSubjectAction()">添加</button>
+      </div>
+      <div id="subjectMissingDefaults" style="display:none;margin-top:8px;">
+        <div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">可恢复的默认科目：</div>
+        <div class="subject-mgmt-restore-list"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button onclick="showMissingDefaults()" class="btn-subject-restore">➕ 添加默认科目</button>
+        <button onclick="resetSubjects()" class="btn-subject-reset">🔄 重置为默认科目</button>
+      </div>
+    </div>
     </div>
   `;
 
@@ -2132,10 +2195,83 @@ async function saveAllSettings() {
 }
 
 async function resetSettingsToDefaults() {
-  adminSettings = {};
-  await API.putSettings({});
+  adminSettings = {
+    ...adminSettings,
+    subjects: SETTINGS_DEFAULTS.subjects.map(s => ({ ...s })),
+  };
+  await API.putSettings(adminSettings);
   renderSettingsTab();
   showToast('已恢复默认值');
+}
+
+/** 添加科目操作 */
+async function addSubjectAction() {
+  const input = document.getElementById('subjectAddInput');
+  const name = input.value.trim();
+  if (!name) { showToast('请输入科目名称'); return; }
+
+  const current = getActiveSubjects(adminSettings);
+  if (current.some(s => s.id === name)) { showToast('科目已存在'); return; }
+
+  const icon = matchSubjectIcon(name);
+  const newSubjects = addSubject(current, name, icon, '#a78bfa');
+  adminSettings.subjects = newSubjects;
+  await API.putSettings(adminSettings);
+  renderSettingsTab();
+  showToast(`已添加科目「${name}」`);
+}
+
+/** 删除科目确认 */
+async function confirmRemoveSubject(id) {
+  const subject = getActiveSubjects(adminSettings).find(s => s.id === id);
+  if (!subject) return;
+  if (!confirm(`确定删除「${id}」吗？已有作业中的「${id}」科目将显示为纯文本。`)) return;
+
+  const current = getActiveSubjects(adminSettings);
+  adminSettings.subjects = removeSubject(current, id);
+  await API.putSettings(adminSettings);
+  renderSettingsTab();
+  showToast(`已删除科目「${id}」`);
+}
+
+/** 显示可恢复的默认科目 */
+function showMissingDefaults() {
+  const current = getActiveSubjects(adminSettings);
+  const missing = getMissingDefaults(current);
+  if (missing.length === 0) { showToast('所有默认科目已在列表中'); return; }
+
+  const container = document.getElementById('subjectMissingDefaults');
+  const list = container.querySelector('.subject-mgmt-restore-list');
+  container.style.display = 'block';
+  list.innerHTML = missing.map(s => `
+    <button class="subject-mgmt-restore-btn" onclick="restoreDefaultSubject('${s.id}')">${s.icon} ${s.id}</button>
+  `).join('');
+}
+
+/** 恢复默认科目 */
+async function restoreDefaultSubject(id) {
+  const defaultSub = SETTINGS_DEFAULTS.subjects.find(s => s.id === id);
+  if (!defaultSub) return;
+  const current = getActiveSubjects(adminSettings);
+  adminSettings.subjects = addSubject(current, defaultSub.id, defaultSub.icon, defaultSub.color);
+  await API.putSettings(adminSettings);
+  renderSettingsTab();
+  showToast(`已恢复科目「${id}」`);
+}
+
+/** 重置为默认科目（保留自定义科目） */
+async function resetSubjects() {
+  if (!confirm('重置为默认科目将恢复 5 个默认科目（自定义科目将保留），确定吗？')) return;
+  const customSubjects = getActiveSubjects(adminSettings).filter(
+    s => !SETTINGS_DEFAULTS.subjects.some(d => d.id === s.id)
+  );
+  adminSettings.subjects = [
+    ...SETTINGS_DEFAULTS.subjects.map(s => ({ ...s })),
+    ...customSubjects,
+  ];
+  await API.putSettings(adminSettings);
+  renderSettingsTab();
+  showToast('已重置为默认科目');
 }
 
 async function changeAdminDate(delta) {

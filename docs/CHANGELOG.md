@@ -7,10 +7,19 @@
 ## [Unreleased]
 
 ### Added
-- 管理端统计页折线图新增 LOESS 局部加权平滑曲线（月视图和总计视图），采用 tricube 核加权线性回归，span=0.5，实线细线 stroke-width=1.5 淡紫色渲染；新增 `calcLOESS` 纯函数 + TDD 14 个测试；全量 382 测试通过
+- 自定义科目：科目从硬编码改为 settings 可配置，设置页新增科目管理卡片
+  - 支持添加/删除自定义科目，智能 emoji 匹配（物理→⚛️、历史→📜 等）
+  - 可恢复已删除的默认科目，支持重置为默认科目（保留自定义科目）
+  - 管理端作业弹窗科目选择器从 `ADMIN_SUBJECTS` 硬编码改为动态读取 `settings.subjects`
+  - 孩子端不存在的科目显示纯文本（无 icon）
+  - 新增 TDD 测试 18 个；全量 400 测试通过
 
 ### Changed
+- 孩子端科目显示改为动态读取：`SUBJECTS` 常量替换为 `DEFAULT_SUBJECTS` 数组 + `getSubject()` 函数，从 `cachedData.settings.subjects` 动态读取科目配置；icon 为 null 时跳过渲染；新增 TDD 测试 4 个；全量 400 测试通过
 - 管理端统计页"均值线"改为"中值线"：`renderSvgLineChart` 使用 `calcMedian` 替代算术平均，标签由"平均"改为"中值"，虚线样式不变；新增 `calcMedian` 纯函数 + TDD 6 个测试
+
+### Added
+- 管理端统计页折线图新增 LOESS 局部加权平滑曲线（月视图和总计视图），采用 tricube 核加权线性回归，span=0.5，实线细线 stroke-width=1.5 淡紫色渲染；新增 `calcLOESS` 纯函数 + TDD 14 个测试；全量 382 测试通过
 
 ### Fixed
 - 修复管理端统计页"连续全勤天数"计算 Bug：`calcStreak()` 原按逐日历日回退检查 `dailySettlement`，周末/无作业日缺口导致 streak 提前中断；改为遍历有 settlement 记录的日期数组，跳过无记录日期间隔；新增 TDD 测试 5 个；全量 366/367 测试通过（唯一失败为已知 connection_offline_threshold flaky 测试）
