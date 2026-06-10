@@ -1826,14 +1826,14 @@ function renderStatsTab() {
       <div class="chart-title">📈 ${groupLabels[groupMode]}总用时（分钟）</div>
       ${totalMinutes.length === 0
       ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'
-      : renderSvgLineChart(totalMinutes, { color: 'var(--success)', avgColor: 'var(--accent)', unit: '分钟' })}
+      : renderSvgLineChart(totalMinutes, { color: 'var(--success)', avgColor: 'var(--accent)', unit: '分钟', showLOESS: _statsRange === 'month' || _statsRange === 'all' })}
     </div>
 
     <div class="chart-container">
       <div class="chart-title">📊 ${groupLabels[groupMode]}效率比（实际/参考）</div>
       ${efficiencyRatios.length === 0 || efficiencyRatios.every(d => d.value === 0)
       ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'
-      : renderSvgLineChart(efficiencyRatios, { color: 'var(--warning)', avgColor: 'var(--accent)', unit: '%' })}
+      : renderSvgLineChart(efficiencyRatios, { color: 'var(--warning)', avgColor: 'var(--accent)', unit: '%', showLOESS: _statsRange === 'month' || _statsRange === 'all' })}
     </div>
 
     <div class="chart-container">
