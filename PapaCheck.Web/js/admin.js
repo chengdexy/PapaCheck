@@ -1428,6 +1428,48 @@ function calcMedian(values) {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+function calcLOESS(data, span = 0.5) {
+  const n = data.length;
+  if (n < 4) return null;
+  const values = data.map(d => d.value);
+  const xVals = data.map((_, i) => i);
+
+  const result = [];
+  for (let i = 0; i < n; i++) {
+    const x0 = i;
+    const distances = xVals.map(x => Math.abs(x - x0));
+    const sortedDists = [...distances].sort((a, b) => a - b);
+    const maxDist = sortedDists[Math.min(Math.floor(span * n), n - 1)] || 1;
+
+    const weights = distances.map(d => {
+      const u = d / maxDist;
+      return u <= 1 ? Math.pow(1 - Math.pow(u, 3), 3) : 0;
+    });
+
+    const sumW = weights.reduce((s, w) => s + w, 0);
+    if (sumW === 0) {
+      result.push({ x: i, y: values[i] });
+      continue;
+    }
+
+    const sumWX = weights.reduce((s, w, j) => s + w * xVals[j], 0);
+    const sumWY = weights.reduce((s, w, j) => s + w * values[j], 0);
+    const sumWX2 = weights.reduce((s, w, j) => s + w * xVals[j] * xVals[j], 0);
+    const sumWXY = weights.reduce((s, w, j) => s + w * xVals[j] * values[j], 0);
+
+    const denom = sumW * sumWX2 - sumWX * sumWX;
+    if (Math.abs(denom) < 1e-10) {
+      result.push({ x: i, y: sumWY / sumW });
+      continue;
+    }
+
+    const slope = (sumW * sumWXY - sumWX * sumWY) / denom;
+    const intercept = (sumWY - slope * sumWX) / sumW;
+    result.push({ x: i, y: slope * x0 + intercept });
+  }
+  return result;
+}
+
 function renderSvgLineChart(data, options) {
   const { width = 600, height = 180, color = 'var(--success)', avgColor = 'var(--accent)', unit = '', yMax } = options;
   const pad = { top: 20, right: 20, bottom: 25, left: 40 };
