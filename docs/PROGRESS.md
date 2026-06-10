@@ -78,6 +78,7 @@
 | 2026-06-10 | 自定义科目：科目从硬编码改为 settings 可配置；设置页新增科目管理卡片（添加/删除/恢复/重置）；管理端作业弹窗科目选择器动态读取；孩子端不存在的科目显示纯文本；新增 TDD 测试 18 个；全量 400 测试通过 |
 | 2026-06-10 | 孩子端科目显示改为动态读取：`SUBJECTS` 常量替换为 `DEFAULT_SUBJECTS` 数组 + `getSubject()` 函数，从 `cachedData.settings.subjects` 动态读取科目配置；icon 为 null 时跳过渲染；新增 TDD 测试 4 个；全量 400 测试通过 |
 | 2026-06-10 | 管理端统计页折线图"均值线"改为"中值线"，新增 LOESS 平滑曲线（月/总计视图）；新增 calcMedian/calcLOESS 纯函数 + TDD 15 个测试；全量 382 测试通过 |
+| 2026-06-10 | 效率比公式翻转为 suggested/actual，review 页标签/数据源修复 |
 | 2026-06-10 | 修复管理端统计页"连续全勤天数"计算 Bug：`calcStreak` 逐日历日回退改为遍历有 settlement 记录的日期数组；新增 TDD 测试 5 个；全量 366/367 测试通过 |
 | 2026-06-09 | Phase 5 上云规划完成：方案选型（腾讯云 + pg + node:22-alpine）、spec/tasks/checklist 已创建、实施计划已就绪，待 1.3.0 启动 |
 | 2026-06-08 | TTS 错误日志简化：非零退出时只取 stderr 最后一行，省略 Python 完整堆栈；`.gitignore` 补充 `PapaCheck.Web/tts_cache/` 并清理遗留 MP3 |
