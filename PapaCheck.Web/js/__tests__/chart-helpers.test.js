@@ -1,6 +1,6 @@
 /**
- * chart-helpers.test.js - calcMedian 纯函数测试
- * 测试 admin.js 中的 calcMedian 实现，避免重复定义
+ * chart-helpers.test.js - calcMedian / calcLOESS / renderSvgLineChart 图表辅助函数测试
+ * 测试 admin.js 中的 calcMedian、calcLOESS 和 renderSvgLineChart 实现
  *
  * Feature: calcMedian 中值计算
  *   Scenario: 奇数长度数组返回中间值
@@ -155,7 +155,7 @@ describe('renderSvgLineChart', () => {
   function renderSvgLineChart(data, options = {}) {
     const {
       width = 600, height = 180, color = 'var(--success)',
-      avgColor = 'var(--accent)', unit = '', yMax,
+      medianColor = 'var(--accent)', unit = '', yMax,
       showLOESS = false, loessColor = '#a78bfa',
     } = options;
     const pad = { top: 20, right: 20, bottom: 25, left: 40 };
@@ -198,8 +198,8 @@ describe('renderSvgLineChart', () => {
     const medianY = pad.top + chartH - ((medianVal - minVal) / range) * chartH;
     let medianLine = '';
     if (values.length > 1) {
-      medianLine = `<line x1="${pad.left}" y1="${medianY}" x2="${width - pad.right}" y2="${medianY}" stroke="${avgColor}" stroke-dasharray="4,4" stroke-width="1.5"/>
-        <text x="${width - pad.right}" y="${medianY - 4}" text-anchor="end" font-size="10" fill="${avgColor}">中值 ${Math.round(medianVal)}${unit}</text>`;
+      medianLine = `<line x1="${pad.left}" y1="${medianY}" x2="${width - pad.right}" y2="${medianY}" stroke="${medianColor}" stroke-dasharray="4,4" stroke-width="1.5"/>
+        <text x="${width - pad.right}" y="${medianY - 4}" text-anchor="end" font-size="10" fill="${medianColor}">中值 ${Math.round(medianVal)}${unit}</text>`;
     }
 
     // LOESS 曲线
