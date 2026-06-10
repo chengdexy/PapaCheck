@@ -189,7 +189,7 @@ async function initAdmin() {
   hideTransitionMask();
   // 恢复上次停留的标签页
   try { var savedTab = localStorage.getItem('adminTab'); } catch (e) { /* 非致命 */ }
-  switchTab(savedTab && ['homework','shop','rewardBox','bounty','redeem','stats','settings'].indexOf(savedTab) !== -1 ? savedTab : 'homework');
+  switchTab(savedTab && ['homework', 'shop', 'rewardBox', 'bounty', 'redeem', 'stats', 'settings'].indexOf(savedTab) !== -1 ? savedTab : 'homework');
 
   setInterval(async () => {
     await refreshAllData();
@@ -273,7 +273,7 @@ function switchTab(tab) {
 
 function updateSettingsTabState() {
   var isOffline = ConnectionManager.getMode() === 'offline';
-  document.querySelectorAll('.tab-btn[data-tab="settings"]').forEach(function(btn) {
+  document.querySelectorAll('.tab-btn[data-tab="settings"]').forEach(function (btn) {
     var icon = btn.querySelector('.tab-icon');
     if (icon) {
       icon.textContent = isOffline ? '🔒' : '⚙️';
@@ -392,7 +392,8 @@ function renderHomeworkTab() {
         };
         return priority(a) - priority(b);
       }).map(hw => {
-        const subject = ADMIN_SUBJECTS.find(s => s.id === hw.subject) || ADMIN_SUBJECTS[4];
+        const subjects = getActiveSubjects(adminSettings);
+        const subject = subjects.find(s => s.id === hw.subject) || subjects.find(s => s.id === '其他') || { icon: '📚' };
         const modeText = '⚔️ ' + hw.suggestedDuration + '分钟';
         const bpText = ' · ' + (hw.basePoints ?? 10) + '奖励分';
         let elapsedText = '';
@@ -626,7 +627,8 @@ function openRatingModal(dateKey) {
     <h3>📝 作业评级</h3>
     <div class="rating-homework-list">
       ${doneHw.map(hw => {
-    const subject = ADMIN_SUBJECTS.find(s => s.id === hw.subject) || ADMIN_SUBJECTS[4];
+    const subjects = getActiveSubjects(adminSettings);
+    const subject = subjects.find(s => s.id === hw.subject) || subjects.find(s => s.id === '其他') || { icon: '📚' };
     let timeInfo = '';
     if (hw.mode === 'challenge' && hw.actualDuration !== null) {
       const icon = hw.actualDuration <= hw.suggestedDuration * 0.8 ? '⚡' :
