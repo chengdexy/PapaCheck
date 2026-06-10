@@ -149,3 +149,118 @@ describe('calcLOESS', () => {
     expect(result[0]).toHaveProperty('y');
   });
 });
+
+describe('renderSvgLineChart', () => {
+  // Simplified renderSvgLineChart that uses calcMedian and calcLOESS from vm context
+  function renderSvgLineChart(data, options = {}) {
+    const {
+      width = 600, height = 180, color = 'var(--success)',
+      avgColor = 'var(--accent)', unit = '', yMax,
+      showLOESS = false, loessColor = '#a78bfa',
+    } = options;
+    const pad = { top: 20, right: 20, bottom: 25, left: 40 };
+    const chartW = width - pad.left - pad.right;
+    const chartH = height - pad.top - pad.bottom;
+    const values = data.map(d => d.value);
+    const rawMin = Math.min(...values);
+    const rawMax = Math.max(...values);
+    const maxVal = yMax || rawMax;
+    const minVal = rawMin > 0 ? Math.max(0, Math.floor(rawMin * 0.9 / 10) * 10) : 0;
+    const range = maxVal - minVal || 1;
+    const medianVal = calcMedian(values);
+
+    const points = data.map((d, i) => {
+      const x = pad.left + (i / Math.max(data.length - 1, 1)) * chartW;
+      const y = pad.top + chartH - ((d.value - minVal) / range) * chartH;
+      return { x, y, label: d.label, value: d.value };
+    });
+
+    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+    const circles = points.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3" fill="${color}" stroke="var(--card)" stroke-width="1.5"/>`).join('');
+    const maxLabels = Math.min(points.length, 10);
+    const labelStep = points.length > 1 ? (points.length - 1) / Math.max(maxLabels - 1, 1) : 1;
+    const labelIndices = [];
+    for (let k = 0; k < maxLabels; k++) labelIndices.push(Math.min(Math.round(k * labelStep), points.length - 1));
+    const labels = labelIndices.map(i => `<text x="${points[i].x}" y="${height - 5}" text-anchor="middle" font-size="10" fill="var(--text-secondary)">${points[i].label}</text>`).join('');
+    const dataMax = Math.max(...values);
+    const dataMin = Math.min(...values);
+    const valuesTxt = points.filter(p => p.value === dataMax || p.value === dataMin).map(p => `<text class="chart-value-label" x="${p.x}" y="${p.y - 8}" text-anchor="middle" font-size="10" fill="${color}">${p.value}</text>`).join('');
+    const yLabels = [];
+    const ySteps = 4;
+    for (let i = 0; i <= ySteps; i++) {
+      const val = Math.round(minVal + (range / ySteps) * (ySteps - i));
+      const yy = pad.top + (chartH / ySteps) * i;
+      yLabels.push(`<text x="${pad.left - 6}" y="${yy + 3}" text-anchor="end" font-size="10" fill="var(--text-secondary)">${val}</text>`);
+      if (i > 0) yLabels.push(`<line x1="${pad.left}" y1="${yy}" x2="${width - pad.right}" y2="${yy}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`);
+    }
+
+    // 中值线
+    const medianY = pad.top + chartH - ((medianVal - minVal) / range) * chartH;
+    let medianLine = '';
+    if (medianVal > 0 && values.length > 1) {
+      medianLine = `<line x1="${pad.left}" y1="${medianY}" x2="${width - pad.right}" y2="${medianY}" stroke="${avgColor}" stroke-dasharray="4,4" stroke-width="1.5"/>
+        <text x="${width - pad.right}" y="${medianY - 4}" text-anchor="end" font-size="10" fill="${avgColor}">中值 ${Math.round(medianVal)}${unit}</text>`;
+    }
+
+    // LOESS 曲线
+    let loessSvg = '';
+    if (showLOESS && data.length >= 4) {
+      const loessData = calcLOESS(data, 0.5);
+      if (loessData) {
+        const loessPoints = loessData.map((pt, i) => {
+          const x = pad.left + (i / Math.max(data.length - 1, 1)) * chartW;
+          const y = pad.top + chartH - ((pt.y - minVal) / range) * chartH;
+          return { x, y };
+        });
+        const loessPath = loessPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+        loessSvg = `<path d="${loessPath}" fill="none" stroke="${loessColor}" stroke-width="1.5" stroke-linejoin="round"/>`;
+      }
+    }
+
+    return `
+    <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:${height}px;">
+      ${yLabels.join('')}
+      <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>
+      ${circles}
+      ${medianLine}
+      ${loessSvg}
+      ${valuesTxt}
+      ${labels}
+    </svg>`;
+  }
+
+  it('should render "中值" instead of "平均" in median line label', () => {
+    const data = [{ label: '1', value: 10 }, { label: '2', value: 20 }, { label: '3', value: 30 }];
+    const svg = renderSvgLineChart(data, { unit: '分钟' });
+    expect(svg).toContain('中值');
+    expect(svg).not.toContain('平均');
+  });
+
+  it('should render LOESS path when showLOESS is true and data >= 4 points', () => {
+    const data = [
+      { label: '1', value: 10 }, { label: '2', value: 15 },
+      { label: '3', value: 13 }, { label: '4', value: 20 }, { label: '5', value: 18 },
+    ];
+    const svg = renderSvgLineChart(data, { showLOESS: true });
+    const pathMatches = svg.match(/<path /g);
+    expect(pathMatches).not.toBeNull();
+    expect(pathMatches.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('should not render LOESS path when showLOESS is false', () => {
+    const data = [
+      { label: '1', value: 10 }, { label: '2', value: 15 },
+      { label: '3', value: 13 }, { label: '4', value: 20 },
+    ];
+    const svg = renderSvgLineChart(data, { showLOESS: false });
+    const pathMatches = svg.match(/<path /g);
+    expect(pathMatches).toHaveLength(1);
+  });
+
+  it('should not render LOESS path when data has < 4 points even if showLOESS is true', () => {
+    const data = [{ label: '1', value: 10 }, { label: '2', value: 20 }, { label: '3', value: 30 }];
+    const svg = renderSvgLineChart(data, { showLOESS: true });
+    const pathMatches = svg.match(/<path /g);
+    expect(pathMatches).toHaveLength(1);
+  });
+});

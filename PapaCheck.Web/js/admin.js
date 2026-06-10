@@ -1471,7 +1471,10 @@ function calcLOESS(data, span = 0.5) {
 }
 
 function renderSvgLineChart(data, options) {
-  const { width = 600, height = 180, color = 'var(--success)', avgColor = 'var(--accent)', unit = '', yMax } = options;
+  const {
+    width = 600, height = 180, color = 'var(--success)', avgColor = 'var(--accent)',
+    unit = '', yMax, showLOESS = false, loessColor = '#a78bfa',
+  } = options;
   const pad = { top: 20, right: 20, bottom: 25, left: 40 };
   const chartW = width - pad.left - pad.right;
   const chartH = height - pad.top - pad.bottom;
@@ -1481,7 +1484,7 @@ function renderSvgLineChart(data, options) {
   const maxVal = yMax || rawMax;
   const minVal = rawMin > 0 ? Math.max(0, Math.floor(rawMin * 0.9 / 10) * 10) : 0;
   const range = maxVal - minVal || 1;
-  const avg = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+  const medianVal = calcMedian(values);
 
   const points = data.map((d, i) => {
     const x = pad.left + (i / Math.max(data.length - 1, 1)) * chartW;
@@ -1508,11 +1511,27 @@ function renderSvgLineChart(data, options) {
     if (i > 0) yLabels.push(`<line x1="${pad.left}" y1="${yy}" x2="${width - pad.right}" y2="${yy}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`);
   }
 
-  const avgY = pad.top + chartH - ((avg - minVal) / range) * chartH;
-  let avgLine = '';
-  if (avg > 0 && values.length > 1) {
-    avgLine = `<line x1="${pad.left}" y1="${avgY}" x2="${width - pad.right}" y2="${avgY}" stroke="${avgColor}" stroke-dasharray="4,4" stroke-width="1.5"/>
-      <text x="${width - pad.right}" y="${avgY - 4}" text-anchor="end" font-size="10" fill="${avgColor}">平均 ${Math.round(avg)}${unit}</text>`;
+  // 中值线
+  const medianY = pad.top + chartH - ((medianVal - minVal) / range) * chartH;
+  let medianLine = '';
+  if (medianVal > 0 && values.length > 1) {
+    medianLine = `<line x1="${pad.left}" y1="${medianY}" x2="${width - pad.right}" y2="${medianY}" stroke="${avgColor}" stroke-dasharray="4,4" stroke-width="1.5"/>
+      <text x="${width - pad.right}" y="${medianY - 4}" text-anchor="end" font-size="10" fill="${avgColor}">中值 ${Math.round(medianVal)}${unit}</text>`;
+  }
+
+  // LOESS 平滑曲线
+  let loessSvg = '';
+  if (showLOESS && data.length >= 4) {
+    const loessData = calcLOESS(data, 0.5);
+    if (loessData) {
+      const loessPoints = loessData.map((pt, i) => {
+        const x = pad.left + (i / Math.max(data.length - 1, 1)) * chartW;
+        const y = pad.top + chartH - ((pt.y - minVal) / range) * chartH;
+        return { x, y };
+      });
+      const loessPath = loessPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+      loessSvg = `<path d="${loessPath}" fill="none" stroke="${loessColor}" stroke-width="1.5" stroke-linejoin="round"/>`;
+    }
   }
 
   return `
@@ -1520,7 +1539,8 @@ function renderSvgLineChart(data, options) {
       ${yLabels.join('')}
       <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>
       ${circles}
-      ${avgLine}
+      ${medianLine}
+      ${loessSvg}
       ${valuesTxt}
       ${labels}
     </svg>`;
