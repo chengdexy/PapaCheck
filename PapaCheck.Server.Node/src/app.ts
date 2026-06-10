@@ -1,7 +1,8 @@
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import { createHash } from 'crypto';
 import { createReadStream } from 'fs';
-import { readdir, stat } from 'fs/promises';
+import { readdir, stat, readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { PapaCheckDB } from './db/index.js';
 import { TTSBridge } from './tts/index.js';
@@ -50,6 +51,18 @@ const versionSchema = {
         clientVersion: { type: 'string' },
       },
       required: ['clientVersion'],
+    },
+  },
+};
+
+const staticVersionSchema = {
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        version: { type: 'string' },
+      },
+      required: ['version'],
     },
   },
 };
@@ -232,6 +245,31 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       }
     }
     return sendJson(reply, { clientVersion });
+  });
+
+  // 2a. GET /api/static-version - 静态文件版本 hash
+  // ⚠️ 上云时：此路由需加内存缓存（启动算一次，每 60s 刷新），避免每次请求都读文件
+  app.get('/api/static-version', { schema: staticVersionSchema }, async (_request, reply) => {
+    let version = '';
+    if (options.webDir) {
+      const files = [
+        'index.html', 'admin.html', 'sw.js', 'favicon.png',
+        'css/style.css', 'css/admin.css',
+        'js/api.js', 'js/connection.js', 'js/app.js', 'js/big-screen.js',
+        'js/admin.js', 'js/db.js', 'js/change-log.js', 'js/crdt-sync.js', 'js/sync.js',
+      ];
+      const hash = createHash('sha1');
+      for (const f of files) {
+        try {
+          const content = await readFile(join(options.webDir, f));
+          hash.update(content);
+        } catch {
+          // 文件不存在则跳过
+        }
+      }
+      version = hash.digest('hex').slice(0, 12);
+    }
+    return sendJson(reply, { version });
   });
 
   // 2b. GET /api/download - 下载最新 APK

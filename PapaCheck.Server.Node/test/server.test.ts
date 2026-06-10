@@ -31,3 +31,16 @@ describe('GET /api/ping', () => {
     expect(typeof body.serverTime).toBe('string');
   });
 });
+
+describe('GET /api/static-version', () => {
+  it('webDir 为空时返回空字符串 version', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/static-version',
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toHaveProperty('version');
+    expect(typeof body.version).toBe('string');
+  });
+});

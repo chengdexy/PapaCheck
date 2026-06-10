@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- 静态文件版本号自动检测：服务端 `/api/static-version` 返回核心文件 SHA1 hash，SW 后台每 30 秒检测文件变化，hash 不一致时自动清空缓存、重新预缓存并通知页面刷新；用户无感，全屏 Mask 后自动 reload，刷新后 Toast 提示；支持 Web 和 Android WebView，离线静默跳过
 - 自定义科目：科目从硬编码改为 settings 可配置，设置页新增科目管理卡片
   - 支持添加/删除自定义科目，智能 emoji 匹配（物理→⚛️、历史→📜 等）
   - 可恢复已删除的默认科目，支持重置为默认科目（保留自定义科目）

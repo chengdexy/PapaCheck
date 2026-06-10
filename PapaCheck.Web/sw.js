@@ -1,4 +1,4 @@
-var CACHE_NAME = 'papacheck-v2';
+var CACHE_NAME = 'papacheck-v3';
 
 var CORE_RESOURCES = [
   '/',
@@ -13,6 +13,7 @@ var CORE_RESOURCES = [
   '/js/admin.js',
   '/js/db.js',
   '/js/change-log.js',
+  '/js/crdt-sync.js',
   '/js/sync.js',
   '/favicon.png'
 ];
@@ -35,10 +36,68 @@ self.addEventListener('activate', function (event) {
         keys.filter(function (key) { return key !== CACHE_NAME; })
           .map(function (key) { return caches.delete(key); })
       );
+    }).then(function () {
+      return self.clients.claim();
     })
   );
-  self.clients.claim();
 });
+
+// ========== 静态文件版本检测 ==========
+
+var _lastVersionCheck = 0;
+var _serverHash = '';
+
+function isCoreResource(url) {
+  var path = url.pathname;
+  return CORE_RESOURCES.indexOf(path) !== -1;
+}
+
+function shouldCheckVersion(url) {
+  return isCoreResource(url);
+}
+
+function checkVersionInBackground() {
+  var now = Date.now();
+  if (now - _lastVersionCheck < 30000) return;
+  _lastVersionCheck = now;
+
+  fetch('/api/static-version').then(function (resp) {
+    if (!resp.ok) return;
+    return resp.json();
+  }).then(function (data) {
+    if (!data || !data.version) return;
+    var newHash = data.version;
+
+    if (!_serverHash) {
+      _serverHash = newHash;
+      return;
+    }
+
+    if (newHash !== _serverHash) {
+      _serverHash = newHash;
+      triggerFullRefresh();
+    }
+  }).catch(function () {
+    // 离线，忽略
+  });
+}
+
+function triggerFullRefresh() {
+  console.log('SW: static files changed, refreshing all clients...');
+  caches.delete(CACHE_NAME).then(function () {
+    return caches.open(CACHE_NAME);
+  }).then(function (cache) {
+    return cache.addAll(CORE_RESOURCES);
+  }).then(function () {
+    return self.clients.matchAll();
+  }).then(function (clients) {
+    clients.forEach(function (client) {
+      client.postMessage({ type: 'FORCE_REFRESH' });
+    });
+  }).catch(function (err) {
+    console.warn('SW refresh failed:', err);
+  });
+}
 
 self.addEventListener('fetch', function (event) {
   var url = new URL(event.request.url);
@@ -72,6 +131,11 @@ function networkFirst(request) {
 
 function cacheFirst(request) {
   return caches.match(request).then(function (cached) {
+    // 后台检查版本（仅对核心资源生效，每分钟最多一次）
+    if (shouldCheckVersion(new URL(request.url))) {
+      checkVersionInBackground();
+    }
+
     if (cached) {
       if (request.method === 'GET') {
         fetch(request).then(function (response) {

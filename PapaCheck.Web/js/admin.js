@@ -10,7 +10,24 @@ if ('serviceWorker' in navigator) {
     }).catch(function (err) {
       console.log('SW registration failed:', err);
     });
+
+    // 监听 SW 发来的强制刷新消息
+    navigator.serviceWorker.addEventListener('message', function (event) {
+      if (event.data && event.data.type === 'FORCE_REFRESH') {
+        sessionStorage.setItem('sw_updated', 'true');
+        showTransitionMask('检测到新版本，正在刷新页面...');
+        window.location.reload();
+      }
+    });
   });
+}
+
+// 页面加载时检测是否为刷新后
+if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('sw_updated') === 'true') {
+  sessionStorage.removeItem('sw_updated');
+  setTimeout(function () {
+    showToast('已更新到最新版本');
+  }, 500);
 }
 
 // ========== Transition Mask ==========
