@@ -1428,6 +1428,12 @@ function calcMedian(values) {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+/**
+ * 对数据进行 LOESS 局部加权平滑处理
+ * @param {Array<{value: number}>} data - 输入数据数组
+ * @param {number} [span=0.5] - 平滑参数，控制邻域大小（比例）
+ * @returns {Array<{x: number, y: number}>|null} 平滑后的点数组，输入少于4点时返回 null
+ */
 function calcLOESS(data, span = 0.5) {
   const n = data.length;
   if (n < 4) return null;
