@@ -1520,7 +1520,7 @@ function renderSvgLineChart(data, options) {
   // 中值线
   const medianY = pad.top + chartH - ((medianVal - minVal) / range) * chartH;
   let medianLine = '';
-  if (medianVal > 0 && values.length > 1) {
+  if (values.length > 1) {
     medianLine = `<line x1="${pad.left}" y1="${medianY}" x2="${width - pad.right}" y2="${medianY}" stroke="${avgColor}" stroke-dasharray="4,4" stroke-width="1.5"/>
       <text x="${width - pad.right}" y="${medianY - 4}" text-anchor="end" font-size="10" fill="${avgColor}">中值 ${Math.round(medianVal)}${unit}</text>`;
   }
