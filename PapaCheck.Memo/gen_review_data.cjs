@@ -41,7 +41,7 @@ const totalSuggestedMin = doneItems.reduce((s, h) => s + (h.suggestedDuration ||
 // === 4. 效率 ===
 const fasterCount = withEfficiency.filter(h => h.actualDuration <= h.suggestedDuration).length;
 const fasterPct = Math.round(fasterCount / withEfficiency.length * 100);
-const avgPct = Math.round(withEfficiency.reduce((s, h) => s + h.actualDuration / h.suggestedDuration, 0) / withEfficiency.length * 100);
+const avgPct = Math.round(withEfficiency.reduce((s, h) => s + h.suggestedDuration / h.actualDuration, 0) / withEfficiency.length * 100);
 
 // Subject efficiency (suggested/actual, higher = faster)
 const subjEff = {};

@@ -16,7 +16,7 @@ function extractEfficiencyLogic() {
         calcRatios: (homeworks) => {
             return homeworks
                 .filter(h => h.actualDuration !== null && h.suggestedDuration > 0)
-                .map(h => h.actualDuration / h.suggestedDuration);
+                .map(h => h.suggestedDuration / h.actualDuration);
         },
         calcAvgRatio: (ratios) => {
             return ratios.length > 0
@@ -34,7 +34,7 @@ function extractEfficiencyLogic() {
 //     Given 两项 done 作业：作业A mode='challenge' actualDuration=10 suggestedDuration=20
 //           作业B mode='timer' actualDuration=15 suggestedDuration=20
 //     When calculateSettlement() 计算效率
-//     Then averageRatio = ((10/20) + (15/20)) / 2 = 0.625
+//     Then averageRatio = ((20/10) + (20/15)) / 2 = 1.667
 //     And 两个作业都被计入 ratios 数组
 test('计时模式作业参与效率统计', () => {
     const { filterEfficiencyHw, calcRatios, calcAvgRatio } = extractEfficiencyLogic();
@@ -49,18 +49,18 @@ test('计时模式作业参与效率统计', () => {
 
     const ratios = calcRatios(efficiencyHw);
     assert.strictEqual(ratios.length, 2);
-    assert.strictEqual(ratios[0], 0.5);  // 10/20
-    assert.strictEqual(ratios[1], 0.75); // 15/20
+    assert.strictEqual(ratios[0], 2.0);  // 20/10
+    assert.closeTo(ratios[1], 1.333, 0.001); // 20/15
 
     const avgRatio = calcAvgRatio(ratios);
-    assert.strictEqual(avgRatio, 0.625);
+    assert.closeTo(avgRatio, 1.667, 0.001);
 });
 
 //   Scenario: 被驳回作业不参与效率统计
 //     Given 两项 done 作业：作业A mode='challenge' not rejected actualDuration=10 suggestedDuration=20
 //           作业B mode='timer' rejected=true actualDuration=15 suggestedDuration=20
 //     When calculateSettlement() 计算效率
-//     Then averageRatio = 10/20 = 0.5
+//     Then averageRatio = 20/10 = 2.0
 //     And 仅作业A被计入
 test('被驳回作业不参与效率统计', () => {
     const { filterEfficiencyHw, calcRatios, calcAvgRatio } = extractEfficiencyLogic();
@@ -76,16 +76,16 @@ test('被驳回作业不参与效率统计', () => {
 
     const ratios = calcRatios(efficiencyHw);
     assert.strictEqual(ratios.length, 1);
-    assert.strictEqual(ratios[0], 0.5);
+    assert.strictEqual(ratios[0], 2.0);
 
     const avgRatio = calcAvgRatio(ratios);
-    assert.strictEqual(avgRatio, 0.5);
+    assert.strictEqual(avgRatio, 2.0);
 });
 
 //   Scenario: completedInSchool 作业参与效率统计
 //     Given 一项 done 作业：completedInSchool=true mode='challenge' actualDuration=18 suggestedDuration=20
 //     When calculateSettlement() 计算效率
-//     Then averageRatio = 18/20 = 0.9
+//     Then averageRatio = 20/18 = 1.111
 test('completedInSchool 作业参与效率统计', () => {
     const { filterEfficiencyHw, calcRatios, calcAvgRatio } = extractEfficiencyLogic();
 
@@ -98,8 +98,8 @@ test('completedInSchool 作业参与效率统计', () => {
     assert.strictEqual(efficiencyHw[0].completedInSchool, true);
 
     const ratios = calcRatios(efficiencyHw);
-    assert.strictEqual(ratios[0], 0.9);
+    assert.closeTo(ratios[0], 1.111, 0.001);
 
     const avgRatio = calcAvgRatio(ratios);
-    assert.strictEqual(avgRatio, 0.9);
+    assert.closeTo(avgRatio, 1.111, 0.001);
 });
