@@ -82,7 +82,7 @@ async function calculateSettlementLogic({
         const ratios = [];
         efficiencyHw.forEach(hw => {
             if (hw.actualDuration !== null && hw.suggestedDuration > 0) {
-                ratios.push(hw.actualDuration / hw.suggestedDuration);
+                ratios.push(hw.suggestedDuration / hw.actualDuration);
             }
         });
         const averageRatio = ratios.length > 0
@@ -126,7 +126,7 @@ async function calculateSettlementLogic({
     const ratios = [];
     efficiencyHw.forEach(hw => {
         if (hw.actualDuration !== null && hw.suggestedDuration > 0) {
-            ratios.push(hw.actualDuration / hw.suggestedDuration);
+            ratios.push(hw.suggestedDuration / hw.actualDuration);
         }
     });
     const averageRatio = ratios.length > 0

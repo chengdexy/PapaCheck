@@ -1797,7 +1797,7 @@ function renderStatsTab() {
     totalMinData.push({ date, value: totalMin });
 
     const effHw = doneHw.filter(h => h.suggestedDuration > 0 && h.actualDuration !== null);
-    const ratios = effHw.map(h => h.actualDuration / h.suggestedDuration);
+    const ratios = effHw.map(h => h.suggestedDuration / h.actualDuration);
     const avgRatio = ratios.length > 0 ? Math.round(ratios.reduce((a, b) => a + b, 0) / ratios.length * 100) : 0;
     effRatioData.push({ date, value: avgRatio });
 
@@ -1882,7 +1882,7 @@ function renderStatsTab() {
     </div>
 
     <div class="chart-container">
-      <div class="chart-title">📊 ${groupLabels[groupMode]}效率比（实际/参考）</div>
+      <div class="chart-title">📊 ${groupLabels[groupMode]}效率比（参考/实际）</div>
       ${efficiencyRatios.length === 0 || efficiencyRatios.every(d => d.value === 0)
       ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'
       : renderSvgLineChart(efficiencyRatios, { color: 'var(--warning)', medianColor: 'var(--accent)', unit: '%', showLOESS: _statsRange === 'month' || _statsRange === 'all' })}

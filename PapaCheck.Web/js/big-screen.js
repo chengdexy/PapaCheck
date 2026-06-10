@@ -567,10 +567,10 @@ function updateHomeworkGrid() {
       if (hw.actualDuration !== null) {
         statusText += ' · ' + hw.actualDuration + '分钟';
         if (hw.mode === 'challenge' && hw.suggestedDuration > 0) {
-          const ratio = hw.actualDuration / hw.suggestedDuration;
+          const ratio = hw.suggestedDuration / hw.actualDuration;
           let effText = '';
-          if (ratio <= 0.8) effText = '效率优秀';
-          else if (ratio <= 1.0) effText = '效率良好';
+          if (ratio >= 1.25) effText = '效率优秀';
+          else if (ratio >= 1.0) effText = '效率良好';
           else effText = '略微超时';
           statusText += ' · ' + effText;
         }
