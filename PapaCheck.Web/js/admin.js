@@ -99,6 +99,13 @@ function getActiveSubjects(settings) {
   return settings?.subjects || SETTINGS_DEFAULTS.subjects;
 }
 
+/** 将「其他」排到最后（纯函数） */
+function sortSubjectsWithOtherLast(subjects) {
+  const others = subjects.filter(s => s.id === '其他');
+  const rest = subjects.filter(s => s.id !== '其他');
+  return [...rest, ...others];
+}
+
 /** 添加新科目到列表（纯函数） */
 function addSubject(subjects, id, icon, color) {
   return [...subjects, { id, icon, color }];
@@ -450,7 +457,7 @@ function openHwModal(mode, hwId) {
     <div class="form-group">
       <label>科目</label>
       <div class="subject-selector" id="adminSubjectSelector">
-        ${getActiveSubjects(adminSettings).map(s => `
+        ${sortSubjectsWithOtherLast(getActiveSubjects(adminSettings)).map(s => `
           <button class="subject-option ${(hw?.subject || '语文') === s.id ? 'selected' : ''}"
             data-subject="${s.id}">${s.icon} ${s.id}</button>
         `).join('')}
@@ -2071,11 +2078,11 @@ function renderSettingsTab() {
     <div class="admin-card" id="subjectMgmtCard">
       <div class="admin-card-title">📚 科目管理</div>
       <div id="subjectList">
-        ${getActiveSubjects(adminSettings).map(s => `
+        ${sortSubjectsWithOtherLast(getActiveSubjects(adminSettings)).map(s => `
           <div class="subject-mgmt-row" data-subject-id="${s.id}">
             <span class="subject-mgmt-icon">${s.icon}</span>
             <span class="subject-mgmt-name">${s.id}</span>
-            <button class="subject-mgmt-delete" data-subject-id="${s.id}" title="删除">🗑️</button>
+            ${s.id === '其他' ? '<span style="font-size:12px;color:var(--text-secondary);padding:4px 8px;">不可删除</span>' : `<button class="subject-mgmt-delete" data-subject-id="${s.id}" title="删除">🗑️</button>`}
           </div>
         `).join('')}
       </div>
@@ -2239,6 +2246,7 @@ async function addSubjectAction() {
 
 /** 删除科目确认 */
 async function confirmRemoveSubject(id) {
+  if (id === '其他') { showToast('「其他」科目不可删除'); return; }
   const subject = getActiveSubjects(adminSettings).find(s => s.id === id);
   if (!subject) return;
   if (!confirm(`确定删除「${id}」吗？已有作业中的「${id}」科目将显示为纯文本。`)) return;

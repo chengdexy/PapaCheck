@@ -111,6 +111,50 @@ describe('subjects settings 加载', () => {
   });
 });
 
+// Feature: 「其他」始终在最后
+//   Scenario: 排序函数将其他排到最后
+//     Given 科目列表为 ["物理", "数学", "其他", "语文"]
+//     When 调用 sortSubjectsWithOtherLast
+//     Then 返回 ["物理", "数学", "语文", "其他"]
+//
+//   Scenario: 无其他时返回原顺序
+//     Given 科目列表为 ["物理", "数学", "语文"]
+//     When 调用 sortSubjectsWithOtherLast
+//     Then 返回 ["物理", "数学", "语文"]
+
+describe('sortSubjectsWithOtherLast', () => {
+  function sortSubjectsWithOtherLast(subjects) {
+    const others = subjects.filter(s => s.id === '其他');
+    const rest = subjects.filter(s => s.id !== '其他');
+    return [...rest, ...others];
+  }
+
+  it('将其他排到最后', () => {
+    const subjects = [
+      { id: '物理', icon: '⚛️' },
+      { id: '数学', icon: '🔢' },
+      { id: '其他', icon: '📚' },
+      { id: '语文', icon: '📖' },
+    ];
+    const result = sortSubjectsWithOtherLast(subjects);
+    expect(result[0].id).toBe('物理');
+    expect(result[1].id).toBe('数学');
+    expect(result[2].id).toBe('语文');
+    expect(result[3].id).toBe('其他');
+  });
+
+  it('无其他时返回原顺序', () => {
+    const subjects = [
+      { id: '物理', icon: '⚛️' },
+      { id: '数学', icon: '🔢' },
+    ];
+    const result = sortSubjectsWithOtherLast(subjects);
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe('物理');
+    expect(result[1].id).toBe('数学');
+  });
+});
+
 // Feature: 设置页科目管理工具函数
 //   Scenario: getActiveSubjects 返回 settings 中的 subjects
 //     Given settings.subjects 包含"语文"和"物理"
