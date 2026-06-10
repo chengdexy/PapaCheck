@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- 修复管理端统计页"连续全勤天数"计算 Bug：`calcStreak()` 原按逐日历日回退检查 `dailySettlement`，周末/无作业日缺口导致 streak 提前中断；改为遍历有 settlement 记录的日期数组，跳过无记录日期间隙；新增 TDD 测试 5 个；全量 366/367 测试通过（唯一失败为已知 connection_offline_threshold flaky 测试）
+
 ### Added
 - 新增回顾页（review.html）：孩子端滚动叙事战绩回顾，从生产数据库提取数据，以 15 屏全屏滚动展示 22 天的完整学习历程，包含坚持天数、时间投入、效率分析、评级荣耀、积分经济、兑换榜、赏金任务等维度，每屏配数字 count-up 动画和意义解读
 - 新增微信公众号周报 Skill（PapaCheck.WeChat）：AI 根据 CHANGELOG + git log 自动生成亲子风开发周报，包含 wechat-api（草稿 API 封装）、gen-weekly（Markdown→微信 HTML 转换）、skill.md（Skill 定义）；补齐历史三期周报并上线 GitHub Pages

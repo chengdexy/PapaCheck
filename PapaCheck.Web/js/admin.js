@@ -1807,29 +1807,21 @@ function renderStatsTab() {
 function calcStreak(allDates) {
   if (allDates.length === 0) return 0;
 
+  // 按有 settlement 记录的日期（最新→最旧）迭代，跳过日历缺口
   const sorted = [...allDates].sort().reverse();
   let streak = 0;
-  const today = AdminUtil.dateKey(new Date());
+  let started = false;
 
-  const todaySettlement = cachedData?.dailySettlement?.[today];
-  let checkDate = new Date();
-
-  if (todaySettlement?.rating) {
-    streak = 1;
-    checkDate.setDate(checkDate.getDate() - 1);
-  } else {
-    checkDate.setDate(checkDate.getDate() - 1);
-  }
-
-  while (streak < 365) {
-    const dk = AdminUtil.dateKey(checkDate);
+  for (const dk of sorted) {
     const s = cachedData?.dailySettlement?.[dk];
     if (s?.rating && s.rating !== '差') {
       streak++;
-      checkDate.setDate(checkDate.getDate() - 1);
-    } else {
+      started = true;
+    } else if (started) {
+      // 已经开始计数后遇到无效评级（未评级或'差'），中断
       break;
     }
+    // 未开始计数时遇到无评级日期，跳过（如今日尚未评级）
   }
 
   return streak;

@@ -434,13 +434,13 @@ def run_wizard():
     print(f'  输出目录: {output_dir}')
     print()
 
-    # ---- Step 6: 是否清空输出文件夹 (默认: 是) ----
+    # ---- Step 6: 是否清空输出文件夹 (默认: 保留) ----
     print('─' * 50)
     print(f'  Step 6/6 — 是否清空输出文件夹:')
-    print('    [默认] 是，清空输出文件夹 (直接回车)')
+    print('    [默认] 否，保留旧文件 (直接回车)')
     print('    1) 否，保留旧文件')
     print('    2) 是，清空输出文件夹')
-    choice = ask_int('  请输入序号 [默认:2]: ', 1, 2) or 2
+    choice = ask_int('  请输入序号 [默认:1]: ', 1, 2) or 1
     clear_output = (choice == 2)
     print(f'  清空输出文件夹: {"是" if clear_output else "否"}')
     print()
