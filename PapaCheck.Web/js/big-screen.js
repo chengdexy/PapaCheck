@@ -3,13 +3,19 @@
  * 负责当前任务、作业卡片（含计时器）、结算页面、统计的渲染
  */
 
-const SUBJECTS = {
-  '语文': { icon: '📖', color: '#f87171' },
-  '数学': { icon: '🔢', color: '#60a5fa' },
-  '英语': { icon: '🔤', color: '#fbbf24' },
-  '科学': { icon: '🔬', color: '#4ade80' },
-  '其他': { icon: '📚', color: '#a78bfa' },
-};
+const DEFAULT_SUBJECTS = [
+  { id: '语文', icon: '📖', color: '#f87171' },
+  { id: '数学', icon: '🔢', color: '#60a5fa' },
+  { id: '英语', icon: '🔤', color: '#fbbf24' },
+  { id: '科学', icon: '🔬', color: '#4ade80' },
+  { id: '其他', icon: '📚', color: '#a78bfa' },
+];
+
+function getSubject(subjectName) {
+  const subs = cachedData?.settings?.subjects || DEFAULT_SUBJECTS;
+  const found = subs.find(s => s.id === subjectName);
+  return found || { icon: null, color: null };
+}
 
 const PAGE = { MAIN: 'main', SHOP: 'shop', SETTLEMENT: 'settlement', RATED: 'rated' };
 let currentPage = PAGE.MAIN;
@@ -375,7 +381,7 @@ function updateCurrentTask() {
 }
 
 function renderActiveHomeworkInCurrentTask(display, hw) {
-  const subject = SUBJECTS[hw.subject] || SUBJECTS['其他'];
+  const subject = getSubject(hw.subject);
   const now = new Date();
   const elapsedSeconds = hw.paused && hw._pausedElapsed != null
     ? hw._pausedElapsed
@@ -419,7 +425,7 @@ function renderActiveHomeworkInCurrentTask(display, hw) {
   }
 
   display.innerHTML = `
-    <div class="current-task-icon">${subject.icon}</div>
+    ${subject.icon ? `<div class="current-task-icon">${subject.icon}</div>` : ''}
     <div class="current-task-name">${hw.subject} · ${hw.content}</div>
     <div class="homework-timer ${timerClass}" data-role="ct-timer" style="flex-shrink:0;">${timerHtml}</div>
     ${progressHtml}
@@ -545,7 +551,7 @@ function updateHomeworkGrid() {
   }
 
   grid.innerHTML = pendingHomeworks.map(hw => {
-    const subject = SUBJECTS[hw.subject] || SUBJECTS['其他'];
+    const subject = getSubject(hw.subject);
     const isActive = hw.status === 'doing';
     const isDone = hw.status === 'done';
     const statusClass = isDone ? 'completed' : isActive ? 'active' : '';
@@ -655,7 +661,7 @@ function updateHomeworkGrid() {
     return `
       <div class="homework-card ${statusClass} ${isDone && hw._animClass ? hw._animClass : ''}" data-hw-id="${hw.id}" ${clickAction}>
         <div class="homework-card-row">
-          <span style="font-size:28px;flex-shrink:0;">${subject.icon}</span>
+          ${subject.icon ? `<span style="font-size:28px;flex-shrink:0;">${subject.icon}</span>` : ''}
           <div class="homework-card-info">
             <div style="display:flex;align-items:center;justify-content:space-between;">
               <span style="font-size:18px;font-weight:600;">${hw.subject}</span>
@@ -869,7 +875,7 @@ function updateSettlementPage() {
     }
       <div class="settlement-homeworks">
         ${homeworks.filter(h => h.status === 'done').map(hw => {
-      const subject = SUBJECTS[hw.subject] || SUBJECTS['其他'];
+      const subject = getSubject(hw.subject);
       let timeInfo = '';
       if (hw.mode === 'challenge' && hw.actualDuration !== null) {
         const icon = hw.actualDuration <= hw.suggestedDuration * 0.8 ? '提前' :
@@ -878,7 +884,8 @@ function updateSettlementPage() {
       } else if (hw.actualDuration !== null) {
         timeInfo = `${hw.actualDuration}分钟`;
       }
-      return '<div class="settlement-hw-item">' + subject.icon + ' ' + hw.subject + ' - ' + hw.content + ' ' + timeInfo + '</div>';
+      const iconHtml = subject.icon ? subject.icon + ' ' : '';
+      return '<div class="settlement-hw-item">' + iconHtml + hw.subject + ' - ' + hw.content + ' ' + timeInfo + '</div>';
     }).join('')}
       </div>
     </div >
@@ -1208,13 +1215,13 @@ function confirmStartTask(hwId) {
   const hw = homeworks.find(h => h.id === hwId);
   if (!hw) return;
 
-  const subject = SUBJECTS[hw.subject] || SUBJECTS['其他'];
+  const subject = getSubject(hw.subject);
   const modal = document.getElementById('startConfirmModal');
   const content = document.getElementById('startConfirmModalContent');
 
   if (hw.rejected) {
     content.innerHTML = `
-    <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon} ${hw.subject}</h3>
+    <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon ? subject.icon + ' ' : ''}${hw.subject}</h3>
       <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;font-size:20px;">${hw.content}</p>
       <p style="text-align:center;color:#f87171;font-size:20px;margin-bottom:16px;">⚠️ 已驳回，不计时重新完成</p>
       <div class="modal-actions">
@@ -1228,7 +1235,7 @@ function confirmStartTask(hwId) {
       ? '<button onclick="closeStartConfirm(); requestDeferHomework(\'' + hwId + '\')" style="padding:10px 16px;border:2px solid var(--warning);border-radius:12px;background:transparent;color:var(--warning);font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">⏭️ 明天做</button>'
       : '';
     content.innerHTML = `
-    <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon} ${hw.subject}</h3>
+    <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon ? subject.icon + ' ' : ''}${hw.subject}</h3>
       <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;font-size:20px;">${hw.content}</p>
       <p style="text-align:center;color:var(--accent);font-size:20px;margin-bottom:16px;">建议 ${hw.suggestedDuration} 分钟内完成</p>
       <div class="modal-actions">
