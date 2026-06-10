@@ -1176,14 +1176,8 @@ init();
  */
 function dedupNewHomeworkNotifications(items) {
   const SEEN_TEXT = '收到新作业，请查看';
-  let found = false;
-  const result = [];
-  for (let i = items.length - 1; i >= 0; i--) {
-    if (items[i].text === SEEN_TEXT) {
-      if (found) continue;
-      found = true;
-    }
-    result.unshift(items[i]);
-  }
-  return result;
+  const lastIndex = items.findLastIndex(item => item.text === SEEN_TEXT);
+  return items.filter((item, index) =>
+    item.text !== SEEN_TEXT || index === lastIndex
+  );
 }
