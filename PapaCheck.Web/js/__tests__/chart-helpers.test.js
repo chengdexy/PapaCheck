@@ -156,7 +156,7 @@ describe('renderSvgLineChart', () => {
     const {
       width = 600, height = 180, color = 'var(--success)',
       medianColor = 'var(--accent)', unit = '', yMax,
-      showLOESS = false, loessColor = '#a78bfa',
+      showLOESS = false, loessColor = 'var(--danger)',
     } = options;
     const pad = { top: 20, right: 20, bottom: 25, left: 40 };
     const chartW = width - pad.left - pad.right;
@@ -220,10 +220,10 @@ describe('renderSvgLineChart', () => {
     return `
     <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:${height}px;">
       ${yLabels.join('')}
-      <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>
-      ${circles}
       ${medianLine}
       ${loessSvg}
+      <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>
+      ${circles}
       ${valuesTxt}
       ${labels}
     </svg>`;
