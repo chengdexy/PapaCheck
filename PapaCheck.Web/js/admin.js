@@ -1421,6 +1421,13 @@ async function clearRedemptionHistory() {
 }
 
 // ========== SVG Chart Helpers ==========
+function calcMedian(values) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
 function renderSvgLineChart(data, options) {
   const { width = 600, height = 180, color = 'var(--success)', avgColor = 'var(--accent)', unit = '', yMax } = options;
   const pad = { top: 20, right: 20, bottom: 25, left: 40 };
