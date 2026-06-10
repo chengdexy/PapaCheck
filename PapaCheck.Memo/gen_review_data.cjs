@@ -54,15 +54,18 @@ Object.keys(subjEff).forEach(s => {
   subjEffAvg[s] = (subjEff[s].reduce((a, b) => a + b, 0) / subjEff[s].length).toFixed(2);
 });
 
-// === 5. 效率高光日 ===
+// === 5. 效率高光日（从原始作业数据计算，避免 efficiency_history 中公式变更导致的数据混比）===
 const dailyEff = {};
-const effRows = db.prepare('SELECT * FROM efficiency_history').all();
+withEfficiency.forEach(h => {
+  if (!dailyEff[h.date]) dailyEff[h.date] = [];
+  dailyEff[h.date].push(h.suggestedDuration / h.actualDuration);
+});
 let bestEffDay = null, bestEffVal = 0;
-effRows.forEach(r => {
-  const d = JSON.parse(r.data);
-  if (d.averageRatio > bestEffVal) {
-    bestEffVal = d.averageRatio;
-    bestEffDay = r.date_key;
+Object.entries(dailyEff).forEach(([date, ratios]) => {
+  const avg = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+  if (avg > bestEffVal) {
+    bestEffVal = avg;
+    bestEffDay = date;
   }
 });
 
