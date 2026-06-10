@@ -620,6 +620,25 @@ async function _putEfficiencyIdempotent(dateKey, data) {
   return true;
 }
 
+/**
+ * 计算并保存作业效率数据（消除 calculateSettlement 中的重复代码）
+ * @param {Array} efficiencyHw - 已完成且未拒绝的作业列表
+ * @param {string} dateKey - 日期键 YYYY-MM-DD
+ */
+async function calculateAndSaveEfficiency(efficiencyHw, dateKey) {
+  const ratios = [];
+  efficiencyHw.forEach(hw => {
+    if (hw.actualDuration !== null && hw.suggestedDuration > 0) {
+      ratios.push(hw.suggestedDuration / hw.actualDuration);
+    }
+  });
+  const averageRatio = ratios.length > 0
+    ? ratios.reduce((a, b) => a + b, 0) / ratios.length
+    : 0;
+
+  await _putEfficiencyIdempotent(dateKey, { averageRatio, ratios });
+}
+
 async function calculateSettlement() {
   if (_calculatingSettlement) return;
   _calculatingSettlement = true;
@@ -679,17 +698,7 @@ async function calculateSettlement() {
       }
 
       // 保存 efficiency 数据
-      const ratios = [];
-      efficiencyHw.forEach(hw => {
-        if (hw.actualDuration !== null && hw.suggestedDuration > 0) {
-          ratios.push(hw.suggestedDuration / hw.actualDuration);
-        }
-      });
-      const averageRatio = ratios.length > 0
-        ? ratios.reduce((a, b) => a + b, 0) / ratios.length
-        : 0;
-
-      await _putEfficiencyIdempotent(dateKey, { averageRatio, ratios });
+      await calculateAndSaveEfficiency(efficiencyHw, dateKey);
 
       needsFullRender = true;
       updateBigScreen();
@@ -724,17 +733,7 @@ async function calculateSettlement() {
     if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
     cachedData.dailySettlement[dateKey] = settlementToSave;
 
-    const ratios = [];
-    efficiencyHw.forEach(hw => {
-      if (hw.actualDuration !== null && hw.suggestedDuration > 0) {
-        ratios.push(hw.suggestedDuration / hw.actualDuration);
-      }
-    });
-    const averageRatio = ratios.length > 0
-      ? ratios.reduce((a, b) => a + b, 0) / ratios.length
-      : 0;
-
-    await _putEfficiencyIdempotent(dateKey, { averageRatio, ratios });
+    await calculateAndSaveEfficiency(efficiencyHw, dateKey);
 
     needsFullRender = true;
     updateBigScreen();
@@ -982,7 +981,9 @@ function startPoll(intervalMs) {
         const result = await API.getPendingNotifications();
         const items = result.items || [];
         const currentIds = new Set(items.map(i => i.id));
-        for (const item of items) {
+        // "收到新作业"通知去重：多条同文本只保留最后一条播报
+        const playItems = dedupNewHomeworkNotifications(items);
+        for (const item of playItems) {
           // 只在通知首次出现时播报，后续轮次跳过（延迟消费期间不再重复播报）
           if (!_lastNotifIds || !_lastNotifIds.has(item.id)) {
             Voice.speak(item.text);
@@ -1167,3 +1168,22 @@ async function init() {
 }
 
 init();
+
+/**
+ * 对"收到新作业，请查看"通知去重：多条同文本只保留最后一条
+ * @param {Array<{id: string, text: string}>} items
+ * @returns {Array<{id: string, text: string}>}
+ */
+function dedupNewHomeworkNotifications(items) {
+  const SEEN_TEXT = '收到新作业，请查看';
+  let found = false;
+  const result = [];
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (items[i].text === SEEN_TEXT) {
+      if (found) continue;
+      found = true;
+    }
+    result.unshift(items[i]);
+  }
+  return result;
+}
