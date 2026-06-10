@@ -1478,7 +1478,7 @@ function calcLOESS(data, span = 0.5) {
 
 function renderSvgLineChart(data, options) {
   const {
-    width = 600, height = 180, color = 'var(--success)', avgColor = 'var(--accent)',
+    width = 600, height = 180, color = 'var(--success)', medianColor = 'var(--accent)',
     unit = '', yMax, showLOESS = false, loessColor = '#a78bfa',
   } = options;
   const pad = { top: 20, right: 20, bottom: 25, left: 40 };
@@ -1521,8 +1521,8 @@ function renderSvgLineChart(data, options) {
   const medianY = pad.top + chartH - ((medianVal - minVal) / range) * chartH;
   let medianLine = '';
   if (values.length > 1) {
-    medianLine = `<line x1="${pad.left}" y1="${medianY}" x2="${width - pad.right}" y2="${medianY}" stroke="${avgColor}" stroke-dasharray="4,4" stroke-width="1.5"/>
-      <text x="${width - pad.right}" y="${medianY - 4}" text-anchor="end" font-size="10" fill="${avgColor}">中值 ${Math.round(medianVal)}${unit}</text>`;
+    medianLine = `<line x1="${pad.left}" y1="${medianY}" x2="${width - pad.right}" y2="${medianY}" stroke="${medianColor}" stroke-dasharray="4,4" stroke-width="1.5"/>
+      <text x="${width - pad.right}" y="${medianY - 4}" text-anchor="end" font-size="10" fill="${medianColor}">中值 ${Math.round(medianVal)}${unit}</text>`;
   }
 
   // LOESS 平滑曲线
@@ -1826,14 +1826,14 @@ function renderStatsTab() {
       <div class="chart-title">📈 ${groupLabels[groupMode]}总用时（分钟）</div>
       ${totalMinutes.length === 0
       ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'
-      : renderSvgLineChart(totalMinutes, { color: 'var(--success)', avgColor: 'var(--accent)', unit: '分钟', showLOESS: _statsRange === 'month' || _statsRange === 'all' })}
+      : renderSvgLineChart(totalMinutes, { color: 'var(--success)', medianColor: 'var(--accent)', unit: '分钟', showLOESS: _statsRange === 'month' || _statsRange === 'all' })}
     </div>
 
     <div class="chart-container">
       <div class="chart-title">📊 ${groupLabels[groupMode]}效率比（实际/参考）</div>
       ${efficiencyRatios.length === 0 || efficiencyRatios.every(d => d.value === 0)
       ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'
-      : renderSvgLineChart(efficiencyRatios, { color: 'var(--warning)', avgColor: 'var(--accent)', unit: '%', showLOESS: _statsRange === 'month' || _statsRange === 'all' })}
+      : renderSvgLineChart(efficiencyRatios, { color: 'var(--warning)', medianColor: 'var(--accent)', unit: '%', showLOESS: _statsRange === 'month' || _statsRange === 'all' })}
     </div>
 
     <div class="chart-container">
