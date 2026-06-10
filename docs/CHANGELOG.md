@@ -18,6 +18,9 @@
 - 孩子端科目显示改为动态读取：`SUBJECTS` 常量替换为 `DEFAULT_SUBJECTS` 数组 + `getSubject()` 函数，从 `cachedData.settings.subjects` 动态读取科目配置；icon 为 null 时跳过渲染；新增 TDD 测试 4 个；全量 400 测试通过
 - 管理端统计页"均值线"改为"中值线"：`renderSvgLineChart` 使用 `calcMedian` 替代算术平均，标签由"平均"改为"中值"，虚线样式不变；新增 `calcMedian` 纯函数 + TDD 6 个测试
 
+### Fixed
+- 修复科目管理卡片删除和恢复按钮的 XSS 风险：`onclick` 内联事件改为 `data-*` 属性 + 事件委托；全量 400 测试通过
+
 ### Added
 - 管理端统计页折线图新增 LOESS 局部加权平滑曲线（月视图和总计视图），采用 tricube 核加权线性回归，span=0.5，实线细线 stroke-width=1.5 淡紫色渲染；新增 `calcLOESS` 纯函数 + TDD 14 个测试；全量 382 测试通过
 

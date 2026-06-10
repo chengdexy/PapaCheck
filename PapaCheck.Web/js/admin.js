@@ -161,6 +161,21 @@ async function initAdmin() {
     }
   });
 
+  // 科目管理按钮事件委托（防止 XSS，避免内联 onclick）
+  if (typeof document.addEventListener === 'function') {
+    document.addEventListener('click', (e) => {
+      const deleteBtn = e.target.closest('.subject-mgmt-delete');
+      if (deleteBtn && deleteBtn.dataset.subjectId) {
+        confirmRemoveSubject(deleteBtn.dataset.subjectId);
+        return;
+      }
+      const restoreBtn = e.target.closest('.subject-mgmt-restore-btn');
+      if (restoreBtn && restoreBtn.dataset.subjectId) {
+        restoreDefaultSubject(restoreBtn.dataset.subjectId);
+      }
+    });
+  }
+
   await ConnectionManager.start();
   await refreshAllData();
   updateSettingsTabState();
@@ -2060,7 +2075,7 @@ function renderSettingsTab() {
           <div class="subject-mgmt-row" data-subject-id="${s.id}">
             <span class="subject-mgmt-icon">${s.icon}</span>
             <span class="subject-mgmt-name">${s.id}</span>
-            <button class="subject-mgmt-delete" onclick="confirmRemoveSubject('${s.id}')" title="删除">🗑️</button>
+            <button class="subject-mgmt-delete" data-subject-id="${s.id}" title="删除">🗑️</button>
           </div>
         `).join('')}
       </div>
@@ -2244,7 +2259,7 @@ function showMissingDefaults() {
   const list = container.querySelector('.subject-mgmt-restore-list');
   container.style.display = 'block';
   list.innerHTML = missing.map(s => `
-    <button class="subject-mgmt-restore-btn" onclick="restoreDefaultSubject('${s.id}')">${s.icon} ${s.id}</button>
+    <button class="subject-mgmt-restore-btn" data-subject-id="${s.id}">${s.icon} ${s.id}</button>
   `).join('');
 }
 
