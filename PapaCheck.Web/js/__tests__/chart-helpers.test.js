@@ -197,7 +197,7 @@ describe('renderSvgLineChart', () => {
     // 中值线
     const medianY = pad.top + chartH - ((medianVal - minVal) / range) * chartH;
     let medianLine = '';
-    if (medianVal > 0 && values.length > 1) {
+    if (values.length > 1) {
       medianLine = `<line x1="${pad.left}" y1="${medianY}" x2="${width - pad.right}" y2="${medianY}" stroke="${avgColor}" stroke-dasharray="4,4" stroke-width="1.5"/>
         <text x="${width - pad.right}" y="${medianY - 4}" text-anchor="end" font-size="10" fill="${avgColor}">中值 ${Math.round(medianVal)}${unit}</text>`;
     }
@@ -262,5 +262,12 @@ describe('renderSvgLineChart', () => {
     const svg = renderSvgLineChart(data, { showLOESS: true });
     const pathMatches = svg.match(/<path /g);
     expect(pathMatches).toHaveLength(1);
+  });
+
+  it('should render median line even when median value is 0', () => {
+    const data = [{ label: '1', value: -5 }, { label: '2', value: 0 }, { label: '3', value: 5 }];
+    const svg = renderSvgLineChart(data, { unit: '分' });
+    expect(svg).toContain('中值');
+    expect(svg).toContain('0分');
   });
 });
