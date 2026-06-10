@@ -6,8 +6,15 @@
 
 ## [Unreleased]
 
+### Added
+- 管理端统计页折线图新增 LOESS 局部加权平滑曲线（月视图和总计视图），采用 tricube 核加权线性回归，span=0.5，实线细线 stroke-width=1.5 淡紫色渲染；新增 `calcLOESS` 纯函数 + TDD 14 个测试；全量 382 测试通过
+
+### Changed
+- 管理端统计页"均值线"改为"中值线"：`renderSvgLineChart` 使用 `calcMedian` 替代算术平均，标签由"平均"改为"中值"，虚线样式不变；新增 `calcMedian` 纯函数 + TDD 6 个测试
+
 ### Fixed
-- 修复管理端统计页"连续全勤天数"计算 Bug：`calcStreak()` 原按逐日历日回退检查 `dailySettlement`，周末/无作业日缺口导致 streak 提前中断；改为遍历有 settlement 记录的日期数组，跳过无记录日期间隙；新增 TDD 测试 5 个；全量 366/367 测试通过（唯一失败为已知 connection_offline_threshold flaky 测试）
+- 修复管理端统计页"连续全勤天数"计算 Bug：`calcStreak()` 原按逐日历日回退检查 `dailySettlement`，周末/无作业日缺口导致 streak 提前中断；改为遍历有 settlement 记录的日期数组，跳过无记录日期间隔；新增 TDD 测试 5 个；全量 366/367 测试通过（唯一失败为已知 connection_offline_threshold flaky 测试）
+- 修复中值线在 medianVal=0 时意外不显示的问题：移除 `medianVal > 0` 条件，改为仅依赖 `values.length > 1` 判断
 
 ### Added
 - 新增回顾页（review.html）：孩子端滚动叙事战绩回顾，从生产数据库提取数据，以 15 屏全屏滚动展示 22 天的完整学习历程，包含坚持天数、时间投入、效率分析、评级荣耀、积分经济、兑换榜、赏金任务等维度，每屏配数字 count-up 动画和意义解读
