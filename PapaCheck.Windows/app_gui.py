@@ -538,9 +538,9 @@ class PapaCheckApp:
         self.log_queue = queue.Queue()
         self.log_redirector = LogRedirector(self.log_queue)
 
+        # 先修复旧版本自启动路径（版本更新后 EXE 文件名变化时自动更新），再读取状态
+        self._repair_autostart()
         self._auto_start_var = tk.BooleanVar(value=self._is_autostart())
-        # 启动时清理无效/旧版本的开机自启动注册表条目
-        self._cleanup_stale_autostart()
 
         try:
             self.root.iconbitmap(ICON_TBAR)
@@ -852,8 +852,8 @@ class PapaCheckApp:
         except Exception:
             return False
 
-    def _cleanup_stale_autostart(self):
-        """清理注册表中无效或旧版本的 PapaCheck 自启动条目"""
+    def _repair_autostart(self):
+        """修复注册表中的自启动条目路径（版本更新后 EXE 路径变化时自动更新）"""
         try:
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, AUTORUN_KEY, 0,
                                  winreg.KEY_QUERY_VALUE | winreg.KEY_SET_VALUE)
@@ -861,12 +861,19 @@ class PapaCheckApp:
                 value, reg_type = winreg.QueryValueEx(key, APP_NAME)
                 path = value.strip('"\' ')
                 if path and not os.path.isfile(path):
-                    winreg.DeleteValue(key, APP_NAME)
-                    self._append_log('已清理无效的开机自启动路径: ' + path)
+                    # 旧路径无效（如版本更新后 EXE 文件名变化），更新为当前 EXE 路径
+                    exe_path = sys.executable
+                    script_path = os.path.abspath(__file__)
+                    if getattr(sys, 'frozen', False):
+                        target = '"' + exe_path + '"'
+                    else:
+                        target = '"' + exe_path + '" "' + script_path + '"'
+                    winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, target)
+                    self._append_log('开机自启动路径已更新: ' + target)
             except FileNotFoundError:
-                pass  # 条目不存在，无需清理
+                pass  # 条目不存在，无需修复
             except Exception as e:
-                self._append_log('清理自启动注册表时出错: ' + str(e))
+                self._append_log('修复自启动注册表时出错: ' + str(e))
             finally:
                 winreg.CloseKey(key)
         except Exception:
@@ -874,8 +881,8 @@ class PapaCheckApp:
 
     def _set_autostart(self, enable):
         try:
-            # 无论是启用还是禁用，先清理无效条目
-            self._cleanup_stale_autostart()
+            # 无论是启用还是禁用，先修复路径（确保当前 EXE 路径有效）
+            self._repair_autostart()
 
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, AUTORUN_KEY, 0, winreg.KEY_SET_VALUE)
             if enable:

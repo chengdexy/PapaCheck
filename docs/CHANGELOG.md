@@ -11,6 +11,7 @@
 - 新增 6 个 TDD 测试：`reward_box_delete.test.ts`、`shop_daily_reset.test.ts`、`reward_box_consumption.test.js`（505 总测试）
 
 ### Fixed
+- 修复 Windows 端版本号更迭后开机自启动配置被取消：`_cleanup_stale_autostart`（删除无效路径）改为 `_repair_autostart`（更新为当前 EXE 路径），保留用户自启动设定；新增 TDD 测试 4 个（`test_windows_autostart_repair.py`）
 - 修复奖励箱物品消耗后重新出现（`_fulfillFromRewardBox` 数量归零时未调用 `deleteRewardBoxItem` 标记服务端删除）；同修 `adjustRewardBoxQty`（admin.js / db/index.ts）
 - 修复商店商品每日数量重置被陈旧 CRDT 操作覆盖（`putShopItem` 添加时间戳保护 + `_resetDailyShopQuantity` 更新 `lastModified`）；`getRewardBox` 添加 `_filterDeleted` 过滤已删除物品（db/index.ts）
 - 删除 `cleanupExpiredNotifications` 死代码（已内联到 `getPendingNotifications`）；更新对应测试（db.test.ts / api.test.ts）
