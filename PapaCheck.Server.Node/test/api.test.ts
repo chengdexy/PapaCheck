@@ -1077,11 +1077,6 @@ describe('GET /api/notify/pending', () => {
     const body = JSON.parse(res.body);
     expect(body.items).toHaveLength(1);
     expect(body.items[0].id).toBe(validId);
-
-    // 过期通知需单独调用清理
-    (db as any).cleanupExpiredNotifications();
-    const remaining = dbWrite.prepare('SELECT COUNT(*) as cnt FROM notifications').get() as any;
-    expect(remaining.cnt).toBe(1);
   });
 
   it('无通知时返回 { "items": [] }', async () => {

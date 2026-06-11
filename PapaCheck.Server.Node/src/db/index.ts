@@ -515,11 +515,6 @@ export class PapaCheckDB {
     }));
   }
 
-  cleanupExpiredNotifications(): void {
-    const cutoff = Date.now() - 3600000;
-    this.db.prepare('DELETE FROM notifications WHERE created_at < ?').run(cutoff);
-  }
-
   consumeNotifications(ids: string[]): void {
     if (ids.length === 0) return;
     const BATCH_SIZE = 500;

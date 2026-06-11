@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-11 20:10
+> 最后更新：2026-06-11 20:50
 
 ## 当前版本
 
@@ -74,6 +74,7 @@
 | 日期 | 变更 |
 |------|------|
 | 2026-06-11 | 全量代码审查 + 30 个 Bug 修复（11 Critical + 19 Major）：`getTomorrow` 无效日期保护、`dateKey!` 非空断言 → 400 校验、IMAP 连接泄漏修复、TTS daemon error 监听、XSS 防护（innerHTML + onclick bypass）、SQL 参数分批、软删除复活保护、UI 瞬态字段不持久化、fetch 超时控制、数据导入校验、静态文件哈希错误分级日志等；新增 91 个测试（Server 28 + Frontend 50 + TTS/Email 8 + 定向补漏 5）；全量 499 测试通过；覆盖提升至 Stmts 85.22% / Branch 71.89% |
+| 2026-06-11 | 增量代码审查 + 修复 2 个 Minor 问题：删除 `cleanupExpiredNotifications` 死代码（已内联到 `getPendingNotifications`）；删除 `getLastError()` 冗余兜底 `\|\| ''`；全量 499 测试通过 |
 |------|------|
 | 2026-06-10 | 静态文件版本号自动检测：服务端 `/api/static-version`（SHA1 hash）+ SW 后台版本检测（30s 节流）+ 前端自动刷新（Mask + reload + Toast）；全量 408 测试通过 |
 | 2026-06-10 | 修复短时间内添加多项新作业导致孩子端连续快速播报"收到新作业"多次的问题：pollServer 通知播报增加 `dedupNewHomeworkNotifications` 去重过滤，多条同文本只保留最后一条播报；新增 TDD 测试 5 个；全量 407 测试通过 |

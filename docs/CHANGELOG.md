@@ -9,6 +9,10 @@
 ### Added
 - 全量代码审查 + 测试覆盖增强：覆盖提升至 Stmts 85.22% / Branch 71.89% / Funcs 90.94% / Lines 87.06%；
 
+### Fixed
+- 删除 `cleanupExpiredNotifications` 死代码（已内联到 `getPendingNotifications`）；更新对应测试（db.test.ts / api.test.ts）
+- 删除 `TTSBridge.getLastError()` 中冗余的 `|| ''` 兜底
+
 ### Security
 - 修复 admin.js 多处 XSS 漏洞：`innerHTML` 插入的商品名称/奖励名称添加 `escapeHtml` 转义（L768, L943）
 - 修复 admin.js onclick JS 上下文的 XSS bypass：内联 `onclick` 改为 `data-si-*` 属性 + 事件委托（L976-979）

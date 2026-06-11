@@ -1534,17 +1534,15 @@ describe('Database', () => {
     });
 
     // Feature: 过期清理
-    //   Scenario: 删除过期通知
+    //   Scenario: getPendingNotifications 自动删除过期通知
     //     Given 数据库中有一条过期通知和一条有效通知
-    //     When 调用 cleanupExpiredNotifications()
+    //     When 调用 getPendingNotifications()
     //     Then 过期通知被删除，有效通知保留
-    it('cleanupExpiredNotifications 删除过期通知', () => {
+    it('getPendingNotifications 自动删除过期通知', () => {
       (db as any).db.prepare(
         'INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)'
       ).run('old-id', '旧通知', Date.now() - 7200000);
       const validId = (db as any).addNotification('新通知');
-
-      (db as any).cleanupExpiredNotifications();
 
       const remaining = (db as any).getPendingNotifications();
       expect(remaining).toHaveLength(1);
