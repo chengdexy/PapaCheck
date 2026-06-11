@@ -162,11 +162,6 @@ export class TTSBridge {
     return this.cache.get(text);
   }
 
-  /** 获取上次 TTS 失败的错误信息 */
-  getLastError(): string {
-    return this._lastError;
-  }
-
   /** 生成语音，返回 MP3 Buffer */
   async speak(text: string): Promise<Buffer> {
     // 1. 检查内存缓存

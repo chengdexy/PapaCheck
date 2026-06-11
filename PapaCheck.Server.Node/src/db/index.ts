@@ -501,6 +501,8 @@ export class PapaCheckDB {
 
   getPendingNotifications(): NotificationItem[] {
     const cutoff = Date.now() - 3600000;
+    // 先清理过期通知，避免累积
+    this.db.prepare('DELETE FROM notifications WHERE created_at < ?').run(cutoff);
 
     const rows = this.db.prepare(
       'SELECT id, text, created_at FROM notifications WHERE created_at >= ? ORDER BY created_at ASC'
