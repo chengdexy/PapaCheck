@@ -1081,8 +1081,10 @@ async function adjustRewardBoxQty(itemId, delta) {
   item.quantity = Math.max(0, (item.quantity || 0) + delta);
   if (item.quantity <= 0) {
     adminRewardBox = adminRewardBox.filter(i => i.id !== itemId);
+    await API.deleteRewardBoxItem(itemId);
+  } else {
+    await API.putRewardBoxItem(item.id, item);
   }
-  await API.putRewardBoxItem(item.id, item);
   await refreshAllData();
   renderRewardBoxTab();
   if (delta > 0) pregenSpeech(['奖励箱有新奖励，快去看看吧']);
@@ -1405,9 +1407,11 @@ async function _fulfillFromRewardBox(redemption) {
   if (rbItem) {
     rbItem.quantity = (rbItem.quantity || 0) - 1;
     if (rbItem.quantity <= 0) {
+      // 数量归零时，标记服务端删除
+      await API.deleteRewardBoxItem(rbItem.id);
       const idx = rewardBox.indexOf(rbItem);
       if (idx !== -1) rewardBox.splice(idx, 1);
-      // 无单独 DELETE API，PUT 剩余物品到服务端
+      // PUT 剩余物品到服务端
       for (var i = 0; i < rewardBox.length; i++) {
         await API.putRewardBoxItem(rewardBox[i].id, rewardBox[i]);
       }

@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-11 20:50
+> 最后更新：2026-06-11 22:00
 
 ## 当前版本
 
-**v1.2.22**（全量代码审查 + 测试覆盖增强）
+**v1.2.23**（修复奖励箱物品消耗后重新出现 + 商店每日数量重置保护）
 
 ---
 
@@ -73,6 +73,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-11 | 修复奖励箱物品消耗后重新出现（`_fulfillFromRewardBox` 数量归零时未删除服务端记录）；修复商店每日数量重置被陈旧 CRDT 操作覆盖（`putShopItem` 时间戳保护 + `_resetDailyShopQuantity` 更新 `lastModified`）；`getRewardBox` 添加 `_filterDeleted`；新增 TDD 测试 6 个；全量 505 测试通过 |
 | 2026-06-11 | 全量代码审查 + 30 个 Bug 修复（11 Critical + 19 Major）：`getTomorrow` 无效日期保护、`dateKey!` 非空断言 → 400 校验、IMAP 连接泄漏修复、TTS daemon error 监听、XSS 防护（innerHTML + onclick bypass）、SQL 参数分批、软删除复活保护、UI 瞬态字段不持久化、fetch 超时控制、数据导入校验、静态文件哈希错误分级日志等；新增 91 个测试（Server 28 + Frontend 50 + TTS/Email 8 + 定向补漏 5）；全量 499 测试通过；覆盖提升至 Stmts 85.22% / Branch 71.89% |
 | 2026-06-11 | 增量代码审查 + 修复 2 个 Minor 问题：删除 `cleanupExpiredNotifications` 死代码（已内联到 `getPendingNotifications`）；删除 `getLastError()` 冗余兜底 `\|\| ''`；全量 499 测试通过 |
 |------|------|

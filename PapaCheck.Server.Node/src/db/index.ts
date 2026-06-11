@@ -284,6 +284,7 @@ export class PapaCheckDB {
       if (!itemsRow) return;
       const items = this._safeJsonParse(itemsRow.data);
       if (!Array.isArray(items)) return;
+      const now = new Date().toISOString();
       for (const item of items) {
         if (item && typeof item === 'object') {
           // 兼容旧版 dailyLimit/dailySold 字段
@@ -294,9 +295,10 @@ export class PapaCheckDB {
           if (item.dailyLimit !== undefined && typeof item.dailySold === 'number') {
             item.dailySold = 0;
           }
-          // 重置 baseQuantity/remainingQuantity 模型的每日数量
+          // 重置 baseQuantity/remainingQuantity 模型的每日数量，并更新 lastModified 防止被陈旧 CRDT 操作覆盖
           if (typeof item.baseQuantity === 'number' && typeof item.remainingQuantity === 'number') {
             item.remainingQuantity = item.baseQuantity;
+            item.lastModified = now;
           }
         }
       }
@@ -712,11 +714,18 @@ export class PapaCheckDB {
 
   putShopItem(id: string, data: any): void {
     const items = this._getJson('shop_items') ?? [];
-    const { index } = this._findInArray(items, id);
+    const { index, item: existingItem } = this._findInArray(items, id);
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
 
     if (index !== -1) {
+      // 保护：防止陈旧 CRDT 数据覆盖已重置的每日数量
+      // 若 incoming 数据的 lastModified 早于现有数据，且现有数据刚被每日重置，
+      // 则保留现有数据的 baseQuantity 和 remainingQuantity
+      if (existingItem?.lastModified && data.lastModified < existingItem.lastModified) {
+        data.baseQuantity = existingItem.baseQuantity;
+        data.remainingQuantity = existingItem.remainingQuantity;
+      }
       items[index] = data;
     } else {
       items.push(data);
@@ -775,7 +784,7 @@ export class PapaCheckDB {
   // ==================== Reward Box ====================
 
   getRewardBox(): any[] {
-    return this._getJson('reward_box') ?? [];
+    return this._filterDeleted(this._getJson('reward_box')) ?? [];
   }
 
   saveRewardBox(items: any[]): void {

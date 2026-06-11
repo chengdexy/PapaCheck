@@ -218,7 +218,11 @@ describe('Database', () => {
     it('保存并获取商品', () => {
       db.saveShopItems(shopItems);
       const result = db.getShopItems();
-      expect(result).toEqual(shopItems);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({ id: 1, name: '零食', baseQuantity: 2, remainingQuantity: 2 });
+      expect(result[1]).toMatchObject({ id: 2, name: '玩具', baseQuantity: 1, remainingQuantity: 1 });
+      expect(result[0].lastModified).toBeDefined();
+      expect(result[1].lastModified).toBeDefined();
     });
   });
 
