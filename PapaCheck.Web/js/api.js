@@ -72,6 +72,7 @@ const API = {
     }
     var resp = await fetch(url, fetchOptions);
     if (!resp.ok) throw new Error(resp.statusText);
+    if (resp.status === 204 || resp.status === 205) return null;
     return await resp.json();
   },
 

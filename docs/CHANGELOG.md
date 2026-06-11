@@ -7,6 +7,45 @@
 ## [Unreleased]
 
 ### Added
+- 全量代码审查 + 测试覆盖增强：覆盖提升至 Stmts 85.22% / Branch 71.89% / Funcs 90.94% / Lines 87.06%；
+
+### Security
+- 修复 admin.js 多处 XSS 漏洞：`innerHTML` 插入的商品名称/奖励名称添加 `escapeHtml` 转义（L768, L943）
+- 修复 admin.js onclick JS 上下文的 XSS bypass：内联 `onclick` 改为 `data-si-*` 属性 + 事件委托（L976-979）
+- 修复 sw.js 缓存错误响应：后台 fetch 仅当 `response.ok` 时缓存（L140-146）
+- `POST /api/data` 添加输入验证：检查 body 类型（非 null、非数组、是对象）+ 大小限制 10MB（L414-424）
+- `PATCH /api/points` 添加 action 值校验：仅允许 `'earn'` 或 `'spend'`（L464-467）
+
+### Fixed
+- 修复 `getTomorrow()` 无效日期崩溃：添加正则格式校验 + `isNaN` 保护（app.ts:80-84）
+- 修复 3 处 `body.dateKey!` 非空断言：改为 `if (!body.dateKey) return 400` 守卫（app.ts:527-580）
+- 修复 `_findRecordById` 使用裸 `JSON.parse`：改为 `_safeJsonParse`，无效 JSON 时跳过（db/index.ts:327）
+- 修复 `pushMerge` 中 bounty 类变更 `recordKey` 推导错误：增加 `data.dateKey` / `uuid` 回退链（db/index.ts:1102）
+- 修复 `resetDate` 中 `dateKey.split('-')` 数组越界：添加 `parts.length !== 3` 守卫（db/index.ts:1224）
+- 修复 IMAP openBox/search 失败未关闭连接：reject 前调用 `imap.end()`（imap.ts:58-64）
+- 修复 IMAP fetch error 在 resolve 后触发导致 unhandled rejection：添加 `settled` 守卫（imap.ts:136-139）
+- 修复 TTS daemon spawn 失败导致 Node.js 进程崩溃：添加 `proc.on('error', ...)`（tts/index.ts:275-277）
+- 修复 admin.js `parseInt` + `??` 导致 NaN 默认值失效：改为 `||`（admin.js:519）
+- 修复 admin.js 保存作业时空 `{}` 覆盖 settlement：移除 `putSettlement(dateKey, {})`（admin.js:543-547）
+- 修复 defer-homework approve 未更新 homework.date 字段：添加 `hw.date = tomorrow`（app.ts:619）
+- 修复邮件同步逐条插入无事务：添加 try-catch + 回滚（app.ts:746-780）
+- 修复 `consumeNotifications` SQL 参数超 999 上限：改为 500 一批分批执行（db/index.ts:523-528）
+- 修复 `putHomework` 会复活已软删除记录：添加 `isDeleted` 检查（db/index.ts:626）
+- 修复 IMAP 同名附件互相覆盖：文件名添加时间戳前缀（imap.ts:109）
+- 修复 AI fetch 无超时控制：添加 `AbortSignal.timeout(30000)`（ai.ts:35-73）
+- 修复 app.js UI 瞬态字段 `_animClass` 被持久化到服务端（app.js:370-372）
+- 修复 app.js wakeUp 中双重 poll：添加 `stopPoll()` 调用（app.js:1061）
+- 修复 app.js Voice.speak 可能朗读 "undefined"：添加 `hw.content || ''` 守卫（app.js:274-278）
+- 修复 connection.js `cachedData` TDZ 风险：try-catch 包裹（connection.js:64）
+- 修复 api.js DELETE 204 空响应时 `resp.json()` 抛异常：添加状态码判断（api.js:75）
+- 修复 `(tts as any)._lastError` 私有属性访问：改为 `tts.getLastError()` 公开方法（app.ts:401）
+- 修复 `getPendingNotifications` 副作用：内部 DELETE 清理逻辑移至 `cleanupExpiredNotifications`（db/index.ts:501-515）
+- 修复 TTS spawn 后未移除监听器：close 回调中添加 `removeAllListeners`（tts/index.ts）
+- 修复静态文件哈希错误被静默吞掉：区分 ENOENT 与其他错误（app.ts:270-275）
+- 添加优雅关闭钩子：`onClose` 中关闭数据库和 TTS 进程（app.ts:992-994）
+- 添加 `onRoute` 钩子 `Object.freeze` 守卫：冻结 schema 时展开创建新对象（app.ts:172-178）
+
+### Added
 - 静态文件版本号自动检测：服务端 `/api/static-version` 返回核心文件 SHA1 hash，SW 后台每 30 秒检测文件变化，hash 不一致时自动清空缓存、重新预缓存并通知页面刷新；用户无感，全屏 Mask 后自动 reload，刷新后 Toast 提示；支持 Web 和 Android WebView，离线静默跳过
 - 自定义科目：科目从硬编码改为 settings 可配置，设置页新增科目管理卡片
   - 支持添加/删除自定义科目，智能 emoji 匹配（物理→⚛️、历史→📜 等）

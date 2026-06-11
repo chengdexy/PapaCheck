@@ -10,17 +10,17 @@
  *     And 参数只包含 status/startedAt/mode 三个字段
  *     And 仅对开始的那项作业发起调用
  *
- *   Scenario: 暂停作业时只 PATCH paused/wasPaused/_pausedElapsed
+ *   Scenario: 暂停作业时只 PATCH paused/wasPaused（UI 临时字段不持久化）
  *     Given 存在一项 doing 状态的作业
  *     When 调用 pauseActiveTask
  *     Then 调用 API.patchHomework
- *     And 参数只包含 paused/wasPaused/_pausedElapsed
+ *     And 参数只包含 paused/wasPaused（不含 _pausedElapsed 等 UI 临时字段）
  *
- *   Scenario: 完成作业时只 PATCH status/completedAt/actualDuration/mode/_animClass
+ *   Scenario: 完成作业时只 PATCH status/completedAt/actualDuration/mode（不含 UI 临时字段）
  *     Given 存在一项 doing 状态的作业
  *     When 调用 completeHomework
  *     Then 调用 API.patchHomework
- *     And 参数只包含完成相关字段
+ *     And 参数只包含完成相关字段（不含 _animClass）
  *
  *   Scenario: 开始/暂停/完成不调用 saveHomeworksSilent
  *     Given 有多个作业
@@ -81,7 +81,7 @@ test('RED: 开始作业 PATCH 只含 status/startedAt/mode', async () => {
 
 // ========== RED: 暂停作业使用 PATCH ==========
 
-test('RED: 暂停作业调用 API.patchHomework 含 paused/wasPaused/_pausedElapsed', async () => {
+test('RED: 暂停作业调用 API.patchHomework 含 paused/wasPaused', async () => {
   const fnCode = extractFunction('pauseActiveTask');
   assert.ok(fnCode, 'pauseActiveTask 函数应存在于 app.js 中');
 
@@ -98,7 +98,8 @@ test('RED: 暂停作业调用 API.patchHomework 含 paused/wasPaused/_pausedElap
   const callStr = patchCall[0];
   assert.ok(callStr.includes('paused:'), '应包含 paused');
   assert.ok(callStr.includes('wasPaused:'), '应包含 wasPaused');
-  assert.ok(callStr.includes('_pausedElapsed:'), '应包含 _pausedElapsed');
+  // UI 临时字段 _pausedElapsed 不应持久化到服务器
+  assert.ok(!callStr.includes('_pausedElapsed:'), '不应包含 _pausedElapsed（UI 临时字段不应持久化）');
 });
 
 // ========== RED: 完成作业使用 PATCH ==========

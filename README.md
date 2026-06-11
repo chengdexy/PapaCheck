@@ -82,7 +82,7 @@ PapaCheck/
 | **Windows 桌面端** | Python, tkinter, 内嵌 Node.js 子进程（pkg SEA 单 EXE） |
 | **邮件同步**      | Node.js IMAP 模块（内置于服务端）                       |
 | **Android 端**    | Flutter, `webview_flutter`                              |
-| **测试**          | Vitest（前端/服务端 407 测试）、pytest（Python 53 测试） |
+| **测试**          | Vitest（前端/服务端 499 测试）、pytest（Python 53 测试） |
 | **构建发布**      | release.py（一站式：EXE + APK + ZIP）                    |
 
 ## 🔧 开发

@@ -271,10 +271,11 @@ async function startHomework(id, mode) {
       mode: hw.mode,
     }, Util.dateKey(currentDate));
 
+    var content = hw.content || '';
     if (mode === 'challenge') {
-      Voice.speak('开始' + hw.content + '，挑战' + hw.suggestedDuration + '分钟');
+      Voice.speak('开始' + content + '，挑战' + hw.suggestedDuration + '分钟');
     } else {
-      Voice.speak('开始' + hw.content);
+      Voice.speak('开始' + content);
     }
 
     startTickTimer();
@@ -368,7 +369,6 @@ async function completeHomework(id) {
       completedAt: hw.completedAt,
       actualDuration: hw.actualDuration,
       mode: hw.mode,
-      _animClass: hw._animClass,
     }, Util.dateKey(currentDate));
 
     await checkAllDone();
@@ -443,7 +443,6 @@ async function pauseActiveTask() {
   if (task.subject) await API.patchHomework(task.id, {
     paused: true,
     wasPaused: true,
-    _pausedElapsed: task._pausedElapsed,
   }, Util.dateKey(currentDate));
   else await API.putFreeTimeTask(task.id, task);
   needsFullRender = true;
@@ -897,7 +896,7 @@ function startPoll(intervalMs) {
             if (!allDone) {
               cachedData._settlement = null;
               window._settlement = null;
-              if (cachedData.dailySettlement) cachedData.dailySettlement[key] = null;
+              if (cachedData.dailySettlement) delete cachedData.dailySettlement[key];
             }
           }
           // BUG FIX: 作业列表变化后全部已完成时（如最后一项被延后审批通过），自动触发结算
@@ -1059,6 +1058,7 @@ function wakeUp() {
   isScreenSaverActive = false;
   document.getElementById('screenSaver').classList.remove('active');
   startScreenSaverTimer();
+  stopPoll();
   pollServer();
   startPoll(5000);
   Voice.speak('屏幕已唤醒');

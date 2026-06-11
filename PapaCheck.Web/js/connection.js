@@ -61,7 +61,9 @@ var ConnectionManager = (function () {
           }
         }
         // 从 IndexedDB 读取最新数据（CRDT 成功时已更新，失败时保留本地状态）
-        if (typeof DB !== 'undefined' && DB.getFullData && typeof cachedData !== 'undefined') {
+        var _hasCachedData = false;
+        try { _hasCachedData = typeof cachedData !== 'undefined'; } catch (e) {}
+        if (typeof DB !== 'undefined' && DB.getFullData && _hasCachedData) {
           cachedData = await DB.getFullData();
         }
       })();

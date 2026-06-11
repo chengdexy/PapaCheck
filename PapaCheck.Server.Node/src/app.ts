@@ -78,7 +78,13 @@ const dataSchema = {
 
 /** 计算指定日期的下一天（YYYY-MM-DD） */
 function getTomorrow(dateStr: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    throw new AppError(400, ErrorCodes.VALIDATION_ERROR, `无效的日期格式: ${dateStr}`);
+  }
   const d = new Date(dateStr + 'T00:00:00Z');
+  if (isNaN(d.getTime())) {
+    throw new AppError(400, ErrorCodes.VALIDATION_ERROR, `无效的日期: ${dateStr}`);
+  }
   d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().slice(0, 10);
 }
@@ -162,7 +168,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     if (url.startsWith('/api/') && !url.startsWith('/api/docs')) {
       const parts = url.replace('/api/', '').split('/');
       const tag = parts[0] || 'other';
-      routeOptions.schema = routeOptions.schema || {};
+      if (!routeOptions.schema) {
+        routeOptions.schema = {};
+      }
+      // schema 可能已被 Object.freeze() 冻结（如 Fastify 编译优化后），无法直接修改，
+      // 此时创建一个新对象并拷贝已有属性
+      if (Object.isFrozen(routeOptions.schema)) {
+        routeOptions.schema = { ...routeOptions.schema };
+      }
       if (!routeOptions.schema.tags) {
         routeOptions.schema.tags = [tag];
       }
@@ -263,8 +276,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         try {
           const content = await readFile(join(options.webDir, f));
           hash.update(content);
-        } catch {
-          // 文件不存在则跳过
+        } catch (err: any) {
+          if (err.code !== 'ENOENT') {
+            console.error(`[static-version] 读取文件 ${f} 出错:`, err);
+          }
         }
       }
       version = hash.digest('hex').slice(0, 12);
@@ -386,7 +401,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
     const mp3Data = await tts.speak(text);
     if (mp3Data.length === 0) {
-      const lastError = (tts as any)._lastError || 'TTS 返回空数据';
+      const lastError = tts.getLastError() || 'TTS 返回空数据';
       return reply.status(500).send({ error: lastError, code: 'TTS_EMPTY' });
     }
     reply.header('Content-Type', 'audio/mpeg');
@@ -396,13 +411,22 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   // ==================== POST Endpoints ====================
 
-  // 17. POST /api/data - 导入完整数据
+  // 18. POST /api/data - 导入完整数据
   app.post('/api/data', async (request, reply) => {
-    db.importFullData(request.body);
+    const body = request.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return reply.status(400).send({ error: '请求体必须是 JSON 对象' });
+    }
+    // 估算大小：序列化后超过 10MB 拒绝
+    const raw = JSON.stringify(body);
+    if (raw.length > 10 * 1024 * 1024) {
+      return reply.status(413).send({ error: '数据过大，最大允许 10MB' });
+    }
+    db.importFullData(body);
     return sendJson(reply, { ok: true });
   });
 
-  // 18. PUT /api/homeworks — 全量替换当日作业列表（body 含 dateKey + homeworks）
+  // 19. PUT /api/homeworks — 全量替换当日作业列表（body 含 dateKey + homeworks）
   app.put('/api/homeworks', async (request, reply) => {
     const body = request.body as { dateKey?: string; homeworks: unknown[] };
     const dateKey = body.dateKey;
@@ -426,7 +450,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     params: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1 } } },
   };
 
-  // 19. PUT /api/settlement/:date — 全量替换结算数据
+  // 20. PUT /api/settlement/:date — 全量替换结算数据
   app.put<{ Params: { date: string } }>('/api/settlement/:date', async (request, reply) => {
     const body = request.body as any;
     // 同时兼容 { settlement: data } 和直接 data 两种 payload 格式
@@ -434,10 +458,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true });
   });
 
-  // 20. PATCH /api/points - 更新积分
+  // 21. PATCH /api/points - 更新积分
   app.patch('/api/points', async (request, reply) => {
     const body = request.body as any;
     if (body.action) {
+      if (body.action !== 'earn' && body.action !== 'spend') {
+        return reply.status(400).send({ error: 'action 必须是 earn 或 spend' });
+      }
       // 全量替换风格（原 POST /api/points）
       const balance = db.updatePoints(body.action, body.amount, body.detail);
       return sendJson(reply, { ok: true, balance });
@@ -447,34 +474,34 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true, balance });
   });
 
-  // 21. PUT /api/shop
+  // 22. PUT /api/shop
   app.put('/api/shop', async (request, reply) => {
     const body = request.body as { items: unknown[] };
     db.saveShopItems(body.items);
     return sendJson(reply, { ok: true });
   });
 
-  // 22. PUT /api/redemptions
+  // 23. PUT /api/redemptions
   app.put('/api/redemptions', async (request, reply) => {
     const body = request.body as { redemptions: unknown[] };
     db.saveRedemptions(body.redemptions);
     return sendJson(reply, { ok: true });
   });
 
-  // 22b. DELETE /api/redemptions/fulfilled — 清空已兑现记录
+  // 23b. DELETE /api/redemptions/fulfilled — 清空已兑现记录
   app.delete('/api/redemptions/fulfilled', async (_request, reply) => {
     db.clearFulfilledRedemptions();
     return sendJson(reply, { ok: true });
   });
 
-  // 23. PUT /api/reward-box
+  // 24. PUT /api/reward-box
   app.put('/api/reward-box', async (request, reply) => {
     const body = request.body as { items: unknown[] };
     db.saveRewardBox(body.items);
     return sendJson(reply, { ok: true });
   });
 
-  // 24. PUT /api/settings — 全量替换设置
+  // 25. PUT /api/settings — 全量替换设置
   app.put('/api/settings', async (request, reply) => {
     const body = request.body as any;
     // 同时兼容 { settings: data } 和直接 data 两种 payload 格式
@@ -482,14 +509,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true });
   });
 
-  // 25. PUT /api/active-buffs
+  // 26. PUT /api/active-buffs
   app.put('/api/active-buffs', async (request, reply) => {
     const body = request.body as { buffs: unknown[] };
     db.saveActiveBuffs(body.buffs);
     return sendJson(reply, { ok: true });
   });
 
-  // 26. PUT /api/efficiency/:date — 全量替换效率数据
+  // 27. PUT /api/efficiency/:date — 全量替换效率数据
   app.put<{ Params: { date: string } }>('/api/efficiency/:date', async (request, reply) => {
     const body = request.body as any;
     // 同时兼容 { efficiency: data } 和直接 data 两种 payload 格式
@@ -497,53 +524,62 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true });
   });
 
-  // 27. PUT /api/freetime — 全量替换自由时间（body 含 dateKey + tasks）
+  // 28. PUT /api/freetime — 全量替换自由时间（body 含 dateKey + tasks）
   app.put('/api/freetime', async (request, reply) => {
     const body = request.body as { dateKey?: string; tasks: unknown[] };
-    db.saveFreeTime(body.dateKey!, body.tasks);
+    if (!body.dateKey) {
+      return reply.status(400).send({ error: '缺少 dateKey' });
+    }
+    db.saveFreeTime(body.dateKey, body.tasks);
     return sendJson(reply, { ok: true });
   });
 
-  // 27b. PUT /api/freetime/:id — 单条自由时间 upsert
+  // 28b. PUT /api/freetime/:id — 单条自由时间 upsert
   app.put<{ Params: { id: string } }>('/api/freetime/:id', { schema: idParamSchema }, async (request, reply) => {
     db.putFreeTimeTask(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
-  // 28. PUT /api/bounty-tasks
+  // 29. PUT /api/bounty-tasks
   app.put('/api/bounty-tasks', async (request, reply) => {
     const body = request.body as { items: unknown[] };
     db.saveBountyTasks(body.items);
     return sendJson(reply, { ok: true });
   });
 
-  // 29. PUT /api/bounty-submissions — 全量替换赏金提交（body 含 dateKey + submissions）
+  // 30. PUT /api/bounty-submissions — 全量替换赏金提交（body 含 dateKey + submissions）
   app.put('/api/bounty-submissions', async (request, reply) => {
     const body = request.body as { dateKey?: string; submissions: unknown[] };
-    db.saveBountySubmissions(body.dateKey!, body.submissions);
+    if (!body.dateKey) {
+      return reply.status(400).send({ error: '缺少 dateKey' });
+    }
+    db.saveBountySubmissions(body.dateKey, body.submissions);
     return sendJson(reply, { ok: true });
   });
 
-  // 29b. PUT /api/bounty-submissions/:id — 单条赏金提交 upsert
+  // 30b. PUT /api/bounty-submissions/:id — 单条赏金提交 upsert
   app.put<{ Params: { id: string } }>('/api/bounty-submissions/:id', { schema: idParamSchema }, async (request, reply) => {
     db.putBountySubmission(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
-  // 30. PUT /api/bounty-completions — 全量替换赏金完成（body 含 dateKey + completions）
+  // 31. PUT /api/bounty-completions — 全量替换赏金完成（body 含 dateKey + completions）
   app.put('/api/bounty-completions', async (request, reply) => {
-    const body = request.body as { dateKey?: string; completions: unknown };
-    db.saveBountyCompletions(body.dateKey!, body.completions);
+    const body = request.body as { dateKey?: string; completions: unknown[] };
+    if (!body.dateKey) {
+      return reply.status(400).send({ error: '缺少 dateKey' });
+    }
+    db.saveBountyCompletions(body.dateKey, body.completions);
     return sendJson(reply, { ok: true });
   });
 
-  // 30b. PUT /api/bounty-completions/:id — 单条赏金完成 upsert
+  // 31b. PUT /api/bounty-completions/:id — 单条赏金完成 upsert
   app.put<{ Params: { id: string } }>('/api/bounty-completions/:id', { schema: idParamSchema }, async (request, reply) => {
     db.putBountyCompletion(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
-  // 31. POST /api/defer-homework - 延迟作业（请求/批准/拒绝）
+  // 32. POST /api/defer-homework - 延迟作业（请求/批准/拒绝）
   app.post('/api/defer-homework', async (request, reply) => {
     const body = request.body as {
       date: string;
@@ -580,6 +616,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
         // 添加到次日
         const tomorrow = getTomorrow(date);
+        hw.date = tomorrow;
         const tomorrowHw = db.getHomeworks(tomorrow);
         tomorrowHw.push(hw);
         db.saveHomeworks(tomorrow, tomorrowHw);
@@ -602,21 +639,21 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true });
   });
 
-  // 32. POST /api/reset-date - 重置日期数据
+  // 33. POST /api/reset-date - 重置日期数据
   app.post('/api/reset-date', async (request, reply) => {
     const body = request.body as { date: string };
     db.resetDate(body.date);
     return sendJson(reply, { ok: true });
   });
 
-  // 33. POST /api/sync/push - 同步推送
+  // 34. POST /api/sync/push - 同步推送
   app.post('/api/sync/push', async (request, reply) => {
     const body = request.body as { changes: unknown[] };
     const result = db.pushMerge(body.changes);
     return sendJson(reply, result);
   });
 
-  // 34. POST /api/pregen-speech - 预生成语音（后台执行）
+  // 35. POST /api/pregen-speech - 预生成语音（后台执行）
   app.post('/api/pregen-speech', async (request, reply) => {
     const body = request.body as { texts: string[] };
     if (body.texts && body.texts.length > 0) {
@@ -625,7 +662,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true });
   });
 
-  // 35. POST /api/email/config - 保存邮箱配置
+  // 36. POST /api/email/config - 保存邮箱配置
   app.post('/api/email/config', async (request, reply) => {
     const body = request.body as {
       host?: string;
@@ -680,7 +717,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return items;
   }
 
-  // 36. POST /api/email/sync - 触发邮件同步
+  // 37. POST /api/email/sync - 触发邮件同步
   app.post('/api/email/sync', async (request, reply) => {
     const config = db.getEmailConfig();
 
@@ -717,20 +754,35 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         expanded.push(...items);
       }
 
-      for (const hw of expanded) {
-        const dateKey = hw.date || new Date().toISOString().slice(0, 10);
-        const hwId = `email-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        db.putHomework(hwId, {
-          id: hwId,
-          subject: hw.subject,
-          content: hw.content,
-          dateKey,
-          status: 'pending',
-          source: 'email',
-          suggestedDuration: hw.suggestedDuration ?? 20,
-          basePoints: hw.basePoints ?? 10,
-          mode: 'pending',
-          actualDuration: null,
+      // 先收集所有要插入的作业，统一生成 ID，避免插入过程中出错后部分残留
+      const insertedIds: string[] = [];
+      try {
+        for (const hw of expanded) {
+          const dateKey = hw.date || new Date().toISOString().slice(0, 10);
+          const hwId = `email-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          db.putHomework(hwId, {
+            id: hwId,
+            subject: hw.subject,
+            content: hw.content,
+            dateKey,
+            status: 'pending',
+            source: 'email',
+            suggestedDuration: hw.suggestedDuration ?? 20,
+            basePoints: hw.basePoints ?? 10,
+            mode: 'pending',
+            actualDuration: null,
+          });
+          insertedIds.push(hwId);
+        }
+      } catch (err) {
+        console.error('[email/sync] 插入作业时出错，已插入 %d 条，尝试回滚...', insertedIds.length, err);
+        // 尝试删除已插入的作业（幂等回滚）
+        for (const id of insertedIds) {
+          try { db.deleteHomework(id); } catch { /* 忽略单个删除失败 */ }
+        }
+        return reply.status(500).send({
+          error: '邮件同步插入作业失败，已回滚',
+          code: 'EMAIL_SYNC_INSERT_ERROR',
         });
       }
 
@@ -934,6 +986,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   // 启动时后台预生成固定短语（不阻塞启动）
   tts.pregenAllFixed().catch(() => { });
+
+  // ==================== Graceful Shutdown ====================
+
+  app.addHook('onClose', async (_instance) => {
+    db.close();
+    tts.stop();
+  });
 
   return app;
 }

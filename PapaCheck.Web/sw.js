@@ -139,9 +139,11 @@ function cacheFirst(request) {
     if (cached) {
       if (request.method === 'GET') {
         fetch(request).then(function (response) {
-          caches.open(CACHE_NAME).then(function (cache) {
-            cache.put(request, response);
-          });
+          if (response.ok) {
+            caches.open(CACHE_NAME).then(function (cache) {
+              cache.put(request, response);
+            });
+          }
         }).catch(function () { });
       }
       return cached;

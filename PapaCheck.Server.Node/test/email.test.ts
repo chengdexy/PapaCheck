@@ -26,6 +26,7 @@ import type { FastifyInstance } from 'fastify';
 
 // Shared flag to control IMAP connect behavior
 let imapShouldFail = false;
+let openBoxShouldFail = false;
 
 // Mock imap module with proper EventEmitter-based event handling
 vi.mock('imap', () => {
@@ -49,7 +50,11 @@ vi.mock('imap', () => {
         }, 5);
       }),
       openBox: vi.fn((_name: string, _readOnly: boolean, cb: Function) => {
-        cb(null);
+        if (openBoxShouldFail) {
+          cb(new Error('Cannot open mailbox'));
+        } else {
+          cb(null);
+        }
       }),
       search: vi.fn((_criteria: string[], cb: Function) => {
         cb(null, [1, 2, 3]);
@@ -115,6 +120,7 @@ describe('EmailSync', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     imapShouldFail = false;
+    openBoxShouldFail = false;
     app = await buildApp({ port: 0, webDir: '', dbPath: ':memory:', showPollingLog: false });
     await app.listen({ port: 0, host: '127.0.0.1' });
   });
@@ -285,6 +291,136 @@ describe('EmailSync', () => {
       expect(res.statusCode).toBe(500);
       const body = JSON.parse(res.body);
       expect(body).toHaveProperty('error');
+      expect(body).toHaveProperty('code', 'EMAIL_SYNC_ERROR');
+    });
+
+    it('IMAP openBox 失败时返回错误信息', async () => {
+      openBoxShouldFail = true;
+
+      const config = {
+        host: 'imap.example.com',
+        port: 993,
+        user: 'test@example.com',
+        password: 'password123',
+        apiKey: 'sk-xxx',
+        apiUrl: 'https://api.deepseek.com/v1/chat/completions',
+      };
+
+      await app.inject({
+        method: 'POST',
+        url: '/api/email/config',
+        payload: config,
+      });
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/email/sync',
+      });
+
+      expect(res.statusCode).toBe(500);
+      const body = JSON.parse(res.body);
+      expect(body).toHaveProperty('error');
+      expect(body).toHaveProperty('code', 'EMAIL_SYNC_ERROR');
+    });
+
+    it('AI API 超时时返回超时错误信息', async () => {
+      // Mock fetch to reject with AbortError
+      const abortError = new Error('The operation was aborted');
+      abortError.name = 'AbortError';
+      const mockFetch = vi.fn().mockRejectedValue(abortError);
+      (globalThis as any).fetch = mockFetch;
+
+      const config = {
+        host: 'imap.example.com',
+        port: 993,
+        user: 'test@example.com',
+        password: 'password123',
+        apiKey: 'sk-xxx',
+        apiUrl: 'https://api.deepseek.com/v1/chat/completions',
+      };
+
+      await app.inject({
+        method: 'POST',
+        url: '/api/email/config',
+        payload: config,
+      });
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/email/sync',
+      });
+
+      expect(res.statusCode).toBe(500);
+      const body = JSON.parse(res.body);
+      expect(body).toHaveProperty('error', 'AI API 请求超时（30秒）');
+      expect(body).toHaveProperty('code', 'EMAIL_SYNC_ERROR');
+    });
+
+    it('AI API 返回非 200 状态码时返回错误', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      });
+      (globalThis as any).fetch = mockFetch;
+
+      const config = {
+        host: 'imap.example.com',
+        port: 993,
+        user: 'test@example.com',
+        password: 'password123',
+        apiKey: 'sk-invalid',
+        apiUrl: 'https://api.deepseek.com/v1/chat/completions',
+      };
+
+      await app.inject({
+        method: 'POST',
+        url: '/api/email/config',
+        payload: config,
+      });
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/email/sync',
+      });
+
+      expect(res.statusCode).toBe(500);
+      const body = JSON.parse(res.body);
+      expect(body).toHaveProperty('error');
+      expect(body.error).toContain('AI API 调用失败');
+      expect(body).toHaveProperty('code', 'EMAIL_SYNC_ERROR');
+    });
+
+    it('AI API 返回空 choices 时返回错误', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ choices: [] }),
+      });
+      (globalThis as any).fetch = mockFetch;
+
+      const config = {
+        host: 'imap.example.com',
+        port: 993,
+        user: 'test@example.com',
+        password: 'password123',
+        apiKey: 'sk-xxx',
+        apiUrl: 'https://api.deepseek.com/v1/chat/completions',
+      };
+
+      await app.inject({
+        method: 'POST',
+        url: '/api/email/config',
+        payload: config,
+      });
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/email/sync',
+      });
+
+      expect(res.statusCode).toBe(500);
+      const body = JSON.parse(res.body);
+      expect(body).toHaveProperty('error', 'AI API 返回空结果');
       expect(body).toHaveProperty('code', 'EMAIL_SYNC_ERROR');
     });
   });

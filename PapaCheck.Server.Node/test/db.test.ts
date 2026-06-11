@@ -146,6 +146,16 @@ describe('Database', () => {
       // 底层方法应该安全返回 undefined
       expect(() => { (db as any)._getDateDataRaw('homeworks', 'corrupt-date'); }).not.toThrow();
     });
+
+    it('_safeJsonParse 在 JSON null 时返回 undefined', () => {
+      const result = (db as any)._safeJsonParse('null');
+      expect(result).toBeUndefined();
+    });
+
+    it('_safeJsonParse 在 undefined 输入时返回 undefined', () => {
+      const result = (db as any)._safeJsonParse(undefined);
+      expect(result).toBeUndefined();
+    });
   });
 
   describe('homeworks CRUD', () => {
@@ -429,6 +439,15 @@ describe('Database', () => {
       expect(buffs).toHaveLength(1);
       expect(buffs[0].id).toBe('buff2');
     });
+
+    it('resetDate 无效 dateKey 格式不崩溃（不足三段）', () => {
+      // dateKey 长度不足 3 段应提前 return
+      expect(() => db.resetDate('invalid')).not.toThrow();
+    });
+
+    it('resetDate 无效 dateKey 格式（两段）不崩溃', () => {
+      expect(() => db.resetDate('2026-06')).not.toThrow();
+    });
   });
 
   describe('importFullData / getFullData roundtrip', () => {
@@ -581,6 +600,43 @@ describe('Database', () => {
       const result = db.getSettlement(dateKey);
       expect(result.rating).toBe('A+');
     });
+
+    // Feature: pushMerge 对 date_key 表且无 date 字段应跳过
+    //   Scenario: 数据缺少 date/dateKey/uuid 时跳过处理
+    //     Given 当前数据库状态
+    //     When 使用 pushMerge 传入 data 无 date/dateKey 且 uuid 为空
+    //     Then 不抛出异常，recordKey 为空跳过该条变更
+    it('pushMerge 无 date 字段且空 uuid 的 bounty_submissions 应跳过', () => {
+      expect(() => {
+        db.pushMerge([{
+          type: 'update',
+          uuid: '',
+          data: { id: 'bs1', taskId: 'bt1', startedAt: '2026-06-06T10:00:00Z' },
+          timestamp: '2026-06-06T10:00:00Z',
+        }]);
+      }).not.toThrow();
+    });
+
+    // Feature: pushMerge 对 date_key 表 dict 类型执行 delete
+    //   Scenario: delete 标记 daily_settlement 数据为已删除
+    //     Given daily_settlement 存在一条记录
+    //     When 使用 pushMerge 传入 type delete 且数据为 dict 类型
+    //     Then 数据被标记 isDeleted
+    it('pushMerge 对 daily_settlement dict 类型执行 delete', () => {
+      const dateKey = '2026-06-06';
+      db.saveSettlement(dateKey, { rating: 'A', dailyBase: 100 });
+
+      db.pushMerge([{
+        type: 'delete',
+        uuid: 'settlement-del',
+        data: { rating: 'A', dailyBase: 100, date: dateKey, lastModified: '2026-06-06T10:00:00Z' },
+        timestamp: '2026-06-06T10:00:00Z',
+      }]);
+
+      // delete 操作在 dict 类型上标记 isDeleted
+      const raw = (db as any)._getDateDataRaw('daily_settlement', dateKey);
+      expect(raw.isDeleted).toBe(true);
+    });
   });
 
   describe('pushMerge - single-row tables', () => {
@@ -661,6 +717,69 @@ describe('Database', () => {
 
       const items = db.getShopItems();
       expect(items).toHaveLength(3);
+    });
+
+    // Feature: pushMerge 对 SINGLE_ROW dict 类型（settings）执行 delete
+    //   Scenario: delete 标记 settings 数据为已删除
+    //     Given settings 表存在一条记录
+    //     When 使用 pushMerge 传入 type delete 且数据为 dict 类型
+    //     Then 数据被标记 isDeleted
+    it('pushMerge for settings dict type with delete 应标记 isDeleted', () => {
+      db.saveSettings({ dailyBasePoints: 100, ratingMultipliers: { A: 1.0 } });
+
+      db.pushMerge([{
+        type: 'delete',
+        uuid: 'settings-delete',
+        data: { dailyBasePoints: 100, lastModified: '2026-06-06T10:00:00Z' },
+        timestamp: '2026-06-06T10:00:00Z',
+      }]);
+
+      // settings 是 dict 类型，delete 应标记 isDeleted
+      const settings = (db as any)._getJson('settings');
+      expect(settings.isDeleted).toBe(true);
+    });
+
+    // Feature: pushMerge 非对象数据类型应跳过
+    //   Scenario: 传入 data 为字符串或 null
+    //     Given 任何数据库状态
+    //     When 使用 pushMerge 传入非对象 data
+    //     Then 跳过该条变更
+    it('pushMerge 非对象数据类型（字符串）应跳过', () => {
+      expect(() => {
+        db.pushMerge([{
+          type: 'update',
+          uuid: 'string-data',
+          data: 'this-is-not-an-object',
+          timestamp: '2026-06-06T10:00:00Z',
+        }]);
+      }).not.toThrow();
+    });
+
+    it('pushMerge data 为 null 应跳过', () => {
+      expect(() => {
+        db.pushMerge([{
+          type: 'update',
+          uuid: 'null-data',
+          data: null,
+          timestamp: '2026-06-06T10:00:00Z',
+        }]);
+      }).not.toThrow();
+    });
+
+    // Feature: pushMerge 无法分类的数据应跳过
+    //   Scenario: 传入 data 无法匹配任何表
+    //     Given 任何数据库状态
+    //     When 使用 pushMerge 传入无法分类的 data
+    //     Then 跳过该条变更
+    it('pushMerge 无法分类的数据（无匹配字段）应跳过', () => {
+      expect(() => {
+        db.pushMerge([{
+          type: 'update',
+          uuid: 'unclassified',
+          data: { someUnknownField: 'value' },
+          timestamp: '2026-06-06T10:00:00Z',
+        }]);
+      }).not.toThrow();
     });
   });
 
@@ -795,6 +914,29 @@ describe('Database', () => {
       const raw = (db as any)._getDateDataRaw('homeworks', dateKey);
       const deleted = raw.find((h: any) => h.id === 'hw1');
       expect(deleted.isDeleted).toBe(true);
+    });
+
+    it('putHomework 在软删除记录上创建新记录', () => {
+      // 先删除作业
+      db.deleteHomework('hw1');
+      expect(db.getHomeworkById('hw1')).toBeNull();
+
+      // 用同一 ID 重新创建——应创建新记录（不是恢复旧的）
+      db.putHomework('hw1', { id: 'hw1', subject: '重新创建', content: '新内容', dateKey: '2026-06-07' });
+
+      // getHomeworkById 按 _findRecordById 顺序找到旧记录（已删除），返回 null
+      expect(db.getHomeworkById('hw1')).toBeNull();
+
+      // 验证新记录在 dateKey=2026-06-07 的列表中
+      const hwList = db.getHomeworks('2026-06-07');
+      const newHw = hwList.find((h: any) => h.id === 'hw1');
+      expect(newHw).toBeDefined();
+      expect(newHw!.subject).toBe('重新创建');
+
+      // 验证旧记录仍有 isDeleted 标记
+      const raw = (db as any)._getDateDataRaw('homeworks', '2026-06-06');
+      const oldDeleted = raw.find((h: any) => h.id === 'hw1' && h.isDeleted);
+      expect(oldDeleted).toBeDefined();
     });
   });
 
@@ -1424,6 +1566,32 @@ describe('Database', () => {
       const remaining = (db as any).getPendingNotifications();
       expect(remaining).toHaveLength(1);
       expect(remaining[0].id).toBe(id3);
+    });
+
+    // Feature: 消费通知批处理
+    //   Scenario: 超过 500 个 ID 时分批处理
+    //     Given 数据库中有 510 条通知
+    //     When 调用 consumeNotifications(ids) 传入 510 个 ID
+    //     Then 所有通知被删除
+    it('consumeNotifications 超过 500 个 ID 时批量处理', () => {
+      const ids: string[] = [];
+      const count = 510;
+      for (let i = 0; i < count; i++) {
+        const id = `batch-${String(i).padStart(4, '0')}`;
+        ids.push(id);
+        (db as any).db.prepare(
+          'INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)'
+        ).run(id, `批量通知${i}`, Date.now());
+      }
+
+      (db as any).consumeNotifications(ids);
+
+      const remaining = (db as any).getPendingNotifications();
+      expect(remaining).toHaveLength(0);
+
+      // 验证数据库中确实没有记录
+      const allRows = (db as any).db.prepare('SELECT COUNT(*) as cnt FROM notifications').get() as any;
+      expect(allRows.cnt).toBe(0);
     });
 
     // Feature: CRDT 分类

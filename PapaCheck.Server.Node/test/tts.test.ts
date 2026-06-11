@@ -340,6 +340,33 @@ describe('TTSBridge', () => {
     });
   });
 
+  describe('getLastError', () => {
+    it('_lastError 为空字符串时返回空字符串', () => {
+      bridge = new TTSBridge({ _spawn: mockSpawn as unknown as SpawnFn });
+      expect(bridge.getLastError()).toBe('');
+    });
+
+    it('_lastError 有值时返回对应错误信息', () => {
+      bridge = new TTSBridge({ _spawn: mockSpawn as unknown as SpawnFn });
+      (bridge as any)._lastError = 'python not found';
+      expect(bridge.getLastError()).toBe('python not found');
+    });
+  });
+
+  describe('pregenAllFixed - 空 FIXED_TEXTS', () => {
+    it('FIXED_TEXTS 为空时提前返回，不调用 speak', async () => {
+      const original = (TTSBridge as any).FIXED_TEXTS;
+      (TTSBridge as any).FIXED_TEXTS = [];
+      bridge = new TTSBridge({ _spawn: mockSpawn as unknown as SpawnFn });
+      const speakSpy = vi.spyOn(bridge, 'speak').mockResolvedValue(Buffer.alloc(0));
+
+      await bridge.pregenAllFixed();
+
+      expect(speakSpy).not.toHaveBeenCalled();
+      (TTSBridge as any).FIXED_TEXTS = original;
+    });
+  });
+
   describe('daemon 常驻进程', () => {
     let daemonProc: any;
 
@@ -364,6 +391,18 @@ describe('TTSBridge', () => {
         { stdio: ['pipe', 'pipe', 'pipe'] },
       );
       expect((bridge as any)._daemonProc).toBe(daemonProc);
+    });
+
+    it('_ensureDaemon spawn 触发 error 时将 _daemonProc 置为 null', () => {
+      mockSpawn.mockReturnValue(daemonProc);
+      bridge = new TTSBridge({ scriptPath: '/fake/tts_bridge.py', _spawn: mockSpawn as unknown as SpawnFn });
+
+      (bridge as any)._ensureDaemon();
+      expect((bridge as any)._daemonProc).toBe(daemonProc);
+
+      daemonProc.emit('error', new Error('python not found'));
+
+      expect((bridge as any)._daemonProc).toBeNull();
     });
 
     it('_ensureDaemon 多次调用只启动一个进程', () => {

@@ -56,11 +56,13 @@ export function fetchUnseen(imap: Connection, markAsRead = true, attachmentDir?:
   return new Promise((resolve, reject) => {
     imap.openBox('INBOX', false, (openErr) => {
       if (openErr) {
+        try { imap.end(); } catch { /* ignore */ }
         return reject(openErr);
       }
 
       imap.search(['UNSEEN'], (searchErr, results) => {
         if (searchErr) {
+          try { imap.end(); } catch { /* ignore */ }
           return reject(searchErr);
         }
 
@@ -74,10 +76,24 @@ export function fetchUnseen(imap: Connection, markAsRead = true, attachmentDir?:
         const uids: number[] = [];
         let pending = results.length;
 
+        let settled = false;
+
         fetch.on('message', (msg, seqno) => {
           const chunks: Buffer[] = [];
 
+          msg.on('error', () => {
+            pending--;
+            if (pending <= 0) {
+              if (!settled) {
+                settled = true;
+                imap.end();
+                resolve(messages);
+              }
+            }
+          });
+
           msg.on('body', (stream, info) => {
+            stream.on('error', () => { /* ignore stream error */ });
             stream.on('data', (chunk: Buffer) => {
               chunks.push(chunk);
             });
@@ -106,7 +122,8 @@ export function fetchUnseen(imap: Connection, markAsRead = true, attachmentDir?:
                     await mkdir(attachmentDir, { recursive: true });
                     for (const att of parsed.attachments) {
                       if (att.filename && att.content) {
-                        const filePath = join(attachmentDir, att.filename);
+                        const prefix = Date.now() + '-' + Math.random().toString(36).slice(2,6) + '-';
+                        const filePath = join(attachmentDir, prefix + att.filename);
                         await writeFile(filePath, att.content);
                       }
                     }
@@ -119,14 +136,17 @@ export function fetchUnseen(imap: Connection, markAsRead = true, attachmentDir?:
               }
               pending -= 1;
               if (pending === 0) {
-                if (markAsRead && uids.length > 0) {
-                  imap.addFlags(uids, '\\Seen', () => {
+                if (!settled) {
+                  settled = true;
+                  if (markAsRead && uids.length > 0) {
+                    imap.addFlags(uids, '\\Seen', () => {
+                      imap.end();
+                      resolve(messages);
+                    });
+                  } else {
                     imap.end();
                     resolve(messages);
-                  });
-                } else {
-                  imap.end();
-                  resolve(messages);
+                  }
                 }
               }
             });
@@ -134,6 +154,8 @@ export function fetchUnseen(imap: Connection, markAsRead = true, attachmentDir?:
         });
 
         fetch.once('error', (fetchErr) => {
+          if (settled) return;
+          settled = true;
           imap.end();
           reject(fetchErr);
         });

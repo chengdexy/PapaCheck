@@ -46,7 +46,6 @@ function registerCleanup(tmpPath: string): void {
   const cleanup = () => {
     try { unlinkSync(tmpPath); } catch { /* 文件可能已被删除 */ }
   };
-  process.on('exit', cleanup);
   process.on('SIGINT', () => { cleanup(); process.exit(0); });
   process.on('SIGTERM', () => { cleanup(); process.exit(0); });
 }
@@ -136,6 +135,10 @@ export class TTSBridge {
   private spawnFn: SpawnFn;
   /** 上次 TTS 失败的错误信息（供 API 端点读取） */
   _lastError: string = '';
+  /** 获取上一次 TTS 失败的错误信息 */
+  getLastError(): string {
+    return this._lastError || '';
+  }
   /** 常驻子进程引用 */
   private _daemonProc: any = null;
   /** daemon 通信串行锁（Promise 链，同一时间只允许一个请求通过 stdin/stdout） */
@@ -157,6 +160,11 @@ export class TTSBridge {
   /** 获取内存缓存中的语音数据 */
   getCached(text: string): Buffer | undefined {
     return this.cache.get(text);
+  }
+
+  /** 获取上次 TTS 失败的错误信息 */
+  getLastError(): string {
+    return this._lastError;
   }
 
   /** 生成语音，返回 MP3 Buffer */
@@ -235,6 +243,8 @@ export class TTSBridge {
       });
 
       proc.on('close', (code) => {
+        proc.stdout.removeAllListeners('data');
+        proc.stderr.removeAllListeners('data');
         const stderr = Buffer.concat(errChunks).toString('utf-8').trim();
         if (code === 0) {
           if (stderr) console.log('[TTS] stderr:', stderr);
@@ -261,6 +271,10 @@ export class TTSBridge {
       for (const line of lines) {
         if (line) console.log(`[TTS] daemon: ${line}`);
       }
+    });
+    proc.on('error', (err) => {
+      console.error('[TTS] daemon 启动失败:', err.message);
+      this._daemonProc = null;
     });
     proc.on('close', () => {
       this._daemonProc = null;
@@ -346,6 +360,8 @@ export class TTSBridge {
 
   /** 启动时预生成所有固定短语并清理陈旧缓存 */
   async pregenAllFixed(): Promise<void> {
+    if (TTSBridge.FIXED_TEXTS.length === 0) return;
+
     const validHashes = new Set(TTSBridge.FIXED_TEXTS.map(t => this.md5(t) + '.mp3'));
 
     console.log('[TTS] 开始预生成TTS固定短语mp3...');
@@ -368,6 +384,16 @@ export class TTSBridge {
       if (text && text.trim()) {
         this.speak(text).catch(() => { });
       }
+    }
+  }
+
+  /** 停止常驻进程，释放资源 */
+  stop(): void {
+    if (this._daemonProc) {
+      try {
+        this._daemonProc.kill();
+      } catch { /* 进程可能已退出 */ }
+      this._daemonProc = null;
     }
   }
 }

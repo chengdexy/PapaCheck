@@ -324,7 +324,8 @@ export class PapaCheckDB {
   _findRecordById(table: string, id: string): { dateKey: string; index: number; item: any } | null {
     const rows = this.db.prepare(`SELECT date_key, data FROM ${table}`).all() as { date_key: string; data: string }[];
     for (const row of rows) {
-      const data = JSON.parse(row.data);
+      const data = this._safeJsonParse(row.data);
+      if (!data) continue;
       if (Array.isArray(data)) {
         const { index, item } = this._findInArray(data, id);
         if (item) return { dateKey: row.date_key, index, item };
@@ -500,8 +501,6 @@ export class PapaCheckDB {
 
   getPendingNotifications(): NotificationItem[] {
     const cutoff = Date.now() - 3600000;
-    // Also clean up expired
-    this.db.prepare('DELETE FROM notifications WHERE created_at < ?').run(cutoff);
 
     const rows = this.db.prepare(
       'SELECT id, text, created_at FROM notifications WHERE created_at >= ? ORDER BY created_at ASC'
@@ -521,8 +520,12 @@ export class PapaCheckDB {
 
   consumeNotifications(ids: string[]): void {
     if (ids.length === 0) return;
-    const placeholders = ids.map(() => '?').join(',');
-    this.db.prepare(`DELETE FROM notifications WHERE id IN (${placeholders})`).run(...ids);
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      const batch = ids.slice(i, i + BATCH_SIZE);
+      const placeholders = batch.map(() => '?').join(',');
+      this.db.prepare(`DELETE FROM notifications WHERE id IN (${placeholders})`).run(...batch);
+    }
   }
 
   // ==================== Points ====================
@@ -620,7 +623,7 @@ export class PapaCheckDB {
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
 
-    if (existing) {
+    if (existing && !existing.item.isDeleted) {
       const items = this._getDateDataRaw('homeworks', existing.dateKey);
       if (!Array.isArray(items)) {
         // 数据损坏：覆盖为新数组
@@ -1099,7 +1102,7 @@ export class PapaCheckDB {
       }
 
       if (DATE_KEY_TABLES.has(table)) {
-        const recordKey = data.date ?? '';
+        const recordKey = data.date || data.dateKey || uuid || '';
         if (!recordKey) continue;
 
         const existing = this._getDateDataRaw(table, recordKey);
@@ -1218,6 +1221,7 @@ export class PapaCheckDB {
     const buffs = this._getJson('active_buffs') ?? [];
     const beforeCount = buffs.length;
     const parts = dateKey.split('-');
+    if (parts.length !== 3) return;
     const isoPrefix = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
     const filteredBuffs = buffs.filter((b: any) =>
       b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)

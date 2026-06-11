@@ -196,6 +196,15 @@ async function initAdmin() {
       const restoreBtn = e.target.closest('.subject-mgmt-restore-btn');
       if (restoreBtn && restoreBtn.dataset.subjectId) {
         restoreDefaultSubject(restoreBtn.dataset.subjectId);
+        return;
+      }
+      // 奖励箱添加商品事件委托（防止 XSS，避免内联 onclick）
+      const rewardItem = e.target.closest('.reward-shop-item');
+      if (rewardItem && rewardItem.dataset.siName) {
+        const name = rewardItem.dataset.siName;
+        const type = rewardItem.dataset.siType || 'time';
+        const duration = rewardItem.dataset.siDuration || '0';
+        addRewardFromShop(name, type, duration);
       }
     });
   }
@@ -516,7 +525,7 @@ async function saveAdminHw() {
 
   const subject = window._adminSelectedSubject || '语文';
   const suggestedDuration = parseInt(document.getElementById('adminHwDuration').value) || 20;
-  const basePoints = parseInt(document.getElementById('adminHwBasePoints').value) ?? 10;
+  const basePoints = parseInt(document.getElementById('adminHwBasePoints').value) || 10;
 
   if (adminEditingId) {
     // 编辑已有作业：只 PATCH 改动的字段，不发整条作业
@@ -541,10 +550,7 @@ async function saveAdminHw() {
     await API.putHomework(newHw.id, newHw);
 
     const dateKey = AdminUtil.dateKey(adminDate);
-    const existingSettlement = cachedData?.dailySettlement?.[dateKey];
-    if (!existingSettlement || !existingSettlement.rating) {
-      await API.putSettlement(dateKey, {});
-    }
+    // BUG FIX: 不再用空 {} 覆写 settlement，由 app.js 在作业完成时自动初始化
     try { await API.announce('收到新作业，请查看'); } catch (e) { /* 非致命 */ }
   }
   closeAdminModal();
@@ -765,7 +771,7 @@ function openShopModal(mode, itemId) {
     <h3>${adminEditingId ? '编辑商品' : '添加商品'}</h3>
     <div class="form-group">
       <label>商品名称</label>
-      <input type="text" id="adminItemName" value="${item?.name || ''}" placeholder="例如：游戏时间" maxlength="20">
+      <input type="text" id="adminItemName" value="${escapeHtml(item?.name || '')}" placeholder="例如：游戏时间" maxlength="20">
     </div>
     <div class="form-group">
       <label>所需积分</label>
@@ -940,7 +946,7 @@ function openRewardBoxModal(mode, itemId) {
       <h3>编辑奖励</h3>
       <div class="form-group">
         <label>奖励名称</label>
-        <input type="text" id="adminItemName" value="${item.name}" maxlength="20">
+        <input type="text" id="adminItemName" value="${escapeHtml(item.name)}" maxlength="20">
       </div>
       <div class="form-group">
         <label>奖励类型</label>
@@ -973,10 +979,10 @@ function openRewardBoxModal(mode, itemId) {
           ${adminShopItems.length === 0
         ? '<div style="text-align:center;color:var(--text-secondary);padding:16px;">商店暂无商品</div>'
         : adminShopItems.map(si => `
-              <div style="padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);"
+              <div class="reward-shop-item" data-si-name="${escapeHtml(si.name)}" data-si-type="${escapeHtml(si.type)}" data-si-duration="${si.durationMinutes || 0}"
+                style="padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);"
                 onmouseover="this.style.background='rgba(255,255,255,0.05)'"
-                onmouseout="this.style.background='transparent'"
-                onclick="addRewardFromShop('${escapeHtml(si.name)}','${si.type}','${si.durationMinutes || 0}')">
+                onmouseout="this.style.background='transparent'">
                 <div>
                   <div style="font-weight:600;">${si.type === 'time' ? '⏱️' : '🎁'} ${escapeHtml(si.name)}</div>
                   <div style="font-size:12px;color:var(--text-secondary);">${si.points}积分${si.type === 'time' && si.durationMinutes ? ' · ' + si.durationMinutes + '分钟' : ''}</div>

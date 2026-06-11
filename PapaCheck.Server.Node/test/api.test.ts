@@ -215,6 +215,16 @@ describe('POST /api/data', () => {
     const body = JSON.parse(res.body);
     expect(body).toHaveProperty('ok', true);
   });
+
+  it('null 请求体返回 400', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/data', payload: null });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('数组请求体返回 400', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/data', payload: [] });
+    expect(res.statusCode).toBe(400);
+  });
 });
 
 describe('PUT /api/homeworks', () => {
@@ -275,6 +285,15 @@ describe('PATCH /api/points', () => {
     const body = JSON.parse(res.body);
     expect(body).toHaveProperty('ok', true);
     expect(body).toHaveProperty('balance');
+  });
+
+  it('无效 action 返回 400', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/points',
+      payload: { action: 'invalid', amount: 10, detail: '测试' },
+    });
+    expect(res.statusCode).toBe(400);
   });
 });
 
@@ -376,6 +395,19 @@ describe('PUT /api/freetime/:date', () => {
   });
 });
 
+describe('PUT /api/freetime 缺少 dateKey', () => {
+  it('返回 400', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/freetime',
+      payload: { tasks: [] },
+    });
+    expect(res.statusCode).toBe(400);
+    const body = JSON.parse(res.body);
+    expect(body).toHaveProperty('error', '缺少 dateKey');
+  });
+});
+
 describe('PUT /api/bounty-tasks', () => {
   it('保存赏金任务', async () => {
     const items = [{ id: 'bt_test', name: '赏金测试', points: 100 }];
@@ -404,6 +436,19 @@ describe('PUT /api/bounty-submissions/:date', () => {
   });
 });
 
+describe('PUT /api/bounty-submissions 缺少 dateKey', () => {
+  it('返回 400', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/bounty-submissions',
+      payload: { submissions: [] },
+    });
+    expect(res.statusCode).toBe(400);
+    const body = JSON.parse(res.body);
+    expect(body).toHaveProperty('error', '缺少 dateKey');
+  });
+});
+
 describe('PUT /api/bounty-completions/:date', () => {
   it('保存赏金完成记录', async () => {
     const completions = { taskId: 'bt_test', completed: true };
@@ -415,6 +460,19 @@ describe('PUT /api/bounty-completions/:date', () => {
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
     expect(body).toHaveProperty('ok', true);
+  });
+});
+
+describe('PUT /api/bounty-completions 缺少 dateKey', () => {
+  it('返回 400', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/bounty-completions',
+      payload: { completions: [] },
+    });
+    expect(res.statusCode).toBe(400);
+    const body = JSON.parse(res.body);
+    expect(body).toHaveProperty('error', '缺少 dateKey');
   });
 });
 
@@ -583,6 +641,92 @@ describe('CORS 头', () => {
     const res = await app.inject({ method: 'OPTIONS', url: '/api/ping' });
     expect(res.statusCode).toBe(204);
     expect(res.headers['access-control-allow-origin']).toBe('*');
+  });
+});
+
+// ==================== POST /api/email/config ====================
+
+describe('POST /api/email/config 缺少必填字段', () => {
+  it('缺失 host 返回 400', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/email/config',
+      payload: { port: 993, user: 'test', password: 'pass' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('缺失 port 返回 400', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/email/config',
+      payload: { host: 'imap.test.com', user: 'test', password: 'pass' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('缺失 user 返回 400', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/email/config',
+      payload: { host: 'imap.test.com', port: 993, password: 'pass' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('缺失 password 返回 400', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/email/config',
+      payload: { host: 'imap.test.com', port: 993, user: 'test' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('全部缺失返回 400', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/email/config',
+      payload: {},
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+// ==================== 404 和错误处理器 ====================
+
+describe('404 handler', () => {
+  it('未知路由返回 404', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/nonexistent-route' });
+    expect(res.statusCode).toBe(404);
+    const body = JSON.parse(res.body);
+    expect(body).toHaveProperty('error', '请求的资源不存在');
+  });
+});
+
+describe('Error handler - validation errors', () => {
+  it('body schema 校验失败返回 400', async () => {
+    // PATCH /api/settings 的 schema 要求 body 为 object，发送 string 触发校验失败
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings',
+      payload: JSON.stringify('not-an-object'),
+      headers: { 'content-type': 'application/json' },
+    });
+    expect(res.statusCode).toBe(400);
+    const body = JSON.parse(res.body);
+    expect(body).toHaveProperty('code', 'VALIDATION_ERROR');
+  });
+});
+
+// ==================== GET /api/static-version ====================
+
+describe('GET /api/static-version', () => {
+  it('webDir 为空时返回空字符串版本', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/static-version' });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toHaveProperty('version', '');
   });
 });
 
@@ -779,6 +923,11 @@ describe('HEAD /api/shop/:id', () => {
     const res = await app.inject({ method: 'HEAD', url: '/api/shop/shop-head-1' });
     expect(res.statusCode).toBe(200);
   });
+
+  it('不存在的商品返回 404', async () => {
+    const res = await app.inject({ method: 'HEAD', url: '/api/shop/nonexistent-head' });
+    expect(res.statusCode).toBe(404);
+  });
 });
 
 describe('HEAD /api/bounty-tasks/:id', () => {
@@ -788,6 +937,25 @@ describe('HEAD /api/bounty-tasks/:id', () => {
 
     const res = await app.inject({ method: 'HEAD', url: '/api/bounty-tasks/bt-head-1' });
     expect(res.statusCode).toBe(200);
+  });
+
+  it('不存在的赏金任务返回 404', async () => {
+    const res = await app.inject({ method: 'HEAD', url: '/api/bounty-tasks/nonexistent-head' });
+    expect(res.statusCode).toBe(404);
+  });
+});
+
+// ==================== DELETE 端点 ====================
+
+describe('DELETE /api/reward-box/:id', () => {
+  it('软删奖励箱物品', async () => {
+    const data = { id: 'rb-del-1', name: '待删除奖励', quantity: 1 };
+    await app.inject({ method: 'PUT', url: '/api/reward-box/rb-del-1', payload: data });
+
+    const res = await app.inject({ method: 'DELETE', url: '/api/reward-box/rb-del-1' });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toEqual({ ok: true });
   });
 });
 
@@ -910,7 +1078,8 @@ describe('GET /api/notify/pending', () => {
     expect(body.items).toHaveLength(1);
     expect(body.items[0].id).toBe(validId);
 
-    // Verify expired was cleaned up
+    // 过期通知需单独调用清理
+    (db as any).cleanupExpiredNotifications();
     const remaining = dbWrite.prepare('SELECT COUNT(*) as cnt FROM notifications').get() as any;
     expect(remaining.cnt).toBe(1);
   });
@@ -959,6 +1128,26 @@ describe('DELETE /api/notify/consumed', () => {
     const res = await app.inject({
       method: 'DELETE',
       url: '/api/notify/consumed',
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toEqual({ ok: true });
+  });
+
+  it('空字符串 ids 返回 ok', async () => {
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/api/notify/consumed?ids=',
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toEqual({ ok: true });
+  });
+
+  it('逗号 ids 返回 ok', async () => {
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/api/notify/consumed?ids=,,',
     });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
