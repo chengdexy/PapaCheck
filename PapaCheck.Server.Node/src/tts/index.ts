@@ -137,7 +137,7 @@ export class TTSBridge {
   _lastError: string = '';
   /** 获取上一次 TTS 失败的错误信息 */
   getLastError(): string {
-    return this._lastError;
+    return this._lastError || '';
   }
   /** 常驻子进程引用 */
   private _daemonProc: any = null;
