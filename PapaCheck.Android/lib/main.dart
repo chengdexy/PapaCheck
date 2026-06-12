@@ -561,7 +561,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     final appPrefix = isCloud ? '/app' : '';
 
     // 防止 baseUrl 尾部已有斜杠时拼接出双斜杠
-    final base = baseUrl.endsWith('/')
+    final base = baseUrl.isNotEmpty && baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
 
