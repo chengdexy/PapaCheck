@@ -1,10 +1,16 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-11 22:23
+> 最后更新：2026-06-12 09:45
 
 ## 当前版本
 
 **v1.2.23**（修复 Windows 端版本更新后开机自启动配置被取消）
+
+## 部署状态
+
+- [x] **阿里云 ECS 部署完成** — 2核2G / 3M / 40G SSD / Ubuntu 24.04 / Docker Compose
+- [x] **域名 + HTTPS 已配置** — https://papacheck.chengdexy.cn/（落地页）
+- [x] Nginx 落地页容器 + Let's Encrypt 自动证书
 
 ---
 
@@ -59,6 +65,8 @@
 - [ ] 离线功能差距填补与前端测试（spec 已有）
 - [ ] 简化 Flutter 启动流程（spec 已有）
 - [ ] Windows 端合并到服务端（spec 已有）
+- [ ] Phase 5b: PostgreSQL 适配（数据库抽象层重构）
+- [ ] Phase 5c: HTTPS + 域名配置
 
 ---
 
@@ -73,6 +81,9 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-12 | **HTTPS + 域名配置**：DNS A 记录 papacheck → 123.57.129.243；Nginx 容器加端口 443 + Let's Encrypt 免费证书 + HTTP 自动 301 跳转；部署产品落地页（80 端口）；全量 505 测试通过 |
+| 2026-06-12 | **修复 OOM 宕机**：docker compose up -d 重建容器时内存溢出（2核2G 无 Swap），导致 SSH 断连、服务器卡死。修复：创建 2GB Swap 分区 + Docker mem_limit 768m + memswap_limit 1536m；更新 docker-compose.yml、Dockerfile、SKILL.md |
+| 2026-06-12 | **阿里云 ECS 上云完成**：购买 2核2G 经济型 e 实例（99元/年）→ Ubuntu 24.04 初始化 → Docker 安装 → SSH 安全加固 + UFW 防火墙 → 本地打包上传代码 → Docker 多阶段构建（node:22-alpine）→ Docker Compose 启动 → 阿里云安全组配置 8080 端口；创建 `cloud-deploy` Skill 记录完整部署流程 |
 | 2026-06-11 | 修复 Windows 端版本号更迭后开机自启动配置被取消：`_cleanup_stale_autostart`（删除无效路径）→ `_repair_autostart`（更新为当前 EXE 路径），保留用户自启动设定；新增 TDD 测试 4 个；全量 565 测试通过（505 JS + 60 Python） |
 | 2026-06-11 | 修复奖励箱物品消耗后重新出现（`_fulfillFromRewardBox` 数量归零时未删除服务端记录）；修复商店每日数量重置被陈旧 CRDT 操作覆盖（`putShopItem` 时间戳保护 + `_resetDailyShopQuantity` 更新 `lastModified`）；`getRewardBox` 添加 `_filterDeleted`；新增 TDD 测试 6 个；全量 505 测试通过 |
 | 2026-06-11 | 全量代码审查 + 30 个 Bug 修复（11 Critical + 19 Major）：`getTomorrow` 无效日期保护、`dateKey!` 非空断言 → 400 校验、IMAP 连接泄漏修复、TTS daemon error 监听、XSS 防护（innerHTML + onclick bypass）、SQL 参数分批、软删除复活保护、UI 瞬态字段不持久化、fetch 超时控制、数据导入校验、静态文件哈希错误分级日志等；新增 91 个测试（Server 28 + Frontend 50 + TTS/Email 8 + 定向补漏 5）；全量 499 测试通过；覆盖提升至 Stmts 85.22% / Branch 71.89% |

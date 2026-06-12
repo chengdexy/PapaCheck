@@ -23,7 +23,16 @@ PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和�
 
 ## 🚀 快速开始
 
-### 1. 启动服务器
+### 0. 云部署（免局域网，随时随地访问）
+
+项目已部署到阿里云 ECS，直接在浏览器访问服务器 IP 的 8080 端口：
+
+- **孩子端**：`http://<服务器IP>:8080/`
+- **管理端**：`http://<服务器IP>:8080/admin.html`
+
+> 服务器配置：2核2G / 3M带宽 / Ubuntu 24.04 / Docker Compose，年费仅 99 元。
+
+### 1. 本地启动服务器
 
 **方式 A：Windows 桌面端（推荐）**
 
@@ -107,6 +116,7 @@ npx vitest run PapaCheck.Tests/duplicate_rating.test.js
 | [API](docs/API.md)                     | API 接口文档 |
 | [CHANGELOG](docs/CHANGELOG.md)         | 变更日志    |
 | [PROGRESS](docs/PROGRESS.md)           | 进度记录    |
+| [HANDOVER](docs/HANDOVER.md)           | 上云交接文档 |
 
 ### 测试驱动开发
 

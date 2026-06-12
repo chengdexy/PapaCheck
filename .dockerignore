@@ -1,0 +1,15 @@
+.git
+.gitignore
+node_modules/
+dist/
+data.db
+*.md
+test/
+scripts/
+PapaCheck.Android/
+PapaCheck.Windows/
+PapaCheck.Email/
+PapaCheck.Tests/
+PapaCheck.Server/
+docs/
+.trae/

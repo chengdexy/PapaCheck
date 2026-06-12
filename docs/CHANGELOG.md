@@ -7,6 +7,12 @@
 ## [Unreleased]
 
 ### Added
+- **阿里云 ECS 上云部署完成**：购买 2核2G 经济型 e 实例（99元/年，续费同价）→ Ubuntu 24.04 初始化 → Docker CE 29.5 + Compose v5.1 → SSH 密钥登录 + UFW 防火墙 → 本地打包上传 → 多阶段 Docker 构建（node:22-alpine）→ Docker Compose 启动 → 阿里云安全组配置
+- 创建 `cloud-deploy` Skill 记录完整上云部署流程
+- 创建 `docs/HANDOVER.md` 会话交接文档，含服务器信息、AccessKey、部署架构、常用操作
+- 创建 2GB Swap 分区 + Docker mem_limit 768m 防 OOM
+- **HTTPS + 域名配置**：DNS A 记录（papacheck → 123.57.129.243）→ Let's Encrypt 免费证书 → Nginx HTTPS 443 → HTTP 80 自动 301 重定向
+- Nginx 落地页容器（nginx:alpine，mem_limit 64m）部署产品落地页（docs/）
 - 全量代码审查 + 测试覆盖增强：覆盖提升至 Stmts 85.22% / Branch 71.89% / Funcs 90.94% / Lines 87.06%；
 - 新增 6 个 TDD 测试：`reward_box_delete.test.ts`、`shop_daily_reset.test.ts`、`reward_box_consumption.test.js`（505 总测试）
 
