@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+### Changed
+- **release.py 云端部署从 Docker Compose 迁移到 systemd**：tar 包直接解压到 `/opt/papacheck/`，远程命令改为 `npm ci + systemctl restart papacheck`
+- **`npx node-gyp` → `npx --yes node-gyp`**：修复首次构建时因 npx 确认提示导致卡住的问题
+- **EXE 版本 1.2.22→1.3.1，APK 版本 1.3.0→1.3.1**
+
 ### Fixed
 - **修复管理端确认兑现时全量 PUT 所有兑换记录导致的两个 Bug**（520 测试通过）
   - Bug 1：孩子端撤回的兑现自由时间，管理端没有消失 — 根因：`fulfillRedemption` 循环 PUT 所有 `adminRedemptions`，覆盖了孩子端的撤销操作（cancelled → pending）

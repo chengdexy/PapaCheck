@@ -54,7 +54,7 @@ def cloud_publish(server_ip, server_user):
     # 1. 运行测试
     print(f'  ▶ [1/5] 运行全量测试 ... ', end='', flush=True)
     result = subprocess.run(
-        ['npm', 'test'], cwd=ROOT,
+        'npm test', cwd=ROOT, shell=True,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if result.returncode != 0:
         print('✗')
@@ -71,9 +71,10 @@ def cloud_publish(server_ip, server_user):
         '--exclude=PapaCheck.Email', '--exclude=PapaCheck.Tests',
         '--exclude=PapaCheck.Server', '--exclude=docs', '--exclude=.trae',
         '--exclude=*.md', '--exclude=publish.ps1', '--exclude=.publish.tar.gz',
+        '--exclude=docker-compose.yml', '--exclude=.dockerignore',
+        '--exclude=nginx.conf', '--exclude=papacheck.service',
         '-czf', tar_path,
         'PapaCheck.Server.Node', 'PapaCheck.Web',
-        'docker-compose.yml', '.dockerignore', 'nginx.conf',
     ]
     result = subprocess.run(tar_cmd, cwd=ROOT)
     if result.returncode != 0:
@@ -101,7 +102,7 @@ def cloud_publish(server_ip, server_user):
         print(f'  ▶ [3/5] 上传 APK ({os.path.basename(apk_local)}) ... ', end='', flush=True)
         result = subprocess.run(
             ['scp', '-o', 'StrictHostKeyChecking=accept-new',
-             apk_local, f'{server_user}@{server_ip}:/opt/PapaCheck.Web/apk/'])
+             apk_local, f'{server_user}@{server_ip}:/opt/papacheck/PapaCheck.Web/apk/'])
         if result.returncode != 0:
             print('✗')
             print('  APK 上传失败')
@@ -109,7 +110,7 @@ def cloud_publish(server_ip, server_user):
             print('✓')
             # 清理旧 APK，只保留最新的 3 个
             cleanup_cmd = (
-                'cd /opt/PapaCheck.Web/apk && '
+                'cd /opt/papacheck/PapaCheck.Web/apk && '
                 'ls PapaCheck-*.apk 2>/dev/null | sort -r | tail -n +4 | '
                 'while read f; do rm -f "$f"; done && '
                 'echo "  清理旧 APK 完成"')
@@ -134,9 +135,13 @@ def cloud_publish(server_ip, server_user):
 
     # 5. 服务器端构建并重启
     print(f'  ▶ [5/5] 云端构建并重启 ... ', end='', flush=True)
-    remote_cmd = ('cd /opt && tar xzf .publish.tar.gz && '
-                  'rm -f .publish.tar.gz && '
-                  'docker compose build && docker compose up -d')
+    remote_cmd = (
+        'mkdir -p /opt/papacheck && '
+        'cd /opt && tar xzf .publish.tar.gz -C /opt/papacheck && '
+        'rm -f .publish.tar.gz && '
+        'cd /opt/papacheck/PapaCheck.Server.Node && '
+        'npm ci --omit=dev --ignore-scripts && '
+        'sudo systemctl restart papacheck')
     result = subprocess.run(
         ['ssh', '-o', 'StrictHostKeyChecking=accept-new',
          f'{server_user}@{server_ip}', remote_cmd])
@@ -285,16 +290,19 @@ def read_apk_version():
     return '0.0.0'
 
 
-def run_step(n, total, desc, cmd, cwd=None, shell=False):
+def run_step(n, total, desc, cmd, cwd=None, shell=False, verbose=False):
     print(f'  ▶ [{n}/{total}] {desc} ... ', end='', flush=True)
+    kwargs = {'cwd': cwd}
     if shell:
-        result = subprocess.run(cmd, cwd=cwd, shell=True,
-                                stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL)
+        kwargs['shell'] = True
+    if verbose:
+        kwargs['stdout'] = None
+        kwargs['stderr'] = None
+        print()
     else:
-        result = subprocess.run(cmd, cwd=cwd,
-                                stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL)
+        kwargs['stdout'] = subprocess.DEVNULL
+        kwargs['stderr'] = subprocess.DEVNULL
+    result = subprocess.run(cmd, **kwargs)
     if result.returncode != 0:
         print('✗')
         print(f'  ✗ {desc} (退出码: {result.returncode})')

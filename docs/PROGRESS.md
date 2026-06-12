@@ -4,7 +4,7 @@
 
 ## 当前版本
 
-**v1.3.0-beta**（Phase 5a+5b：PostgreSQL 适配 + 数据库抽象层重构 + 临时认证 + 部署架构重构 + 服务器 PostgreSQL 切换）
+**v1.3.1-beta**（release.py 云端部署迁移 + 发布流程修复 + 版本发布）
 
 ## 部署状态
 
@@ -85,6 +85,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-12 | **release.py 云端部署迁移 + 发布流程修复 + 版本发布 v1.3.1** |
 | 2026-06-12 | **修复管理端确认兑现时全量 PUT 兑换记录导致的两个 Bug** |
 | 2026-06-12 | **Phase 5a+5b 代码实施完成 + 服务器部署切换 PostgreSQL** |
 | 2026-06-12 | **修复 Dockerfile TTS Python 路径**：Docker CMD 添加 `--tts-python python3`（Alpine 无 `python` 命令，只有 `python3`，之前 TTS 实际未生效）；优化 pip 安装参数 `--no-cache-dir` 减镜像体积；代码审查修复 SCP 失败后 tar 包提前删除 bug；清理 publish.ps1 统一到 release.py；全量 505 测试通过 |

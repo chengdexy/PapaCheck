@@ -30,7 +30,7 @@ async function build() {
   if (existsSync(swaggerStatic)) { mkdirSync(swaggerDst, { recursive: true }); execSync('xcopy "' + swaggerStatic + '" "' + swaggerDst + '" /E /I /Y /Q', { stdio: 'ignore' }); }
 
   console.log('\n=== Step 4: 重编 better-sqlite3 为 Node 18 目标 ===\n');
-  run('cd node_modules/better-sqlite3 && npx node-gyp rebuild --target=18.5.0 --arch=x64 --dist-url=https://nodejs.org/dist');
+  run('cd node_modules/better-sqlite3 && npx --yes node-gyp rebuild --target=18.5.0 --arch=x64 --dist-url=https://nodejs.org/dist');
   var nodeAddonSrc = resolve(ROOT, 'node_modules', 'better-sqlite3', 'build', 'Release', 'better_sqlite3.node');
   var nodeAddonDst = resolve(DIST, 'better_sqlite3.node');
   if (existsSync(nodeAddonSrc)) { copyFileSync(nodeAddonSrc, nodeAddonDst); }
