@@ -127,7 +127,7 @@ def cloud_publish(server_ip, server_user):
     if result.returncode != 0:
         print('✗')
         print('  上传失败')
-        os.remove(tar_path)
+        # 保留 tar 包以便重试
         return False
     os.remove(tar_path)
     print('✓')
