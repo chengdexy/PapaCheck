@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-12 15:42
+> 最后更新：2026-06-12 22:02
 
 ## 当前版本
 
@@ -85,6 +85,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-12 | **修复管理端确认兑现时全量 PUT 兑换记录导致的两个 Bug** |
 | 2026-06-12 | **Phase 5a+5b 代码实施完成 + 服务器部署切换 PostgreSQL** |
 | 2026-06-12 | **修复 Dockerfile TTS Python 路径**：Docker CMD 添加 `--tts-python python3`（Alpine 无 `python` 命令，只有 `python3`，之前 TTS 实际未生效）；优化 pip 安装参数 `--no-cache-dir` 减镜像体积；代码审查修复 SCP 失败后 tar 包提前删除 bug；清理 publish.ps1 统一到 release.py；全量 505 测试通过 |
 | 2026-06-12 | **HTTPS + 域名配置**：DNS A 记录 papacheck → 123.57.129.243；Nginx 容器加端口 443 + Let's Encrypt 免费证书 + HTTP 自动 301 跳转；部署产品落地页（80 端口）；全量 505 测试通过 |

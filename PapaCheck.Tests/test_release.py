@@ -27,6 +27,8 @@ def _make_args(**kwargs):
         'no_bump_exe': False,
         'no_bump_apk': False,
         'no_zip': False,
+        'cloud_only': False,
+        'cloud': False,
         'output_dir': release.DEFAULT_OUTPUT_DIR,
         'v': None,
     }

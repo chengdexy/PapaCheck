@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### Fixed
+- **修复管理端确认兑现时全量 PUT 所有兑换记录导致的两个 Bug**（520 测试通过）
+  - Bug 1：孩子端撤回的兑现自由时间，管理端没有消失 — 根因：`fulfillRedemption` 循环 PUT 所有 `adminRedemptions`，覆盖了孩子端的撤销操作（cancelled → pending）
+  - Bug 2：偶发管理端审核通过的自由时间在管理端没有消失 — 根因：循环中某个 PUT 网络失败只更新了部分记录，`refreshAllData` 后已兑现记录回退到 pending
+  - 修复：只 PUT 当前正在兑现的那条记录（`await API.putRedemption(redemption.id, redemption)`），与孩子端 `cancelRedemption` 保持一致
+  - 新增 TDD 测试 5 个（`fulfill_redemption_only_put_target.test.js`）
+
 ### Added
 - **Phase 5a: PostgreSQL 适配 — 数据库抽象层重构**（v1.3.0 规划）
   - `IDatabase` 接口定义完整（~60 个方法），`DatabaseAdapter` 抽象基类提取通用工具方法

@@ -1463,9 +1463,11 @@ async function fulfillRedemption(id) {
   _fulfillingRedemption = true;
   try {
     redemption.status = 'fulfilled';
-    for (var i = 0; i < adminRedemptions.length; i++) {
-      await API.putRedemption(adminRedemptions[i].id, adminRedemptions[i]);
-    }
+    // 修复：只 PUT 当前兑现的记录，不再循环 PUT 所有记录
+    // 旧行为循环 PUT 所有记录导致：
+    //   1. 覆盖孩子端的撤销操作（cancelled → pending）
+    //   2. 偶发网络故障导致已兑现记录回退到 pending
+    await API.putRedemption(redemption.id, redemption);
 
     if (redemption.fromRewardBox) {
       await _fulfillFromRewardBox(redemption);
