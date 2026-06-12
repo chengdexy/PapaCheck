@@ -560,10 +560,15 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     final isCloud = uri != null && (uri.port == 80 || uri.port == 443);
     final appPrefix = isCloud ? '/app' : '';
 
+    // 防止 baseUrl 尾部已有斜杠时拼接出双斜杠
+    final base = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+
     if (role == DeviceRole.parent) {
-      return '$baseUrl$appPrefix/admin.html';
+      return '$base$appPrefix/admin.html';
     }
-    return '$baseUrl$appPrefix/';
+    return '$base$appPrefix/';
   }
 
   void _applyOrientation(DeviceRole role) {
