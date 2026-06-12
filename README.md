@@ -30,13 +30,13 @@ PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和�
 - **孩子端**：`https://papacheck.chengdexy.cn/app/`
 - **管理端**：`https://papacheck.chengdexy.cn/app/admin.html`
 
-> 服务器配置：2核2G / 3M带宽 / Ubuntu 24.04 / systemd + Nginx + PostgreSQL，年费仅 99 元。
+> 服务器配置：2核2G / 3M带宽 / Ubuntu 24.04 / systemd + Nginx + PostgreSQL
 
 ### 1. 本地启动服务器
 
 **方式 A：Windows 桌面端（推荐）**
 
-从 [Releases](https://github.com/chengdexy/PapaCheck/releases) 下载最新版 `PapaCheck-{version}.exe`（当前 v1.2.21），双击运行即可。
+从 [Releases](https://github.com/chengdexy/PapaCheck/releases) 下载最新版 `PapaCheck-{version}.exe`（当前 v1.3.0-beta），双击运行即可。
 
 服务默认启动在 `8080` 端口，首次运行会自动创建数据库和 TTS 语音缓存。
 
