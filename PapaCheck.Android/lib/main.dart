@@ -555,10 +555,15 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   }
 
   String _buildFullUrl(String baseUrl, DeviceRole role) {
+    // 标准 Web 端口（80/443）视为云端部署，需要 /app/ 前缀
+    final uri = Uri.tryParse(baseUrl);
+    final isCloud = uri != null && (uri.port == 80 || uri.port == 443);
+    final appPrefix = isCloud ? '/app' : '';
+
     if (role == DeviceRole.parent) {
-      return '$baseUrl/admin.html';
+      return '$baseUrl$appPrefix/admin.html';
     }
-    return baseUrl;
+    return '$baseUrl$appPrefix/';
   }
 
   void _applyOrientation(DeviceRole role) {

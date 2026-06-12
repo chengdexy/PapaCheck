@@ -76,7 +76,9 @@ class _SetupPageState extends State<SetupPage> {
     final port = _portController.text.trim();
     if (ip.isEmpty || port.isEmpty) return;
 
-    final url = 'http://$ip:$port';
+    // 尝试 HTTPS 优先，失败则回退 HTTP
+    final urlHttps = 'https://$ip:$port';
+    final urlHttp = 'http://$ip:$port';
 
     setState(() {
       _connecting = true;
@@ -84,7 +86,14 @@ class _SetupPageState extends State<SetupPage> {
       _statusSuccess = null;
     });
 
-    final ok = await _tryConnect(url);
+    // 先试 HTTPS
+    var ok = await _tryConnect(urlHttps);
+    var finalUrl = urlHttps;
+    if (!ok) {
+      // HTTPS 失败，试 HTTP
+      ok = await _tryConnect(urlHttp);
+      finalUrl = urlHttp;
+    }
     if (!mounted) return;
 
     if (ok) {
@@ -95,11 +104,11 @@ class _SetupPageState extends State<SetupPage> {
       });
       await Future.delayed(const Duration(milliseconds: 500));
       if (!mounted) return;
-      await ConfigService.setUrl(url);
+      await ConfigService.setUrl(finalUrl);
       await ConfigService.setRole(_role);
       if (!mounted) return;
       Navigator.of(context)
-          .pop(SetupResult(url: url, role: _role));
+          .pop(SetupResult(url: finalUrl, role: _role));
     } else {
       setState(() {
         _connecting = false;
@@ -238,7 +247,7 @@ class _SetupPageState extends State<SetupPage> {
           _buildSectionTitle('\u670d\u52a1\u5668\u5730\u5740'),
           const SizedBox(height: 4),
           const Text(
-            '\u8bf7\u8f93\u5165\u7535\u8111\u7aef\u5c40\u57df\u7f51 IP',
+            '\u8bf7\u8f93\u5165\u670d\u52a1\u5668 IP\u3001\u57df\u540d\u6216\u8bbf\u95ee\u5730\u5740',
             style: TextStyle(fontSize: 13, color: Color(0xFF999999)),
           ),
           const SizedBox(height: 12),
@@ -346,11 +355,11 @@ class _SetupPageState extends State<SetupPage> {
           flex: 3,
           child: TextField(
             controller: _ipController,
-            keyboardType: TextInputType.number,
+            keyboardType: TextInputType.url,
             style: const TextStyle(
                 fontSize: 15, fontWeight: FontWeight.w500),
             decoration: _inputDecoration(
-                '192.168.1.xxx'),
+                '192.168.1.xxx \u6216\u57df\u540d'),
           ),
         ),
         Padding(
