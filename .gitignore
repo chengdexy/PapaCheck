@@ -82,3 +82,6 @@ PapaCheck.WeChat/*.html
 .coverage
 coverage/
 htmlcov/
+
+# 临时构建产物
+.publish.tar.gz

@@ -13,10 +13,14 @@
 - 创建 2GB Swap 分区 + Docker mem_limit 768m 防 OOM
 - **HTTPS + 域名配置**：DNS A 记录（papacheck → 123.57.129.243）→ Let's Encrypt 免费证书 → Nginx HTTPS 443 → HTTP 80 自动 301 重定向
 - Nginx 落地页容器（nginx:alpine，mem_limit 64m）部署产品落地页（docs/）
+- 代码发布流程：release.py 新增 `--cloud` / `--cloud-only` 模式，自动测试→打包→上传 APK→云端构建
 - 全量代码审查 + 测试覆盖增强：覆盖提升至 Stmts 85.22% / Branch 71.89% / Funcs 90.94% / Lines 87.06%；
 - 新增 6 个 TDD 测试：`reward_box_delete.test.ts`、`shop_daily_reset.test.ts`、`reward_box_consumption.test.js`（505 总测试）
 
 ### Fixed
+- **修复 Docker TTS 实际未生效**：Dockerfile CMD 添加 `--tts-python python3`（Alpine 无 `python` 命令，只有 `python3`），之前 TTS 语音调用因找不到 python 二进制而失败
+- **修复 release.py SCP 失败时 tar 包提前删除**：`os.remove(tar_path)` 移到 SCP 结果检查之后，失败时保留 tar 包可重试
+- **清理 publish.ps1**：已被 release.py `--cloud-only` 替代，统一发布流程
 - 修复 Windows 端版本号更迭后开机自启动配置被取消：`_cleanup_stale_autostart`（删除无效路径）改为 `_repair_autostart`（更新为当前 EXE 路径），保留用户自启动设定；新增 TDD 测试 4 个（`test_windows_autostart_repair.py`）
 - 修复奖励箱物品消耗后重新出现（`_fulfillFromRewardBox` 数量归零时未调用 `deleteRewardBoxItem` 标记服务端删除）；同修 `adjustRewardBoxQty`（admin.js / db/index.ts）
 - 修复商店商品每日数量重置被陈旧 CRDT 操作覆盖（`putShopItem` 添加时间戳保护 + `_resetDailyShopQuantity` 更新 `lastModified`）；`getRewardBox` 添加 `_filterDeleted` 过滤已删除物品（db/index.ts）

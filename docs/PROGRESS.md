@@ -81,6 +81,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-12 | **修复 Dockerfile TTS Python 路径**：Docker CMD 添加 `--tts-python python3`（Alpine 无 `python` 命令，只有 `python3`，之前 TTS 实际未生效）；优化 pip 安装参数 `--no-cache-dir` 减镜像体积；代码审查修复 SCP 失败后 tar 包提前删除 bug；清理 publish.ps1 统一到 release.py；全量 505 测试通过 |
 | 2026-06-12 | **HTTPS + 域名配置**：DNS A 记录 papacheck → 123.57.129.243；Nginx 容器加端口 443 + Let's Encrypt 免费证书 + HTTP 自动 301 跳转；部署产品落地页（80 端口）；全量 505 测试通过 |
 | 2026-06-12 | **修复 OOM 宕机**：docker compose up -d 重建容器时内存溢出（2核2G 无 Swap），导致 SSH 断连、服务器卡死。修复：创建 2GB Swap 分区 + Docker mem_limit 768m + memswap_limit 1536m；更新 docker-compose.yml、Dockerfile、SKILL.md |
 | 2026-06-12 | **阿里云 ECS 上云完成**：购买 2核2G 经济型 e 实例（99元/年）→ Ubuntu 24.04 初始化 → Docker 安装 → SSH 安全加固 + UFW 防火墙 → 本地打包上传代码 → Docker 多阶段构建（node:22-alpine）→ Docker Compose 启动 → 阿里云安全组配置 8080 端口；创建 `cloud-deploy` Skill 记录完整部署流程 |

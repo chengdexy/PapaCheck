@@ -3,7 +3,7 @@ services:
     build:
       context: ./PapaCheck.Server.Node
       dockerfile: Dockerfile
-    command: ["node", "dist/index.js", "--web-dir", "/app/web", "--db-path", "/app/data/data.db"]
+    command: ["node", "dist/index.js", "--web-dir", "/app/web", "--db-path", "/app/data/data.db", "--tts-python", "python3"]
     ports:
       - "8080:8080"
     environment:

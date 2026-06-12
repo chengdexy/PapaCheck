@@ -13,8 +13,9 @@ RUN npx tsc
 FROM node:22-alpine AS runner
 WORKDIR /app
 
-# TTS 运行时依赖 Python + edge-tts
-RUN apk add --no-cache python3 py3-pip && pip3 install --break-system-packages edge-tts
+# TTS 依赖 Python + edge-tts
+# --break-system-packages 在 Docker 隔离环境中安全
+RUN apk add --no-cache python3 py3-pip && pip3 install --break-system-packages --no-cache-dir edge-tts
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm rebuild better-sqlite3
@@ -28,4 +29,4 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
 
 EXPOSE 8080
 
-CMD ["node", "dist/index.js", "--web-dir", "/app/web", "--db-path", "/app/data/data.db"]
+CMD ["node", "dist/index.js", "--web-dir", "/app/web", "--db-path", "/app/data/data.db", "--tts-python", "python3"]

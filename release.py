@@ -20,6 +20,10 @@ BUMP_VERSION_SCRIPT = os.path.join(WINDOWS_DIR, 'bump_version.py')
 BUILD_EXE_SCRIPT = os.path.join(WINDOWS_DIR, 'build_exe.py')
 DEFAULT_OUTPUT_DIR = os.path.join(WINDOWS_DIR, 'dist')
 
+# 云发布配置（可通过环境变量覆盖）
+CLOUD_SERVER_IP = os.environ.get('PAPACHECK_CLOUD_IP', '123.57.129.243')
+CLOUD_SERVER_USER = 'root'
+
 VERSION_RE = re.compile(r'^(\d+)\.(\d+)\.(\d+)$')
 
 # ── 输出美化 ────────────────────────────────────────────
@@ -40,20 +44,131 @@ def done(text):
 # ───────────────────────────────────────────────────────
 
 
+def cloud_publish(server_ip, server_user):
+    """同步代码到云端服务器。"""
+    print()
+    section('云同步')
+    print(f'  目标: {server_user}@{server_ip}')
+    print()
+
+    # 1. 运行测试
+    print(f'  ▶ [1/5] 运行全量测试 ... ', end='', flush=True)
+    result = subprocess.run(
+        ['npm', 'test'], cwd=ROOT,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if result.returncode != 0:
+        print('✗')
+        print('  测试失败，中止发布')
+        return False
+    print('✓')
+
+    # 2. 打包代码
+    print(f'  ▶ [2/5] 打包代码 ... ', end='', flush=True)
+    tar_path = os.path.join(ROOT, '.publish.tar.gz')
+    tar_cmd = [
+        'tar', '--exclude=node_modules', '--exclude=dist', '--exclude=test',
+        '--exclude=PapaCheck.Android', '--exclude=PapaCheck.Windows',
+        '--exclude=PapaCheck.Email', '--exclude=PapaCheck.Tests',
+        '--exclude=PapaCheck.Server', '--exclude=docs', '--exclude=.trae',
+        '--exclude=*.md', '--exclude=publish.ps1', '--exclude=.publish.tar.gz',
+        '-czf', tar_path,
+        'PapaCheck.Server.Node', 'PapaCheck.Web',
+        'docker-compose.yml', '.dockerignore', 'nginx.conf',
+    ]
+    result = subprocess.run(tar_cmd, cwd=ROOT)
+    if result.returncode != 0:
+        print('✗')
+        print('  打包失败')
+        return False
+    print('✓')
+
+    # 3. 检查并准备 APK
+    apk_local = None
+    # 优先从归档目录取
+    apk_archive_dir = os.path.join(ROOT, 'PapaCheck.Android', 'apk')
+    if os.path.isdir(apk_archive_dir):
+        apk_files = sorted(
+            [f for f in os.listdir(apk_archive_dir)
+             if f.startswith('PapaCheck-') and f.endswith('.apk')],
+            reverse=True)
+        if apk_files:
+            apk_local = os.path.join(apk_archive_dir, apk_files[0])
+    # 其次从构建产物取
+    if apk_local is None and os.path.exists(APK_BUILD_OUTPUT):
+        apk_local = APK_BUILD_OUTPUT
+
+    if apk_local:
+        print(f'  ▶ [3/5] 上传 APK ({os.path.basename(apk_local)}) ... ', end='', flush=True)
+        result = subprocess.run(
+            ['scp', '-o', 'StrictHostKeyChecking=accept-new',
+             apk_local, f'{server_user}@{server_ip}:/opt/PapaCheck.Web/apk/'])
+        if result.returncode != 0:
+            print('✗')
+            print('  APK 上传失败')
+        else:
+            print('✓')
+            # 清理旧 APK，只保留最新的 3 个
+            cleanup_cmd = (
+                'cd /opt/PapaCheck.Web/apk && '
+                'ls PapaCheck-*.apk 2>/dev/null | sort -r | tail -n +4 | '
+                'while read f; do rm -f "$f"; done && '
+                'echo "  清理旧 APK 完成"')
+            subprocess.run(
+                ['ssh', '-o', 'StrictHostKeyChecking=accept-new',
+                 f'{server_user}@{server_ip}', cleanup_cmd])
+    else:
+        print(f'  ▶ [3/5] 无 APK 可上传，跳过')
+
+    # 4. 上传代码包
+    print(f'  ▶ [4/5] 上传代码到服务器 ... ', end='', flush=True)
+    result = subprocess.run(
+        ['scp', '-o', 'StrictHostKeyChecking=accept-new',
+         tar_path, f'{server_user}@{server_ip}:/opt/'])
+    if result.returncode != 0:
+        print('✗')
+        print('  上传失败')
+        os.remove(tar_path)
+        return False
+    os.remove(tar_path)
+    print('✓')
+
+    # 5. 服务器端构建并重启
+    print(f'  ▶ [5/5] 云端构建并重启 ... ', end='', flush=True)
+    remote_cmd = ('cd /opt && tar xzf .publish.tar.gz && '
+                  'rm -f .publish.tar.gz && '
+                  'docker compose build && docker compose up -d')
+    result = subprocess.run(
+        ['ssh', '-o', 'StrictHostKeyChecking=accept-new',
+         f'{server_user}@{server_ip}', remote_cmd])
+    if result.returncode != 0:
+        print('✗')
+        print('  云端构建失败')
+        return False
+    print('✓')
+
+    print()
+    done('云同步完成')
+    return True
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='PapaCheck 发布编排脚本 — 一站式构建 APK / EXE / ZIP 制品',
+        description='PapaCheck 发布编排脚本 — 构建 APK / EXE / ZIP 制品，并可选同步到云端',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 使用示例:
   python release.py                              # 交互式引导模式
-  python release.py --exe-only                              # 仅构建 Windows EXE，默认递增 patch
+  python release.py --exe-only                              # 仅构建 Windows EXE
   python release.py --apk-only --set-apk-ver 2.0.0          # 仅构建 APK，指定版本号
-  python release.py --node-only                             # 仅构建 Node.js SEA 单 EXE
-  python release.py --bump-exe major --no-bump-apk          # 完整发布，EXE 升 major，APK 不升
-  python release.py -v 1.5.0 --no-bump-exe       # 指定 APK 版本，不升 EXE 版本
-  python release.py --no-zip                     # 完整发布但不创建 ZIP 包
+  python release.py --cloud                                # 构建后同步到云端
+  python release.py --cloud-only                           # 仅同步到云端（不构建制品）
+  python release.py --bump-exe major --no-bump-apk          # 完整发布，EXE 升 major
+  python release.py -v 1.5.0 --no-bump-exe       # 指定 APK 版本，不升 EXE
+  python release.py --no-zip                     # 完整发布但不创建 ZIP
   python release.py --output-dir D:\\releases     # 指定输出目录
+
+环境变量:
+  PAPACHECK_CLOUD_IP=your.server.ip   # 指定云端服务器 IP（默认 123.57.129.243）
 ''')
 
     build_group = parser.add_mutually_exclusive_group()
@@ -63,6 +178,11 @@ def parse_args():
                              help='仅构建 Android APK')
     build_group.add_argument('--node-only', action='store_true',
                              help='仅构建 Node.js SEA 单 EXE')
+
+    parser.add_argument('--cloud', action='store_true',
+                        help='构建后同步到云端服务器')
+    parser.add_argument('--cloud-only', action='store_true',
+                        help='仅同步到云端（不构建制品）')
 
     parser.add_argument('--bump-exe', nargs='?', const='patch', default=None,
                         metavar='patch|minor|major',
@@ -138,8 +258,8 @@ def parse_args():
     if args.no_bump_apk and args.set_apk_ver is not None:
         parser.error('--no-bump-apk 和 --set-apk-ver 不能同时指定')
 
-    need_exe = exe_only or (not apk_only)
-    need_apk = apk_only or (not exe_only)
+    need_exe = exe_only or (not apk_only and not args.cloud_only)
+    need_apk = apk_only or (not exe_only and not args.cloud_only)
 
     if need_exe and not (args.bump_exe or args.set_exe_ver or args.no_bump_exe):
         args.bump_exe = 'patch'
@@ -185,7 +305,7 @@ def run_step(n, total, desc, cmd, cwd=None, shell=False):
 def build_steps(args):
     steps = []
 
-    if args.apk_only or (not args.exe_only):
+    if args.apk_only or (not args.exe_only and not args.cloud_only):
         if args.bump_apk:
             cmd = [sys.executable, BUMP_VERSION_SCRIPT,
                    '--target', 'apk', args.bump_apk]
@@ -201,7 +321,7 @@ def build_steps(args):
         apk_cmd_str = 'flutter build apk --release'
         steps.append(('构建 Android APK', apk_cmd_str, ANDROID_DIR, True))
 
-    if args.exe_only or (not args.apk_only):
+    if args.exe_only or (not args.apk_only and not args.cloud_only):
         if args.bump_exe:
             cmd = [sys.executable, BUMP_VERSION_SCRIPT,
                    '--target', 'exe', args.bump_exe]
@@ -256,7 +376,7 @@ def create_zips(output_dir, exe_ver, apk_ver, apk_src, dist_dir):
     return full_zip, win_zip
 
 
-def print_summary(output_dir, exe_ver, apk_ver, zips, need_exe, need_apk, no_zip):
+def print_summary(output_dir, exe_ver, apk_ver, zips, need_exe, need_apk, no_zip, did_cloud):
     print()
     print('  ' + '═' * SECTION_WIDTH)
     print('  ═══  发布完成  ═══')
@@ -277,9 +397,12 @@ def print_summary(output_dir, exe_ver, apk_ver, zips, need_exe, need_apk, no_zip
     if zips:
         for z in zips:
             print(f'    • {os.path.basename(z)}')
+    if did_cloud:
+        print(f'    • 已同步到云端 ({CLOUD_SERVER_IP})')
     print()
-    print(f'  输出目录  {output_dir}')
-    print()
+    if need_exe or need_apk:
+        print(f'  输出目录  {output_dir}')
+        print()
 
 
 def ask_int(prompt, min_val, max_val):
@@ -318,7 +441,7 @@ def run_wizard():
 
     # ---- Step 1: 构建目标 (默认: 仅 EXE) ----
     print('─' * 50)
-    print('  Step 1/6 — 选择构建目标:')
+    print('  Step 1/7 — 选择构建目标:')
     print('    [默认] 仅构建 Windows EXE (直接回车)')
     print('    1) 完整发布 (EXE + APK)')
     print('    2) 仅构建 Windows EXE')
@@ -350,7 +473,7 @@ def run_wizard():
     # ---- Step 2: EXE 版本控制 (默认: 不变) ----
     if need_exe:
         print('─' * 50)
-        print(f'  Step 2/6 — EXE 版本控制 (当前: {current_exe}):')
+        print(f'  Step 2/7 — EXE 版本控制 (当前: {current_exe}):')
         print('    [默认] 不改变版本号 (直接回车)')
         print('    1) 自动递增 patch   (如 1.0.0 → 1.0.1)')
         print('    2) 自动递增 minor   (如 1.0.0 → 1.1.0)')
@@ -380,7 +503,7 @@ def run_wizard():
     # ---- Step 3: APK 版本控制 (默认: 不变) ----
     if need_apk:
         print('─' * 50)
-        print(f'  Step 3/6 — APK 版本控制 (当前: {current_apk}):')
+        print(f'  Step 3/7 — APK 版本控制 (当前: {current_apk}):')
         print('    [默认] 不改变版本号 (直接回车)')
         print('    1) 自动递增 patch   (如 1.0.0 → 1.0.1)')
         print('    2) 自动递增 minor   (如 1.0.0 → 1.1.0)')
@@ -409,7 +532,7 @@ def run_wizard():
 
     # ---- Step 4: ZIP 打包 (默认: 否) ----
     print('─' * 50)
-    print('  Step 4/6 — ZIP 打包:')
+    print('  Step 4/7 — ZIP 打包:')
     print('    [默认] 不生成 ZIP (直接回车)')
     print('    1) 生成 ZIP 压缩包')
     print('    2) 不生成 ZIP')
@@ -420,7 +543,7 @@ def run_wizard():
 
     # ---- Step 5: 输出目录 (默认: 默认目录) ----
     print('─' * 50)
-    print(f'  Step 5/6 — 输出目录:')
+    print(f'  Step 5/7 — 输出目录:')
     print(f'    [默认] 默认目录 (直接回车)')
     print(f'    1) 默认 ({DEFAULT_OUTPUT_DIR})')
     print(f'    2) 自定义')
@@ -436,13 +559,24 @@ def run_wizard():
 
     # ---- Step 6: 是否清空输出文件夹 (默认: 保留) ----
     print('─' * 50)
-    print(f'  Step 6/6 — 是否清空输出文件夹:')
+    print(f'  Step 6/7 — 是否清空输出文件夹:')
     print('    [默认] 否，保留旧文件 (直接回车)')
     print('    1) 否，保留旧文件')
     print('    2) 是，清空输出文件夹')
     choice = ask_int('  请输入序号 [默认:1]: ', 1, 2) or 1
     clear_output = (choice == 2)
     print(f'  清空输出文件夹: {"是" if clear_output else "否"}')
+    print()
+
+    # ---- Step 7: 是否同步到云端 (新增) ----
+    print('─' * 50)
+    print(f'  Step 7/7 — 同步到云端服务器 ({CLOUD_SERVER_IP}):')
+    print('    [默认] 不同步 (直接回车)')
+    print('    1) 同步到云端')
+    print('    2) 不同步')
+    choice = ask_int('  请输入序号 [默认:2]: ', 1, 2) or 2
+    do_cloud = (choice == 1)
+    print(f'  云同步: {"是" if do_cloud else "否"}')
     print()
 
     # ---- 确认 ----
@@ -469,6 +603,7 @@ def run_wizard():
     print(f'    ZIP 打包: {"否" if no_zip else "是"}')
     print(f'    输出目录: {output_dir}')
     print(f'    清空输出文件夹: {"是" if clear_output else "否"}')
+    print(f'    云同步: {"是" if do_cloud else "否"} ({CLOUD_SERVER_IP})')
     print('=' * 50)
     print()
 
@@ -507,6 +642,8 @@ def run_wizard():
         no_bump_apk=no_bump_apk,
         no_zip=no_zip,
         output_dir=output_dir,
+        cloud=do_cloud,
+        cloud_only=False,
         v=None,
     )
 
@@ -531,8 +668,13 @@ def rebuild_better_sqlite3():
 def main():
     args = parse_args()
 
-    need_exe = args.exe_only or not (args.apk_only or args.node_only)
-    need_apk = args.apk_only or not (args.exe_only or args.node_only)
+    # 仅云同步模式
+    if args.cloud_only:
+        cloud_publish(CLOUD_SERVER_IP, CLOUD_SERVER_USER)
+        return
+
+    need_exe = args.exe_only or not (args.apk_only or args.node_only or args.cloud_only)
+    need_apk = args.apk_only or not (args.exe_only or args.node_only or args.cloud_only)
     need_node = args.node_only
 
     output_dir = os.path.abspath(args.output_dir)
@@ -550,15 +692,16 @@ def main():
         done('移除旧版 APK 构建产物')
 
     # ── 构建 ──
-    section('构建')
-    steps = build_steps(args)
-    for i, (desc, cmd, cwd, shell) in enumerate(steps, 1):
-        run_step(i, len(steps), desc, cmd, cwd=cwd, shell=shell)
+    if need_exe or need_apk:
+        section('构建')
+        steps = build_steps(args)
+        for i, (desc, cmd, cwd, shell) in enumerate(steps, 1):
+            run_step(i, len(steps), desc, cmd, cwd=cwd, shell=shell)
 
-    if need_apk and not os.path.isfile(APK_BUILD_OUTPUT):
-        print()
-        print(f'  ✗ APK 构建产物未找到: {APK_BUILD_OUTPUT}')
-        sys.exit(1)
+        if need_apk and not os.path.isfile(APK_BUILD_OUTPUT):
+            print()
+            print(f'  ✗ APK 构建产物未找到: {APK_BUILD_OUTPUT}')
+            sys.exit(1)
 
     # ── 版本号 ──
     exe_ver = read_exe_version() if need_exe else ''
@@ -598,8 +741,13 @@ def main():
     else:
         done('better-sqlite3 已就绪，无需重建')
 
+    # ── 云同步 ──
+    did_cloud = False
+    if args.cloud:
+        did_cloud = cloud_publish(CLOUD_SERVER_IP, CLOUD_SERVER_USER)
+
     print_summary(output_dir, exe_ver, apk_ver, zips,
-                  need_exe, need_apk, args.no_zip)
+                  need_exe, need_apk, args.no_zip, did_cloud)
 
 
 if __name__ == '__main__':
