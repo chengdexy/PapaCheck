@@ -360,7 +360,14 @@ export class TTSBridge {
     const validHashes = new Set(TTSBridge.FIXED_TEXTS.map(t => this.md5(t) + '.mp3'));
 
     console.log('[TTS] 开始预生成TTS固定短语mp3...');
-    await Promise.allSettled(TTSBridge.FIXED_TEXTS.map(t => this.speak(t)));
+    // 逐个生成，避免同时 spawn 多个 Python 子进程导致 OOM
+    for (const text of TTSBridge.FIXED_TEXTS) {
+      try {
+        await this.speak(text);
+        // 每条间隔 300ms，给系统喘息时间
+        await new Promise(resolve => setTimeout(resolve, 300));
+      } catch { /* 单条失败不影响后续 */ }
+    }
 
     // 清理不在列表中的旧 mp3
     try {

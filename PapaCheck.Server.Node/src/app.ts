@@ -144,7 +144,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   // 创建数据库和 TTS 实例
-  const db = createDatabase({ dbPath: options.dbPath });
+  const db = await createDatabase({ dbPath: options.dbPath });
   const tts = new TTSBridge({
     pythonPath: options.ttsPython ?? 'python',
     cacheDir: join(dirname(options.dbPath ?? join(_moduleDirname, '..', 'data.db')), 'tts_cache'),

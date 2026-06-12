@@ -25,13 +25,15 @@ export async function authPlugin(app: FastifyInstance, db: IDatabase): Promise<v
     console.log('========================================');
   }
 
-  // 认证钩子
+  // 认证钩子（仅保护 /api/* 端点，静态页面放行）
   app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
     const url = request.url.split('?')[0];
     
-    // 跳过公开路径
+    // 仅拦截 /api/ 路径
+    if (!url.startsWith('/api/')) return;
+    
+    // 公开 API 路径放行
     if (PUBLIC_PATHS.has(url)) return;
-    if (url.startsWith('/docs') || url.startsWith('/css/') || url.startsWith('/js/') || url.startsWith('/login.html')) return;
     
     // 检查 OPTIONS 预检请求（CORS）
     if (request.method === 'OPTIONS') return;

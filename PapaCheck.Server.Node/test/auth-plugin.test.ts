@@ -8,7 +8,7 @@ describe('Auth Plugin', () => {
   let db: any;
 
   beforeAll(async () => {
-    db = createDatabase({ dbPath: ':memory:' });
+    db = await createDatabase({ dbPath: ':memory:' });
     // 手动设置一个已知密码用于测试
     db.saveSettings({ apiPassword: 'test-password' });
 

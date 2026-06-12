@@ -4,14 +4,14 @@ import { SqliteAdapter } from '../../src/db/sqlite-adapter.js';
 import type { IDatabase } from '../../src/db/types.js';
 
 describe('createDatabase factory', () => {
-  it('should return a SqliteAdapter instance when no DATABASE_URL', () => {
-    const db = createDatabase({ dbPath: ':memory:' });
+  it('should return a SqliteAdapter instance when no DATABASE_URL', async () => {
+    const db = await createDatabase({ dbPath: ':memory:' });
     expect(db).toBeInstanceOf(SqliteAdapter);
     db.close();
   });
 
-  it('should return an object implementing IDatabase', () => {
-    const db = createDatabase({ dbPath: ':memory:' }) as IDatabase;
+  it('should return an object implementing IDatabase', async () => {
+    const db = (await createDatabase({ dbPath: ':memory:' })) as IDatabase;
     expect(typeof db.getFullData).toBe('function');
     expect(typeof db.getPointsBalance).toBe('function');
     expect(typeof db.getHomeworks).toBe('function');

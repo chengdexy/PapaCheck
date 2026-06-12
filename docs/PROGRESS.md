@@ -4,11 +4,11 @@
 
 ## 当前版本
 
-**v1.3.0-beta**（Phase 5a+5b：PostgreSQL 适配 + 数据库抽象层重构 + 临时认证 + 部署架构重构）
+**v1.3.0-beta**（Phase 5a+5b：PostgreSQL 适配 + 数据库抽象层重构 + 临时认证 + 部署架构重构 + 服务器 PostgreSQL 切换）
 
 ## 部署状态
 
-- [ ] **Phase 5b 服务器迁移进行中** — 待移除 Docker、配置 systemd + Nginx + PostgreSQL
+- [x] **Phase 5b 服务器迁移完成** — 已移除 Docker，改用 systemd + Nginx + PostgreSQL 直接部署
 
 ---
 
@@ -41,6 +41,8 @@
 - [x] **Cookie Session 临时认证** — 部署密码 + 登录页（Phase 5b）
 - [x] **PostgreSQL 迁移脚本** — `migrate-to-pg.ts` 逐表迁移 + 行数校验
 - [x] **部署脚本 + systemd service** — `scripts/deploy.sh` + `papacheck.service`
+- [x] **服务器已迁移到 systemd + Nginx** — 移除 Docker，Nginx 反向代理 + HTTPS Let's Encrypt
+- [x] **云端数据库已切换到 PostgreSQL 16** — SQLite 数据完整迁移，19 张表行数校验通过
 - [x] TTS 语音提醒（edge-tts，Python 子进程桥接）
 - [x] 邮件同步（IMAP + AI 解析）
 - [x] 附件下载
@@ -83,7 +85,7 @@
 
 | 日期 | 变更 |
 |------|------|
-| 2026-06-12 | **Phase 5a+5b 代码实施完成**：数据库抽象层重构（`IDatabase` 接口 + `DatabaseAdapter` 基类 + `SqliteAdapter`/`PostgresAdapter`）、Cookie Session 临时认证中间件、数据迁移脚本、部署脚本 + systemd service、全量 515 测试通过；创建完整 5 阶段 Phase 5 规划文档（spec/tasks/checklist/plan） |
+| 2026-06-12 | **Phase 5a+5b 代码实施完成 + 服务器部署切换 PostgreSQL** |
 | 2026-06-12 | **修复 Dockerfile TTS Python 路径**：Docker CMD 添加 `--tts-python python3`（Alpine 无 `python` 命令，只有 `python3`，之前 TTS 实际未生效）；优化 pip 安装参数 `--no-cache-dir` 减镜像体积；代码审查修复 SCP 失败后 tar 包提前删除 bug；清理 publish.ps1 统一到 release.py；全量 505 测试通过 |
 | 2026-06-12 | **HTTPS + 域名配置**：DNS A 记录 papacheck → 123.57.129.243；Nginx 容器加端口 443 + Let's Encrypt 免费证书 + HTTP 自动 301 跳转；部署产品落地页（80 端口）；全量 505 测试通过 |
 | 2026-06-12 | **修复 OOM 宕机**：docker compose up -d 重建容器时内存溢出（2核2G 无 Swap），导致 SSH 断连、服务器卡死。修复：创建 2GB Swap 分区 + Docker mem_limit 768m + memswap_limit 1536m；更新 docker-compose.yml、Dockerfile、SKILL.md |

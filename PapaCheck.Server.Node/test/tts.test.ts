@@ -246,6 +246,18 @@ describe('TTSBridge', () => {
   });
 
   describe('pregenAllFixed', () => {
+    beforeEach(() => {
+      // Mock setTimeout to avoid 300ms delays between each of 45 TTS pre-generations
+      vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: any) => {
+        if (typeof fn === 'function') fn();
+        return 0;
+      }) as any);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
     it('对所有固定短语调用 speak', async () => {
       bridge = new TTSBridge({ _spawn: mockSpawn as unknown as SpawnFn });
       const speakSpy = vi.spyOn(bridge, 'speak').mockResolvedValue(Buffer.alloc(0));

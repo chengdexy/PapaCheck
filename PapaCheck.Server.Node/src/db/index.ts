@@ -6,10 +6,10 @@ export * from './types.js';
 
 export type DatabaseType = IDatabase;
 
-export function createDatabase(options: { dbPath?: string; databaseUrl?: string }): IDatabase {
+export async function createDatabase(options: { dbPath?: string; databaseUrl?: string }): Promise<IDatabase> {
   const url = options.databaseUrl ?? process.env['DATABASE_URL'];
   if (url) {
-    const { PostgresAdapter } = require('./postgres-adapter.js') as { PostgresAdapter: new (url: string) => IDatabase };
+    const { PostgresAdapter } = await import('./postgres-adapter.js');
     return new PostgresAdapter(url);
   }
   return new SqliteAdapter(options.dbPath ?? 'data.db');

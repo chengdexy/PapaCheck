@@ -28,13 +28,18 @@
 - 数据库层从同步 API 重构为 async/await：`SqliteAdapter`、`app.ts`、所有 DB 测试适配异步调用
 - `auth-plugin.ts` 按 `enableAuth` 选项开关，不影响已有 500+ 测试
 - 项目版本规划调整为 v1.3.0（Phase 5a+5b），新增测试 8 个，总测试数 515
+- **TTS 预生成防 OOM**：`pregenAllFixed()` 从 45 条并发改为逐条生成 + 300ms 间隔，避免同时 spawn 多个 Python 子进程打爆 2G 内存
+- **Auth 插件改为仅保护 API**：不再拦截静态页面，前端能正常加载 `index.html` / `admin.html`
+- **前端 401 处理**：`connection.js` ping 检测到 401 时跳转登录页；`api.js` 所有 API 请求 401 时跳转登录页
 
 ### Security
 - **公网 API 防护**：Cookie Session 认证，未登录用户访问 API 返回 401
 - 部署密码自动生成并打印到启动日志，settings 中持久化存储
+- **Nginx HTTPS + 域名**：配置 Let's Encrypt SSL 证书，HTTP 自动 301 重定向到 HTTPS
+- **8080 端口关闭**：安全组 + UFW 双重关闭公网 8080 端口，所有流量经 Nginx 443
 
 ### Removed
-- Docker 相关配置计划在 Phase 5b 服务器环境实施中逐步移除（systemd + Nginx 替代）
+- Docker 容器已从服务器停止并移除，改用 systemd + Nginx + PostgreSQL 直接部署
 
 ### Added
 - 新增回顾页（review.html）：孩子端滚动叙事战绩回顾，从生产数据库提取数据，以 15 屏全屏滚动展示 22 天的完整学习历程，包含坚持天数、时间投入、效率分析、评级荣耀、积分经济、兑换榜、赏金任务等维度，每屏配数字 count-up 动画和意义解读

@@ -26,6 +26,11 @@ var ConnectionManager = (function () {
       cache: 'no-store',
       headers: { 'Content-Type': 'application/json' }
     }).then(async function (resp) {
+      if (resp.status === 401) {
+        // 未认证，跳转到登录页
+        window.location.href = '/login.html?redirect=' + encodeURIComponent(window.location.pathname);
+        return false;
+      }
       if (!resp.ok) throw new Error('ping failed');
       var data = await resp.json();
       if (data.ok !== true) throw new Error('ping not ok');
