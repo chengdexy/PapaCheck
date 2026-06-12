@@ -2,7 +2,7 @@
 
 ![PapaCheck Banner](./docs/imgs/_banner.jpg)
 
-> **v1.2.23** — 家庭作业管理从未如此轻松
+> **v1.3.0-beta** — 家庭作业管理从未如此轻松
 
 PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和跟踪孩子的作业完成情况。支持通过转发微信群中老师布置的作业到邮件，AI 自动解析并添加到清单；孩子可以自主开始/暂停/完成作业并获得积分；家长远程评级并管理积分商店。
 
@@ -25,12 +25,12 @@ PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和�
 
 ### 0. 云部署（免局域网，随时随地访问）
 
-项目已部署到阿里云 ECS，直接在浏览器访问服务器 IP 的 8080 端口：
+项目已部署到阿里云 ECS，访问 [https://papacheck.chengdexy.cn/app/](https://papacheck.chengdexy.cn/app/)：
 
-- **孩子端**：`http://<服务器IP>:8080/`
-- **管理端**：`http://<服务器IP>:8080/admin.html`
+- **孩子端**：`https://papacheck.chengdexy.cn/app/`
+- **管理端**：`https://papacheck.chengdexy.cn/app/admin.html`
 
-> 服务器配置：2核2G / 3M带宽 / Ubuntu 24.04 / Docker Compose，年费仅 99 元。
+> 服务器配置：2核2G / 3M带宽 / Ubuntu 24.04 / systemd + Nginx + PostgreSQL，年费仅 99 元。
 
 ### 1. 本地启动服务器
 
@@ -74,7 +74,10 @@ npm run dev -- --port 8080
 ```
 PapaCheck/
 ├── PapaCheck.Server/        # [已废弃] Python 服务端（保留参考，不再维护）
-├── PapaCheck.Server.Node/   # 服务端（Node.js + Fastify + better-sqlite3）
+├── PapaCheck.Server.Node/   # 服务端（Node.js + Fastify + SQLite/PostgreSQL 双后端）
+│   ├── src/db/              # 数据库抽象层（IDatabase + SqliteAdapter + PostgresAdapter）
+│   ├── src/auth-plugin.ts   # Cookie Session 认证（临时）
+│   └── scripts/             # 迁移脚本 + PostgreSQL DDL
 ├── PapaCheck.Web/           # Web 前端（孩子大屏 & 管理端 admin.html）
 ├── PapaCheck.Windows/       # Windows 桌面端（PyInstaller 单 EXE，内嵌 Node.js 服务器）
 ├── PapaCheck.Android/       # Android 端（Flutter WebView 混合应用）
@@ -86,12 +89,12 @@ PapaCheck/
 
 | 模块              | 技术                                                    |
 | ----------------- | ------------------------------------------------------- |
-| **Server**        | Node.js, Fastify, better-sqlite3, edge-tts (`tts_bridge.py`) |
+| **Server**        | Node.js, Fastify, better-sqlite3 / pg (PostgreSQL), edge-tts (`tts_bridge.py`) |
 | **Web 前端**      | 原生 HTML/CSS/JS, SVG 图表, Service Worker              |
 | **Windows 桌面端** | Python, tkinter, 内嵌 Node.js 子进程（pkg SEA 单 EXE） |
 | **邮件同步**      | Node.js IMAP 模块（内置于服务端）                       |
 | **Android 端**    | Flutter, `webview_flutter`                              |
-| **测试**          | Vitest（前端/服务端 505 测试）、pytest（Python 53 测试） |
+| **测试**          | Vitest（前端/服务端 515 测试）、pytest（Python 53 测试） |
 | **构建发布**      | release.py（一站式：EXE + APK + ZIP）                    |
 
 ## 🔧 开发
@@ -100,7 +103,7 @@ PapaCheck/
 
 ```bash
 # 全部测试
-npm test                   # 前端 + 服务端测试（Vitest，505 个测试用例）
+npm test                   # 前端 + 服务端测试（Vitest，515 个测试用例）
 cd PapaCheck.Android && flutter test  # Android 端测试
 
 # 单个测试文件

@@ -15,9 +15,9 @@ describe('Database', () => {
     db = new Database(dbPath);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     if (db) {
-      db.close();
+      await db.close();
     }
     // 清理临时目录
     const dir = dbPath.substring(0, dbPath.lastIndexOf('\\'));
@@ -27,17 +27,17 @@ describe('Database', () => {
   });
 
   describe('constructor', () => {
-    it('创建并打开一个新的数据库文件', () => {
+    it('创建并打开一个新的数据库文件', async () => {
       expect(existsSync(dbPath)).toBe(true);
       // 验证数据库已初始化，points 表有默认行
-      const balance = db.getPointsBalance();
+      const balance = await db.getPointsBalance();
       expect(balance).toBe(0);
     });
   });
 
   describe('getFullData', () => {
-    it('返回正确的结构，空表时值为默认', () => {
-      const data = db.getFullData();
+    it('返回正确的结构，空表时值为默认', async () => {
+      const data = await db.getFullData();
       expect(data).toHaveProperty('points');
       expect(data.points).toHaveProperty('balance', 0);
       expect(data.points).toHaveProperty('history', []);
@@ -58,62 +58,62 @@ describe('Database', () => {
       expect(data).toHaveProperty('bountyCompletions', {});
     });
 
-    it('homeworks 表中非数组数据不崩溃', () => {
+    it('homeworks 表中非数组数据不崩溃', async () => {
       // 模拟数据损坏：写入非数组数据
-      (db as any).db.prepare(
+      await (db as any).db.prepare(
         "INSERT OR REPLACE INTO homeworks (date_key, data) VALUES (?, ?)"
       ).run('2026-06-06', JSON.stringify({ bad: 'not an array' }));
 
-      const data = db.getFullData();
+      const data = await db.getFullData();
       expect(data.homeworks['2026-06-06']).toBeUndefined();
     });
 
-    it('dailySettlement 表中 null 数据不崩溃', () => {
-      (db as any).db.prepare(
+    it('dailySettlement 表中 null 数据不崩溃', async () => {
+      await (db as any).db.prepare(
         "INSERT OR REPLACE INTO daily_settlement (date_key, data) VALUES (?, ?)"
       ).run('2026-06-06', 'null');
 
-      const data = db.getFullData();
+      const data = await db.getFullData();
       expect(data.dailySettlement['2026-06-06']).toBeUndefined();
     });
 
-    it('efficiencyHistory 表中非法 JSON 不崩溃', () => {
-      (db as any).db.prepare(
+    it('efficiencyHistory 表中非法 JSON 不崩溃', async () => {
+      await (db as any).db.prepare(
         "INSERT OR REPLACE INTO efficiency_history (date_key, data) VALUES (?, ?)"
       ).run('2026-06-06', '{broken');
 
-      expect(() => db.getFullData()).not.toThrow();
+      expect(async () => await db.getFullData()).not.toThrow();
     });
 
-    it('freeTimeTasks 表中非数组数据不崩溃', () => {
-      (db as any).db.prepare(
+    it('freeTimeTasks 表中非数组数据不崩溃', async () => {
+      await (db as any).db.prepare(
         "INSERT OR REPLACE INTO free_time_tasks (date_key, data) VALUES (?, ?)"
       ).run('2026-06-06', JSON.stringify({ bad: 'object' }));
 
-      const data = db.getFullData();
+      const data = await db.getFullData();
       // _filterDeleted 会返回非数组原样，但不应崩溃
       expect(data.freeTimeTasks['2026-06-06']).toEqual({ bad: 'object' });
     });
 
-    it('bountyCompletions 表中 null 数据不崩溃', () => {
-      (db as any).db.prepare(
+    it('bountyCompletions 表中 null 数据不崩溃', async () => {
+      await (db as any).db.prepare(
         "INSERT OR REPLACE INTO bounty_completions (date_key, data) VALUES (?, ?)"
       ).run('2026-06-06', 'null');
 
-      const data = db.getFullData();
+      const data = await db.getFullData();
       expect(data.bountyCompletions['2026-06-06']).toBeUndefined();
     });
   });
 
   describe('putHomework 容错', () => {
-    it('dateKey 数据损坏为 object 时能正常写入新作业', () => {
+    it('dateKey 数据损坏为 object 时能正常写入新作业', async () => {
       // 模拟数据损坏：现有数据为对象而非数组
-      (db as any).db.prepare(
+      await (db as any).db.prepare(
         "INSERT OR REPLACE INTO homeworks (date_key, data) VALUES (?, ?)"
       ).run('2026-06-06', JSON.stringify({ id: 'orphan', subject: '损坏数据' }));
 
       // 写入新作业
-      db.putHomework('new-hw-1', {
+      await db.putHomework('new-hw-1', {
         id: 'new-hw-1',
         subject: '数学',
         content: '练习册',
@@ -122,7 +122,7 @@ describe('Database', () => {
       });
 
       // 验证已恢复为数组
-      const hwList = db.getHomeworks('2026-06-06');
+      const hwList = await db.getHomeworks('2026-06-06');
       expect(Array.isArray(hwList)).toBe(true);
       expect(hwList.length).toBe(1);
       expect(hwList[0].subject).toBe('数学');
@@ -130,30 +130,30 @@ describe('Database', () => {
   });
 
   describe('_safeJsonParse 集成', () => {
-    it('_getJson 在 shop_items 表非法 JSON 时不崩溃', () => {
+    it('_getJson 在 shop_items 表非法 JSON 时不崩溃', async () => {
       // 直接写入非法 JSON（INSERT 确保行存在）
-      (db as any).db.prepare("INSERT OR REPLACE INTO shop_items (id, data) VALUES (1, ?)").run('{broken');
+      await (db as any).db.prepare("INSERT OR REPLACE INTO shop_items (id, data) VALUES (1, ?)").run('{broken');
       // 不抛出即可
-      expect(() => db.getShopItems()).not.toThrow();
-      expect(db.getShopItems()).toEqual([]);
+      expect(async () => await db.getShopItems()).not.toThrow();
+      expect(await db.getShopItems()).toEqual([]);
     });
 
-    it('_getDateDataRaw 在 homeworks 表非法 JSON 时不崩溃', () => {
-      (db as any).db.prepare(
+    it('_getDateDataRaw 在 homeworks 表非法 JSON 时不崩溃', async () => {
+      await (db as any).db.prepare(
         "INSERT OR REPLACE INTO homeworks (date_key, data) VALUES (?, ?)"
       ).run('corrupt-date', '{broken');
 
       // 底层方法应该安全返回 undefined
-      expect(() => { (db as any)._getDateDataRaw('homeworks', 'corrupt-date'); }).not.toThrow();
+      expect(async () => { await (db as any)._getDateDataRaw('homeworks', 'corrupt-date'); }).not.toThrow();
     });
 
-    it('_safeJsonParse 在 JSON null 时返回 undefined', () => {
-      const result = (db as any)._safeJsonParse('null');
+    it('_safeJsonParse 在 JSON null 时返回 undefined', async () => {
+      const result = await (db as any)._safeJsonParse('null');
       expect(result).toBeUndefined();
     });
 
-    it('_safeJsonParse 在 undefined 输入时返回 undefined', () => {
-      const result = (db as any)._safeJsonParse(undefined);
+    it('_safeJsonParse 在 undefined 输入时返回 undefined', async () => {
+      const result = await (db as any)._safeJsonParse(undefined);
       expect(result).toBeUndefined();
     });
   });
@@ -165,46 +165,46 @@ describe('Database', () => {
       { id: 'hw2', subject: '语文', content: '作文', isDeleted: false },
     ];
 
-    it('保存并获取作业', () => {
-      db.saveHomeworks(dateKey, hwItems);
-      const result = db.getHomeworks(dateKey);
+    it('保存并获取作业', async () => {
+      await db.saveHomeworks(dateKey, hwItems);
+      const result = await db.getHomeworks(dateKey);
       expect(result).toEqual(hwItems);
     });
 
-    it('获取不存在的日期返回空数组', () => {
-      const result = db.getHomeworks('2099-01-01');
+    it('获取不存在的日期返回空数组', async () => {
+      const result = await db.getHomeworks('2099-01-01');
       expect(result).toEqual([]);
     });
 
-    it('读取时过滤 isDeleted 项', () => {
+    it('读取时过滤 isDeleted 项', async () => {
       const itemsWithDeleted = [
         ...hwItems,
         { id: 'hw3', subject: '英语', content: '单词', isDeleted: true },
       ];
-      db.saveHomeworks(dateKey, itemsWithDeleted);
-      const result = db.getHomeworks(dateKey);
+      await db.saveHomeworks(dateKey, itemsWithDeleted);
+      const result = await db.getHomeworks(dateKey);
       expect(result).toHaveLength(2);
       expect(result.find((h: any) => h.id === 'hw3')).toBeUndefined();
     });
 
-    it('移动作业到另一天', () => {
-      db.saveHomeworks('2026-06-06', hwItems);
-      const moved = db.moveHomework('2026-06-06', '2026-06-07', 'hw1');
+    it('移动作业到另一天', async () => {
+      await db.saveHomeworks('2026-06-06', hwItems);
+      const moved = await db.moveHomework('2026-06-06', '2026-06-07', 'hw1');
       expect(moved).not.toBeNull();
       expect(moved!.id).toBe('hw1');
 
-      const fromResult = db.getHomeworks('2026-06-06');
+      const fromResult = await db.getHomeworks('2026-06-06');
       expect(fromResult).toHaveLength(1);
       expect(fromResult[0].id).toBe('hw2');
 
-      const toResult = db.getHomeworks('2026-06-07');
+      const toResult = await db.getHomeworks('2026-06-07');
       expect(toResult).toHaveLength(1);
       expect(toResult[0].id).toBe('hw1');
     });
 
-    it('移动不存在的 homework 返回 null', () => {
-      db.saveHomeworks('2026-06-06', hwItems);
-      const result = db.moveHomework('2026-06-06', '2026-06-07', 'nonexistent');
+    it('移动不存在的 homework 返回 null', async () => {
+      await db.saveHomeworks('2026-06-06', hwItems);
+      const result = await db.moveHomework('2026-06-06', '2026-06-07', 'nonexistent');
       expect(result).toBeNull();
     });
   });
@@ -215,9 +215,9 @@ describe('Database', () => {
       { id: 2, name: '玩具', baseQuantity: 1, remainingQuantity: 1 },
     ];
 
-    it('保存并获取商品', () => {
-      db.saveShopItems(shopItems);
-      const result = db.getShopItems();
+    it('保存并获取商品', async () => {
+      await db.saveShopItems(shopItems);
+      const result = await db.getShopItems();
       expect(result).toHaveLength(2);
       expect(result[0]).toMatchObject({ id: 1, name: '零食', baseQuantity: 2, remainingQuantity: 2 });
       expect(result[1]).toMatchObject({ id: 2, name: '玩具', baseQuantity: 1, remainingQuantity: 1 });
@@ -231,9 +231,9 @@ describe('Database', () => {
       { itemId: 'r1', itemName: '兑换1', status: 'pending' },
     ];
 
-    it('保存并获取兑换记录', () => {
-      db.saveRedemptions(items);
-      const result = db.getRedemptions();
+    it('保存并获取兑换记录', async () => {
+      await db.saveRedemptions(items);
+      const result = await db.getRedemptions();
       expect(result).toEqual(items);
     });
   });
@@ -243,9 +243,9 @@ describe('Database', () => {
       { name: '宝箱1', quantity: 1 },
     ];
 
-    it('保存并获取奖励箱', () => {
-      db.saveRewardBox(items);
-      const result = db.getRewardBox();
+    it('保存并获取奖励箱', async () => {
+      await db.saveRewardBox(items);
+      const result = await db.getRewardBox();
       expect(result).toEqual(items);
     });
   });
@@ -253,9 +253,9 @@ describe('Database', () => {
   describe('settings CRUD', () => {
     const settings = { dailyBasePoints: 100, ratingMultipliers: { A: 1.0 } };
 
-    it('保存并获取设置', () => {
-      db.saveSettings(settings);
-      const result = db.getSettings();
+    it('保存并获取设置', async () => {
+      await db.saveSettings(settings);
+      const result = await db.getSettings();
       expect(result).toEqual(settings);
     });
   });
@@ -265,9 +265,9 @@ describe('Database', () => {
       { name: '专注', duration: 30, unit: 'min' },
     ];
 
-    it('保存并获取活跃增益', () => {
-      db.saveActiveBuffs(buffs);
-      const result = db.getActiveBuffs();
+    it('保存并获取活跃增益', async () => {
+      await db.saveActiveBuffs(buffs);
+      const result = await db.getActiveBuffs();
       expect(result).toEqual(buffs);
     });
   });
@@ -276,14 +276,14 @@ describe('Database', () => {
     const dateKey = '2026-06-06';
     const data = { efficiencyRatio: 0.85, averageRatio: 0.75 };
 
-    it('保存并获取效率数据', () => {
-      db.saveEfficiency(dateKey, data);
-      const result = db.getEfficiency(dateKey);
+    it('保存并获取效率数据', async () => {
+      await db.saveEfficiency(dateKey, data);
+      const result = await db.getEfficiency(dateKey);
       expect(result).toEqual(data);
     });
 
-    it('获取不存在的日期返回 null', () => {
-      const result = db.getEfficiency('2099-01-01');
+    it('获取不存在的日期返回 null', async () => {
+      const result = await db.getEfficiency('2099-01-01');
       expect(result).toBeNull();
     });
   });
@@ -294,14 +294,14 @@ describe('Database', () => {
       { name: '自由活动', durationMinutes: 30 },
     ];
 
-    it('保存并获取空闲时间任务', () => {
-      db.saveFreeTime(dateKey, tasks);
-      const result = db.getFreeTime(dateKey);
+    it('保存并获取空闲时间任务', async () => {
+      await db.saveFreeTime(dateKey, tasks);
+      const result = await db.getFreeTime(dateKey);
       expect(result).toEqual(tasks);
     });
 
-    it('获取不存在的日期返回空数组', () => {
-      const result = db.getFreeTime('2099-01-01');
+    it('获取不存在的日期返回空数组', async () => {
+      const result = await db.getFreeTime('2099-01-01');
       expect(result).toEqual([]);
     });
   });
@@ -311,9 +311,9 @@ describe('Database', () => {
       { id: 'bt1', name: '赏金任务1', points: 50 },
     ];
 
-    it('保存并获取赏金任务', () => {
-      db.saveBountyTasks(items);
-      const result = db.getBountyTasks();
+    it('保存并获取赏金任务', async () => {
+      await db.saveBountyTasks(items);
+      const result = await db.getBountyTasks();
       expect(result).toEqual(items);
     });
   });
@@ -324,9 +324,9 @@ describe('Database', () => {
       { id: 'bs1', taskId: 'bt1', startedAt: '2026-06-06T10:00:00Z' },
     ];
 
-    it('保存并获取赏金提交', () => {
-      db.saveBountySubmissions(dateKey, items);
-      const result = db.getBountySubmissions(dateKey);
+    it('保存并获取赏金提交', async () => {
+      await db.saveBountySubmissions(dateKey, items);
+      const result = await db.getBountySubmissions(dateKey);
       expect(result).toEqual(items);
     });
   });
@@ -335,19 +335,19 @@ describe('Database', () => {
     const dateKey = '2026-06-06';
     const data = { taskId: 'bt1', completed: true };
 
-    it('保存并获取赏金完成记录', () => {
-      db.saveBountyCompletions(dateKey, data);
-      const result = db.getBountyCompletions(dateKey);
+    it('保存并获取赏金完成记录', async () => {
+      await db.saveBountyCompletions(dateKey, data);
+      const result = await db.getBountyCompletions(dateKey);
       expect(result).toEqual(data);
     });
   });
 
   describe('points update', () => {
-    it('earn 增加积分并记录历史', () => {
-      const balance = db.updatePoints('earn', 100, '完成作业');
+    it('earn 增加积分并记录历史', async () => {
+      const balance = await db.updatePoints('earn', 100, '完成作业');
       expect(balance).toBe(100);
 
-      const fullData = db.getFullData();
+      const fullData = await db.getFullData();
       expect(fullData.points.balance).toBe(100);
       expect(fullData.points.history).toHaveLength(1);
       expect(fullData.points.history[0].earned).toBe(100);
@@ -355,12 +355,12 @@ describe('Database', () => {
       expect(fullData.points.history[0].detail).toBe('完成作业');
     });
 
-    it('spend 减少积分并记录历史', () => {
-      db.updatePoints('earn', 200, '初始');
-      const balance = db.updatePoints('spend', 50, '购买零食');
+    it('spend 减少积分并记录历史', async () => {
+      await db.updatePoints('earn', 200, '初始');
+      const balance = await db.updatePoints('spend', 50, '购买零食');
       expect(balance).toBe(150);
 
-      const fullData = db.getFullData();
+      const fullData = await db.getFullData();
       expect(fullData.points.balance).toBe(150);
       // 历史应有两条记录
       expect(fullData.points.history).toHaveLength(2);
@@ -370,21 +370,21 @@ describe('Database', () => {
   });
 
   describe('modifiedSince / recordModification', () => {
-    it('记录修改并查询最近修改', () => {
+    it('记录修改并查询最近修改', async () => {
       const ts1 = '2026-06-06T10:00:00Z';
-      db.recordModification('homeworks', '2026-06-06', ts1);
+      await db.recordModification('homeworks', '2026-06-06', ts1);
 
-      const modified = db.getModifiedSince('2026-06-06T09:00:00Z');
+      const modified = await db.getModifiedSince('2026-06-06T09:00:00Z');
       expect(modified).toHaveLength(1);
       expect(modified[0].table_name).toBe('homeworks');
       expect(modified[0].record_key).toBe('2026-06-06');
     });
 
-    it('查询不早于某个时间点的修改', () => {
+    it('查询不早于某个时间点的修改', async () => {
       const ts1 = '2026-06-06T10:00:00Z';
-      db.recordModification('homeworks', '2026-06-06', ts1);
+      await db.recordModification('homeworks', '2026-06-06', ts1);
 
-      const modified = db.getModifiedSince('2026-06-06T11:00:00Z');
+      const modified = await db.getModifiedSince('2026-06-06T11:00:00Z');
       expect(modified).toHaveLength(0);
     });
   });
@@ -393,37 +393,37 @@ describe('Database', () => {
     const dateKey = '2026-06-06';
     const data = { rating: 'A', dailyBase: 100, actualPoints: 95 };
 
-    it('保存并获取日结', () => {
-      db.saveSettlement(dateKey, data);
-      const result = db.getSettlement(dateKey);
+    it('保存并获取日结', async () => {
+      await db.saveSettlement(dateKey, data);
+      const result = await db.getSettlement(dateKey);
       expect(result).toEqual(data);
     });
   });
 
   describe('resetDate', () => {
-    it('删除指定日期的所有数据', () => {
+    it('删除指定日期的所有数据', async () => {
       // 写入各种数据
-      db.saveHomeworks('2026-06-06', [{ id: 'hw1', subject: '数学' }]);
-      db.saveSettlement('2026-06-06', { rating: 'A' });
-      db.saveEfficiency('2026-06-06', { efficiencyRatio: 0.8 });
-      db.saveFreeTime('2026-06-06', [{ name: '玩' }]);
-      db.saveBountySubmissions('2026-06-06', [{ id: 'bs1' }]);
-      db.saveBountyCompletions('2026-06-06', { taskId: 'bt1' });
+      await db.saveHomeworks('2026-06-06', [{ id: 'hw1', subject: '数学' }]);
+      await db.saveSettlement('2026-06-06', { rating: 'A' });
+      await db.saveEfficiency('2026-06-06', { efficiencyRatio: 0.8 });
+      await db.saveFreeTime('2026-06-06', [{ name: '玩' }]);
+      await db.saveBountySubmissions('2026-06-06', [{ id: 'bs1' }]);
+      await db.saveBountyCompletions('2026-06-06', { taskId: 'bt1' });
 
       // 另外一天的数据应保留
-      db.saveHomeworks('2026-06-07', [{ id: 'hw2', subject: '语文' }]);
+      await db.saveHomeworks('2026-06-07', [{ id: 'hw2', subject: '语文' }]);
 
-      db.resetDate('2026-06-06');
+      await db.resetDate('2026-06-06');
 
-      expect(db.getHomeworks('2026-06-06')).toEqual([]);
-      expect(db.getSettlement('2026-06-06')).toBeNull();
-      expect(db.getEfficiency('2026-06-06')).toBeNull();
-      expect(db.getFreeTime('2026-06-06')).toEqual([]);
-      expect(db.getBountySubmissions('2026-06-06')).toEqual([]);
-      expect(db.getBountyCompletions('2026-06-06')).toEqual({});
+      expect(await db.getHomeworks('2026-06-06')).toEqual([]);
+      expect(await db.getSettlement('2026-06-06')).toBeNull();
+      expect(await db.getEfficiency('2026-06-06')).toBeNull();
+      expect(await db.getFreeTime('2026-06-06')).toEqual([]);
+      expect(await db.getBountySubmissions('2026-06-06')).toEqual([]);
+      expect(await db.getBountyCompletions('2026-06-06')).toEqual({});
 
       // 另一天的数据应该还在
-      expect(db.getHomeworks('2026-06-07')).toHaveLength(1);
+      expect(await db.getHomeworks('2026-06-07')).toHaveLength(1);
     });
 
     // Feature: resetDate 清理 active_buffs
@@ -431,31 +431,31 @@ describe('Database', () => {
     //     Given 存在多个 startDate 不同的 buff
     //     When 调用 resetDate
     //     Then 匹配的 buff 应被移除
-    it('resetDate 应清理 startDate 匹配的 active_buffs', () => {
-      db.saveActiveBuffs([
+    it('resetDate 应清理 startDate 匹配的 active_buffs', async () => {
+      await db.saveActiveBuffs([
         { id: 'buff1', name: '专注', startDate: '2026-06-06', duration: 30, unit: 'min' },
         { id: 'buff2', name: '高效', startDate: '2026-06-07', duration: 30, unit: 'min' },
       ]);
 
-      db.resetDate('2026-06-06');
+      await db.resetDate('2026-06-06');
 
-      const buffs = db.getActiveBuffs();
+      const buffs = await db.getActiveBuffs();
       expect(buffs).toHaveLength(1);
       expect(buffs[0].id).toBe('buff2');
     });
 
-    it('resetDate 无效 dateKey 格式不崩溃（不足三段）', () => {
+    it('resetDate 无效 dateKey 格式不崩溃（不足三段）', async () => {
       // dateKey 长度不足 3 段应提前 return
-      expect(() => db.resetDate('invalid')).not.toThrow();
+      expect(async () => await db.resetDate('invalid')).not.toThrow();
     });
 
-    it('resetDate 无效 dateKey 格式（两段）不崩溃', () => {
-      expect(() => db.resetDate('2026-06')).not.toThrow();
+    it('resetDate 无效 dateKey 格式（两段）不崩溃', async () => {
+      expect(async () => await db.resetDate('2026-06')).not.toThrow();
     });
   });
 
   describe('importFullData / getFullData roundtrip', () => {
-    it('导入完整数据后再导出应一致', () => {
+    it('导入完整数据后再导出应一致', async () => {
       const input: any = {
         points: {
           balance: 500,
@@ -480,8 +480,8 @@ describe('Database', () => {
         tasks: {},
       };
 
-      db.importFullData(input);
-      const output = db.getFullData();
+      await db.importFullData(input);
+      const output = await db.getFullData();
 
       expect(output.points.balance).toBe(500);
       expect(output.points.history).toHaveLength(1);
@@ -502,8 +502,8 @@ describe('Database', () => {
   });
 
   describe('pushMerge', () => {
-    it('合并简单的 points 变更', () => {
-      const result = db.pushMerge([
+    it('合并简单的 points 变更', async () => {
+      const result = await db.pushMerge([
         {
           type: 'update',
           uuid: 'points-1',
@@ -512,15 +512,15 @@ describe('Database', () => {
         },
       ]);
       expect(result).toEqual({ ok: true });
-      expect(db.getPointsBalance()).toBe(300);
+      expect(await db.getPointsBalance()).toBe(300);
     });
 
-    it('合并 date_key 表中的条目', () => {
-      db.saveHomeworks('2026-06-06', [
+    it('合并 date_key 表中的条目', async () => {
+      await db.saveHomeworks('2026-06-06', [
         { id: 'hw1', subject: '数学', lastModified: '2026-06-05T10:00:00Z' },
       ]);
 
-      const result = db.pushMerge([
+      const result = await db.pushMerge([
         {
           type: 'update',
           uuid: 'hw1',
@@ -535,7 +535,7 @@ describe('Database', () => {
       ]);
       expect(result).toEqual({ ok: true });
 
-      const homeworks = db.getHomeworks('2026-06-06');
+      const homeworks = await db.getHomeworks('2026-06-06');
       expect(homeworks).toHaveLength(1);
       expect(homeworks[0].subject).toBe('数学_修改');
     });
@@ -545,18 +545,18 @@ describe('Database', () => {
     //     Given 已存在一条作业记录
     //     When 使用 pushMerge 传入 type 为 delete
     //     Then 该作业应被标记为已删除（getHomeworkById 返回 null）
-    it('pushMerge with type delete 应标记作业为已删除', () => {
+    it('pushMerge with type delete 应标记作业为已删除', async () => {
       const dateKey = '2026-06-06';
-      db.saveHomeworks(dateKey, [{ id: 'hw1', subject: '数学', lastModified: '2026-06-05T10:00:00Z' }]);
+      await db.saveHomeworks(dateKey, [{ id: 'hw1', subject: '数学', lastModified: '2026-06-05T10:00:00Z' }]);
 
-      db.pushMerge([{
+      await db.pushMerge([{
         type: 'delete',
         uuid: 'hw1',
         data: { id: 'hw1', subject: '数学', date: dateKey, lastModified: '2026-06-06T10:00:00Z' },
         timestamp: '2026-06-06T10:00:00Z',
       }]);
 
-      const result = db.getHomeworkById('hw1');
+      const result = await db.getHomeworkById('hw1');
       expect(result).toBeNull();
     });
 
@@ -565,18 +565,18 @@ describe('Database', () => {
     //     Given 已存在一条作业记录
     //     When 使用 pushMerge 传入不同 UUID 的新数据
     //     Then 应返回两条记录
-    it('pushMerge with 新 UUID 应推入新条目', () => {
+    it('pushMerge with 新 UUID 应推入新条目', async () => {
       const dateKey = '2026-06-06';
-      db.saveHomeworks(dateKey, [{ id: 'hw1', subject: '数学', lastModified: '2026-06-05T10:00:00Z' }]);
+      await db.saveHomeworks(dateKey, [{ id: 'hw1', subject: '数学', lastModified: '2026-06-05T10:00:00Z' }]);
 
-      db.pushMerge([{
+      await db.pushMerge([{
         type: 'update',
         uuid: 'hw2',
         data: { id: 'hw2', subject: '语文', date: dateKey, lastModified: '2026-06-06T10:00:00Z' },
         timestamp: '2026-06-06T10:00:00Z',
       }]);
 
-      const homeworks = db.getHomeworks(dateKey);
+      const homeworks = await db.getHomeworks(dateKey);
       expect(homeworks).toHaveLength(2);
     });
 
@@ -585,15 +585,15 @@ describe('Database', () => {
     //     Given daily_settlement 表存在一条对象记录
     //     When 使用 pushMerge 合并新数据
     //     Then 不应崩溃，数据应被正确合并
-    it('pushMerge 处理 dict 类型的 date_key 表', () => {
+    it('pushMerge 处理 dict 类型的 date_key 表', async () => {
       const dateKey = '2026-06-06';
       // 直接写入非数组 JSON 到 daily_settlement 表
-      (db as any).db.prepare(
+      await (db as any).db.prepare(
         "INSERT OR REPLACE INTO daily_settlement (date_key, data) VALUES (?, ?)"
       ).run(dateKey, JSON.stringify({ rating: 'A', dailyBase: 100 }));
 
-      expect(() => {
-        db.pushMerge([{
+      expect(async () => {
+        await db.pushMerge([{
           type: 'update',
           uuid: 'settlement-1',
           data: { rating: 'A+', dailyBase: 110, date: dateKey, lastModified: '2026-06-06T10:00:00Z' },
@@ -601,7 +601,7 @@ describe('Database', () => {
         }]);
       }).not.toThrow();
 
-      const result = db.getSettlement(dateKey);
+      const result = await db.getSettlement(dateKey);
       expect(result.rating).toBe('A+');
     });
 
@@ -610,9 +610,9 @@ describe('Database', () => {
     //     Given 当前数据库状态
     //     When 使用 pushMerge 传入 data 无 date/dateKey 且 uuid 为空
     //     Then 不抛出异常，recordKey 为空跳过该条变更
-    it('pushMerge 无 date 字段且空 uuid 的 bounty_submissions 应跳过', () => {
-      expect(() => {
-        db.pushMerge([{
+    it('pushMerge 无 date 字段且空 uuid 的 bounty_submissions 应跳过', async () => {
+      expect(async () => {
+        await db.pushMerge([{
           type: 'update',
           uuid: '',
           data: { id: 'bs1', taskId: 'bt1', startedAt: '2026-06-06T10:00:00Z' },
@@ -626,11 +626,11 @@ describe('Database', () => {
     //     Given daily_settlement 存在一条记录
     //     When 使用 pushMerge 传入 type delete 且数据为 dict 类型
     //     Then 数据被标记 isDeleted
-    it('pushMerge 对 daily_settlement dict 类型执行 delete', () => {
+    it('pushMerge 对 daily_settlement dict 类型执行 delete', async () => {
       const dateKey = '2026-06-06';
-      db.saveSettlement(dateKey, { rating: 'A', dailyBase: 100 });
+      await db.saveSettlement(dateKey, { rating: 'A', dailyBase: 100 });
 
-      db.pushMerge([{
+      await db.pushMerge([{
         type: 'delete',
         uuid: 'settlement-del',
         data: { rating: 'A', dailyBase: 100, date: dateKey, lastModified: '2026-06-06T10:00:00Z' },
@@ -638,7 +638,7 @@ describe('Database', () => {
       }]);
 
       // delete 操作在 dict 类型上标记 isDeleted
-      const raw = (db as any)._getDateDataRaw('daily_settlement', dateKey);
+      const raw = await (db as any)._getDateDataRaw('daily_settlement', dateKey);
       expect(raw.isDeleted).toBe(true);
     });
   });
@@ -649,17 +649,17 @@ describe('Database', () => {
     //     Given shop_items 表已有数据
     //     When 使用 pushMerge 添加新商品
     //     Then 应包含新旧两个商品
-    it('pushMerge for shop_items 应添加新条目', () => {
-      db.saveShopItems([{ id: 's1', name: '零食', lastModified: '2026-06-05T10:00:00Z' }]);
+    it('pushMerge for shop_items 应添加新条目', async () => {
+      await db.saveShopItems([{ id: 's1', name: '零食', lastModified: '2026-06-05T10:00:00Z' }]);
 
-      db.pushMerge([{
+      await db.pushMerge([{
         type: 'update',
         uuid: 's2',
         data: { id: 's2', name: '玩具', cost: 10, baseQuantity: 1, lastModified: '2026-06-06T10:00:00Z' },
         timestamp: '2026-06-06T10:00:00Z',
       }]);
 
-      const items = db.getShopItems();
+      const items = await db.getShopItems();
       expect(items).toHaveLength(2);
     });
 
@@ -668,17 +668,17 @@ describe('Database', () => {
     //     Given shop_items 表存在一个商品
     //     When 使用 pushMerge 传入 type 为 delete
     //     Then 该商品应被标记为已删除
-    it('pushMerge for shop_items with type delete 应标记为已删除', () => {
-      db.saveShopItems([{ id: 's1', name: '零食', lastModified: '2026-06-05T10:00:00Z' }]);
+    it('pushMerge for shop_items with type delete 应标记为已删除', async () => {
+      await db.saveShopItems([{ id: 's1', name: '零食', lastModified: '2026-06-05T10:00:00Z' }]);
 
-      db.pushMerge([{
+      await db.pushMerge([{
         type: 'delete',
         uuid: 's1',
         data: { id: 's1', name: '零食', cost: 10, baseQuantity: 1, lastModified: '2026-06-06T10:00:00Z' },
         timestamp: '2026-06-06T10:00:00Z',
       }]);
 
-      const result = db.getShopItemById('s1');
+      const result = await db.getShopItemById('s1');
       expect(result).toBeNull();
     });
 
@@ -687,17 +687,17 @@ describe('Database', () => {
     //     Given bounty_tasks 表已有数据
     //     When 使用 pushMerge 添加新任务
     //     Then 应包含两个任务
-    it('pushMerge for bounty_tasks 应添加新条目', () => {
-      db.saveBountyTasks([{ id: 'bt1', name: '赏金1', points: 50, lastModified: '2026-06-05T10:00:00Z' }]);
+    it('pushMerge for bounty_tasks 应添加新条目', async () => {
+      await db.saveBountyTasks([{ id: 'bt1', name: '赏金1', points: 50, lastModified: '2026-06-05T10:00:00Z' }]);
 
-      db.pushMerge([{
+      await db.pushMerge([{
         type: 'update',
         uuid: 'bt2',
         data: { id: 'bt2', name: '赏金2', points: 30, createdAt: '2026-06-06T10:00:00Z', lastModified: '2026-06-06T10:00:00Z' },
         timestamp: '2026-06-06T10:00:00Z',
       }]);
 
-      const tasks = db.getBountyTasks();
+      const tasks = await db.getBountyTasks();
       expect(tasks).toHaveLength(2);
     });
 
@@ -706,20 +706,20 @@ describe('Database', () => {
     //     Given shop_items 表存在两个商品
     //     When 使用 pushMerge 传入不存在的 UUID
     //     Then 应新增为第三条
-    it('pushMerge for single-row table 找不到条目时推入新条目', () => {
-      db.saveShopItems([
+    it('pushMerge for single-row table 找不到条目时推入新条目', async () => {
+      await db.saveShopItems([
         { id: 's1', name: '零食', lastModified: '2026-06-05T10:00:00Z' },
         { id: 's2', name: '玩具', lastModified: '2026-06-05T10:00:00Z' },
       ]);
 
-      db.pushMerge([{
+      await db.pushMerge([{
         type: 'update',
         uuid: 's3',
         data: { id: 's3', name: '图书', cost: 20, baseQuantity: 1, lastModified: '2026-06-06T10:00:00Z' },
         timestamp: '2026-06-06T10:00:00Z',
       }]);
 
-      const items = db.getShopItems();
+      const items = await db.getShopItems();
       expect(items).toHaveLength(3);
     });
 
@@ -728,10 +728,10 @@ describe('Database', () => {
     //     Given settings 表存在一条记录
     //     When 使用 pushMerge 传入 type delete 且数据为 dict 类型
     //     Then 数据被标记 isDeleted
-    it('pushMerge for settings dict type with delete 应标记 isDeleted', () => {
-      db.saveSettings({ dailyBasePoints: 100, ratingMultipliers: { A: 1.0 } });
+    it('pushMerge for settings dict type with delete 应标记 isDeleted', async () => {
+      await db.saveSettings({ dailyBasePoints: 100, ratingMultipliers: { A: 1.0 } });
 
-      db.pushMerge([{
+      await db.pushMerge([{
         type: 'delete',
         uuid: 'settings-delete',
         data: { dailyBasePoints: 100, lastModified: '2026-06-06T10:00:00Z' },
@@ -739,7 +739,7 @@ describe('Database', () => {
       }]);
 
       // settings 是 dict 类型，delete 应标记 isDeleted
-      const settings = (db as any)._getJson('settings');
+      const settings = await (db as any)._getJson('settings');
       expect(settings.isDeleted).toBe(true);
     });
 
@@ -748,9 +748,9 @@ describe('Database', () => {
     //     Given 任何数据库状态
     //     When 使用 pushMerge 传入非对象 data
     //     Then 跳过该条变更
-    it('pushMerge 非对象数据类型（字符串）应跳过', () => {
-      expect(() => {
-        db.pushMerge([{
+    it('pushMerge 非对象数据类型（字符串）应跳过', async () => {
+      expect(async () => {
+        await db.pushMerge([{
           type: 'update',
           uuid: 'string-data',
           data: 'this-is-not-an-object',
@@ -759,9 +759,9 @@ describe('Database', () => {
       }).not.toThrow();
     });
 
-    it('pushMerge data 为 null 应跳过', () => {
-      expect(() => {
-        db.pushMerge([{
+    it('pushMerge data 为 null 应跳过', async () => {
+      expect(async () => {
+        await db.pushMerge([{
           type: 'update',
           uuid: 'null-data',
           data: null,
@@ -775,9 +775,9 @@ describe('Database', () => {
     //     Given 任何数据库状态
     //     When 使用 pushMerge 传入无法分类的 data
     //     Then 跳过该条变更
-    it('pushMerge 无法分类的数据（无匹配字段）应跳过', () => {
-      expect(() => {
-        db.pushMerge([{
+    it('pushMerge 无法分类的数据（无匹配字段）应跳过', async () => {
+      expect(async () => {
+        await db.pushMerge([{
           type: 'update',
           uuid: 'unclassified',
           data: { someUnknownField: 'value' },
@@ -788,10 +788,10 @@ describe('Database', () => {
   });
 
   describe('close', () => {
-    it('重复关闭不会抛异常', () => {
-      expect(() => {
-        db.close();
-        db.close();
+    it('重复关闭不会抛异常', async () => {
+      expect(async () => {
+        await db.close();
+        await db.close();
       }).not.toThrow();
     });
   });
@@ -799,40 +799,40 @@ describe('Database', () => {
   // ==================== 新增资源级方法测试 ====================
 
   describe('_findInArray', () => {
-    it('按 id 查找元素', () => {
+    it('按 id 查找元素', async () => {
       const items = [
         { id: 'a1', name: 'Item A' },
         { id: 'b2', name: 'Item B' },
       ];
-      const result = (db as any)._findInArray(items, 'b2');
+      const result = await (db as any)._findInArray(items, 'b2');
       expect(result).toEqual({ index: 1, item: items[1] });
     });
 
-    it('按 uuid 查找元素', () => {
+    it('按 uuid 查找元素', async () => {
       const items = [
         { uuid: 'u1', name: 'Item 1' },
         { uuid: 'u2', name: 'Item 2' },
       ];
-      const result = (db as any)._findInArray(items, 'u1');
+      const result = await (db as any)._findInArray(items, 'u1');
       expect(result).toEqual({ index: 0, item: items[0] });
     });
 
-    it('按 taskId 查找元素', () => {
+    it('按 taskId 查找元素', async () => {
       const items = [
         { taskId: 't1', name: 'Task 1' },
       ];
-      const result = (db as any)._findInArray(items, 't1');
+      const result = await (db as any)._findInArray(items, 't1');
       expect(result).toEqual({ index: 0, item: items[0] });
     });
 
-    it('找不到返回 index=-1 item=null', () => {
-      const result = (db as any)._findInArray([], 'nonexistent');
+    it('找不到返回 index=-1 item=null', async () => {
+      const result = await (db as any)._findInArray([], 'nonexistent');
       expect(result).toEqual({ index: -1, item: null });
     });
 
-    it('在含有 null 的数组中查找不报错', () => {
+    it('在含有 null 的数组中查找不报错', async () => {
       const items = [null, { id: 'x1', name: 'X' }];
-      const result = (db as any)._findInArray(items, 'x1');
+      const result = await (db as any)._findInArray(items, 'x1');
       expect(result).toEqual({ index: 1, item: items[1] });
     });
   });
@@ -841,30 +841,30 @@ describe('Database', () => {
     const dateKey1 = '2026-06-06';
     const dateKey2 = '2026-06-07';
 
-    beforeEach(() => {
-      db.saveHomeworks(dateKey1, [
+    beforeEach(async () => {
+      await db.saveHomeworks(dateKey1, [
         { id: 'hw1', subject: '数学', content: 'P10' },
         { id: 'hw2', subject: '语文', content: '作文' },
       ]);
-      db.saveHomeworks(dateKey2, [
+      await db.saveHomeworks(dateKey2, [
         { id: 'hw3', subject: '英语', content: '单词' },
       ]);
     });
 
-    it('在 date_key 表中按 id 查找记录', () => {
-      const result = (db as any)._findRecordById('homeworks', 'hw2');
+    it('在 date_key 表中按 id 查找记录', async () => {
+      const result = await (db as any)._findRecordById('homeworks', 'hw2');
       expect(result).not.toBeNull();
       expect(result!.dateKey).toBe(dateKey1);
       expect(result!.item.subject).toBe('语文');
     });
 
-    it('找不到返回 null', () => {
-      const result = (db as any)._findRecordById('homeworks', 'nonexistent');
+    it('找不到返回 null', async () => {
+      const result = await (db as any)._findRecordById('homeworks', 'nonexistent');
       expect(result).toBeNull();
     });
 
-    it('空表返回 null', () => {
-      const result = (db as any)._findRecordById('free_time_tasks', 'any');
+    it('空表返回 null', async () => {
+      const result = await (db as any)._findRecordById('free_time_tasks', 'any');
       expect(result).toBeNull();
     });
   });
@@ -873,72 +873,72 @@ describe('Database', () => {
     const dateKey = '2026-06-06';
     const hwData = { id: 'hw1', subject: '数学', content: '练习册P10' };
 
-    beforeEach(() => {
-      db.saveHomeworks(dateKey, [hwData]);
+    beforeEach(async () => {
+      await db.saveHomeworks(dateKey, [hwData]);
     });
 
-    it('getHomeworkById 返回匹配的作业', () => {
-      const result = db.getHomeworkById('hw1');
+    it('getHomeworkById 返回匹配的作业', async () => {
+      const result = await db.getHomeworkById('hw1');
       expect(result).not.toBeNull();
       expect(result!.subject).toBe('数学');
     });
 
-    it('getHomeworkById 找不到返回 null', () => {
-      const result = db.getHomeworkById('nonexistent');
+    it('getHomeworkById 找不到返回 null', async () => {
+      const result = await db.getHomeworkById('nonexistent');
       expect(result).toBeNull();
     });
 
-    it('putHomework 创建新作业', () => {
-      db.putHomework('hw_new', { id: 'hw_new', subject: '物理', content: '实验' });
-      const result = db.getHomeworkById('hw_new');
+    it('putHomework 创建新作业', async () => {
+      await db.putHomework('hw_new', { id: 'hw_new', subject: '物理', content: '实验' });
+      const result = await db.getHomeworkById('hw_new');
       expect(result).not.toBeNull();
       expect(result!.subject).toBe('物理');
     });
 
-    it('putHomework 更新已有作业', () => {
-      db.putHomework('hw1', { id: 'hw1', subject: '数学（修改）', content: 'P20' });
-      const result = db.getHomeworkById('hw1');
+    it('putHomework 更新已有作业', async () => {
+      await db.putHomework('hw1', { id: 'hw1', subject: '数学（修改）', content: 'P20' });
+      const result = await db.getHomeworkById('hw1');
       expect(result!.subject).toBe('数学（修改）');
       expect(result!.content).toBe('P20');
     });
 
-    it('patchHomework 部分更新', () => {
-      db.patchHomework('hw1', { content: 'P30' });
-      const result = db.getHomeworkById('hw1');
+    it('patchHomework 部分更新', async () => {
+      await db.patchHomework('hw1', { content: 'P30' });
+      const result = await db.getHomeworkById('hw1');
       expect(result!.subject).toBe('数学');
       expect(result!.content).toBe('P30');
       expect(result!.lastModified).toBeDefined();
     });
 
-    it('deleteHomework 标记删除', () => {
-      db.deleteHomework('hw1');
-      const result = db.getHomeworkById('hw1');
+    it('deleteHomework 标记删除', async () => {
+      await db.deleteHomework('hw1');
+      const result = await db.getHomeworkById('hw1');
       expect(result).toBeNull();
       // 原始数据应标记 isDeleted
-      const raw = (db as any)._getDateDataRaw('homeworks', dateKey);
+      const raw = await (db as any)._getDateDataRaw('homeworks', dateKey);
       const deleted = raw.find((h: any) => h.id === 'hw1');
       expect(deleted.isDeleted).toBe(true);
     });
 
-    it('putHomework 在软删除记录上创建新记录', () => {
+    it('putHomework 在软删除记录上创建新记录', async () => {
       // 先删除作业
-      db.deleteHomework('hw1');
-      expect(db.getHomeworkById('hw1')).toBeNull();
+      await db.deleteHomework('hw1');
+      expect(await db.getHomeworkById('hw1')).toBeNull();
 
       // 用同一 ID 重新创建——应创建新记录（不是恢复旧的）
-      db.putHomework('hw1', { id: 'hw1', subject: '重新创建', content: '新内容', dateKey: '2026-06-07' });
+      await db.putHomework('hw1', { id: 'hw1', subject: '重新创建', content: '新内容', dateKey: '2026-06-07' });
 
       // getHomeworkById 按 _findRecordById 顺序找到旧记录（已删除），返回 null
-      expect(db.getHomeworkById('hw1')).toBeNull();
+      expect(await db.getHomeworkById('hw1')).toBeNull();
 
       // 验证新记录在 dateKey=2026-06-07 的列表中
-      const hwList = db.getHomeworks('2026-06-07');
+      const hwList = await db.getHomeworks('2026-06-07');
       const newHw = hwList.find((h: any) => h.id === 'hw1');
       expect(newHw).toBeDefined();
       expect(newHw!.subject).toBe('重新创建');
 
       // 验证旧记录仍有 isDeleted 标记
-      const raw = (db as any)._getDateDataRaw('homeworks', '2026-06-06');
+      const raw = await (db as any)._getDateDataRaw('homeworks', '2026-06-06');
       const oldDeleted = raw.find((h: any) => h.id === 'hw1' && h.isDeleted);
       expect(oldDeleted).toBeDefined();
     });
@@ -948,23 +948,23 @@ describe('Database', () => {
     const dateKey = '2026-06-06';
     const data = { rating: 'A', dailyBase: 100, actualPoints: 95 };
 
-    it('putSettlement 创建/更新日结', () => {
-      db.putSettlement(dateKey, data);
-      const result = db.getSettlement(dateKey);
+    it('putSettlement 创建/更新日结', async () => {
+      await db.putSettlement(dateKey, data);
+      const result = await db.getSettlement(dateKey);
       expect(result).toEqual(data);
     });
 
-    it('putSettlement 更新已有日结', () => {
-      db.putSettlement(dateKey, { rating: 'B', dailyBase: 80 });
-      db.putSettlement(dateKey, { rating: 'A', dailyBase: 100, actualPoints: 95 });
-      const result = db.getSettlement(dateKey);
+    it('putSettlement 更新已有日结', async () => {
+      await db.putSettlement(dateKey, { rating: 'B', dailyBase: 80 });
+      await db.putSettlement(dateKey, { rating: 'A', dailyBase: 100, actualPoints: 95 });
+      const result = await db.getSettlement(dateKey);
       expect(result.rating).toBe('A');
     });
 
-    it('patchSettlement 部分更新', () => {
-      db.putSettlement(dateKey, { rating: 'A', dailyBase: 100 });
-      db.patchSettlement(dateKey, { actualPoints: 95 });
-      const result = db.getSettlement(dateKey);
+    it('patchSettlement 部分更新', async () => {
+      await db.putSettlement(dateKey, { rating: 'A', dailyBase: 100 });
+      await db.patchSettlement(dateKey, { actualPoints: 95 });
+      const result = await db.getSettlement(dateKey);
       expect(result.rating).toBe('A');
       expect(result.dailyBase).toBe(100);
       expect(result.actualPoints).toBe(95);
@@ -973,36 +973,36 @@ describe('Database', () => {
   });
 
   describe('patchPoints', () => {
-    it('earn 增加积分', () => {
-      const balance = db.patchPoints({ earn: 100, detail: '完成作业' });
+    it('earn 增加积分', async () => {
+      const balance = await db.patchPoints({ earn: 100, detail: '完成作业' });
       expect(balance).toBe(100);
-      expect(db.getPointsBalance()).toBe(100);
+      expect(await db.getPointsBalance()).toBe(100);
     });
 
-    it('spend 减少积分', () => {
-      db.updatePoints('earn', 200, '初始');
-      const balance = db.patchPoints({ spend: 50, detail: '购买零食' });
+    it('spend 减少积分', async () => {
+      await db.updatePoints('earn', 200, '初始');
+      const balance = await db.patchPoints({ spend: 50, detail: '购买零食' });
       expect(balance).toBe(150);
     });
 
-    it('同时 earn 和 spend', () => {
-      db.updatePoints('earn', 100, '初始');
-      const balance = db.patchPoints({ earn: 50, spend: 30, detail: '净赚20' });
+    it('同时 earn 和 spend', async () => {
+      await db.updatePoints('earn', 100, '初始');
+      const balance = await db.patchPoints({ earn: 50, spend: 30, detail: '净赚20' });
       expect(balance).toBe(120);
     });
 
-    it('记录到 points_history', () => {
-      db.patchPoints({ earn: 100, detail: '测试' });
-      const fullData = db.getFullData();
+    it('记录到 points_history', async () => {
+      await db.patchPoints({ earn: 100, detail: '测试' });
+      const fullData = await db.getFullData();
       const lastHistory = fullData.points.history[fullData.points.history.length - 1];
       expect(lastHistory.earned).toBe(100);
       expect(lastHistory.spent).toBe(0);
       expect(lastHistory.detail).toBe('测试');
     });
 
-    it('空 delta 不改变积分', () => {
-      db.updatePoints('earn', 100, '初始');
-      const balance = db.patchPoints({});
+    it('空 delta 不改变积分', async () => {
+      await db.updatePoints('earn', 100, '初始');
+      const balance = await db.patchPoints({});
       expect(balance).toBe(100);
     });
   });
@@ -1013,97 +1013,97 @@ describe('Database', () => {
       { id: 's2', name: '玩具', baseQuantity: 1, remainingQuantity: 1 },
     ];
 
-    beforeEach(() => {
-      db.saveShopItems(items);
+    beforeEach(async () => {
+      await db.saveShopItems(items);
     });
 
-    it('getShopItemById 返回匹配商品', () => {
-      const result = db.getShopItemById('s1');
+    it('getShopItemById 返回匹配商品', async () => {
+      const result = await db.getShopItemById('s1');
       expect(result).not.toBeNull();
       expect(result!.name).toBe('零食');
     });
 
-    it('getShopItemById 找不到返回 null', () => {
-      const result = db.getShopItemById('nonexistent');
+    it('getShopItemById 找不到返回 null', async () => {
+      const result = await db.getShopItemById('nonexistent');
       expect(result).toBeNull();
     });
 
-    it('putShopItem 更新已有商品', () => {
-      db.putShopItem('s1', { id: 's1', name: '零食（大包）', baseQuantity: 3, remainingQuantity: 3 });
-      const result = db.getShopItemById('s1');
+    it('putShopItem 更新已有商品', async () => {
+      await db.putShopItem('s1', { id: 's1', name: '零食（大包）', baseQuantity: 3, remainingQuantity: 3 });
+      const result = await db.getShopItemById('s1');
       expect(result!.name).toBe('零食（大包）');
     });
 
-    it('putShopItem 创建新商品', () => {
-      db.putShopItem('s3', { id: 's3', name: '图书', baseQuantity: 5, remainingQuantity: 5 });
-      const all = db.getShopItems();
+    it('putShopItem 创建新商品', async () => {
+      await db.putShopItem('s3', { id: 's3', name: '图书', baseQuantity: 5, remainingQuantity: 5 });
+      const all = await db.getShopItems();
       expect(all).toHaveLength(3);
     });
 
-    it('deleteShopItem 标记删除', () => {
-      db.deleteShopItem('s1');
-      const result = db.getShopItemById('s1');
+    it('deleteShopItem 标记删除', async () => {
+      await db.deleteShopItem('s1');
+      const result = await db.getShopItemById('s1');
       expect(result).toBeNull();
       // getFullData 应过滤已删除项
-      const fullData = db.getFullData();
+      const fullData = await db.getFullData();
       expect(fullData.shopItems.find((s: any) => s.id === 's1')).toBeUndefined();
     });
   });
 
   describe('每日数量重置', () => {
-    it('当日期变更时，getShopItems 应重置 remainingQuantity 为 baseQuantity', () => {
+    it('当日期变更时，getShopItems 应重置 remainingQuantity 为 baseQuantity', async () => {
       const items = [
         { id: 's1', name: '零食', baseQuantity: 3, remainingQuantity: 0 },
         { id: 's2', name: '玩具', baseQuantity: 5, remainingQuantity: 2 },
         { id: 's3', name: '图书', baseQuantity: 1, remainingQuantity: 1 },
       ];
-      db.saveShopItems(items);
+      await db.saveShopItems(items);
 
       // 将 last_shop_reset 设为昨天，模拟日期变更
       const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-      (db as any).db.prepare(
+      await (db as any).db.prepare(
         "INSERT OR REPLACE INTO meta (key, value) VALUES ('last_shop_reset', ?)"
       ).run(yesterday);
 
-      const result = db.getShopItems();
+      const result = await db.getShopItems();
 
       expect(result.find((r: any) => r.id === 's1').remainingQuantity).toBe(3);
       expect(result.find((r: any) => r.id === 's2').remainingQuantity).toBe(5);
       expect(result.find((r: any) => r.id === 's3').remainingQuantity).toBe(1);
     });
 
-    it('同一天多次调用不重复重置', () => {
+    it('同一天多次调用不重复重置', async () => {
       const items = [
         { id: 's1', name: '零食', baseQuantity: 3, remainingQuantity: 0 },
       ];
-      db.saveShopItems(items);
+      await db.saveShopItems(items);
 
       // 第一次触发应重置
-      const result1 = db.getShopItems();
+      const result1 = await db.getShopItems();
       expect(result1.find((r: any) => r.id === 's1').remainingQuantity).toBe(3);
 
       // 手动扣减
       const s1 = result1.find((r: any) => r.id === 's1');
       s1.remainingQuantity = 0;
-      db.putShopItem('s1', s1);
+      await db.putShopItem('s1', s1);
 
       // 第二次获取不应再次重置（同一天）
-      const result2 = db.getShopItems();
+      const result2 = await db.getShopItems();
       expect(result2.find((r: any) => r.id === 's1').remainingQuantity).toBe(0);
     });
 
-    it('没有 baseQuantity 的商品不触发重置（向后兼容）', () => {
+    it('没有 baseQuantity 的商品不触发重置（向后兼容）', async () => {
       const items = [
         { id: 's1', name: '旧商品', dailyLimit: 3, dailySold: 3 },
       ];
-      db.saveShopItems(items);
+      await db.saveShopItems(items);
 
       const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-      (db as any).db.prepare(
+      await (db as any).db.prepare(
         "INSERT OR REPLACE INTO meta (key, value) VALUES ('last_shop_reset', ?)"
       ).run(yesterday);
 
-      const result = db.getShopItems();
+      const result = await db.getShopItems();
       const item = result.find((r: any) => r.id === 's1');
       expect(item.dailySold).toBe(0);
       expect(item.dailyLimit).toBe(3);
@@ -1111,50 +1111,50 @@ describe('Database', () => {
   });
 
   describe('redemptions 单资源方法', () => {
-    it('putRedemption 创建新兑换记录', () => {
-      db.putRedemption('r1', { id: 'r1', itemId: 'r1', itemName: '兑换1', status: 'pending' });
-      const redemptions = db.getRedemptions();
+    it('putRedemption 创建新兑换记录', async () => {
+      await db.putRedemption('r1', { id: 'r1', itemId: 'r1', itemName: '兑换1', status: 'pending' });
+      const redemptions = await db.getRedemptions();
       expect(redemptions).toHaveLength(1);
       expect(redemptions[0].itemName).toBe('兑换1');
     });
 
-    it('putRedemption 更新已有兑换记录', () => {
-      db.putRedemption('r1', { id: 'r1', itemId: 'r1', itemName: '兑换1', status: 'pending' });
-      db.putRedemption('r1', { id: 'r1', itemId: 'r1', itemName: '兑换1', status: 'completed' });
-      const redemptions = db.getRedemptions();
+    it('putRedemption 更新已有兑换记录', async () => {
+      await db.putRedemption('r1', { id: 'r1', itemId: 'r1', itemName: '兑换1', status: 'pending' });
+      await db.putRedemption('r1', { id: 'r1', itemId: 'r1', itemName: '兑换1', status: 'completed' });
+      const redemptions = await db.getRedemptions();
       expect(redemptions).toHaveLength(1);
       expect(redemptions[0].status).toBe('completed');
     });
   });
 
   describe('reward_box 单资源方法', () => {
-    it('putRewardBoxItem 创建新奖励箱物品', () => {
-      db.putRewardBoxItem('rb1', { id: 'rb1', name: '宝箱1', quantity: 1 });
-      const box = db.getRewardBox();
+    it('putRewardBoxItem 创建新奖励箱物品', async () => {
+      await db.putRewardBoxItem('rb1', { id: 'rb1', name: '宝箱1', quantity: 1 });
+      const box = await db.getRewardBox();
       expect(box).toHaveLength(1);
       expect(box[0].name).toBe('宝箱1');
     });
 
-    it('putRewardBoxItem 更新已有物品', () => {
-      db.putRewardBoxItem('rb1', { id: 'rb1', name: '宝箱1', quantity: 1 });
-      db.putRewardBoxItem('rb1', { id: 'rb1', name: '宝箱1', quantity: 2 });
-      const box = db.getRewardBox();
+    it('putRewardBoxItem 更新已有物品', async () => {
+      await db.putRewardBoxItem('rb1', { id: 'rb1', name: '宝箱1', quantity: 1 });
+      await db.putRewardBoxItem('rb1', { id: 'rb1', name: '宝箱1', quantity: 2 });
+      const box = await db.getRewardBox();
       expect(box).toHaveLength(1);
       expect(box[0].quantity).toBe(2);
     });
   });
 
   describe('settings 单资源方法', () => {
-    it('putSettings 全量替换设置', () => {
-      db.putSettings({ dailyBasePoints: 100, ratingMultipliers: { A: 1.0 } });
-      const result = db.getSettings();
+    it('putSettings 全量替换设置', async () => {
+      await db.putSettings({ dailyBasePoints: 100, ratingMultipliers: { A: 1.0 } });
+      const result = await db.getSettings();
       expect(result.dailyBasePoints).toBe(100);
     });
 
-    it('patchSettings 部分更新', () => {
-      db.putSettings({ dailyBasePoints: 100, ratingMultipliers: { A: 1.0 } });
-      db.patchSettings({ dailyBasePoints: 150 });
-      const result = db.getSettings();
+    it('patchSettings 部分更新', async () => {
+      await db.putSettings({ dailyBasePoints: 100, ratingMultipliers: { A: 1.0 } });
+      await db.patchSettings({ dailyBasePoints: 150 });
+      const result = await db.getSettings();
       expect(result.dailyBasePoints).toBe(150);
       expect(result.ratingMultipliers).toEqual({ A: 1.0 });
       expect(result.lastModified).toBeDefined();
@@ -1162,26 +1162,26 @@ describe('Database', () => {
   });
 
   describe('active_buffs 单资源方法', () => {
-    it('putBuff 创建新增益', () => {
-      db.putBuff('buff1', { id: 'buff1', name: '专注', duration: 30, unit: 'min' });
-      const buffs = db.getActiveBuffs();
+    it('putBuff 创建新增益', async () => {
+      await db.putBuff('buff1', { id: 'buff1', name: '专注', duration: 30, unit: 'min' });
+      const buffs = await db.getActiveBuffs();
       expect(buffs).toHaveLength(1);
       expect(buffs[0].name).toBe('专注');
     });
 
-    it('putBuff 更新已有增益', () => {
-      db.putBuff('buff1', { id: 'buff1', name: '专注', duration: 30, unit: 'min' });
-      db.putBuff('buff1', { id: 'buff1', name: '专注', duration: 45, unit: 'min' });
-      const buffs = db.getActiveBuffs();
+    it('putBuff 更新已有增益', async () => {
+      await db.putBuff('buff1', { id: 'buff1', name: '专注', duration: 30, unit: 'min' });
+      await db.putBuff('buff1', { id: 'buff1', name: '专注', duration: 45, unit: 'min' });
+      const buffs = await db.getActiveBuffs();
       expect(buffs).toHaveLength(1);
       expect(buffs[0].duration).toBe(45);
     });
 
-    it('deleteBuff 标记删除', () => {
-      db.putBuff('buff1', { id: 'buff1', name: '专注', duration: 30, unit: 'min' });
-      db.deleteBuff('buff1');
+    it('deleteBuff 标记删除', async () => {
+      await db.putBuff('buff1', { id: 'buff1', name: '专注', duration: 30, unit: 'min' });
+      await db.deleteBuff('buff1');
       // getFullData 会过滤已删除项
-      const fullData = db.getFullData();
+      const fullData = await db.getFullData();
       expect(fullData.activeBuffs.find((b: any) => b.name === '专注')).toBeUndefined();
     });
   });
@@ -1189,16 +1189,16 @@ describe('Database', () => {
   describe('efficiency_history 单资源方法', () => {
     const dateKey = '2026-06-06';
 
-    it('putEfficiency 保存效率数据', () => {
-      db.putEfficiency(dateKey, { efficiencyRatio: 0.85, averageRatio: 0.75 });
-      const result = db.getEfficiency(dateKey);
+    it('putEfficiency 保存效率数据', async () => {
+      await db.putEfficiency(dateKey, { efficiencyRatio: 0.85, averageRatio: 0.75 });
+      const result = await db.getEfficiency(dateKey);
       expect(result.efficiencyRatio).toBe(0.85);
     });
 
-    it('putEfficiency 更新已有数据', () => {
-      db.putEfficiency(dateKey, { efficiencyRatio: 0.85 });
-      db.putEfficiency(dateKey, { efficiencyRatio: 0.90, averageRatio: 0.80 });
-      const result = db.getEfficiency(dateKey);
+    it('putEfficiency 更新已有数据', async () => {
+      await db.putEfficiency(dateKey, { efficiencyRatio: 0.85 });
+      await db.putEfficiency(dateKey, { efficiencyRatio: 0.90, averageRatio: 0.80 });
+      const result = await db.getEfficiency(dateKey);
       expect(result.efficiencyRatio).toBe(0.90);
       expect(result.averageRatio).toBe(0.80);
     });
@@ -1207,52 +1207,52 @@ describe('Database', () => {
   describe('free_time_tasks 单资源方法', () => {
     const dateKey = '2026-06-06';
 
-    it('putFreeTimeTask 创建新任务', () => {
-      db.putFreeTimeTask('ft1', { id: 'ft1', name: '自由活动', durationMinutes: 30, dateKey });
-      const tasks = db.getFreeTime(dateKey);
+    it('putFreeTimeTask 创建新任务', async () => {
+      await db.putFreeTimeTask('ft1', { id: 'ft1', name: '自由活动', durationMinutes: 30, dateKey });
+      const tasks = await db.getFreeTime(dateKey);
       expect(tasks).toHaveLength(1);
       expect(tasks[0].name).toBe('自由活动');
     });
 
-    it('putFreeTimeTask 更新已有任务', () => {
-      db.putFreeTimeTask('ft1', { id: 'ft1', name: '自由活动', durationMinutes: 30, dateKey });
-      db.putFreeTimeTask('ft1', { id: 'ft1', name: '自由活动（延长）', durationMinutes: 45, dateKey });
-      const tasks = db.getFreeTime(dateKey);
+    it('putFreeTimeTask 更新已有任务', async () => {
+      await db.putFreeTimeTask('ft1', { id: 'ft1', name: '自由活动', durationMinutes: 30, dateKey });
+      await db.putFreeTimeTask('ft1', { id: 'ft1', name: '自由活动（延长）', durationMinutes: 45, dateKey });
+      const tasks = await db.getFreeTime(dateKey);
       expect(tasks).toHaveLength(1);
       expect(tasks[0].durationMinutes).toBe(45);
     });
   });
 
   describe('bounty_tasks 单资源方法', () => {
-    it('getBountyTaskById 返回匹配任务', () => {
-      db.saveBountyTasks([{ id: 'bt1', name: '赏金1', points: 50 }]);
-      const result = db.getBountyTaskById('bt1');
+    it('getBountyTaskById 返回匹配任务', async () => {
+      await db.saveBountyTasks([{ id: 'bt1', name: '赏金1', points: 50 }]);
+      const result = await db.getBountyTaskById('bt1');
       expect(result).not.toBeNull();
       expect(result!.name).toBe('赏金1');
     });
 
-    it('getBountyTaskById 找不到返回 null', () => {
-      const result = db.getBountyTaskById('nonexistent');
+    it('getBountyTaskById 找不到返回 null', async () => {
+      const result = await db.getBountyTaskById('nonexistent');
       expect(result).toBeNull();
     });
 
-    it('putBountyTask 创建新任务', () => {
-      db.putBountyTask('bt1', { id: 'bt1', name: '赏金1', points: 50 });
-      const tasks = db.getBountyTasks();
+    it('putBountyTask 创建新任务', async () => {
+      await db.putBountyTask('bt1', { id: 'bt1', name: '赏金1', points: 50 });
+      const tasks = await db.getBountyTasks();
       expect(tasks).toHaveLength(1);
     });
 
-    it('putBountyTask 更新已有任务', () => {
-      db.putBountyTask('bt1', { id: 'bt1', name: '赏金1', points: 50 });
-      db.putBountyTask('bt1', { id: 'bt1', name: '赏金1（修改）', points: 60 });
-      const result = db.getBountyTaskById('bt1');
+    it('putBountyTask 更新已有任务', async () => {
+      await db.putBountyTask('bt1', { id: 'bt1', name: '赏金1', points: 50 });
+      await db.putBountyTask('bt1', { id: 'bt1', name: '赏金1（修改）', points: 60 });
+      const result = await db.getBountyTaskById('bt1');
       expect(result!.points).toBe(60);
     });
 
-    it('deleteBountyTask 标记删除', () => {
-      db.putBountyTask('bt1', { id: 'bt1', name: '赏金1', points: 50 });
-      db.deleteBountyTask('bt1');
-      const result = db.getBountyTaskById('bt1');
+    it('deleteBountyTask 标记删除', async () => {
+      await db.putBountyTask('bt1', { id: 'bt1', name: '赏金1', points: 50 });
+      await db.deleteBountyTask('bt1');
+      const result = await db.getBountyTaskById('bt1');
       expect(result).toBeNull();
     });
   });
@@ -1260,17 +1260,17 @@ describe('Database', () => {
   describe('bounty_submissions 单资源方法', () => {
     const dateKey = '2026-06-06';
 
-    it('putBountySubmission 创建新提交', () => {
-      db.putBountySubmission('bs1', { id: 'bs1', taskId: 'bt1', startedAt: '2026-06-06T10:00:00Z', dateKey });
-      const subs = db.getBountySubmissions(dateKey);
+    it('putBountySubmission 创建新提交', async () => {
+      await db.putBountySubmission('bs1', { id: 'bs1', taskId: 'bt1', startedAt: '2026-06-06T10:00:00Z', dateKey });
+      const subs = await db.getBountySubmissions(dateKey);
       expect(subs).toHaveLength(1);
       expect(subs[0].taskId).toBe('bt1');
     });
 
-    it('putBountySubmission 更新已有提交', () => {
-      db.putBountySubmission('bs1', { id: 'bs1', taskId: 'bt1', startedAt: '2026-06-06T10:00:00Z', dateKey });
-      db.putBountySubmission('bs1', { id: 'bs1', taskId: 'bt1', startedAt: '2026-06-06T11:00:00Z', dateKey });
-      const subs = db.getBountySubmissions(dateKey);
+    it('putBountySubmission 更新已有提交', async () => {
+      await db.putBountySubmission('bs1', { id: 'bs1', taskId: 'bt1', startedAt: '2026-06-06T10:00:00Z', dateKey });
+      await db.putBountySubmission('bs1', { id: 'bs1', taskId: 'bt1', startedAt: '2026-06-06T11:00:00Z', dateKey });
+      const subs = await db.getBountySubmissions(dateKey);
       expect(subs).toHaveLength(1);
       expect(subs[0].startedAt).toBe('2026-06-06T11:00:00Z');
     });
@@ -1279,17 +1279,17 @@ describe('Database', () => {
   describe('bounty_completions 单资源方法', () => {
     const dateKey = '2026-06-06';
 
-    it('putBountyCompletion 创建完成记录', () => {
-      db.putBountyCompletion(dateKey, { taskId: 'bt1', completed: true });
-      const result = db.getBountyCompletions(dateKey);
+    it('putBountyCompletion 创建完成记录', async () => {
+      await db.putBountyCompletion(dateKey, { taskId: 'bt1', completed: true });
+      const result = await db.getBountyCompletions(dateKey);
       expect(result.taskId).toBe('bt1');
       expect(result.completed).toBe(true);
     });
 
-    it('putBountyCompletion 更新已有记录', () => {
-      db.putBountyCompletion(dateKey, { taskId: 'bt1', completed: false });
-      db.putBountyCompletion(dateKey, { taskId: 'bt1', completed: true });
-      const result = db.getBountyCompletions(dateKey);
+    it('putBountyCompletion 更新已有记录', async () => {
+      await db.putBountyCompletion(dateKey, { taskId: 'bt1', completed: false });
+      await db.putBountyCompletion(dateKey, { taskId: 'bt1', completed: true });
+      const result = await db.getBountyCompletions(dateKey);
       expect(result.completed).toBe(true);
     });
   });
@@ -1300,10 +1300,10 @@ describe('Database', () => {
     //     Given 存在一条作业记录
     //     When 使用 applyCRDTOperation 传入 type 为 delete
     //     Then 该作业应被标记为已删除
-    it('applyCRDTOperation with type delete for homeworks 应标记为已删除', () => {
-      db.saveHomeworks('2026-06-06', [{ id: 'hw1', subject: '数学' }]);
+    it('applyCRDTOperation with type delete for homeworks 应标记为已删除', async () => {
+      await db.saveHomeworks('2026-06-06', [{ id: 'hw1', subject: '数学' }]);
 
-      (db as any).applyCRDTOperation({
+      await (db as any).applyCRDTOperation({
         id: 'op-1',
         type: 'delete',
         table: 'homeworks',
@@ -1314,7 +1314,7 @@ describe('Database', () => {
         nodeId: 'node1',
       });
 
-      const result = db.getHomeworkById('hw1');
+      const result = await db.getHomeworkById('hw1');
       expect(result).toBeNull();
     });
 
@@ -1323,10 +1323,10 @@ describe('Database', () => {
     //     Given shop_items 表存在一个商品
     //     When 使用 applyCRDTOperation 传入 type 为 delete
     //     Then 该商品应被标记为已删除
-    it('applyCRDTOperation with type delete for shop_items 应标记为已删除', () => {
-      db.saveShopItems([{ id: 's1', name: '零食' }]);
+    it('applyCRDTOperation with type delete for shop_items 应标记为已删除', async () => {
+      await db.saveShopItems([{ id: 's1', name: '零食' }]);
 
-      (db as any).applyCRDTOperation({
+      await (db as any).applyCRDTOperation({
         id: 'op-2',
         type: 'delete',
         table: 'shop_items',
@@ -1337,7 +1337,7 @@ describe('Database', () => {
         nodeId: 'node1',
       });
 
-      const result = db.getShopItemById('s1');
+      const result = await db.getShopItemById('s1');
       expect(result).toBeNull();
     });
 
@@ -1346,10 +1346,10 @@ describe('Database', () => {
     //     Given bounty_tasks 表存在一个任务
     //     When 使用 applyCRDTOperation 传入 type 为 delete
     //     Then 该任务应被标记为已删除
-    it('applyCRDTOperation with type delete for bounty_tasks 应标记为已删除', () => {
-      db.saveBountyTasks([{ id: 'bt1', name: '赏金1', points: 50 }]);
+    it('applyCRDTOperation with type delete for bounty_tasks 应标记为已删除', async () => {
+      await db.saveBountyTasks([{ id: 'bt1', name: '赏金1', points: 50 }]);
 
-      (db as any).applyCRDTOperation({
+      await (db as any).applyCRDTOperation({
         id: 'op-3',
         type: 'delete',
         table: 'bounty_tasks',
@@ -1360,7 +1360,7 @@ describe('Database', () => {
         nodeId: 'node1',
       });
 
-      const result = db.getBountyTaskById('bt1');
+      const result = await db.getBountyTaskById('bt1');
       expect(result).toBeNull();
     });
 
@@ -1369,10 +1369,10 @@ describe('Database', () => {
     //     Given active_buffs 表存在一个增益
     //     When 使用 applyCRDTOperation 传入 type 为 delete
     //     Then 该增益应被标记为已删除
-    it('applyCRDTOperation with type delete for active_buffs 应标记为已删除', () => {
-      db.saveActiveBuffs([{ id: 'buff1', name: '专注', duration: 30, unit: 'min' }]);
+    it('applyCRDTOperation with type delete for active_buffs 应标记为已删除', async () => {
+      await db.saveActiveBuffs([{ id: 'buff1', name: '专注', duration: 30, unit: 'min' }]);
 
-      (db as any).applyCRDTOperation({
+      await (db as any).applyCRDTOperation({
         id: 'op-4',
         type: 'delete',
         table: 'active_buffs',
@@ -1383,7 +1383,7 @@ describe('Database', () => {
         nodeId: 'node1',
       });
 
-      const fullData = db.getFullData();
+      const fullData = await db.getFullData();
       expect(fullData.activeBuffs.find((b: any) => b.id === 'buff1')).toBeUndefined();
     });
 
@@ -1392,10 +1392,10 @@ describe('Database', () => {
     //     Given 存在一条作业记录
     //     When 使用 applyCRDTOperation 传入 type 为 update
     //     Then 该作业应被更新
-    it('applyCRDTOperation with type update for homeworks 应更新或创建', () => {
-      db.saveHomeworks('2026-06-06', [{ id: 'hw1', subject: '数学', lastModified: '2026-06-05T10:00:00Z' }]);
+    it('applyCRDTOperation with type update for homeworks 应更新或创建', async () => {
+      await db.saveHomeworks('2026-06-06', [{ id: 'hw1', subject: '数学', lastModified: '2026-06-05T10:00:00Z' }]);
 
-      (db as any).applyCRDTOperation({
+      await (db as any).applyCRDTOperation({
         id: 'op-5',
         type: 'update',
         table: 'homeworks',
@@ -1406,7 +1406,7 @@ describe('Database', () => {
         nodeId: 'node1',
       });
 
-      const result = db.getHomeworkById('hw1');
+      const result = await db.getHomeworkById('hw1');
       expect(result).not.toBeNull();
       expect(result!.subject).toBe('数学_修改');
     });
@@ -1416,10 +1416,10 @@ describe('Database', () => {
     //     Given shop_items 表存在一个商品
     //     When 使用 applyCRDTOperation 传入 type 为 update
     //     Then 该商品应被更新
-    it('applyCRDTOperation with type update for shop_items 应更新', () => {
-      db.saveShopItems([{ id: 's1', name: '零食' }]);
+    it('applyCRDTOperation with type update for shop_items 应更新', async () => {
+      await db.saveShopItems([{ id: 's1', name: '零食' }]);
 
-      (db as any).applyCRDTOperation({
+      await (db as any).applyCRDTOperation({
         id: 'op-6',
         type: 'update',
         table: 'shop_items',
@@ -1430,7 +1430,7 @@ describe('Database', () => {
         nodeId: 'node1',
       });
 
-      const result = db.getShopItemById('s1');
+      const result = await db.getShopItemById('s1');
       expect(result!.name).toBe('零食（大包）');
     });
 
@@ -1439,10 +1439,10 @@ describe('Database', () => {
     //     Given bounty_tasks 表存在一个任务
     //     When 使用 applyCRDTOperation 传入 type 为 update
     //     Then 该任务应被更新
-    it('applyCRDTOperation with type update for bounty_tasks 应更新', () => {
-      db.saveBountyTasks([{ id: 'bt1', name: '赏金1', points: 50 }]);
+    it('applyCRDTOperation with type update for bounty_tasks 应更新', async () => {
+      await db.saveBountyTasks([{ id: 'bt1', name: '赏金1', points: 50 }]);
 
-      (db as any).applyCRDTOperation({
+      await (db as any).applyCRDTOperation({
         id: 'op-7',
         type: 'update',
         table: 'bounty_tasks',
@@ -1453,7 +1453,7 @@ describe('Database', () => {
         nodeId: 'node1',
       });
 
-      const result = db.getBountyTaskById('bt1');
+      const result = await db.getBountyTaskById('bt1');
       expect(result!.points).toBe(60);
     });
 
@@ -1462,10 +1462,10 @@ describe('Database', () => {
     //     Given settings 表存在设置值
     //     When 使用 applyCRDTOperation 传入 type 为 update
     //     Then 设置应被更新
-    it('applyCRDTOperation with type update for settings 应更新', () => {
-      db.saveSettings({ dailyBasePoints: 100 });
+    it('applyCRDTOperation with type update for settings 应更新', async () => {
+      await db.saveSettings({ dailyBasePoints: 100 });
 
-      (db as any).applyCRDTOperation({
+      await (db as any).applyCRDTOperation({
         id: 'op-8',
         type: 'update',
         table: 'settings',
@@ -1476,7 +1476,7 @@ describe('Database', () => {
         nodeId: 'node1',
       });
 
-      const result = db.getSettings();
+      const result = await db.getSettings();
       expect(result.dailyBasePoints).toBe(150);
     });
   });
@@ -1492,10 +1492,10 @@ describe('Database', () => {
       db = new (Database)(dbPath);
     });
 
-    afterEach(() => {
-      db.close();
-      rmSync(tmpDir, { recursive: true, force: true });
-    });
+    afterEach(async () => {
+        await db.close();
+        rmSync(tmpDir, { recursive: true, force: true });
+      });
 
     // Feature: 通知创建
     //   Scenario: 写入通知
@@ -1503,8 +1503,8 @@ describe('Database', () => {
     //     When 调用 addNotification('测试通知')
     //     Then 返回的 id 是有效的 UUID 字符串
     //     And 通知被正确写入数据库
-    it('addNotification 写入通知并返回 id', () => {
-      const id = (db as any).addNotification('测试通知');
+    it('addNotification 写入通知并返回 id', async () => {
+      const id = await (db as any).addNotification('测试通知');
       expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
     });
 
@@ -1514,11 +1514,11 @@ describe('Database', () => {
     //     When 调用 getPendingNotifications()
     //     Then 返回包含两条通知的数组
     //     And 按 created_at 升序排列
-    it('getPendingNotifications 返回未过期通知', () => {
-      (db as any).addNotification('通知一');
-      (db as any).addNotification('通知二');
+    it('getPendingNotifications 返回未过期通知', async () => {
+      await (db as any).addNotification('通知一');
+      await (db as any).addNotification('通知二');
 
-      const notifications = (db as any).getPendingNotifications();
+      const notifications = await (db as any).getPendingNotifications();
       expect(notifications).toHaveLength(2);
       expect(notifications[0].createdAt).toBeLessThanOrEqual(notifications[1].createdAt);
     });
@@ -1528,12 +1528,12 @@ describe('Database', () => {
     //     Given 数据库中有一条 2 分钟前的通知（通过修改 created_at 模拟）
     //     When 调用 getPendingNotifications()
     //     Then 返回空数组
-    it('getPendingNotifications 过滤过期通知', () => {
-      (db as any).db.prepare(
+    it('getPendingNotifications 过滤过期通知', async () => {
+      await (db as any).db.prepare(
         'INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)'
       ).run('old-id', '旧通知', Date.now() - 7200000);
 
-      const notifications = (db as any).getPendingNotifications();
+      const notifications = await (db as any).getPendingNotifications();
       expect(notifications).toEqual([]);
     });
 
@@ -1542,13 +1542,13 @@ describe('Database', () => {
     //     Given 数据库中有一条过期通知和一条有效通知
     //     When 调用 getPendingNotifications()
     //     Then 过期通知被删除，有效通知保留
-    it('getPendingNotifications 自动删除过期通知', () => {
-      (db as any).db.prepare(
+    it('getPendingNotifications 自动删除过期通知', async () => {
+      await (db as any).db.prepare(
         'INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)'
       ).run('old-id', '旧通知', Date.now() - 7200000);
-      const validId = (db as any).addNotification('新通知');
+      const validId = await (db as any).addNotification('新通知');
 
-      const remaining = (db as any).getPendingNotifications();
+      const remaining = await (db as any).getPendingNotifications();
       expect(remaining).toHaveLength(1);
       expect(remaining[0].id).toBe(validId);
     });
@@ -1558,14 +1558,14 @@ describe('Database', () => {
     //     Given 数据库中有多条通知
     //     When 调用 consumeNotifications([id1, id2])
     //     Then 指定的两条通知被删除，其余保留
-    it('consumeNotifications 按 ids 批量删除', () => {
-      const id1 = (db as any).addNotification('通知一');
-      const id2 = (db as any).addNotification('通知二');
-      const id3 = (db as any).addNotification('通知三');
+    it('consumeNotifications 按 ids 批量删除', async () => {
+      const id1 = await (db as any).addNotification('通知一');
+      const id2 = await (db as any).addNotification('通知二');
+      const id3 = await (db as any).addNotification('通知三');
 
-      (db as any).consumeNotifications([id1, id2]);
+      await (db as any).consumeNotifications([id1, id2]);
 
-      const remaining = (db as any).getPendingNotifications();
+      const remaining = await (db as any).getPendingNotifications();
       expect(remaining).toHaveLength(1);
       expect(remaining[0].id).toBe(id3);
     });
@@ -1575,24 +1575,24 @@ describe('Database', () => {
     //     Given 数据库中有 510 条通知
     //     When 调用 consumeNotifications(ids) 传入 510 个 ID
     //     Then 所有通知被删除
-    it('consumeNotifications 超过 500 个 ID 时批量处理', () => {
+    it('consumeNotifications 超过 500 个 ID 时批量处理', async () => {
       const ids: string[] = [];
       const count = 510;
       for (let i = 0; i < count; i++) {
         const id = `batch-${String(i).padStart(4, '0')}`;
         ids.push(id);
-        (db as any).db.prepare(
+        await (db as any).db.prepare(
           'INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)'
         ).run(id, `批量通知${i}`, Date.now());
       }
 
-      (db as any).consumeNotifications(ids);
+      await (db as any).consumeNotifications(ids);
 
-      const remaining = (db as any).getPendingNotifications();
+      const remaining = await (db as any).getPendingNotifications();
       expect(remaining).toHaveLength(0);
 
       // 验证数据库中确实没有记录
-      const allRows = (db as any).db.prepare('SELECT COUNT(*) as cnt FROM notifications').get() as any;
+      const allRows = await (db as any).db.prepare('SELECT COUNT(*) as cnt FROM notifications').get() as any;
       expect(allRows.cnt).toBe(0);
     });
 
@@ -1601,8 +1601,8 @@ describe('Database', () => {
     //     Given 一个 data 对象包含 _table: 'notifications'
     //     When 调用 _classifyChange(data)
     //     Then 返回 'notifications'
-    it('_classifyChange 识别 notifications 类型', () => {
-      const result = (db as any)._classifyChange({ _table: 'notifications' });
+    it('_classifyChange 识别 notifications 类型', async () => {
+      const result = await (db as any)._classifyChange({ _table: 'notifications' });
       expect(result).toBe('notifications');
     });
 
@@ -1611,8 +1611,8 @@ describe('Database', () => {
     //     Given 一个 CRDT update 操作，table 为 'notifications'
     //     When 调用 applyCRDTOperation(op)
     //     Then 通知被成功创建
-    it('applyCRDTOperation 的 notifications 分支能创建通知', () => {
-      (db as any).applyCRDTOperation({
+    it('applyCRDTOperation 的 notifications 分支能创建通知', async () => {
+      await (db as any).applyCRDTOperation({
         id: 'op-notify-1',
         type: 'update',
         table: 'notifications',
@@ -1623,7 +1623,7 @@ describe('Database', () => {
         nodeId: 'node1',
       });
 
-      const notifications = (db as any).getPendingNotifications();
+      const notifications = await (db as any).getPendingNotifications();
       expect(notifications).toHaveLength(1);
       expect(notifications[0].text).toBe('CRDT通知');
     });

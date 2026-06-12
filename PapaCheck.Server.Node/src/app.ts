@@ -4,15 +4,17 @@ import { createHash } from 'crypto';
 import { createReadStream } from 'fs';
 import { readdir, stat, readFile } from 'fs/promises';
 import { join, dirname } from 'path';
-import { PapaCheckDB } from './db/index.js';
+import { createDatabase } from './db/index.js';
 import { TTSBridge, _moduleDirname } from './tts/index.js';
 import { EmailSync } from './email/index.js';
 import type { HomeworkItem } from './email/ai.js';
 import fastifyStatic from '@fastify/static';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+import cookie from '@fastify/cookie';
 import { AppError, ErrorCodes } from './errors.js';
 import type { CRDTOperation } from './crdt/types.js';
+import { authPlugin } from './auth-plugin.js';
 
 export interface AppOptions {
   port: number;
@@ -20,6 +22,8 @@ export interface AppOptions {
   dbPath: string;
   ttsPython?: string;
   showPollingLog?: boolean;
+  /** 启用 Cookie Session 临时认证（生产环境设为 true） */
+  enableAuth?: boolean;
 }
 
 /** 设置 Content-Type: application/json; charset=utf-8 并返回数据 */
@@ -140,7 +144,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   // 创建数据库和 TTS 实例
-  const db = new PapaCheckDB(options.dbPath);
+  const db = createDatabase({ dbPath: options.dbPath });
   const tts = new TTSBridge({
     pythonPath: options.ttsPython ?? 'python',
     cacheDir: join(dirname(options.dbPath ?? join(_moduleDirname, '..', 'data.db')), 'tts_cache'),
@@ -181,6 +185,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       }
     }
   });
+
+  // ==================== Cookie 解析 & 临时认证 ====================
+
+  if (options.enableAuth) {
+    await app.register(cookie);
+    await authPlugin(app, db);
+  }
 
   // ==================== Swagger Docs（必须在路由之前注册才能捕获到路由） ====================
 
@@ -269,7 +280,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         'index.html', 'admin.html', 'sw.js', 'favicon.png',
         'css/style.css', 'css/admin.css',
         'js/api.js', 'js/connection.js', 'js/app.js', 'js/big-screen.js',
-        'js/admin.js', 'js/db.js', 'js/change-log.js', 'js/crdt-sync.js', 'js/sync.js',
+        'js/admin.js', 'js/await await await await db.js', 'js/change-log.js', 'js/crdt-sync.js', 'js/sync.js',
       ];
       const hash = createHash('sha1');
       for (const f of files) {
@@ -321,74 +332,74 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   // 3. GET /api/data - 完整数据
   app.get('/api/data', { schema: dataSchema }, async (_request, reply) => {
-    return sendJson(reply, db.getFullData());
+    return sendJson(reply, await await await await db.getFullData());
   });
 
   // 4. GET /api/homeworks/:date
   app.get<{ Params: { date: string } }>('/api/homeworks/:date', async (request, reply) => {
-    return sendJson(reply, db.getHomeworks(request.params.date));
+    return sendJson(reply, await await await await db.getHomeworks(request.params.date));
   });
 
   // 5. GET /api/settlement/:date
   app.get<{ Params: { date: string } }>('/api/settlement/:date', async (request, reply) => {
-    return sendJson(reply, db.getSettlement(request.params.date));
+    return sendJson(reply, await await await await db.getSettlement(request.params.date));
   });
 
   // 6. GET /api/shop
   app.get('/api/shop', async (_request, reply) => {
-    return sendJson(reply, db.getShopItems());
+    return sendJson(reply, await await await await db.getShopItems());
   });
 
   // 7. GET /api/redemptions
   app.get('/api/redemptions', async (_request, reply) => {
-    return sendJson(reply, db.getRedemptions());
+    return sendJson(reply, await await await await db.getRedemptions());
   });
 
   // 8. GET /api/reward-box
   app.get('/api/reward-box', async (_request, reply) => {
-    return sendJson(reply, db.getRewardBox());
+    return sendJson(reply, await await await await db.getRewardBox());
   });
 
   // 9. GET /api/settings
   app.get('/api/settings', async (_request, reply) => {
-    return sendJson(reply, db.getSettings());
+    return sendJson(reply, await await await await db.getSettings());
   });
 
   // 10. GET /api/active-buffs
   app.get('/api/active-buffs', async (_request, reply) => {
-    return sendJson(reply, db.getActiveBuffs());
+    return sendJson(reply, await await await await db.getActiveBuffs());
   });
 
   // 11. GET /api/efficiency/:date
   app.get<{ Params: { date: string } }>('/api/efficiency/:date', async (request, reply) => {
-    return sendJson(reply, db.getEfficiency(request.params.date));
+    return sendJson(reply, await await await await db.getEfficiency(request.params.date));
   });
 
   // 12. GET /api/freetime/:date
   app.get<{ Params: { date: string } }>('/api/freetime/:date', async (request, reply) => {
-    return sendJson(reply, db.getFreeTime(request.params.date));
+    return sendJson(reply, await await await await db.getFreeTime(request.params.date));
   });
 
   // 13. GET /api/bounty-tasks
   app.get('/api/bounty-tasks', async (_request, reply) => {
-    return sendJson(reply, db.getBountyTasks());
+    return sendJson(reply, await await await await db.getBountyTasks());
   });
 
   // 14. GET /api/bounty-submissions/:date
   app.get<{ Params: { date: string } }>('/api/bounty-submissions/:date', async (request, reply) => {
-    return sendJson(reply, db.getBountySubmissions(request.params.date));
+    return sendJson(reply, await await await await db.getBountySubmissions(request.params.date));
   });
 
   // 15. GET /api/bounty-completions/:date
   app.get<{ Params: { date: string } }>('/api/bounty-completions/:date', async (request, reply) => {
-    return sendJson(reply, db.getBountyCompletions(request.params.date));
+    return sendJson(reply, await await await await db.getBountyCompletions(request.params.date));
   });
 
   // 16. GET /api/sync/pull - 同步拉取
   app.get('/api/sync/pull', async (request, reply) => {
     const query = request.query as { lastSync?: string };
     const lastSync = query.lastSync || '1970-01-01T00:00:00+00:00';
-    const changes = db.getModifiedSince(lastSync);
+    const changes = await await await await db.getModifiedSince(lastSync);
     return sendJson(reply, { changes, serverTime: new Date().toISOString() });
   });
 
@@ -422,7 +433,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     if (raw.length > 10 * 1024 * 1024) {
       return reply.status(413).send({ error: '数据过大，最大允许 10MB' });
     }
-    db.importFullData(body);
+    await await await await db.importFullData(body);
     return sendJson(reply, { ok: true });
   });
 
@@ -433,7 +444,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     if (!dateKey) {
       return reply.status(400).send({ error: '缺少 dateKey' });
     }
-    db.saveHomeworks(dateKey, body.homeworks);
+    await await await await db.saveHomeworks(dateKey, body.homeworks);
     return sendJson(reply, { ok: true });
   });
 
@@ -454,7 +465,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.put<{ Params: { date: string } }>('/api/settlement/:date', async (request, reply) => {
     const body = request.body as any;
     // 同时兼容 { settlement: data } 和直接 data 两种 payload 格式
-    db.saveSettlement(request.params.date, body.settlement ?? body);
+    await await await await db.saveSettlement(request.params.date, body.settlement ?? body);
     return sendJson(reply, { ok: true });
   });
 
@@ -466,38 +477,38 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         return reply.status(400).send({ error: 'action 必须是 earn 或 spend' });
       }
       // 全量替换风格（原 POST /api/points）
-      const balance = db.updatePoints(body.action, body.amount, body.detail);
+      const balance = await await await await db.updatePoints(body.action, body.amount, body.detail);
       return sendJson(reply, { ok: true, balance });
     }
     // 增量更新风格（原 PATCH /api/points）
-    const balance = db.patchPoints(body);
+    const balance = await await await await db.patchPoints(body);
     return sendJson(reply, { ok: true, balance });
   });
 
   // 22. PUT /api/shop
   app.put('/api/shop', async (request, reply) => {
     const body = request.body as { items: unknown[] };
-    db.saveShopItems(body.items);
+    await await await await db.saveShopItems(body.items);
     return sendJson(reply, { ok: true });
   });
 
   // 23. PUT /api/redemptions
   app.put('/api/redemptions', async (request, reply) => {
     const body = request.body as { redemptions: unknown[] };
-    db.saveRedemptions(body.redemptions);
+    await await await await db.saveRedemptions(body.redemptions);
     return sendJson(reply, { ok: true });
   });
 
   // 23b. DELETE /api/redemptions/fulfilled — 清空已兑现记录
   app.delete('/api/redemptions/fulfilled', async (_request, reply) => {
-    db.clearFulfilledRedemptions();
+    await await await await db.clearFulfilledRedemptions();
     return sendJson(reply, { ok: true });
   });
 
   // 24. PUT /api/reward-box
   app.put('/api/reward-box', async (request, reply) => {
     const body = request.body as { items: unknown[] };
-    db.saveRewardBox(body.items);
+    await await await await db.saveRewardBox(body.items);
     return sendJson(reply, { ok: true });
   });
 
@@ -505,14 +516,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.put('/api/settings', async (request, reply) => {
     const body = request.body as any;
     // 同时兼容 { settings: data } 和直接 data 两种 payload 格式
-    db.saveSettings(body.settings ?? body);
+    await await await await db.saveSettings(body.settings ?? body);
     return sendJson(reply, { ok: true });
   });
 
   // 26. PUT /api/active-buffs
   app.put('/api/active-buffs', async (request, reply) => {
     const body = request.body as { buffs: unknown[] };
-    db.saveActiveBuffs(body.buffs);
+    await await await await db.saveActiveBuffs(body.buffs);
     return sendJson(reply, { ok: true });
   });
 
@@ -520,7 +531,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.put<{ Params: { date: string } }>('/api/efficiency/:date', async (request, reply) => {
     const body = request.body as any;
     // 同时兼容 { efficiency: data } 和直接 data 两种 payload 格式
-    db.saveEfficiency(request.params.date, body.efficiency ?? body);
+    await await await await db.saveEfficiency(request.params.date, body.efficiency ?? body);
     return sendJson(reply, { ok: true });
   });
 
@@ -530,20 +541,20 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     if (!body.dateKey) {
       return reply.status(400).send({ error: '缺少 dateKey' });
     }
-    db.saveFreeTime(body.dateKey, body.tasks);
+    await await await await db.saveFreeTime(body.dateKey, body.tasks);
     return sendJson(reply, { ok: true });
   });
 
   // 28b. PUT /api/freetime/:id — 单条自由时间 upsert
   app.put<{ Params: { id: string } }>('/api/freetime/:id', { schema: idParamSchema }, async (request, reply) => {
-    db.putFreeTimeTask(request.params.id, request.body);
+    await await await await db.putFreeTimeTask(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 29. PUT /api/bounty-tasks
   app.put('/api/bounty-tasks', async (request, reply) => {
     const body = request.body as { items: unknown[] };
-    db.saveBountyTasks(body.items);
+    await await await await db.saveBountyTasks(body.items);
     return sendJson(reply, { ok: true });
   });
 
@@ -553,13 +564,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     if (!body.dateKey) {
       return reply.status(400).send({ error: '缺少 dateKey' });
     }
-    db.saveBountySubmissions(body.dateKey, body.submissions);
+    await await await await db.saveBountySubmissions(body.dateKey, body.submissions);
     return sendJson(reply, { ok: true });
   });
 
   // 30b. PUT /api/bounty-submissions/:id — 单条赏金提交 upsert
   app.put<{ Params: { id: string } }>('/api/bounty-submissions/:id', { schema: idParamSchema }, async (request, reply) => {
-    db.putBountySubmission(request.params.id, request.body);
+    await await await await db.putBountySubmission(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
@@ -569,13 +580,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     if (!body.dateKey) {
       return reply.status(400).send({ error: '缺少 dateKey' });
     }
-    db.saveBountyCompletions(body.dateKey, body.completions);
+    await await await await db.saveBountyCompletions(body.dateKey, body.completions);
     return sendJson(reply, { ok: true });
   });
 
   // 31b. PUT /api/bounty-completions/:id — 单条赏金完成 upsert
   app.put<{ Params: { id: string } }>('/api/bounty-completions/:id', { schema: idParamSchema }, async (request, reply) => {
-    db.putBountyCompletion(request.params.id, request.body);
+    await await await await db.putBountyCompletion(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
@@ -590,20 +601,20 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     const { date, hwId, action, requestedAt } = body;
 
     if (action === 'request') {
-      const homeworks = db.getHomeworks(date);
+      const homeworks = await await await await db.getHomeworks(date);
       const found = homeworks.find((h: any) => h.id === hwId);
       if (found && found.status === 'pending' && !found.deferRequest) {
         found.deferRequest = {
           requestedAt: requestedAt || new Date().toISOString(),
           status: 'pending',
         };
-        db.saveHomeworks(date, homeworks);
+        await await await await db.saveHomeworks(date, homeworks);
       }
       return sendJson(reply, { ok: true });
     }
 
     if (action === 'approve') {
-      const homeworks = db.getHomeworks(date);
+      const homeworks = await await await await db.getHomeworks(date);
       const idx = homeworks.findIndex((h: any) => h.id === hwId);
       if (idx !== -1) {
         const hw = { ...homeworks[idx] };
@@ -612,14 +623,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
         // 从当前日期移除
         homeworks.splice(idx, 1);
-        db.saveHomeworks(date, homeworks);
+        await await await await db.saveHomeworks(date, homeworks);
 
         // 添加到次日
         const tomorrow = getTomorrow(date);
         hw.date = tomorrow;
-        const tomorrowHw = db.getHomeworks(tomorrow);
+        const tomorrowHw = await await await await db.getHomeworks(tomorrow);
         tomorrowHw.push(hw);
-        db.saveHomeworks(tomorrow, tomorrowHw);
+        await await await await db.saveHomeworks(tomorrow, tomorrowHw);
 
         return sendJson(reply, { ok: true, homework: hw });
       }
@@ -627,11 +638,11 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
 
     if (action === 'reject') {
-      const homeworks = db.getHomeworks(date);
+      const homeworks = await await await await db.getHomeworks(date);
       const found = homeworks.find((h: any) => h.id === hwId);
       if (found) {
         delete found.deferRequest;
-        db.saveHomeworks(date, homeworks);
+        await await await await db.saveHomeworks(date, homeworks);
       }
       return sendJson(reply, { ok: true });
     }
@@ -642,14 +653,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // 33. POST /api/reset-date - 重置日期数据
   app.post('/api/reset-date', async (request, reply) => {
     const body = request.body as { date: string };
-    db.resetDate(body.date);
+    await await await await db.resetDate(body.date);
     return sendJson(reply, { ok: true });
   });
 
   // 34. POST /api/sync/push - 同步推送
   app.post('/api/sync/push', async (request, reply) => {
     const body = request.body as { changes: unknown[] };
-    const result = db.pushMerge(body.changes);
+    const result = await await await await db.pushMerge(body.changes);
     return sendJson(reply, result);
   });
 
@@ -682,7 +693,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       });
     }
 
-    db.saveEmailConfig(body);
+    await await await await db.saveEmailConfig(body);
     return sendJson(reply, { ok: true });
   });
 
@@ -719,7 +730,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   // 37. POST /api/email/sync - 触发邮件同步
   app.post('/api/email/sync', async (request, reply) => {
-    const config = db.getEmailConfig();
+    const config = await await await await db.getEmailConfig();
 
     if (!config) {
       return reply.status(400).send({
@@ -760,7 +771,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         for (const hw of expanded) {
           const dateKey = hw.date || new Date().toISOString().slice(0, 10);
           const hwId = `email-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-          db.putHomework(hwId, {
+          await await await await db.putHomework(hwId, {
             id: hwId,
             subject: hw.subject,
             content: hw.content,
@@ -778,7 +789,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         console.error('[email/sync] 插入作业时出错，已插入 %d 条，尝试回滚...', insertedIds.length, err);
         // 尝试删除已插入的作业（幂等回滚）
         for (const id of insertedIds) {
-          try { db.deleteHomework(id); } catch { /* 忽略单个删除失败 */ }
+          try { await await await await db.deleteHomework(id); } catch { /* 忽略单个删除失败 */ }
         }
         return reply.status(500).send({
           error: '邮件同步插入作业失败，已回滚',
@@ -787,7 +798,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       }
 
       // 添加通知：有新作业来自云端
-      db.addNotification('收到云端作业，请查看');
+      await await await await db.addNotification('收到云端作业，请查看');
     }
 
     return sendJson(reply, { ok: true, homeworks: expanded || [], hasAttachments: result.hasAttachments ?? false });
@@ -802,13 +813,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         code: 'VALIDATION_ERROR',
       });
     }
-    const id = db.addNotification(body.text.trim());
+    const id = await await await await db.addNotification(body.text.trim());
     return sendJson(reply, { ok: true, id });
   });
 
   // 通知：拉取待消费通知（自动清理过期）
   app.get('/api/notify/pending', async (_request, reply) => {
-    const items = db.getPendingNotifications();
+    const items = await await await await db.getPendingNotifications();
     return sendJson(reply, { items });
   });
 
@@ -818,7 +829,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     if (query.ids) {
       const ids = query.ids.split(',').filter(Boolean);
       if (ids.length > 0) {
-        db.consumeNotifications(ids);
+        await await await await db.consumeNotifications(ids);
       }
     }
     return sendJson(reply, { ok: true });
@@ -831,8 +842,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       return reply.status(400).send({ error: '缺少 operations 数组', code: 'VALIDATION_ERROR' });
     }
     for (const op of body.operations) {
-      db.saveCRDTOperation(op);
-      db.applyCRDTOperation(op);
+      await await await await db.saveCRDTOperation(op);
+      await await await await db.applyCRDTOperation(op);
     }
     return sendJson(reply, { ok: true });
   });
@@ -841,7 +852,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.get('/api/sync/crdt-pull', async (request, reply) => {
     const query = request.query as { since?: string };
     const since = query.since || '1970-01-01T00:00:00Z';
-    const operations = db.getCRDTOperationsSince(since);
+    const operations = await await await await db.getCRDTOperationsSince(since);
     return sendJson(reply, { operations });
   });
 
@@ -849,7 +860,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.delete('/api/sync/crdt-pull', async (request, reply) => {
     const query = request.query as { ack?: string };
     if (query.ack) {
-      db.ackCRDTOperations(query.ack);
+      await await await await db.ackCRDTOperations(query.ack);
     }
     return sendJson(reply, { ok: true });
   });
@@ -858,43 +869,43 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   // 35. PUT /api/homeworks/:id
   app.put<{ Params: { id: string } }>('/api/homeworks/:id', { schema: idParamSchema }, async (request, reply) => {
-    db.putHomework(request.params.id, request.body);
+    await await await await db.putHomework(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 37. PUT /api/shop/:id
   app.put<{ Params: { id: string } }>('/api/shop/:id', { schema: idParamSchema }, async (request, reply) => {
-    db.putShopItem(request.params.id, request.body);
+    await await await await db.putShopItem(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 38. PUT /api/redemptions/:id
   app.put<{ Params: { id: string } }>('/api/redemptions/:id', { schema: idParamSchema }, async (request, reply) => {
-    db.putRedemption(request.params.id, request.body);
+    await await await await db.putRedemption(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 39. PUT /api/reward-box/:id
   app.put<{ Params: { id: string } }>('/api/reward-box/:id', { schema: idParamSchema }, async (request, reply) => {
-    db.putRewardBoxItem(request.params.id, request.body);
+    await await await await db.putRewardBoxItem(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 40. DELETE /api/reward-box/:id
   app.delete<{ Params: { id: string } }>('/api/reward-box/:id', { schema: deleteParamSchema }, async (request, reply) => {
-    db.deleteRewardBoxItem(request.params.id);
+    await await await await db.deleteRewardBoxItem(request.params.id);
     return sendJson(reply, { ok: true });
   });
 
   // 41. PUT /api/active-buffs/:id
   app.put<{ Params: { id: string } }>('/api/active-buffs/:id', { schema: idParamSchema }, async (request, reply) => {
-    db.putBuff(request.params.id, request.body);
+    await await await await db.putBuff(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 44. PUT /api/bounty-tasks/:id
   app.put<{ Params: { id: string } }>('/api/bounty-tasks/:id', { schema: idParamSchema }, async (request, reply) => {
-    db.putBountyTask(request.params.id, request.body);
+    await await await await db.putBountyTask(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
@@ -902,19 +913,19 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   // 47. PATCH /api/homeworks/:id
   app.patch<{ Params: { id: string } }>('/api/homeworks/:id', { schema: idParamSchema }, async (request, reply) => {
-    db.patchHomework(request.params.id, request.body);
+    await await await await db.patchHomework(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 48. PATCH /api/settlement/:date
   app.patch<{ Params: { date: string } }>('/api/settlement/:date', { schema: dateParamSchema }, async (request, reply) => {
-    db.patchSettlement(request.params.date, request.body);
+    await await await await db.patchSettlement(request.params.date, request.body);
     return sendJson(reply, { ok: true });
   });
 
   // 50. PATCH /api/settings
   app.patch('/api/settings', { schema: { body: { type: 'object' } } }, async (request, reply) => {
-    db.patchSettings(request.body);
+    await await await await db.patchSettings(request.body);
     return sendJson(reply, { ok: true });
   });
 
@@ -922,25 +933,25 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   // 51. DELETE /api/homeworks/:id
   app.delete<{ Params: { id: string } }>('/api/homeworks/:id', { schema: deleteParamSchema }, async (request, reply) => {
-    db.deleteHomework(request.params.id);
+    await await await await db.deleteHomework(request.params.id);
     return sendJson(reply, { ok: true });
   });
 
   // 52. DELETE /api/shop/:id
   app.delete<{ Params: { id: string } }>('/api/shop/:id', { schema: deleteParamSchema }, async (request, reply) => {
-    db.deleteShopItem(request.params.id);
+    await await await await db.deleteShopItem(request.params.id);
     return sendJson(reply, { ok: true });
   });
 
   // 53. DELETE /api/active-buffs/:id
   app.delete<{ Params: { id: string } }>('/api/active-buffs/:id', { schema: deleteParamSchema }, async (request, reply) => {
-    db.deleteBuff(request.params.id);
+    await await await await db.deleteBuff(request.params.id);
     return sendJson(reply, { ok: true });
   });
 
   // 54. DELETE /api/bounty-tasks/:id
   app.delete<{ Params: { id: string } }>('/api/bounty-tasks/:id', { schema: deleteParamSchema }, async (request, reply) => {
-    db.deleteBountyTask(request.params.id);
+    await await await await db.deleteBountyTask(request.params.id);
     return sendJson(reply, { ok: true });
   });
 
@@ -948,7 +959,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   // 55. HEAD /api/shop/:id
   app.head<{ Params: { id: string } }>('/api/shop/:id', { schema: { params: idParamSchema.params } }, async (request, reply) => {
-    const item = db.getShopItemById(request.params.id);
+    const item = await await await await db.getShopItemById(request.params.id);
     if (!item) {
       return reply.status(404).send();
     }
@@ -957,7 +968,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   // 56. HEAD /api/bounty-tasks/:id
   app.head<{ Params: { id: string } }>('/api/bounty-tasks/:id', { schema: { params: idParamSchema.params } }, async (request, reply) => {
-    const item = db.getBountyTaskById(request.params.id);
+    const item = await await await await db.getBountyTaskById(request.params.id);
     if (!item) {
       return reply.status(404).send();
     }
@@ -990,7 +1001,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // ==================== Graceful Shutdown ====================
 
   app.addHook('onClose', async (_instance) => {
-    db.close();
+    await await await await db.close();
     tts.stop();
   });
 

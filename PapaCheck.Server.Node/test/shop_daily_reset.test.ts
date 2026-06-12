@@ -14,9 +14,9 @@ describe('商店每日数量重置保护', () => {
     db = new Database(dbPath);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     if (db) {
-      db.close();
+      await db.close();
     }
     const dir = dbPath.substring(0, dbPath.lastIndexOf('\\'));
     if (existsSync(dir)) {
@@ -24,11 +24,11 @@ describe('商店每日数量重置保护', () => {
     }
   });
 
-  it('每日重置后 putShopItem 收到旧数据不覆盖重置值', () => {
+  it('每日重置后 putShopItem 收到旧数据不覆盖重置值', async () => {
     const items = [
       { id: 's1', name: '零食', baseQuantity: 3, remainingQuantity: 0, createdAt: Date.now() },
     ];
-    db.saveShopItems(items);
+    await db.saveShopItems(items);
 
     // 将 last_shop_reset 设为昨天，模拟日期变更
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -37,7 +37,7 @@ describe('商店每日数量重置保护', () => {
     ).run(yesterday);
 
     // 触发重置
-    const resetResult = db.getShopItems();
+    const resetResult = await db.getShopItems();
     expect(resetResult.find((r: any) => r.id === 's1').remainingQuantity).toBe(3);
 
     // 模拟陈旧客户端推送（包含 old remainingQuantity 和 old lastModified）
@@ -49,18 +49,18 @@ describe('商店每日数量重置保护', () => {
       createdAt: Date.now(),
       lastModified: '2025-01-01T00:00:00.000Z',
     };
-    db.putShopItem('s1', staleData);
+    await db.putShopItem('s1', staleData);
 
     // Verify remainingQuantity is still 3 (the reset value), not overwritten by stale data
-    const updatedItems = db.getShopItems();
+    const updatedItems = await db.getShopItems();
     expect(updatedItems.find((r: any) => r.id === 's1').remainingQuantity).toBe(3);
   });
 
-  it('每日重置后正常购买应正确减少数量', () => {
+  it('每日重置后正常购买应正确减少数量', async () => {
     const items = [
       { id: 's1', name: '零食', baseQuantity: 3, remainingQuantity: 3, createdAt: Date.now() },
     ];
-    db.saveShopItems(items);
+    await db.saveShopItems(items);
 
     // 模拟已在今天重置过，防止 getShopItems 再次触发重置
     const today = new Date().toISOString().slice(0, 10);
@@ -77,9 +77,9 @@ describe('商店每日数量重置保护', () => {
       createdAt: Date.now(),
       lastModified: new Date().toISOString(),
     };
-    db.putShopItem('s1', currentData);
+    await db.putShopItem('s1', currentData);
 
-    const result = db.getShopItems();
+    const result = await db.getShopItems();
     expect(result.find((r: any) => r.id === 's1').remainingQuantity).toBe(2);
   });
 });

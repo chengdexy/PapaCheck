@@ -39,6 +39,7 @@ async function main(): Promise<void> {
     webDir,
     dbPath,
     ttsPython,
+    enableAuth: true,
   });
 
   // 替换已有的 SIGTERM/SIGINT 处理器（TTS bridge 有自注册的 process.exit(0) 处理器）

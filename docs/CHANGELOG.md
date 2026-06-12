@@ -7,91 +7,34 @@
 ## [Unreleased]
 
 ### Added
-- **阿里云 ECS 上云部署完成**：购买 2核2G 经济型 e 实例（99元/年，续费同价）→ Ubuntu 24.04 初始化 → Docker CE 29.5 + Compose v5.1 → SSH 密钥登录 + UFW 防火墙 → 本地打包上传 → 多阶段 Docker 构建（node:22-alpine）→ Docker Compose 启动 → 阿里云安全组配置
-- 创建 `cloud-deploy` Skill 记录完整上云部署流程
-- 创建 `docs/HANDOVER.md` 会话交接文档，含服务器信息、AccessKey、部署架构、常用操作
-- 创建 2GB Swap 分区 + Docker mem_limit 768m 防 OOM
-- **HTTPS + 域名配置**：DNS A 记录（papacheck → 123.57.129.243）→ Let's Encrypt 免费证书 → Nginx HTTPS 443 → HTTP 80 自动 301 重定向
-- Nginx 落地页容器（nginx:alpine，mem_limit 64m）部署产品落地页（docs/）
-- 代码发布流程：release.py 新增 `--cloud` / `--cloud-only` 模式，自动测试→打包→上传 APK→云端构建
-- 全量代码审查 + 测试覆盖增强：覆盖提升至 Stmts 85.22% / Branch 71.89% / Funcs 90.94% / Lines 87.06%；
-- 新增 6 个 TDD 测试：`reward_box_delete.test.ts`、`shop_daily_reset.test.ts`、`reward_box_consumption.test.js`（505 总测试）
-
-### Fixed
-- **修复 Docker TTS 实际未生效**：Dockerfile CMD 添加 `--tts-python python3`（Alpine 无 `python` 命令，只有 `python3`），之前 TTS 语音调用因找不到 python 二进制而失败
-- **修复 release.py SCP 失败时 tar 包提前删除**：`os.remove(tar_path)` 移到 SCP 结果检查之后，失败时保留 tar 包可重试
-- **清理 publish.ps1**：已被 release.py `--cloud-only` 替代，统一发布流程
-- 修复 Windows 端版本号更迭后开机自启动配置被取消：`_cleanup_stale_autostart`（删除无效路径）改为 `_repair_autostart`（更新为当前 EXE 路径），保留用户自启动设定；新增 TDD 测试 4 个（`test_windows_autostart_repair.py`）
-- 修复奖励箱物品消耗后重新出现（`_fulfillFromRewardBox` 数量归零时未调用 `deleteRewardBoxItem` 标记服务端删除）；同修 `adjustRewardBoxQty`（admin.js / db/index.ts）
-- 修复商店商品每日数量重置被陈旧 CRDT 操作覆盖（`putShopItem` 添加时间戳保护 + `_resetDailyShopQuantity` 更新 `lastModified`）；`getRewardBox` 添加 `_filterDeleted` 过滤已删除物品（db/index.ts）
-- 删除 `cleanupExpiredNotifications` 死代码（已内联到 `getPendingNotifications`）；更新对应测试（db.test.ts / api.test.ts）
-- 删除 `TTSBridge.getLastError()` 中冗余的 `|| ''` 兜底
-
-### Security
-- 修复 admin.js 多处 XSS 漏洞：`innerHTML` 插入的商品名称/奖励名称添加 `escapeHtml` 转义（L768, L943）
-- 修复 admin.js onclick JS 上下文的 XSS bypass：内联 `onclick` 改为 `data-si-*` 属性 + 事件委托（L976-979）
-- 修复 sw.js 缓存错误响应：后台 fetch 仅当 `response.ok` 时缓存（L140-146）
-- `POST /api/data` 添加输入验证：检查 body 类型（非 null、非数组、是对象）+ 大小限制 10MB（L414-424）
-- `PATCH /api/points` 添加 action 值校验：仅允许 `'earn'` 或 `'spend'`（L464-467）
-
-### Fixed
-- 修复 `getTomorrow()` 无效日期崩溃：添加正则格式校验 + `isNaN` 保护（app.ts:80-84）
-- 修复 3 处 `body.dateKey!` 非空断言：改为 `if (!body.dateKey) return 400` 守卫（app.ts:527-580）
-- 修复 `_findRecordById` 使用裸 `JSON.parse`：改为 `_safeJsonParse`，无效 JSON 时跳过（db/index.ts:327）
-- 修复 `pushMerge` 中 bounty 类变更 `recordKey` 推导错误：增加 `data.dateKey` / `uuid` 回退链（db/index.ts:1102）
-- 修复 `resetDate` 中 `dateKey.split('-')` 数组越界：添加 `parts.length !== 3` 守卫（db/index.ts:1224）
-- 修复 IMAP openBox/search 失败未关闭连接：reject 前调用 `imap.end()`（imap.ts:58-64）
-- 修复 IMAP fetch error 在 resolve 后触发导致 unhandled rejection：添加 `settled` 守卫（imap.ts:136-139）
-- 修复 TTS daemon spawn 失败导致 Node.js 进程崩溃：添加 `proc.on('error', ...)`（tts/index.ts:275-277）
-- 修复 admin.js `parseInt` + `??` 导致 NaN 默认值失效：改为 `||`（admin.js:519）
-- 修复 admin.js 保存作业时空 `{}` 覆盖 settlement：移除 `putSettlement(dateKey, {})`（admin.js:543-547）
-- 修复 defer-homework approve 未更新 homework.date 字段：添加 `hw.date = tomorrow`（app.ts:619）
-- 修复邮件同步逐条插入无事务：添加 try-catch + 回滚（app.ts:746-780）
-- 修复 `consumeNotifications` SQL 参数超 999 上限：改为 500 一批分批执行（db/index.ts:523-528）
-- 修复 `putHomework` 会复活已软删除记录：添加 `isDeleted` 检查（db/index.ts:626）
-- 修复 IMAP 同名附件互相覆盖：文件名添加时间戳前缀（imap.ts:109）
-- 修复 AI fetch 无超时控制：添加 `AbortSignal.timeout(30000)`（ai.ts:35-73）
-- 修复 app.js UI 瞬态字段 `_animClass` 被持久化到服务端（app.js:370-372）
-- 修复 app.js wakeUp 中双重 poll：添加 `stopPoll()` 调用（app.js:1061）
-- 修复 app.js Voice.speak 可能朗读 "undefined"：添加 `hw.content || ''` 守卫（app.js:274-278）
-- 修复 connection.js `cachedData` TDZ 风险：try-catch 包裹（connection.js:64）
-- 修复 api.js DELETE 204 空响应时 `resp.json()` 抛异常：添加状态码判断（api.js:75）
-- 修复 `(tts as any)._lastError` 私有属性访问：改为 `tts.getLastError()` 公开方法（app.ts:401）
-- 修复 `getPendingNotifications` 副作用：内部 DELETE 清理逻辑移至 `cleanupExpiredNotifications`（db/index.ts:501-515）
-- 修复 TTS spawn 后未移除监听器：close 回调中添加 `removeAllListeners`（tts/index.ts）
-- 修复静态文件哈希错误被静默吞掉：区分 ENOENT 与其他错误（app.ts:270-275）
-- 添加优雅关闭钩子：`onClose` 中关闭数据库和 TTS 进程（app.ts:992-994）
-- 添加 `onRoute` 钩子 `Object.freeze` 守卫：冻结 schema 时展开创建新对象（app.ts:172-178）
-
-### Added
-- 静态文件版本号自动检测：服务端 `/api/static-version` 返回核心文件 SHA1 hash，SW 后台每 30 秒检测文件变化，hash 不一致时自动清空缓存、重新预缓存并通知页面刷新；用户无感，全屏 Mask 后自动 reload，刷新后 Toast 提示；支持 Web 和 Android WebView，离线静默跳过
-- 自定义科目：科目从硬编码改为 settings 可配置，设置页新增科目管理卡片
-  - 支持添加/删除自定义科目，智能 emoji 匹配（物理→⚛️、历史→📜 等）
-  - 可恢复已删除的默认科目，支持重置为默认科目（保留自定义科目）
-  - 管理端作业弹窗科目选择器从 `ADMIN_SUBJECTS` 硬编码改为动态读取 `settings.subjects`
-  - 孩子端不存在的科目显示纯文本（无 icon）
-  - 新增 TDD 测试 18 个；全量 400 测试通过
+- **Phase 5a: PostgreSQL 适配 — 数据库抽象层重构**（v1.3.0 规划）
+  - `IDatabase` 接口定义完整（~60 个方法），`DatabaseAdapter` 抽象基类提取通用工具方法
+  - `SqliteAdapter extends DatabaseAdapter` 保留原 `PapaCheckDB` 全部逻辑，向后兼容
+  - `PostgresAdapter extends DatabaseAdapter` 使用 `pg` 库完整实现全部方法，JSON-in-column 模式
+  - 工厂函数 `createDatabase()` 通过 `DATABASE_URL` 环境变量自动切换 SQLite/PostgreSQL
+  - 数据迁移脚本 `migrate-to-pg.ts`：逐表迁移 + 行数校验，幂等运行
+  - 新增 8 个测试（507 → 515 passing）
+- **Phase 5b: 部署架构重构 + 临时安全认证**
+  - Cookie Session 临时认证中间件（`auth-plugin.ts`）：自动生成部署密码，未登录 API 返回 401
+  - 登录页面 `login.html`，`@fastify/cookie` 持久化 session（30 天）
+  - 生产入口（index.ts）`enableAuth: true`，测试环境默认关闭
+  - 部署脚本 `scripts/deploy.sh`：本地编译 → scp → systemctl restart
+  - systemd service 模板：`papacheck.service`，开机自启 + 崩溃重启
+- **Phase 5 完整阶段规划**：5a（PostgreSQL 适配）→ 5b（去 Docker + systemd + Nginx）→ 5c（JWT 多租户认证）→ 5d（运维增强）→ 5e（客户端适配）
+      - spec/tasks/checklist 已创建于 `.trae/specs/phase5-postgresql-migration/`
+      - 实施计划已创建于 `docs/superpowers/plans/2026-06-12-phase5-postgresql-migration.md`
 
 ### Changed
-- 效率比公式从 `actualDuration / suggestedDuration`（越小效率越高）翻转为 `suggestedDuration / actualDuration`（越大效率越高），统计页图表、孩子端效率文本、结算效率存储均同步更新；`big-screen.js` 效率阈值同时从 `<=0.8/<=1.0` 翻转为 `>=1.25/>=1.0`；全量 400 测试通过
-- 孩子端科目显示改为动态读取：`SUBJECTS` 常量替换为 `DEFAULT_SUBJECTS` 数组 + `getSubject()` 函数，从 `cachedData.settings.subjects` 动态读取科目配置；icon 为 null 时跳过渲染；新增 TDD 测试 4 个；全量 400 测试通过
-- 「其他」科目始终排在科目列表末尾；不可删除
-- 管理端统计页"均值线"改为"中值线"：`renderSvgLineChart` 使用 `calcMedian` 替代算术平均，标签由"平均"改为"中值"，虚线样式不变；新增 `calcMedian` 纯函数 + TDD 6 个测试
-- 邮件 AI 解析 prompt：无法识别的科目从输出"未知"改为输出"其他"
+- 数据库层从同步 API 重构为 async/await：`SqliteAdapter`、`app.ts`、所有 DB 测试适配异步调用
+- `auth-plugin.ts` 按 `enableAuth` 选项开关，不影响已有 500+ 测试
+- 项目版本规划调整为 v1.3.0（Phase 5a+5b），新增测试 8 个，总测试数 515
 
-### Fixed
-- 修复短时间内添加多项新作业导致孩子端连续快速播报"收到新作业"多次的问题：在 pollServer 通知播报中增加 `dedupNewHomeworkNotifications` 去重过滤，多条同文本只播报最后一条；新增 TDD 测试 5 个；全量 407 测试通过
-- 修复科目管理卡片删除和恢复按钮的 XSS 风险：`onclick` 内联事件改为 `data-*` 属性 + 事件委托；全量 400 测试通过
-- 修复新增科目输入框被轮询打断：输入框添加 `onfocus/_editingSettings` 守卫，输入中跳过设置页重建
-- 修复 review 页效率标签在新公式下语义错误："平均只用建议时间的 X%" 改为 "平均效率为 X%"
-- 修复 `gen_review_data.cjs` 中 `bestEffDay` 从 `efficiency_history` 读取导致新旧公式数据混比的问题：改为直接从原始作业数据计算
+### Security
+- **公网 API 防护**：Cookie Session 认证，未登录用户访问 API 返回 401
+- 部署密码自动生成并打印到启动日志，settings 中持久化存储
 
-### Added
-- 管理端统计页折线图新增 LOESS 局部加权平滑曲线（月视图和总计视图），采用 tricube 核加权线性回归，span=0.5，实线细线 stroke-width=1.5 淡紫色渲染；新增 `calcLOESS` 纯函数 + TDD 14 个测试；全量 382 测试通过
-
-### Fixed
-- 修复管理端统计页"连续全勤天数"计算 Bug：`calcStreak()` 原按逐日历日回退检查 `dailySettlement`，周末/无作业日缺口导致 streak 提前中断；改为遍历有 settlement 记录的日期数组，跳过无记录日期间隔；新增 TDD 测试 5 个；全量 366/367 测试通过（唯一失败为已知 connection_offline_threshold flaky 测试）
-- 修复中值线在 medianVal=0 时意外不显示的问题：移除 `medianVal > 0` 条件，改为仅依赖 `values.length > 1` 判断
+### Removed
+- Docker 相关配置计划在 Phase 5b 服务器环境实施中逐步移除（systemd + Nginx 替代）
 
 ### Added
 - 新增回顾页（review.html）：孩子端滚动叙事战绩回顾，从生产数据库提取数据，以 15 屏全屏滚动展示 22 天的完整学习历程，包含坚持天数、时间投入、效率分析、评级荣耀、积分经济、兑换榜、赏金任务等维度，每屏配数字 count-up 动画和意义解读

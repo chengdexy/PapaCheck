@@ -1,0 +1,21 @@
+[Unit]
+Description=PapaCheck Server
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=papacheck
+Group=papacheck
+WorkingDirectory=/opt/papacheck/PapaCheck.Server.Node
+ExecStart=/usr/bin/node dist/index.js --web-dir /opt/papacheck/PapaCheck.Web --tts-python python3
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=NODE_ENV=production
+Environment=DATABASE_URL=postgresql://papacheck:${PG_PASSWORD}@localhost:5432/papacheck
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

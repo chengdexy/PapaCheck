@@ -11,7 +11,8 @@
     "build": "tsc",
     "build:sea": "node scripts/build-sea.mjs",
     "test": "vitest run --config ../vitest.config.js",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "migrate:pg": "npx tsx scripts/migrate-to-pg.ts"
   },
   "pkg": {
     "assets": [
@@ -23,6 +24,7 @@
     ]
   },
   "dependencies": {
+    "@fastify/cookie": "^9.4.0",
     "@fastify/static": "^7.0.0",
     "@fastify/swagger": "^8.15.0",
     "@fastify/swagger-ui": "^3.0.0",
@@ -30,7 +32,8 @@
     "fastify": "^4.28.0",
     "imap": "^0.8.19",
     "mailparser": "^3.9.9",
-    "minimist": "^1.2.8"
+    "minimist": "^1.2.8",
+    "pg": "^8.21.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
@@ -38,6 +41,7 @@
     "@types/mailparser": "^3.4.6",
     "@types/minimist": "^1.2.5",
     "@types/node": "^22.13.0",
+    "@types/pg": "^8.20.0",
     "@vitest/coverage-v8": "^3.2.6",
     "esbuild": "^0.25.0",
     "postject": "^1.0.0-alpha.6",

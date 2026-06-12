@@ -1007,8 +1007,8 @@ describe('POST /api/sync/crdt-pull?ack=', () => {
 
 // ==================== 通知端点 ====================
 
-function cleanNotifications() {
-  const dbWrite = (db as any).db;
+async function cleanNotifications() {
+  const dbWrite = await (db as any).db;
   dbWrite.prepare('DELETE FROM notifications').run();
 }
 
@@ -1029,7 +1029,7 @@ describe('POST /api/notify', () => {
     const body = JSON.parse(res.body);
     expect(body).toEqual({ ok: true, id: expect.any(String) });
     // Verify stored in db
-    const notifications = (db as any).getPendingNotifications();
+    const notifications = await (db as any).getPendingNotifications();
     expect(notifications).toHaveLength(1);
     expect(notifications[0].text).toBe('测试通知');
   });
@@ -1066,7 +1066,7 @@ describe('GET /api/notify/pending', () => {
     // Given 数据库中有 1 条有效通知和 1 条过期通知
     // When GET /api/notify/pending
     // Then 只返回有效通知，过期通知被清理
-    const dbWrite = (db as any).db;
+    const dbWrite = await (db as any).db;
     const validId = 'valid-001';
     const expiredId = 'expired-001';
     dbWrite.prepare('INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)').run(validId, '有效通知', Date.now());
@@ -1100,7 +1100,7 @@ describe('DELETE /api/notify/consumed', () => {
     // Given 数据库中有两条通知
     // When DELETE /api/notify/consumed?ids=id1
     // Then 指定通知被删除，其余保留
-    const dbWrite = (db as any).db;
+    const dbWrite = await (db as any).db;
     const id1 = 'del-001';
     const id2 = 'del-002';
     dbWrite.prepare('INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)').run(id1, '通知1', Date.now());
