@@ -4,6 +4,9 @@ import type { IDatabase } from './db/types.js';
 
 const PUBLIC_PATHS = new Set([
   '/api/ping',
+  '/api/version',
+  '/api/static-version',
+  '/api/download',
   '/api/login',
   '/api/logout',
 ]);
