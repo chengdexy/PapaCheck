@@ -794,6 +794,50 @@ describe('Database', () => {
         await db.close();
       }).not.toThrow();
     });
+
+    it('关闭后 WAL 已合并到主文件，复制 data.db 后数据仍可读', async () => {
+      const { copyFileSync } = await import('fs');
+      const { join } = await import('path');
+
+      // 准备：写入一条数据
+      await db.putHomework('test-wal-hw', {
+        id: 'test-wal-hw',
+        subject: '测试',
+        content: 'WAL checkpoint 测试',
+        status: 'done',
+        actualDuration: 30,
+        suggestedDuration: 20,
+        lastModified: new Date().toISOString(),
+      });
+      await db.putSettlement('2026-06-11', { doneCount: 1, finalPoints: 100 });
+
+      // 关闭数据库（此时应触发 WAL checkpoint）
+      await db.close();
+
+      // 模拟用户只复制 data.db 而不带 data.db-wal
+      const copyDir = mkdtempSync(join(require('os').tmpdir(), 'papacheck-wal-test-'));
+      const copyPath = join(copyDir, 'data_copy.db');
+      copyFileSync(dbPath, copyPath);
+
+      // 确认 data.db-wal 不存在于复制目录
+      const walPath = copyPath + '-wal';
+      expect(existsSync(walPath)).toBe(false);
+
+      // 用新连接打开复制文件，验证数据可读
+      const dbCopy = new Database(copyPath);
+      const hw = await dbCopy.getHomeworkById('test-wal-hw');
+      expect(hw).not.toBeNull();
+      expect(hw?.actualDuration).toBe(30);
+
+      const settlement = await dbCopy.getSettlement('2026-06-11');
+      expect(settlement).not.toBeNull();
+      expect(settlement?.finalPoints).toBe(100);
+
+      await dbCopy.close();
+
+      // 清理
+      rmSync(copyDir, { recursive: true, force: true });
+    });
   });
 
   // ==================== 新增资源级方法测试 ====================

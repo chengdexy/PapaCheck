@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### Fixed
+- **修复 Node.js 服务关闭时未调用 `db.close()` 导致 WAL 未合并**：`SqliteAdapter.close()` 时先执行 `PRAGMA wal_checkpoint(TRUNCATE)`；`gracefulShutdown` 在关闭 HTTP 服务后调用 `db.close()`，确保 `data.db-wal` 中的未合并数据写入主文件，避免仅复制 `data.db` 导致数据丢失（521 测试通过）
+  - 新增 TDD 测试 1 个：验证关闭 + 复制 data.db（不带 WAL）后数据仍可读
+
 ### Changed
 - **release.py 云端部署从 Docker Compose 迁移到 systemd**：tar 包直接解压到 `/opt/papacheck/`，远程命令改为 `npm ci + systemctl restart papacheck`
 - **`npx node-gyp` → `npx --yes node-gyp`**：修复首次构建时因 npx 确认提示导致卡住的问题

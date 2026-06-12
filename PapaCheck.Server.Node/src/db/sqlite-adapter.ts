@@ -1225,6 +1225,11 @@ export class SqliteAdapter extends DatabaseAdapter {
   // ==================== Connection ====================
 
   async close(): Promise<void> {
+    try {
+      this.db.pragma('wal_checkpoint(TRUNCATE)');
+    } catch {
+      // checkpoint 非关键操作，失败不影响关闭
+    }
     this.db.close();
   }
 }

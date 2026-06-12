@@ -23,7 +23,12 @@ const gracefulShutdown = (app: Awaited<ReturnType<typeof buildApp>>, signal: str
   shuttingDown = true;
   console.log('[Server] 收到 ' + signal + '，正在优雅关闭...');
   app.close()
-    .then(() => {
+    .then(async () => {
+      try {
+        await (app as any).papaCheckDB.close();
+      } catch {
+        // 数据库关闭失败不影响进程退出
+      }
       console.log('[Server] 服务器已关闭');
       process.exit(0);
     })
