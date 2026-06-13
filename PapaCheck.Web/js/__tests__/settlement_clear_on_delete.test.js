@@ -194,3 +194,4 @@ describe('submitForRating 守卫检查', () => {
     expect(result.reason).toBe('no_done_homework');
   });
 });
+
