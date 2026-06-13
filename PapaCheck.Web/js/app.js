@@ -888,7 +888,27 @@ function startPoll(intervalMs) {
       const newHwJson = JSON.stringify(newHw);
       if (oldHwJson !== newHwJson) {
         if (!_completingHomework && !_startingHomework) {
+          // 捕获旧 active homework 的 in-memory paused 状态
+          // 防止 pollServer 在 pauseActiveTask 的 async PATCH 完成前覆写 paused 标记
+          var _oldActive = getActiveHomework();
+          var _wasPaused = _oldActive && _oldActive.paused;
+
           homeworks = newHw;
+
+          // 恢复本地暂停状态（服务端数据可能尚未包含 paused:true）
+          if (_wasPaused) {
+            var _newActive = getActiveHomework();
+            if (_newActive && _newActive.id === _oldActive.id) {
+              if (!_newActive.paused) {
+                _newActive.paused = true;
+                _newActive.wasPaused = true;
+              }
+              if (_oldActive._pausedElapsed !== undefined) {
+                _newActive._pausedElapsed = _oldActive._pausedElapsed;
+              }
+            }
+          }
+
           needsFullRender = true;
           const allDone = newHw.length > 0 && newHw.every(h => h.status === 'done');
           const settlement = getSettlementData();
@@ -1015,7 +1035,7 @@ function startPoll(intervalMs) {
           if (staleIds.length > 0) {
             await API.consumeNotifications(staleIds);
             // 已消费的 ID 从 currentIds 中移除，防止 _lastNotifIds 保留导致下轮重复消费
-            staleIds.forEach(function(id) { currentIds.delete(id); });
+            staleIds.forEach(function (id) { currentIds.delete(id); });
           }
         }
         _lastNotifIds = currentIds;
