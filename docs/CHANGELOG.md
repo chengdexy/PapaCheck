@@ -7,6 +7,8 @@
 ## [Unreleased]
 
 ### Fixed
+- **修复孩子端作业全部完成弹出评级后，管理端删光作业时评级界面不会自动关闭的 Bug**：`pollServer` 的结算清除逻辑嵌套在 homework 替换块内部，若 homework 数据未变化（如第二次轮询）或 `_completingHomework` 保护开启时，清除不执行。修复：新增独立结算清理检查（每次 pollServer 都执行），无已完成作业时自动清除未评级结算；`submitForRating()` 添加防御性守卫，无已完成作业时拒绝提交（535 测试通过）
+  - 新增 TDD 测试 9 个：`settlement_clear_on_delete.test.js`
 - **修复孩子端作业暂停后计时器仍在计时的竞态条件 Bug**：`pollServer` 在替换 `homeworks` 数组时，若 `pauseActiveTask` 的异步 PATCH 请求尚未被服务端处理，服务端返回的数据不含 `paused:true`，导致 `homeworks = newHw` 覆写掉本地 `paused` 标记，`isAnyTaskPaused()` 返回 false → `startTickTimer()` 重启计时器。修复：替换前捕获旧 active homework 的 in-memory pause 状态，替换后恢复（526 测试通过）
   - 新增 TDD 测试 5 个：`pause_timer_race_condition.test.js`
 - **修复 Node.js 服务关闭时未调用 `db.close()` 导致 WAL 未合并**：`SqliteAdapter.close()` 时先执行 `PRAGMA wal_checkpoint(TRUNCATE)`；`gracefulShutdown` 在关闭 HTTP 服务后调用 `db.close()`，确保 `data.db-wal` 中的未合并数据写入主文件，避免仅复制 `data.db` 导致数据丢失（521 测试通过）

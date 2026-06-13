@@ -765,6 +765,13 @@ async function submitForRating() {
   const settlement = window._settlement;
   if (!settlement) return;
 
+  // 防御：没有已完成作业时不能提交
+  var _hasDone = homeworks.some(function (h) { return h.status === 'done'; });
+  if (!_hasDone) {
+    showToast('没有已完成的作业可提交');
+    return;
+  }
+
   _submittingRating = true;
   try {
     const dateKey = Util.dateKey(currentDate);
@@ -967,7 +974,17 @@ function startPoll(intervalMs) {
         }
       }
 
-
+      // 独立结算清理检查：无已完成作业时清除未评级结算
+      // 不依赖 homework 数据是否变化，确保每次 pollServer 都执行
+      const _hasDoneHw = homeworks.some(function (h) { return h.status === 'done'; });
+      const _unratedS = getSettlementData();
+      if (_unratedS && !_unratedS.rating && !_hasDoneHw) {
+        cachedData._settlement = null;
+        window._settlement = null;
+        if (cachedData.dailySettlement) delete cachedData.dailySettlement[key];
+        _lastRatingInfo = null;
+        needsFullRender = true;
+      }
 
       const settings = cachedData?.settings || {};
       if (_lastSettings !== null && JSON.stringify(settings) !== JSON.stringify(_lastSettings)) {
