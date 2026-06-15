@@ -88,3 +88,6 @@ PapaCheck.Server.Node/data/
 
 # 临时构建产物
 .publish.tar.gz
+
+# 临时调试文件
+.tmp_*
