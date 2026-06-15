@@ -6,7 +6,15 @@
 
 ## [Unreleased]
 
+### Added
+- **测试覆盖补齐**：新增 29 个测试（Super Admin Routes 16 个、Admin Routes 成员管理 11 个、Middleware PUBLIC_PATHS 2 个），全量 613 测试通过
+
 ### Fixed
+- **修复孩子端语音播报 401 问题**：`/api/speak` 未加入 JWT 中间件的 `PUBLIC_PATHS` 白名单，孩子端语音请求被拦截返回 401，表现为 toast "语音异常: speak fail"
+- **修复 `getTenantMembers` 残留已删除字段**：postgres-adapter 和 sqlite-adapter 的 `getTenantMembers` 仍使用 `SELECT *` 并映射已删除的 `access_code_plaintext` 列
+- **修复成员列表 `access_hash` 返回占位符**：admin/routes.ts 中成员列表返回 `'已生成'` 固定值，改为返回实际的 bcrypt hash
+
+### Security
 - **安全加固**：不再明文存储访问码，仅创建/重新生成时 API 返回一次，成员列表显示"已生成"占位符
 - **删除成员时 token 作废**：`deactivateMember` 增加 `token_version + 1`，已删除成员的 JWT 即时失效
 - **孩子端认证增强**：`app.js` 加载时调用 `/api/auth/me` 验证 token 有效性，被吊销/删除后自动跳转登录页

@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-15（Phase 5c 完成）
+> 最后更新：2026-06-15（Phase 5c 完成 + 测试补齐）
 
 ## 当前版本
 
-**v1.3.1-beta**（Phase 5c JWT 多租户认证系统完成，588 测试）
+**v1.3.1-beta**（Phase 5c JWT 多租户认证系统完成，613 测试）
 
 ## 部署状态
 
@@ -87,6 +87,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-15 | **测试补齐 + 3 个 Bug 修复**：`/api/speak` 未加入 PUBLIC_PATHS 导致语音播报 401；`getTenantMembers` 残留已删除 `access_code_plaintext` 字段；成员列表返回 `'已生成'` 占位符；新增 29 个测试；全量 613 测试通过 |
 | 2026-06-15 | **Phase 5c: JWT 多租户认证系统完成** — Hash 码预授权认证 + token_version 吊销 + tenant_id 行级隔离 + JWT 中间件 + 认证/管理员/超管 API（12 个端点）+ 官网管理面板 + 登录页改造；修复 postgres-adapter.ts 4 处代码损坏；全量 588 测试通过 |
 | 2026-06-15 | **修复孩子端奖励兑换/撤回在离线→在线转换期间的竞态条件 Bug**：`guardOnline()` 守卫 + `reconnecting` API 降级 + 服务端 409 兜底 + 19 个 TDD 测试；全量 554 测试通过 |
 | 2026-06-15 | **LICENSE 填写版权信息 + 删除 CNAME 关闭 GitHub Pages** |

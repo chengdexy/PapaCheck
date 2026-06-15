@@ -8,6 +8,7 @@ const PUBLIC_PATHS = new Set([
   '/api/version',
   '/api/static-version',
   '/api/download',
+  '/api/speak',
   '/api/auth/exchange',
   '/api/auth/register',
   '/api/auth/login',

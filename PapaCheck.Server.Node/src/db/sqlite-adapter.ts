@@ -1330,7 +1330,7 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   async getTenantMembers(tenantId: string): Promise<any[]> {
     const rows = this.db.prepare(
-      'SELECT * FROM users WHERE tenant_id = ? AND is_active = 1 ORDER BY created_at ASC'
+      'SELECT id, tenant_id, role, nickname, access_hash, token_version, last_login, created_at FROM users WHERE tenant_id = ? AND is_active = 1 ORDER BY created_at ASC'
     ).all(tenantId) as any[];
     return rows.map(row => ({
       id: row.id,
@@ -1338,7 +1338,6 @@ export class SqliteAdapter extends DatabaseAdapter {
       role: row.role,
       nickname: row.nickname,
       access_hash: row.access_hash,
-      access_code_plaintext: row.access_code_plaintext,
       token_version: row.token_version,
       last_login: row.last_login ?? undefined,
       created_at: row.created_at,

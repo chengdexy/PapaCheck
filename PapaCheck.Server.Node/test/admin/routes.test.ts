@@ -429,4 +429,258 @@ describe('Admin Routes', () => {
     expect(adminUser).toBeDefined();
     expect(adminUser.role).toBe('parent');
   });
+
+  // ==================== 添加成员 ====================
+
+  // Feature: POST /api/admin/members
+  //   Scenario: 未认证访问
+  //     Given 未携带 Authorization 头
+  //     When  调用 POST /api/admin/members
+  //     Then  返回 401
+  it('should return 401 when adding member without auth', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/members',
+      payload: { role: 'child', nickname: '新孩子' },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  // Feature: POST /api/admin/members
+  //   Scenario: child 角色访问
+  //     Given 一个 child 角色的 JWT
+  //     When  调用 POST /api/admin/members
+  //     Then  返回 403
+  it('should return 403 when child role adds member', async () => {
+    const childToken = signToken({
+      sub: childId,
+      tenant_id: adminTenantId,
+      role: 'child',
+      token_version: 1,
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/members',
+      headers: { Authorization: `Bearer ${childToken}` },
+      payload: { role: 'child', nickname: '新孩子' },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe('FORBIDDEN');
+  });
+
+  // Feature: POST /api/admin/members
+  //   Scenario: 缺少必填字段
+  //     Given 缺少 nickname
+  //     When  调用 POST /api/admin/members
+  //     Then  返回 400
+  it('should return 400 when member fields are missing', async () => {
+    const adminToken = signToken({
+      sub: adminId,
+      tenant_id: adminTenantId,
+      role: 'parent',
+      token_version: 1,
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/members',
+      headers: { Authorization: `Bearer ${adminToken}` },
+      payload: { role: 'child' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe('VALIDATION_ERROR');
+  });
+
+  // Feature: POST /api/admin/members
+  //   Scenario: 无效的角色值
+  //     Given role 不是 parent 或 child
+  //     When  调用 POST /api/admin/members
+  //     Then  返回 400
+  it('should return 400 when role is invalid', async () => {
+    const adminToken = signToken({
+      sub: adminId,
+      tenant_id: adminTenantId,
+      role: 'parent',
+      token_version: 1,
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/members',
+      headers: { Authorization: `Bearer ${adminToken}` },
+      payload: { role: 'guest', nickname: '访客' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe('VALIDATION_ERROR');
+  });
+
+  // Feature: POST /api/admin/members
+  //   Scenario: 管理员成功添加成员
+  //     Given 有效的 parent JWT
+  //     When  调用 POST /api/admin/members 添加一个 child 角色
+  //     Then  返回 200 包含 id、access_hash（明文）
+  it('should add a new member successfully', async () => {
+    const adminToken = signToken({
+      sub: adminId,
+      tenant_id: adminTenantId,
+      role: 'parent',
+      token_version: 1,
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/members',
+      headers: { Authorization: `Bearer ${adminToken}` },
+      payload: { role: 'child', nickname: '新孩子' },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body).toHaveProperty('id');
+    expect(body.nickname).toBe('新孩子');
+    expect(body.role).toBe('child');
+    expect(body.access_hash).toMatch(/^pc-/); // 返回明文访问码
+    // 验证成员已存入存储
+    const newMember = storedUsers.find(u => u.id === body.id);
+    expect(newMember).toBeDefined();
+    expect(newMember?.nickname).toBe('新孩子');
+  });
+
+  // ==================== 重新生成访问码 ====================
+
+  // Feature: POST /api/admin/members/:id/regenerate
+  //   Scenario: 未认证访问
+  //     Given 未携带 Authorization 头
+  //     When  调用 POST /api/admin/members/:id/regenerate
+  //     Then  返回 401
+  it('should return 401 when regenerating hash without auth', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/admin/members/${childId}/regenerate`,
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  // Feature: POST /api/admin/members/:id/regenerate
+  //   Scenario: child 角色访问
+  //     Given 一个 child 角色的 JWT
+  //     When  调用 POST /api/admin/members/:id/regenerate
+  //     Then  返回 403
+  it('should return 403 when child role regenerates hash', async () => {
+    const childToken = signToken({
+      sub: childId,
+      tenant_id: adminTenantId,
+      role: 'child',
+      token_version: 1,
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/admin/members/${adminId}/regenerate`,
+      headers: { Authorization: `Bearer ${childToken}` },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe('FORBIDDEN');
+  });
+
+  // Feature: POST /api/admin/members/:id/regenerate
+  //   Scenario: 管理员成功重新生成访问码
+  //     Given 有效的 parent JWT
+  //     When  调用 POST /api/admin/members/:id/regenerate
+  //     Then  返回 200 包含新 access_hash 明文，token_version 递增
+  it('should regenerate hash successfully', async () => {
+    const adminToken = signToken({
+      sub: adminId,
+      tenant_id: adminTenantId,
+      role: 'parent',
+      token_version: 1,
+    });
+    const oldTokenVersion = storedUsers.find(u => u.id === childId)?.token_version ?? 0;
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/admin/members/${childId}/regenerate`,
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.id).toBe(childId);
+    expect(body.access_hash).toMatch(/^pc-/); // 返回明文访问码
+    expect(body.message).toBe('已重新生成，旧访问码已失效');
+    // 验证 token_version 已递增
+    const updatedUser = storedUsers.find(u => u.id === childId);
+    expect(updatedUser?.token_version).toBe(oldTokenVersion + 1);
+  });
+
+  // ==================== 移除成员 ====================
+
+  // Feature: DELETE /api/admin/members/:id
+  //   Scenario: 未认证访问
+  //     Given 未携带 Authorization 头
+  //     When  调用 DELETE /api/admin/members/:id
+  //     Then  返回 401
+  it('should return 401 when deleting member without auth', async () => {
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/api/admin/members/${childId}`,
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  // Feature: DELETE /api/admin/members/:id
+  //   Scenario: child 角色访问
+  //     Given 一个 child 角色的 JWT
+  //     When  调用 DELETE /api/admin/members/:id
+  //     Then  返回 403
+  it('should return 403 when child role deletes member', async () => {
+    const currentChildVersion = storedUsers.find(u => u.id === childId)?.token_version ?? 1;
+    const childToken = signToken({
+      sub: childId,
+      tenant_id: adminTenantId,
+      role: 'child',
+      token_version: currentChildVersion,
+    });
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/api/admin/members/${adminId}`,
+      headers: { Authorization: `Bearer ${childToken}` },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe('FORBIDDEN');
+  });
+
+  // Feature: DELETE /api/admin/members/:id
+  //   Scenario: 管理员成功移除成员
+  //     Given 有效的 parent JWT
+  //     When  调用 DELETE /api/admin/members/:id
+  //     Then  返回 200 且成员 is_active 变为 false，token_version 递增
+  it('should delete a member successfully', async () => {
+    const adminToken = signToken({
+      sub: adminId,
+      tenant_id: adminTenantId,
+      role: 'parent',
+      token_version: 1,
+    });
+    // 先添加一个临时成员用于删除
+    const tempId = 'temp-child-001';
+    storedUsers.push({
+      id: tempId,
+      tenant_id: adminTenantId,
+      role: 'child',
+      nickname: '待删除',
+      access_hash: '$2a$10$dummy',
+      token_version: 1,
+      is_active: true,
+      created_at: '2024-03-01T00:00:00.000Z',
+      last_login: null,
+      email: null,
+      password_hash: null,
+    });
+    const oldTokenVersion = storedUsers.find(u => u.id === tempId)?.token_version ?? 0;
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/api/admin/members/${tempId}`,
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ok).toBe(true);
+    // 验证成员已被停用且 token_version 递增
+    const deletedUser = storedUsers.find(u => u.id === tempId);
+    expect(deletedUser?.is_active).toBe(false);
+    expect(deletedUser?.token_version).toBe(oldTokenVersion + 1);
+  });
 });

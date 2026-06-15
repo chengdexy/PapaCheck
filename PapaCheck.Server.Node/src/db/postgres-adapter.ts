@@ -1519,7 +1519,7 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
 
   async getTenantMembers(tenantId: string): Promise<any[]> {
     const result = await this.pool.query(
-      'SELECT * FROM users WHERE tenant_id = $1 AND is_active = true ORDER BY created_at ASC',
+      'SELECT id, tenant_id, role, nickname, access_hash, token_version, last_login, created_at FROM users WHERE tenant_id = $1 AND is_active = true ORDER BY created_at ASC',
       [tenantId]
     );
     return result.rows.map(row => ({
@@ -1528,7 +1528,6 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
       role: row.role,
       nickname: row.nickname,
       access_hash: row.access_hash,
-      access_code_plaintext: row.access_code_plaintext,
       token_version: row.token_version,
       last_login: row.last_login ?? undefined,
       created_at: row.created_at,

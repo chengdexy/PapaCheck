@@ -89,7 +89,7 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
       id: m.id,
       nickname: m.nickname,
       role: m.role,
-      access_hash: m.access_code_plaintext ?? '已生成',
+      access_hash: m.access_hash,
       token_version: m.token_version,
       last_login: m.last_login,
       created_at: m.created_at,

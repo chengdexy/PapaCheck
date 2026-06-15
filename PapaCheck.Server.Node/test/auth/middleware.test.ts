@@ -22,6 +22,11 @@ describe('Auth Middleware', () => {
     // 注册公开路径
     app.get('/', async () => ({ ok: true }));
     app.get('/api/ping', async () => ({ ok: true, serverTime: new Date().toISOString() }));
+    app.get('/api/speak', async () => ({ ok: true }));
+    app.get('/api/auth/exchange', async () => ({ ok: true }));
+    app.get('/api/auth/register', async () => ({ ok: true }));
+    app.get('/api/auth/login', async () => ({ ok: true }));
+    app.get('/api/admin/super/login', async () => ({ ok: true }));
 
     // 注册受保护的路由
     app.get('/api/test-auth', async (_request, _reply) => {
@@ -54,6 +59,31 @@ describe('Auth Middleware', () => {
   it('should allow public API paths without auth', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/ping' });
     expect(res.statusCode).toBe(200);
+  });
+
+  // Feature: 公开 API 路径无需认证
+  //   Scenario: /api/speak 公开路径直接放行
+  //     Given TTS 语音合成的公开路径 /api/speak
+  //     When  不携带认证信息
+  //     Then  返回 200
+
+  it('should allow /api/speak without auth', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/speak' });
+    expect(res.statusCode).toBe(200);
+  });
+
+  // Feature: 公开 API 路径无需认证
+  //   Scenario: whitelist 中的其他公开路径均放行
+  //     Given 公开 API 路径（/api/auth/exchange、/api/auth/register 等）
+  //     When  不携带认证信息
+  //     Then  返回 200
+
+  it('should allow all PUBLIC_PATHS without auth', async () => {
+    const publicPaths = ['/api/auth/exchange', '/api/auth/register', '/api/auth/login', '/api/admin/super/login'];
+    for (const path of publicPaths) {
+      const res = await app.inject({ method: 'GET', url: path });
+      expect(res.statusCode).toBe(200);
+    }
   });
 
   // Feature: 受保护路径需要认证
