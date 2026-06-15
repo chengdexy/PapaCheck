@@ -180,16 +180,6 @@ async function loadMembers(token) {
           </tr>
         `).join('');
 
-            // Event delegation for member action buttons
-            tbody.addEventListener('click', async (e) => {
-                const btn = e.target.closest('[data-action]');
-                if (!btn) return;
-                const memberId = btn.dataset.memberId;
-                const action = btn.dataset.action;
-                if (action === 'regenerate') await regenerateMemberHash(memberId);
-                else if (action === 'remove') await removeMember(memberId);
-            });
-
             // Copy buttons
             tbody.querySelectorAll('.copy-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
@@ -360,15 +350,6 @@ async function loadSuperTenants(token) {
             </td>
           </tr>
         `).join('');
-
-            // Event delegation for tenant action buttons
-            tbody.addEventListener('click', (e) => {
-                const btn = e.target.closest('[data-action="toggle-tenant"]');
-                if (!btn) return;
-                const tenantId = btn.dataset.tenantId;
-                const isActive = btn.dataset.active === 'true';
-                toggleTenant(tenantId, isActive);
-            });
         } else if (res.status === 401) {
             localStorage.removeItem(ADMIN_TOKEN_KEY);
             document.getElementById('super-dashboard').style.display = 'none';
@@ -447,3 +428,22 @@ checkAdminAuth = async function () {
         alert('网络错误，请检查服务器连接');
     }
 };
+
+// ===== 单次绑定事件委托（避免重复监听器） =====
+
+document.getElementById('member-tbody')?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const memberId = btn.dataset.memberId;
+    const action = btn.dataset.action;
+    if (action === 'regenerate') await regenerateMemberHash(memberId);
+    else if (action === 'remove') await removeMember(memberId);
+});
+
+document.getElementById('super-tenant-tbody')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action="toggle-tenant"]');
+    if (!btn) return;
+    const tenantId = btn.dataset.tenantId;
+    const isActive = btn.dataset.active === 'true';
+    toggleTenant(tenantId, isActive);
+});
