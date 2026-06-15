@@ -802,7 +802,8 @@ async function startBountyTask(taskId) {
       updateBigScreen();
       return;
     }
-    if (submissions.some(s => s.taskId === taskId)) return;
+    // 存在非 abandoned 状态的提交时阻止重复创建（abandoned 已在上面被复用处理）
+    if (submissions.some(s => s.taskId === taskId && s.status !== 'abandoned')) return;
     const newSubmission = { id: Util.genId(), taskId, status: 'doing', startedAt: new Date().toISOString(), submittedAt: null };
     submissions.push(newSubmission);
     await API.putBountySubmission(newSubmission.id, newSubmission);
