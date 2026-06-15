@@ -1,9 +1,36 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { JWTPayload } from './types.js';
 
-const JWT_SECRET: string = process.env['JWT_SECRET'] ?? crypto.randomBytes(32).toString('hex');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
+function loadOrCreateSecret(): string {
+  // 优先使用环境变量
+  const envSecret = process.env['JWT_SECRET'];
+  if (envSecret) return envSecret;
+
+  // 尝试从文件读取
+  const dataDir = resolve(__dirname, '../../data');
+  const secretFile = resolve(dataDir, '.jwt_secret');
+
+  if (existsSync(secretFile)) {
+    return readFileSync(secretFile, 'utf-8').trim();
+  }
+
+  // 生成并持久化
+  const secret = crypto.randomBytes(32).toString('hex');
+  if (!existsSync(dataDir)) {
+    mkdirSync(dataDir, { recursive: true });
+  }
+  writeFileSync(secretFile, secret, 'utf-8');
+  return secret;
+}
+
+const JWT_SECRET: string = loadOrCreateSecret();
 const JWT_EXPIRY = '365d';
 
 export function signToken(payload: JWTPayload): string {

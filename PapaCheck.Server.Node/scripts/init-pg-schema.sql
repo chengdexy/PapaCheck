@@ -33,14 +33,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS
 -- ==================== Business Tables ====================
 
 CREATE TABLE IF NOT EXISTS points (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   id INTEGER NOT NULL,
   balance INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS points_history (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   id SERIAL,
   date TEXT NOT NULL,
   earned INTEGER NOT NULL DEFAULT 0,
@@ -51,110 +51,112 @@ CREATE TABLE IF NOT EXISTS points_history (
 );
 
 CREATE TABLE IF NOT EXISTS homeworks (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   date_key TEXT NOT NULL,
   data TEXT NOT NULL DEFAULT '[]',
   PRIMARY KEY (tenant_id, date_key)
 );
 
 CREATE TABLE IF NOT EXISTS daily_settlement (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   date_key TEXT NOT NULL,
   data TEXT NOT NULL DEFAULT '{}',
   PRIMARY KEY (tenant_id, date_key)
 );
 
 CREATE TABLE IF NOT EXISTS shop_items (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   id INTEGER NOT NULL,
   data TEXT NOT NULL DEFAULT '[]',
   PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS redemptions (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   id INTEGER NOT NULL,
   data TEXT NOT NULL DEFAULT '[]',
   PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS efficiency_history (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   date_key TEXT NOT NULL,
   data TEXT NOT NULL DEFAULT '{}',
   PRIMARY KEY (tenant_id, date_key)
 );
 
 CREATE TABLE IF NOT EXISTS free_time_tasks (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   date_key TEXT NOT NULL,
   data TEXT NOT NULL DEFAULT '[]',
   PRIMARY KEY (tenant_id, date_key)
 );
 
 CREATE TABLE IF NOT EXISTS meta (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL DEFAULT ''
+  tenant_id UUID,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (tenant_id, key)
 );
 
 CREATE TABLE IF NOT EXISTS badges (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   id INTEGER NOT NULL,
   data TEXT NOT NULL DEFAULT '[]',
   PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS reward_box (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   id INTEGER NOT NULL,
   data TEXT NOT NULL DEFAULT '[]',
   PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS settings (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   id INTEGER NOT NULL,
   data TEXT NOT NULL DEFAULT '{}',
   PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS active_buffs (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   id INTEGER NOT NULL,
   data TEXT NOT NULL DEFAULT '[]',
   PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS bounty_tasks (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   id INTEGER NOT NULL,
   data TEXT NOT NULL DEFAULT '[]',
   PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS email_config (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   id INTEGER NOT NULL,
   data TEXT NOT NULL DEFAULT '{}',
   PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS bounty_submissions (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   date_key TEXT NOT NULL,
   data TEXT NOT NULL DEFAULT '[]',
   PRIMARY KEY (tenant_id, date_key)
 );
 
 CREATE TABLE IF NOT EXISTS bounty_completions (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   date_key TEXT NOT NULL,
   data TEXT NOT NULL DEFAULT '{}',
   PRIMARY KEY (tenant_id, date_key)
 );
 
 CREATE TABLE IF NOT EXISTS notifications (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   id TEXT NOT NULL,
   text TEXT NOT NULL,
   created_at BIGINT NOT NULL,
@@ -162,7 +164,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 CREATE TABLE IF NOT EXISTS last_modified (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   table_name TEXT NOT NULL,
   record_key TEXT NOT NULL,
   last_modified TEXT NOT NULL,
@@ -170,7 +172,7 @@ CREATE TABLE IF NOT EXISTS last_modified (
 );
 
 CREATE TABLE IF NOT EXISTS crdt_operations (
-  tenant_id TEXT NOT NULL,
+  tenant_id UUID NOT NULL,
   id TEXT NOT NULL,
   type TEXT NOT NULL,
   table_name TEXT NOT NULL,

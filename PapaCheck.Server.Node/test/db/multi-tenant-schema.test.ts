@@ -26,7 +26,7 @@ describe('Multi-tenant Schema', () => {
     const dateKeyTables = ['homeworks', 'daily_settlement', 'efficiency_history', 'free_time_tasks', 'bounty_submissions', 'bounty_completions'];
     for (const table of dateKeyTables) {
       expect(schema).toContain(`CREATE TABLE IF NOT EXISTS ${table}`);
-      expect(schema).toContain('tenant_id TEXT NOT NULL');
+      expect(schema).toContain('tenant_id UUID NOT NULL');
       expect(schema).toContain('PRIMARY KEY (tenant_id, date_key)');
     }
   });
@@ -35,41 +35,41 @@ describe('Multi-tenant Schema', () => {
     const singleRowTables = ['shop_items', 'redemptions', 'reward_box', 'settings', 'active_buffs', 'bounty_tasks', 'badges', 'email_config'];
     for (const table of singleRowTables) {
       expect(schema).toContain(`CREATE TABLE IF NOT EXISTS ${table}`);
-      expect(schema).toContain('tenant_id TEXT NOT NULL');
+      expect(schema).toContain('tenant_id UUID NOT NULL');
       expect(schema).toContain('PRIMARY KEY (tenant_id, id)');
     }
   });
 
   it('should add tenant_id to points table', () => {
     expect(schema).toContain('CREATE TABLE IF NOT EXISTS points');
+    expect(schema).toContain('tenant_id UUID NOT NULL');
     expect(schema).toContain('PRIMARY KEY (tenant_id, id)');
   });
 
   it('should add tenant_id to points_history table', () => {
     expect(schema).toContain('CREATE TABLE IF NOT EXISTS points_history');
-    expect(schema).toContain('tenant_id TEXT NOT NULL');
+    expect(schema).toContain('tenant_id UUID NOT NULL');
   });
 
   it('should add tenant_id to notifications table', () => {
     expect(schema).toContain('CREATE TABLE IF NOT EXISTS notifications');
-    expect(schema).toContain('tenant_id TEXT NOT NULL');
+    expect(schema).toContain('tenant_id UUID NOT NULL');
   });
 
   it('should add tenant_id to last_modified table', () => {
     expect(schema).toContain('CREATE TABLE IF NOT EXISTS last_modified');
-    expect(schema).toContain('tenant_id TEXT NOT NULL');
+    expect(schema).toContain('tenant_id UUID NOT NULL');
     expect(schema).toContain('PRIMARY KEY (tenant_id, table_name, record_key)');
   });
 
   it('should add tenant_id to crdt_operations table', () => {
     expect(schema).toContain('CREATE TABLE IF NOT EXISTS crdt_operations');
-    expect(schema).toContain('tenant_id TEXT NOT NULL');
+    expect(schema).toContain('tenant_id UUID NOT NULL');
   });
 
-  it('meta table should NOT have tenant_id (internal-only table)', () => {
+  it('meta table should have tenant_id id', () => {
     expect(schema).toContain('CREATE TABLE IF NOT EXISTS meta');
-    // meta 是内部元数据表，不按租户隔离
-    const metaLine = schema.split('\n').filter(l => l.includes('meta'))[0];
-    expect(metaLine).toBeDefined();
+    expect(schema).toContain('tenant_id UUID');
+    expect(schema).toContain('PRIMARY KEY (tenant_id, key)');
   });
 });

@@ -26,6 +26,8 @@
 
 ### Fixed
 - **修复 postgres-adapter.ts 多处代码损坏**：`n e wLastModified` 变量名空格 → `newLastModified`；`turn` → `return`；`ync` → `async`；`W HERE` SQL 语法错误 → `WHERE`；括号/缩进不匹配修复
+- **修复 schema 问题**：tenant_id 从 TEXT 改为 UUID 类型保持一致性；`_initSchema` 移除硬编码 `'default'` 租户 ID，改用 UUID 动态创建；meta 表增加 `tenant_id` 列和复合主键；`_resetDailyShopQuantity` 中 meta INSERT 增加 `tenant_id` 条件
+- **修复 JWT_SECRET 重启后令牌失效**：`jwt.ts` 新增 `loadOrCreateSecret()`，将随机生成的密钥持久化到 `data/.jwt_secret` 文件
 
 ### Changed（历史）
 - **LICENSE 填写版权信息**：模板占位符替换为 `PapaCheck / Copyright (C) 2026 chengdexy`

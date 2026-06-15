@@ -33,8 +33,8 @@ describe('Migration Script', () => {
     // 多租户表
     expect(schema).toContain('CREATE TABLE IF NOT EXISTS tenants');
     expect(schema).toContain('CREATE TABLE IF NOT EXISTS users');
-    // 所有业务表有 tenant_id
-    expect(schema).toContain('tenant_id TEXT NOT NULL');
+    // 所有业务表有 tenant_id（UUID 类型）
+    expect(schema).toContain('tenant_id UUID NOT NULL');
     // 复合主键
     expect(schema).toContain('PRIMARY KEY (tenant_id, date_key)');
     expect(schema).toContain('PRIMARY KEY (tenant_id, id)');

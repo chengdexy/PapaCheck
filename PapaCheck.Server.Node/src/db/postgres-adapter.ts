@@ -54,6 +54,16 @@ export class PostgresAdapter extends DatabaseAdapter {
     const schema = readFileSync(schemaPath, 'utf-8');
     await this.pool.query(schema);
 
+    // 创建默认租户（如果不存在），用于初始化默认数据
+    const defaultTenantId = crypto.randomUUID();
+    await this.pool.query(
+      `INSERT INTO tenants (id, name) VALUES ($1, '默认租户') ON CONFLICT DO NOTHING`,
+      [defaultTenantId]
+    );
+    // 获取实际存在的租户 ID（可能已存在）
+    const tenantResult = await this.pool.query('SELECT id FROM tenants LIMIT 1');
+    const effectiveTenantId = tenantResult.rows[0]?.id ?? defaultTenantId;
+
     // Insert default rows for each tenant's single-row tables
     const singleRowDefaults: Array<{ table: string; data: string }> = [
       { table: 'shop_items', data: '[]' },
@@ -68,14 +78,15 @@ export class PostgresAdapter extends DatabaseAdapter {
 
     for (const { table, data } of singleRowDefaults) {
       await this.pool.query(
-        `INSERT INTO ${table} (tenant_id, id, data) VALUES ('default', 1, $1) ON CONFLICT DO NOTHING`,
-        [data]
+        `INSERT INTO ${table} (tenant_id, id, data) VALUES ($1, 1, $2) ON CONFLICT DO NOTHING`,
+        [effectiveTenantId, data]
       );
     }
 
     // Insert default points row
     await this.pool.query(
-      "INSERT INTO points (tenant_id, id, balance) VALUES ('default', 1, 0) ON CONFLICT DO NOTHING"
+      "INSERT INTO points (tenant_id, id, balance) VALUES ($1, 1, 0) ON CONFLICT DO NOTHING",
+      [effectiveTenantId]
     );
   }
 
@@ -184,8 +195,8 @@ export class PostgresAdapter extends DatabaseAdapter {
 
       if (tenantId) {
         await this.pool.query(
-          "INSERT INTO meta (key, value) VALUES ('last_shop_reset', $1) ON CONFLICT (key) DO UPDATE SET value = $1",
-          [today]
+          "INSERT INTO meta (tenant_id, key, value) VALUES ($1, 'last_shop_reset', $2) ON CONFLICT (tenant_id, key) DO UPDATE SET value = $2",
+          [tenantId, today]
         );
       } else {
         await this.pool.query(
