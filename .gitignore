@@ -83,5 +83,8 @@ PapaCheck.WeChat/*.html
 coverage/
 htmlcov/
 
+# 运行时数据（JWT 密钥、管理员凭据等）
+PapaCheck.Server.Node/data/
+
 # 临时构建产物
 .publish.tar.gz
