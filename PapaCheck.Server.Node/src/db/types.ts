@@ -82,6 +82,7 @@ export interface UserRecord {
   role: 'parent' | 'child';
   nickname: string;
   access_hash: string;
+  access_code_plaintext?: string;
   token_version: number;
   is_active: boolean;
   is_super_admin: boolean;
@@ -107,12 +108,13 @@ token_version: number;
 }
 
 export interface CreateUserInput {
-id: string; 
-tenant_id: string;
-role: 'parent' | 'child';
-nickname: string;
-access_hash: string;
-token_version: number;
+  id: string;
+  tenant_id: string;
+  role: 'parent' | 'child';
+  nickname: string;
+  access_hash: string;
+  access_code_plaintext?: string;
+  token_version: number;
 email ?: string;
 password_hash ? : string;
 }
@@ -196,9 +198,10 @@ putHomework(id: string, data: any, tenantId?: string): Promise<void>;
   createUser(input: CreateUserInput): Promise<void>;
   findAdminByEmail(email: string): Promise<AdminUser | null>;
   getTenantMembers(tenantId: string): Promise<any[]>;
-  regenerateMemberHash(userId: string, tenantId: string, newHash: string): Promise<void>;
+  regenerateMemberHash(userId: string, tenantId: string, newHash: string, newPlaintext?: string): Promise<void>;
   deactivateMember(userId: string, tenantId: string): Promise<void>;
   updateTenantAdmin(tenantId: string, adminUserId: string): Promise<void>;
+  updateTenantName(tenantId: string, newName: string): Promise<void>;
 
   // Super Admin
   findSuperAdmin(username: string): Promise<AdminUser | null>;

@@ -54,15 +54,18 @@ export class PostgresAdapter extends DatabaseAdapter {
     const schema = readFileSync(schemaPath, 'utf-8');
     await this.pool.query(schema);
 
-    // 创建默认租户（如果不存在），用于初始化默认数据
-    const defaultTenantId = crypto.randomUUID();
-    await this.pool.query(
-      `INSERT INTO tenants (id, name) VALUES ($1, '默认租户') ON CONFLICT DO NOTHING`,
-      [defaultTenantId]
-    );
-    // 获取实际存在的租户 ID（可能已存在）
+    // 获取首个已存在的租户 ID（如果表为空则创建一个默认租户）
     const tenantResult = await this.pool.query('SELECT id FROM tenants LIMIT 1');
-    const effectiveTenantId = tenantResult.rows[0]?.id ?? defaultTenantId;
+    let effectiveTenantId: string;
+    if (tenantResult.rows.length > 0) {
+      effectiveTenantId = tenantResult.rows[0].id;
+    } else {
+      effectiveTenantId = crypto.randomUUID();
+      await this.pool.query(
+        `INSERT INTO tenants (id, name) VALUES ($1, '默认租户') ON CONFLICT (id) DO NOTHING`,
+        [effectiveTenantId]
+      );
+    }
 
     // Insert default rows for each tenant's single-row tables
     const singleRowDefaults: Array<{ table: string; data: string }> = [
@@ -1174,7 +1177,7 @@ export class PostgresAdapter extends DatabaseAdapter {
           let foundIdx = idx;
           let foundItem = existingItem;
 
-                if (!foundItem & data.id) {
+                if (!foundItem && data.id) {
                   const alt = this._findByUuid(existingList, data.id);
                   foundIdx = alt.index;
                 foundItem = alt.item;
@@ -1250,7 +1253,7 @@ export class PostgresAdapter extends DatabaseAdapter {
             const oldLast = foundItem.lastModified ?? '0';
             if (changeType === 'delete') {
               existingList[foundIdx].isDeleted = true;
-              existingList[foundIdx].lastModified = n e wLastModified;
+              existingList[foundIdx].lastModified = newLastModified;
           } else if (newLastModified >= oldLast) {
             existingList[foundIdx] = data;
             }
@@ -1282,11 +1285,10 @@ await this.pool.query(
 
   // ==================== Misc ====================
 
-  as
-ync resetDate(dateKey: string, tenantId?: string): Promise<void> {
+  async resetDate(dateKey: string, tenantId?: string): Promise<void> {
     if (tenantId) {
       await this.pool.query("DELETE FROM homeworks WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
-      await this.pool.query("DELETE FROM daily_settlement W HERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
+      await this.pool.query("DELETE FROM daily_settlement WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
     await this.pool.query("DELETE FROM efficiency_history WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
     await this.pool.query("DELETE FROM free_time_tasks WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
     await this.pool.query("DELETE FROM bounty_submissions WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
@@ -1494,8 +1496,8 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
 
   async createUser(input: any): Promise<void> {
     await this.pool.query(
-      'INSERT INTO users (id, tenant_id, role, nickname, access_hash, token_version, email, password_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING',
-      [input.id, input.tenant_id, input.role, input.nickname, input.access_hash, input.token_version, input.email ?? null, input.password_hash ?? null]
+      'INSERT INTO users (id, tenant_id, role, nickname, access_hash, access_code_plaintext, token_version, email, password_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO NOTHING',
+      [input.id, input.tenant_id, input.role, input.nickname, input.access_hash, input.access_code_plaintext ?? null, input.token_version, input.email ?? null, input.password_hash ?? null]
     );
   }
 
@@ -1526,16 +1528,17 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
       role: row.role,
       nickname: row.nickname,
       access_hash: row.access_hash,
+      access_code_plaintext: row.access_code_plaintext,
       token_version: row.token_version,
       last_login: row.last_login ?? undefined,
       created_at: row.created_at,
     }));
   }
 
-  async regenerateMemberHash(userId: string, tenantId: string, newHash: string): Promise<void> {
+  async regenerateMemberHash(userId: string, tenantId: string, newHash: string, newPlaintext?: string): Promise<void> {
     const result = await this.pool.query(
-      'UPDATE users SET access_hash = $1, token_version = token_version + 1 WHERE id = $2 AND tenant_id = $3 AND is_active = true',
-      [newHash, userId, tenantId]
+      'UPDATE users SET access_hash = $1, access_code_plaintext = $2, token_version = token_version + 1 WHERE id = $3 AND tenant_id = $4 AND is_active = true',
+      [newHash, newPlaintext ?? null, userId, tenantId]
     );
     if (result.rowCount === 0) {
       throw new Error('成员不存在或不属于该租户');
@@ -1553,6 +1556,13 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
     await this.pool.query(
       'UPDATE tenants SET admin_id = $1 WHERE id = $2',
       [adminUserId, tenantId]
+    );
+  }
+
+  async updateTenantName(tenantId: string, newName: string): Promise<void> {
+    await this.pool.query(
+      'UPDATE tenants SET name = $1 WHERE id = $2',
+      [newName, tenantId]
     );
   }
 

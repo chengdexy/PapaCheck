@@ -1344,10 +1344,10 @@ export class SqliteAdapter extends DatabaseAdapter {
     }));
   }
 
-  async regenerateMemberHash(userId: string, tenantId: string, newHash: string): Promise<void> {
+  async regenerateMemberHash(userId: string, tenantId: string, newHash: string, newPlaintext?: string): Promise<void> {
     const result = this.db.prepare(
-      'UPDATE users SET access_hash = ?, token_version = token_version + 1 WHERE id = ? AND tenant_id = ? AND is_active = 1'
-    ).run(newHash, userId, tenantId);
+      'UPDATE users SET access_hash = ?, access_code_plaintext = ?, token_version = token_version + 1 WHERE id = ? AND tenant_id = ? AND is_active = 1'
+    ).run(newHash, newPlaintext ?? null, userId, tenantId);
     if (result.changes === 0) {
       throw new Error('成员不存在或不属于该租户');
     }
@@ -1363,6 +1363,12 @@ export class SqliteAdapter extends DatabaseAdapter {
     this.db.prepare(
       'UPDATE tenants SET admin_id = ? WHERE id = ?'
     ).run(adminUserId, tenantId);
+  }
+
+  async updateTenantName(tenantId: string, newName: string): Promise<void> {
+    this.db.prepare(
+      'UPDATE tenants SET name = ? WHERE id = ?'
+    ).run(newName, tenantId);
   }
 
   // ==================== Super Admin ====================

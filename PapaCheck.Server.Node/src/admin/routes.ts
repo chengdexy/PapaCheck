@@ -24,8 +24,16 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
       return reply.status(400).send({ error: '密码长度不能少于6位', code: 'VALIDATION_ERROR' });
     }
 
-    const tenantId = crypto.randomUUID();
-    await db.createTenant(tenantId, family_name);
+    // 优先复用已有默认租户（含旧数据），不存在则创建新租户
+    const existingTenants = await db.getAllTenants();
+    const defaultTenant = existingTenants.find(t => t.name === '默认租户' || t.name === '系统管理');
+    const tenantId = defaultTenant?.id ?? crypto.randomUUID();
+    if (defaultTenant) {
+      // 复用默认租户，更新为家庭名称
+      await db.updateTenantName(tenantId, family_name);
+    } else {
+      await db.createTenant(tenantId, family_name);
+    }
 
     const userId = crypto.randomUUID();
     const { raw, hashed } = generateAccessHash();
@@ -81,7 +89,7 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
       id: m.id,
       nickname: m.nickname,
       role: m.role,
-      access_hash: m.access_hash,
+      access_hash: m.access_code_plaintext ?? m.access_hash,
       token_version: m.token_version,
       last_login: m.last_login,
       created_at: m.created_at,
@@ -112,6 +120,7 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
       role,
       nickname,
       access_hash: hashed,
+      access_code_plaintext: raw,
       token_version: 1,
     });
 
@@ -127,7 +136,7 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
 
     const { id } = request.params as { id: string };
     const { raw, hashed } = generateAccessHash();
-    await db.regenerateMemberHash(id, payload.tenant_id, hashed);
+    await db.regenerateMemberHash(id, payload.tenant_id, hashed, raw);
     return { id, access_hash: raw, message: '已重新生成，旧访问码已失效' };
   });
 

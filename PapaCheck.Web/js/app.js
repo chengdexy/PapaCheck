@@ -3,6 +3,15 @@
  * 负责初始化、作业计时、屏保、语音、Toast、积分结算
  */
 
+// 认证检查：无 token 或非孩子角色时重定向到登录页
+(function checkAuth() {
+  const token = localStorage.getItem('papacheck_token');
+  const role = localStorage.getItem('papacheck_role');
+  if (!token || role !== 'child') {
+    window.location.href = '/login.html?redirect=' + encodeURIComponent('/app/');
+  }
+})();
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('/sw.js').then(function (reg) {

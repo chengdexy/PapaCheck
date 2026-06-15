@@ -50,11 +50,17 @@ export async function ensureSuperAdmin(db: IDatabase): Promise<{ username: strin
   const pool = (db as any).pool;
   if (pool) {
     try {
+      // Create a system tenant for the super admin
+      const tenantId = crypto.randomUUID();
+      await pool.query(
+        `INSERT INTO tenants (id, name) VALUES ($1, '系统管理') ON CONFLICT DO NOTHING`,
+        [tenantId]
+      );
       await pool.query(
         `INSERT INTO users (id, tenant_id, role, nickname, access_hash, token_version, email, password_hash, is_super_admin, is_active)
-         VALUES ($1, '__super_admin__', 'parent', '超级管理员', '', 1, $2, $3, true, true)
+         VALUES ($1, $2, 'parent', '超级管理员', '', 1, $3, $4, true, true)
          ON CONFLICT (id) DO NOTHING`,
-        [id, SUPER_ADMIN_USERNAME, passwordHash]
+        [id, tenantId, SUPER_ADMIN_USERNAME, passwordHash]
       );
       return { username: SUPER_ADMIN_USERNAME, password };
     } catch (e) {

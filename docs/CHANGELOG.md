@@ -17,7 +17,8 @@
   - **超级管理员**：首次部署自动创建超管账号（控制台打印），强制首次登录修改凭证，可查看/启用/禁用所有租户（4 个端点）
   - **官网管理面板**：落地页增量添加家庭管理面板（注册/登录/成员管理）
   - **登录页改造**：从密码登录改为 hash 码输入，JWT 持久化到 localStorage
-  - 新增 70+ 测试，全量 588 测试通过
+- **修复发布部署问题**：meta 表 PK 迁移、19 张业务表加 `tenant_id`、删除旧 Cookie Session 认证插件（`auth-plugin.ts`）、修复 `super-admin.ts` 非法 UUID、修复 `_initSchema` 重复租户、修复旧数据 `tenant_id='default'` 不匹配、修复 `access_hash` 显示为 bcrypt 哈希、官网登录页修复、Nginx `try_files` 配置解决根目录静态资源冲突
+- 新增 70+ 测试，全量 588 测试通过
 
 ### Changed
 - **app.ts 认证从 Cookie Session 替换为 JWT**：移除 `authPlugin` + `@fastify/cookie`，注册 `authMiddleware` + `authRoutes` + `adminRoutes` + `superAdminRoutes`；所有约 60 个 API handler 增加 `tenantId` 透传
