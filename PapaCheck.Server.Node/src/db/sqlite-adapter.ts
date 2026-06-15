@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
+import bcrypt from 'bcryptjs';
 import { DatabaseAdapter } from './adapter.js';
 import type { FullDataSnapshot, PointsHistoryEntry, ModifiedEntry, NotificationItem } from './types.js';
 import type { CRDTOperation } from '../crdt/types.js';
@@ -158,7 +159,36 @@ export class SqliteAdapter extends DatabaseAdapter {
         node_id TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
+
+      -- Multi-tenant auth tables
+      CREATE TABLE IF NOT EXISTS tenants (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        display_name TEXT,
+        admin_id TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        is_active INTEGER NOT NULL DEFAULT 1
+      );
+
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('parent', 'child')),
+        nickname TEXT NOT NULL,
+        access_hash TEXT NOT NULL,
+        token_version INTEGER NOT NULL DEFAULT 1,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        last_login TEXT,
+        email TEXT,
+        password_hash TEXT,
+        UNIQUE(tenant_id, nickname)
+      );
     `);
+
+    // 为已有数据库添加 email/password_hash 列（若不存在则静默失败）
+    try { this.db.exec('ALTER TABLE users ADD COLUMN email TEXT'); } catch { }
+    try { this.db.exec('ALTER TABLE users ADD COLUMN password_hash TEXT'); } catch { }
 
     // 插入默认行
     this.db.prepare(
@@ -267,7 +297,7 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Full Data ====================
 
-  async getFullData(): Promise<FullDataSnapshot> {
+  async getFullData(_tenantId?: string): Promise<FullDataSnapshot> {
     this._resetDailyShopQuantity();
 
     const pointsRow = this.db.prepare("SELECT balance FROM points WHERE id = 1").get() as { balance: number };
@@ -352,7 +382,7 @@ export class SqliteAdapter extends DatabaseAdapter {
     return data;
   }
 
-  async importFullData(data: any): Promise<void> {
+  async importFullData(data: any, _tenantId?: string): Promise<void> {
     const points = data.points ?? {};
     const balance = typeof points === 'number' ? points : (points.balance ?? 0);
     this.db.prepare("UPDATE points SET balance = ? WHERE id = 1").run(balance);
@@ -402,7 +432,7 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Notifications ====================
 
-  async addNotification(text: string, createdAt?: number): Promise<string> {
+  async addNotification(text: string, createdAt?: number, _tenantId?: string): Promise<string> {
     const id = crypto.randomUUID();
     const now = createdAt ?? Date.now();
     this.db.prepare(
@@ -411,7 +441,7 @@ export class SqliteAdapter extends DatabaseAdapter {
     return id;
   }
 
-  async getPendingNotifications(): Promise<NotificationItem[]> {
+  async getPendingNotifications(_tenantId?: string): Promise<NotificationItem[]> {
     const cutoff = Date.now() - 3600000;
     // 先清理过期通知，避免累积
     this.db.prepare('DELETE FROM notifications WHERE created_at < ?').run(cutoff);
@@ -427,7 +457,7 @@ export class SqliteAdapter extends DatabaseAdapter {
     }));
   }
 
-  async consumeNotifications(ids: string[]): Promise<void> {
+  async consumeNotifications(ids: string[], _tenantId?: string): Promise<void> {
     if (ids.length === 0) return;
     const BATCH_SIZE = 500;
     for (let i = 0; i < ids.length; i += BATCH_SIZE) {
@@ -439,12 +469,12 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Points ====================
 
-  async getPointsBalance(): Promise<number> {
+  async getPointsBalance(_tenantId?: string): Promise<number> {
     const row = this.db.prepare("SELECT balance FROM points WHERE id = 1").get() as { balance: number };
     return row.balance;
   }
 
-  async updatePoints(action: 'earn' | 'spend', amount: number, detail: string): Promise<number> {
+  async updatePoints(action: 'earn' | 'spend', amount: number, detail: string, _tenantId?: string): Promise<number> {
     const row = this.db.prepare("SELECT balance FROM points WHERE id = 1").get() as { balance: number };
     let balance = row.balance;
 
@@ -470,7 +500,7 @@ export class SqliteAdapter extends DatabaseAdapter {
     return balance;
   }
 
-  async patchPoints(delta: { earn?: number; spend?: number; detail?: string }): Promise<number> {
+  async patchPoints(delta: { earn?: number; spend?: number; detail?: string }, _tenantId?: string): Promise<number> {
     const row = this.db.prepare("SELECT balance FROM points WHERE id = 1").get() as { balance: number };
     let balance = row.balance;
 
@@ -492,16 +522,16 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Homeworks ====================
 
-  async getHomeworks(dateKey: string): Promise<any[]> {
+  async getHomeworks(dateKey: string, _tenantId?: string): Promise<any[]> {
     return this._getDateData('homeworks', dateKey, []);
   }
 
-  async saveHomeworks(dateKey: string, items: any[]): Promise<void> {
+  async saveHomeworks(dateKey: string, items: any[], _tenantId?: string): Promise<void> {
     this._setDateData('homeworks', dateKey, items);
     this.recordModification('homeworks', dateKey, new Date().toISOString());
   }
 
-  async moveHomework(fromDate: string, toDate: string, hwId: string): Promise<any | null> {
+  async moveHomework(fromDate: string, toDate: string, hwId: string, _tenantId?: string): Promise<any | null> {
     const fromList = this._getDateData('homeworks', fromDate, null);
     if (!fromList) return null;
 
@@ -522,12 +552,12 @@ export class SqliteAdapter extends DatabaseAdapter {
     return hw;
   }
 
-  async getHomeworkById(id: string): Promise<any | null> {
+  async getHomeworkById(id: string, _tenantId?: string): Promise<any | null> {
     const found = this._findRecordById('homeworks', id);
     return found?.item && !found.item.isDeleted ? found.item : null;
   }
 
-  async putHomework(id: string, data: any): Promise<void> {
+  async putHomework(id: string, data: any, _tenantId?: string): Promise<void> {
     if (typeof data !== 'object' || data === null) return;
     const existing = this._findRecordById('homeworks', id);
     const now = new Date().toISOString();
@@ -556,7 +586,7 @@ export class SqliteAdapter extends DatabaseAdapter {
     }
   }
 
-  async patchHomework(id: string, fields: any): Promise<void> {
+  async patchHomework(id: string, fields: any, _tenantId?: string): Promise<void> {
     const existing = this._findRecordById('homeworks', id);
     if (!existing) return;
 
@@ -567,7 +597,7 @@ export class SqliteAdapter extends DatabaseAdapter {
     this.recordModification('homeworks', existing.dateKey, now);
   }
 
-  async deleteHomework(id: string): Promise<void> {
+  async deleteHomework(id: string, _tenantId?: string): Promise<void> {
     const existing = this._findRecordById('homeworks', id);
     if (!existing) return;
 
@@ -581,23 +611,23 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Settlement ====================
 
-  async getSettlement(dateKey: string): Promise<any> {
+  async getSettlement(dateKey: string, _tenantId?: string): Promise<any> {
     return this._getDateData('daily_settlement', dateKey);
   }
 
-  async saveSettlement(dateKey: string, data: any): Promise<void> {
+  async saveSettlement(dateKey: string, data: any, _tenantId?: string): Promise<void> {
     this._setDateData('daily_settlement', dateKey, data);
     this.recordModification('daily_settlement', dateKey, new Date().toISOString());
   }
 
-  async putSettlement(dateKey: string, data: any): Promise<void> {
+  async putSettlement(dateKey: string, data: any, _tenantId?: string): Promise<void> {
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
     this._setDateData('daily_settlement', dateKey, data);
     this.recordModification('daily_settlement', dateKey, now);
   }
 
-  async patchSettlement(dateKey: string, fields: any): Promise<void> {
+  async patchSettlement(dateKey: string, fields: any, _tenantId?: string): Promise<void> {
     const existing = this._getDateDataRaw('daily_settlement', dateKey) ?? {};
     const now = new Date().toISOString();
     const merged = { ...existing, ...fields, lastModified: now };
@@ -607,23 +637,23 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Shop ====================
 
-  async getShopItems(): Promise<any[]> {
+  async getShopItems(_tenantId?: string): Promise<any[]> {
     this._resetDailyShopQuantity();
     return this._getJson('shop_items') ?? [];
   }
 
-  async saveShopItems(items: any[]): Promise<void> {
+  async saveShopItems(items: any[], _tenantId?: string): Promise<void> {
     this._setJson('shop_items', items);
     this.recordModification('shop_items', '1', new Date().toISOString());
   }
 
-  async getShopItemById(id: string): Promise<any | null> {
+  async getShopItemById(id: string, _tenantId?: string): Promise<any | null> {
     const items = this._getJson('shop_items') ?? [];
     const { item } = this._findInArray(items, id);
     return item && !item.isDeleted ? item : null;
   }
 
-  async putShopItem(id: string, data: any): Promise<void> {
+  async putShopItem(id: string, data: any, _tenantId?: string): Promise<void> {
     const items = this._getJson('shop_items') ?? [];
     const { index, item: existingItem } = this._findInArray(items, id);
     const now = new Date().toISOString();
@@ -646,7 +676,7 @@ export class SqliteAdapter extends DatabaseAdapter {
     this.recordModification('shop_items', '1', now);
   }
 
-  async deleteShopItem(id: string): Promise<void> {
+  async deleteShopItem(id: string, _tenantId?: string): Promise<void> {
     const items = this._getJson('shop_items') ?? [];
     const { index } = this._findInArray(items, id);
     if (index === -1) return;
@@ -660,23 +690,23 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Redemptions ====================
 
-  async getRedemptions(): Promise<any[]> {
+  async getRedemptions(_tenantId?: string): Promise<any[]> {
     return this._getJson('redemptions') ?? [];
   }
 
-  async saveRedemptions(items: any[]): Promise<void> {
+  async saveRedemptions(items: any[], _tenantId?: string): Promise<void> {
     this._setJson('redemptions', items);
     this.recordModification('redemptions', '1', new Date().toISOString());
   }
 
-  async clearFulfilledRedemptions(): Promise<void> {
+  async clearFulfilledRedemptions(_tenantId?: string): Promise<void> {
     const items = this._getJson('redemptions') ?? [];
     const remaining = items.filter((r: any) => r.status !== 'fulfilled');
     this._setJson('redemptions', remaining);
     this.recordModification('redemptions', '1', new Date().toISOString());
   }
 
-  async putRedemption(id: string, data: any): Promise<void> {
+  async putRedemption(id: string, data: any, _tenantId?: string): Promise<void> {
     const items = this._getJson('redemptions') ?? [];
     const { index } = this._findInArray(items, id);
     const now = new Date().toISOString();
@@ -694,16 +724,16 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Reward Box ====================
 
-  async getRewardBox(): Promise<any[]> {
+  async getRewardBox(_tenantId?: string): Promise<any[]> {
     return this._filterDeleted(this._getJson('reward_box')) ?? [];
   }
 
-  async saveRewardBox(items: any[]): Promise<void> {
+  async saveRewardBox(items: any[], _tenantId?: string): Promise<void> {
     this._setJson('reward_box', items);
     this.recordModification('reward_box', '1', new Date().toISOString());
   }
 
-  async putRewardBoxItem(id: string, data: any): Promise<void> {
+  async putRewardBoxItem(id: string, data: any, _tenantId?: string): Promise<void> {
     const items = this._getJson('reward_box') ?? [];
     const { index } = this._findInArray(items, id);
     const now = new Date().toISOString();
@@ -719,7 +749,7 @@ export class SqliteAdapter extends DatabaseAdapter {
     this.recordModification('reward_box', '1', now);
   }
 
-  async deleteRewardBoxItem(id: string): Promise<void> {
+  async deleteRewardBoxItem(id: string, _tenantId?: string): Promise<void> {
     const items = this._getJson('reward_box') ?? [];
     const { index } = this._findInArray(items, id);
     if (index === -1) return;
@@ -733,23 +763,23 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Settings ====================
 
-  async getSettings(): Promise<any> {
+  async getSettings(_tenantId?: string): Promise<any> {
     return this._getJson('settings') ?? {};
   }
 
-  async saveSettings(data: any): Promise<void> {
+  async saveSettings(data: any, _tenantId?: string): Promise<void> {
     this._setJson('settings', data);
     this.recordModification('settings', '1', new Date().toISOString());
   }
 
-  async putSettings(data: any): Promise<void> {
+  async putSettings(data: any, _tenantId?: string): Promise<void> {
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
     this._setJson('settings', data);
     this.recordModification('settings', '1', now);
   }
 
-  async patchSettings(fields: any): Promise<void> {
+  async patchSettings(fields: any, _tenantId?: string): Promise<void> {
     const existing = this._getJson('settings') ?? {};
     const now = new Date().toISOString();
     const merged = { ...existing, ...fields, lastModified: now };
@@ -759,16 +789,16 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Active Buffs ====================
 
-  async getActiveBuffs(): Promise<any[]> {
+  async getActiveBuffs(_tenantId?: string): Promise<any[]> {
     return this._getJson('active_buffs') ?? [];
   }
 
-  async saveActiveBuffs(items: any[]): Promise<void> {
+  async saveActiveBuffs(items: any[], _tenantId?: string): Promise<void> {
     this._setJson('active_buffs', items);
     this.recordModification('active_buffs', '1', new Date().toISOString());
   }
 
-  async putBuff(id: string, data: any): Promise<void> {
+  async putBuff(id: string, data: any, _tenantId?: string): Promise<void> {
     const items = this._getJson('active_buffs') ?? [];
     const { index } = this._findInArray(items, id);
     const now = new Date().toISOString();
@@ -784,7 +814,7 @@ export class SqliteAdapter extends DatabaseAdapter {
     this.recordModification('active_buffs', '1', now);
   }
 
-  async deleteBuff(id: string): Promise<void> {
+  async deleteBuff(id: string, _tenantId?: string): Promise<void> {
     const items = this._getJson('active_buffs') ?? [];
     const { index } = this._findInArray(items, id);
     if (index === -1) return;
@@ -798,16 +828,16 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Efficiency ====================
 
-  async getEfficiency(dateKey: string): Promise<any> {
+  async getEfficiency(dateKey: string, _tenantId?: string): Promise<any> {
     return this._getDateData('efficiency_history', dateKey);
   }
 
-  async saveEfficiency(dateKey: string, data: any): Promise<void> {
+  async saveEfficiency(dateKey: string, data: any, _tenantId?: string): Promise<void> {
     this._setDateData('efficiency_history', dateKey, data);
     this.recordModification('efficiency_history', dateKey, new Date().toISOString());
   }
 
-  async putEfficiency(dateKey: string, data: any): Promise<void> {
+  async putEfficiency(dateKey: string, data: any, _tenantId?: string): Promise<void> {
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
     this._setDateData('efficiency_history', dateKey, data);
@@ -816,16 +846,16 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Free Time ====================
 
-  async getFreeTime(dateKey: string): Promise<any[]> {
+  async getFreeTime(dateKey: string, _tenantId?: string): Promise<any[]> {
     return this._getDateData('free_time_tasks', dateKey, []);
   }
 
-  async saveFreeTime(dateKey: string, tasks: any[]): Promise<void> {
+  async saveFreeTime(dateKey: string, tasks: any[], _tenantId?: string): Promise<void> {
     this._setDateData('free_time_tasks', dateKey, tasks);
     this.recordModification('free_time_tasks', dateKey, new Date().toISOString());
   }
 
-  async putFreeTimeTask(id: string, data: any): Promise<void> {
+  async putFreeTimeTask(id: string, data: any, _tenantId?: string): Promise<void> {
     const existing = this._findRecordById('free_time_tasks', id);
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
@@ -846,22 +876,22 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Bounty Tasks ====================
 
-  async getBountyTasks(): Promise<any[]> {
+  async getBountyTasks(_tenantId?: string): Promise<any[]> {
     return this._getJson('bounty_tasks') ?? [];
   }
 
-  async saveBountyTasks(items: any[]): Promise<void> {
+  async saveBountyTasks(items: any[], _tenantId?: string): Promise<void> {
     this._setJson('bounty_tasks', items);
     this.recordModification('bounty_tasks', '1', new Date().toISOString());
   }
 
-  async getBountyTaskById(id: string): Promise<any | null> {
+  async getBountyTaskById(id: string, _tenantId?: string): Promise<any | null> {
     const items = this._getJson('bounty_tasks') ?? [];
     const { item } = this._findInArray(items, id);
     return item && !item.isDeleted ? item : null;
   }
 
-  async putBountyTask(id: string, data: any): Promise<void> {
+  async putBountyTask(id: string, data: any, _tenantId?: string): Promise<void> {
     const items = this._getJson('bounty_tasks') ?? [];
     const { index } = this._findInArray(items, id);
     const now = new Date().toISOString();
@@ -877,7 +907,7 @@ export class SqliteAdapter extends DatabaseAdapter {
     this.recordModification('bounty_tasks', '1', now);
   }
 
-  async deleteBountyTask(id: string): Promise<void> {
+  async deleteBountyTask(id: string, _tenantId?: string): Promise<void> {
     const items = this._getJson('bounty_tasks') ?? [];
     const { index } = this._findInArray(items, id);
     if (index === -1) return;
@@ -891,16 +921,16 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Bounty Submissions ====================
 
-  async getBountySubmissions(dateKey: string): Promise<any[]> {
+  async getBountySubmissions(dateKey: string, _tenantId?: string): Promise<any[]> {
     return this._getDateData('bounty_submissions', dateKey, []);
   }
 
-  async saveBountySubmissions(dateKey: string, data: any[]): Promise<void> {
+  async saveBountySubmissions(dateKey: string, data: any[], _tenantId?: string): Promise<void> {
     this._setDateData('bounty_submissions', dateKey, data);
     this.recordModification('bounty_submissions', dateKey, new Date().toISOString());
   }
 
-  async putBountySubmission(id: string, data: any): Promise<void> {
+  async putBountySubmission(id: string, data: any, _tenantId?: string): Promise<void> {
     const existing = this._findRecordById('bounty_submissions', id);
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
@@ -921,16 +951,16 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Bounty Completions ====================
 
-  async getBountyCompletions(dateKey: string): Promise<any> {
+  async getBountyCompletions(dateKey: string, _tenantId?: string): Promise<any> {
     return this._getDateData('bounty_completions', dateKey, {});
   }
 
-  async saveBountyCompletions(dateKey: string, data: any): Promise<void> {
+  async saveBountyCompletions(dateKey: string, data: any, _tenantId?: string): Promise<void> {
     this._setDateData('bounty_completions', dateKey, data);
     this.recordModification('bounty_completions', dateKey, new Date().toISOString());
   }
 
-  async putBountyCompletion(id: string, data: any): Promise<void> {
+  async putBountyCompletion(id: string, data: any, _tenantId?: string): Promise<void> {
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
     this._setDateData('bounty_completions', id, data);
@@ -939,7 +969,7 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Email Config ====================
 
-  async getEmailConfig(): Promise<any | null> {
+  async getEmailConfig(_tenantId?: string): Promise<any | null> {
     const data = this._getJson('email_config');
     if (data && typeof data === 'object' && Object.keys(data).length > 0) {
       return data;
@@ -947,14 +977,14 @@ export class SqliteAdapter extends DatabaseAdapter {
     return null;
   }
 
-  async saveEmailConfig(config: any): Promise<void> {
+  async saveEmailConfig(config: any, _tenantId?: string): Promise<void> {
     this._setJson('email_config', config);
     this.recordModification('email_config', '1', new Date().toISOString());
   }
 
   // ==================== Sync ====================
 
-  async getModifiedSince(timestamp: string): Promise<ModifiedEntry[]> {
+  async getModifiedSince(timestamp: string, _tenantId?: string): Promise<ModifiedEntry[]> {
     const rows = this.db.prepare(
       "SELECT table_name, record_key, last_modified FROM last_modified WHERE last_modified > ?"
     ).all(timestamp) as { table_name: string; record_key: string; last_modified: string }[];
@@ -998,7 +1028,7 @@ export class SqliteAdapter extends DatabaseAdapter {
     return result;
   }
 
-  async pushMerge(changes: any[]): Promise<{ ok: boolean }> {
+  async pushMerge(changes: any[], _tenantId?: string): Promise<{ ok: boolean }> {
     for (const change of changes) {
       const changeType = change.type as string;
       const uuid = change.uuid as string;
@@ -1118,7 +1148,7 @@ export class SqliteAdapter extends DatabaseAdapter {
     return { ok: true };
   }
 
-  async recordModification(tableName: string, recordKey: string, timestamp: string): Promise<void> {
+  async recordModification(tableName: string, recordKey: string, timestamp: string, _tenantId?: string): Promise<void> {
     this.db.prepare(
       "INSERT OR REPLACE INTO last_modified (table_name, record_key, last_modified) VALUES (?, ?, ?)"
     ).run(tableName, recordKey, timestamp);
@@ -1126,7 +1156,7 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Misc ====================
 
-  async resetDate(dateKey: string): Promise<void> {
+  async resetDate(dateKey: string, _tenantId?: string): Promise<void> {
     this.db.prepare("DELETE FROM homeworks WHERE date_key = ?").run(dateKey);
     this.db.prepare("DELETE FROM daily_settlement WHERE date_key = ?").run(dateKey);
     this.db.prepare("DELETE FROM efficiency_history WHERE date_key = ?").run(dateKey);
@@ -1152,14 +1182,14 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== CRDT Operations ====================
 
-  async saveCRDTOperation(op: CRDTOperation): Promise<void> {
+  async saveCRDTOperation(op: CRDTOperation, _tenantId?: string): Promise<void> {
     this.db.prepare(
       `INSERT OR REPLACE INTO crdt_operations (id, type, table_name, resource_id, field, value, timestamp, node_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(op.id, op.type, op.table, op.resourceId, op.field, JSON.stringify(op.value), op.timestamp, op.nodeId);
   }
 
-  async applyCRDTOperation(op: CRDTOperation): Promise<void> {
+  async applyCRDTOperation(op: CRDTOperation, _tenantId?: string): Promise<void> {
     try {
       if (op.type === 'delete') {
         switch (op.table) {
@@ -1202,7 +1232,7 @@ export class SqliteAdapter extends DatabaseAdapter {
     }
   }
 
-  async getCRDTOperationsSince(timestamp: string): Promise<CRDTOperation[]> {
+  async getCRDTOperationsSince(timestamp: string, _tenantId?: string): Promise<CRDTOperation[]> {
     const rows = this.db.prepare(
       "SELECT * FROM crdt_operations WHERE timestamp > ? ORDER BY timestamp ASC"
     ).all(timestamp) as any[];
@@ -1218,8 +1248,181 @@ export class SqliteAdapter extends DatabaseAdapter {
     }));
   }
 
-  async ackCRDTOperations(timestamp: string): Promise<void> {
+  async ackCRDTOperations(timestamp: string, _tenantId?: string): Promise<void> {
     this.db.prepare("DELETE FROM crdt_operations WHERE timestamp <= ?").run(timestamp);
+  }
+
+  // ==================== Auth ====================
+
+  async queryUserTokenVersion(userId: string): Promise<number> {
+    const row = this.db.prepare("SELECT token_version FROM users WHERE id = ? AND is_active = 1").get(userId) as any;
+    return row?.token_version ?? 1;
+  }
+
+  async findUserByAccessHash(accessHash: string): Promise<any | null> {
+    const rows = this.db.prepare("SELECT * FROM users WHERE is_active = 1").all() as any[];
+    for (const row of rows) {
+      if (bcrypt.compareSync(accessHash, row.access_hash)) {
+        return {
+          id: row.id,
+          tenant_id: row.tenant_id,
+          role: row.role,
+          nickname: row.nickname,
+          access_hash: row.access_hash,
+          token_version: row.token_version,
+          is_active: !!row.is_active,
+          created_at: row.created_at,
+          last_login: row.last_login ?? undefined,
+        };
+      }
+    }
+    return null;
+  }
+
+  async getUserById(userId: string): Promise<any | null> {
+    const row = this.db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as any;
+    if (!row) return null;
+    return {
+      id: row.id,
+      tenant_id: row.tenant_id,
+      role: row.role,
+      nickname: row.nickname,
+      access_hash: row.access_hash,
+      token_version: row.token_version,
+      is_active: !!row.is_active,
+      created_at: row.created_at,
+      last_login: row.last_login ?? undefined,
+    };
+  }
+
+  async updateUserLastLogin(userId: string): Promise<void> {
+    this.db.prepare("UPDATE users SET last_login = datetime('now') WHERE id = ?").run(userId);
+  }
+
+  // ==================== Admin / Members ====================
+
+  async createTenant(id: string, name: string): Promise<void> {
+    this.db.prepare(
+      'INSERT INTO tenants (id, name) VALUES (?, ?)'
+    ).run(id, name);
+  }
+
+  async createUser(input: any): Promise<void> {
+    const { id, tenant_id, role, nickname, access_hash, token_version, email, password_hash } = input;
+    this.db.prepare(
+      'INSERT INTO users (id, tenant_id, role, nickname, access_hash, token_version, email, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, tenant_id, role, nickname, access_hash, token_version, email ?? null, password_hash ?? null);
+  }
+
+  async findAdminByEmail(email: string): Promise<any | null> {
+    const row = this.db.prepare(
+      'SELECT * FROM users WHERE email = ? AND is_active = 1'
+    ).get(email) as any;
+    if (!row) return null;
+    return {
+      id: row.id,
+      tenant_id: row.tenant_id,
+      email: row.email,
+      password_hash: row.password_hash,
+      token_version: row.token_version,
+    };
+  }
+
+  async getTenantMembers(tenantId: string): Promise<any[]> {
+    const rows = this.db.prepare(
+      'SELECT * FROM users WHERE tenant_id = ? AND is_active = 1 ORDER BY created_at ASC'
+    ).all(tenantId) as any[];
+    return rows.map(row => ({
+      id: row.id,
+      tenant_id: row.tenant_id,
+      role: row.role,
+      nickname: row.nickname,
+      access_hash: row.access_hash,
+      token_version: row.token_version,
+      last_login: row.last_login ?? undefined,
+      created_at: row.created_at,
+    }));
+  }
+
+  async regenerateMemberHash(userId: string, tenantId: string, newHash: string): Promise<void> {
+    const result = this.db.prepare(
+      'UPDATE users SET access_hash = ?, token_version = token_version + 1 WHERE id = ? AND tenant_id = ? AND is_active = 1'
+    ).run(newHash, userId, tenantId);
+    if (result.changes === 0) {
+      throw new Error('成员不存在或不属于该租户');
+    }
+  }
+
+  async deactivateMember(userId: string, tenantId: string): Promise<void> {
+    this.db.prepare(
+      'UPDATE users SET is_active = 0 WHERE id = ? AND tenant_id = ?'
+    ).run(userId, tenantId);
+  }
+
+  async updateTenantAdmin(tenantId: string, adminUserId: string): Promise<void> {
+    this.db.prepare(
+      'UPDATE tenants SET admin_id = ? WHERE id = ?'
+    ).run(adminUserId, tenantId);
+  }
+
+  // ==================== Super Admin ====================
+
+  async findSuperAdmin(username: string): Promise<any | null> {
+    // SQLite 模式下从 data/admins.json 读取
+    try {
+      const { readFileSync, existsSync } = await import('node:fs');
+      const { resolve, dirname } = await import('node:path');
+      const { fileURLToPath } = await import('node:url');
+      const dbDir = dirname(fileURLToPath(import.meta.url));
+      const adminsPath = resolve(dbDir, '../../data/admins.json');
+      if (!existsSync(adminsPath)) return null;
+      const content = readFileSync(adminsPath, 'utf-8');
+      const admins = JSON.parse(content);
+      const admin = admins.find((a: any) => a.username === username);
+      if (!admin) return null;
+      return {
+        id: admin.id,
+        tenant_id: '__super_admin__',
+        email: admin.email,
+        password_hash: admin.password_hash,
+        token_version: admin.token_version ?? 1,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async updateSuperAdminCredentials(userId: string, email: string, passwordHash: string): Promise<void> {
+    try {
+      const { readFileSync, writeFileSync, existsSync } = await import('node:fs');
+      const { resolve, dirname } = await import('node:path');
+      const { fileURLToPath } = await import('node:url');
+      const dbDir = dirname(fileURLToPath(import.meta.url));
+      const adminsPath = resolve(dbDir, '../../data/admins.json');
+      let admins: any[] = [];
+      if (existsSync(adminsPath)) {
+        const content = readFileSync(adminsPath, 'utf-8');
+        admins = JSON.parse(content);
+      }
+      const idx = admins.findIndex((a: any) => a.id === userId);
+      if (idx !== -1) {
+        admins[idx].email = email;
+        admins[idx].password_hash = passwordHash;
+        admins[idx].token_version = (admins[idx].token_version ?? 1) + 1;
+      }
+      writeFileSync(adminsPath, JSON.stringify(admins, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('更新超级管理员失败:', e);
+    }
+  }
+
+  async getAllTenants(): Promise<any[]> {
+    // SQLite 模式无真实多租户，返回空数组
+    return [];
+  }
+
+  async setTenantActive(_tenantId: string, _isActive: boolean): Promise<void> {
+    // SQLite 模式无操作
   }
 
   // ==================== Connection ====================

@@ -6,22 +6,36 @@
 
 ## [Unreleased]
 
+### Added
+- **Phase 5c: JWT 多租户认证系统** — 替换临时 Cookie Session，实现完整的多租户数据隔离
+  - **认证方式**：预授权 Hash 码（类似 API Key），管理员在官网注册后为每个家庭成员生成唯一 hash 码，成员凭 hash 码换取 JWT
+  - **token_version 吊销机制**：重新生成 hash 码时版本号 +1，旧 JWT 立即失效，无需黑名单
+  - **租户隔离**：共享 PostgreSQL 库 + `tenant_id` 行级隔离，所有业务表增加 `tenant_id` 复合主键
+  - **JWT 中间件**：Fastify onRequest hook，Bearer token 验证 + token_version 校验 + 公开路径白名单
+  - **认证 API**：`POST /api/auth/exchange`（hash → JWT）、`GET /api/auth/me`（用户信息）
+  - **管理员 API**：注册/登录/添加成员/重新生成 hash/移除成员（6 个端点）
+  - **超级管理员**：首次部署自动创建超管账号（控制台打印），强制首次登录修改凭证，可查看/启用/禁用所有租户（4 个端点）
+  - **官网管理面板**：落地页增量添加家庭管理面板（注册/登录/成员管理）
+  - **登录页改造**：从密码登录改为 hash 码输入，JWT 持久化到 localStorage
+  - 新增 70+ 测试，全量 588 测试通过
+
 ### Changed
+- **app.ts 认证从 Cookie Session 替换为 JWT**：移除 `authPlugin` + `@fastify/cookie`，注册 `authMiddleware` + `authRoutes` + `adminRoutes` + `superAdminRoutes`；所有约 60 个 API handler 增加 `tenantId` 透传
+- **`PapaCheck.Web/js/api.js`**：所有 fetch 调用自动注入 `Authorization: Bearer` 头
+- **`PapaCheck.Web/login.html`**：从 `/api/login` 密码登录改为 `/api/auth/exchange` hash 码登录
+
+### Fixed
+- **修复 postgres-adapter.ts 多处代码损坏**：`n e wLastModified` 变量名空格 → `newLastModified`；`turn` → `return`；`ync` → `async`；`W HERE` SQL 语法错误 → `WHERE`；括号/缩进不匹配修复
+
+### Changed（历史）
 - **LICENSE 填写版权信息**：模板占位符替换为 `PapaCheck / Copyright (C) 2026 chengdexy`
 - **移除 CNAME 文件**：停止 GitHub Pages 服务，删除 `docs/CNAME`
 
-### Fixed
-- **修复孩子端奖励兑换/撤回在离线→在线转换期间的竞态条件 Bug**：解锁平板或从桌面切回孩子端时，Android 限制后台网络触发离线→在线转换。转换期间用户点击兑换/撤回，操作走离线降级写入本地，但随后 `_doReconnect()` 的 CRDT 全量同步会通过 `API.getData()` 用服务端旧数据覆盖本地新数据，导致新建兑换记录"丢失"。用户看到"兑换"按钮再次点击，创建第二条兑换。同时 CRDT 日志中的第一条在下次重连推送，导致服务端出现两条同物品的待处理兑换。
-  - **根本修复**：所有数据操作 handler 入口增加 `guardOnline()` 守卫，`reconnecting` 模式时 toast 提示并直接返回，阻止操作进入逻辑体
-  - **防御深度**：`_requestWithStrategy('online-first')` 将 `reconnecting` 视为 `offline` 降级处理；`online-only` 同步增加 `reconnecting` 检查
-  - **服务端兜底**：`PUT /api/redemptions/:id` 增加同一 `rewardBoxItemId` 的重复 pending 检查，返回 409 Conflict
-  - 新增 TDD 测试 20 个（4 个文件），全量 555 测试通过
-- **修复孩子端作业全部完成弹出评级后，管理端删光作业时评级界面不会自动关闭的 Bug**：`pollServer` 的结算清除逻辑嵌套在 homework 替换块内部，若 homework 数据未变化（如第二次轮询）或 `_completingHomework` 保护开启时，清除不执行。修复：新增独立结算清理检查（每次 pollServer 都执行），无已完成作业时自动清除未评级结算；`submitForRating()` 添加防御性守卫，无已完成作业时拒绝提交（535 测试通过）
-  - 新增 TDD 测试 9 个：`settlement_clear_on_delete.test.js`
-- **修复孩子端作业暂停后计时器仍在计时的竞态条件 Bug**：`pollServer` 在替换 `homeworks` 数组时，若 `pauseActiveTask` 的异步 PATCH 请求尚未被服务端处理，服务端返回的数据不含 `paused:true`，导致 `homeworks = newHw` 覆写掉本地 `paused` 标记，`isAnyTaskPaused()` 返回 false → `startTickTimer()` 重启计时器。修复：替换前捕获旧 active homework 的 in-memory pause 状态，替换后恢复（526 测试通过）
-  - 新增 TDD 测试 5 个：`pause_timer_race_condition.test.js`
-- **修复 Node.js 服务关闭时未调用 `db.close()` 导致 WAL 未合并**：`SqliteAdapter.close()` 时先执行 `PRAGMA wal_checkpoint(TRUNCATE)`；`gracefulShutdown` 在关闭 HTTP 服务后调用 `db.close()`，确保 `data.db-wal` 中的未合并数据写入主文件，避免仅复制 `data.db` 导致数据丢失（521 测试通过）
-  - 新增 TDD 测试 1 个：验证关闭 + 复制 data.db（不带 WAL）后数据仍可读
+### Fixed（历史）
+- **修复孩子端奖励兑换/撤回在离线→在线转换期间的竞态条件 Bug**：新增 `guardOnline()` 守卫 + reconnecting API 降级 + 服务端 409 兜底 + 19 个 TDD 测试；全量 554 测试通过
+- **修复管理端删光作业后孩子端评级界面不关闭 Bug**：独立结算清理检查 + `submitForRating()` 防御性守卫 + 9 个 TDD 测试；全量 535 测试通过
+- **修复孩子端暂停作业后计时器仍在计时的竞态条件 Bug**：pollServer 替换数组时恢复 in-memory pause 状态 + 5 个 TDD 测试；全量 526 测试通过
+- **修复 Node.js 关闭时 WAL 未合并 Bug**：`SqliteAdapter.close()` 加 WAL checkpoint + 1 个 TDD 测试；全量 521 测试通过
 
 ### Changed
 - **release.py 云端部署从 Docker Compose 迁移到 systemd**：tar 包直接解压到 `/opt/papacheck/`，远程命令改为 `npm ci + systemctl restart papacheck`

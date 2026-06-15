@@ -1,14 +1,15 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-15
+> 最后更新：2026-06-15（Phase 5c 完成）
 
 ## 当前版本
 
-**v1.3.1-beta**（release.py 云端部署迁移 + 发布流程修复 + 版本发布）
+**v1.3.1-beta**（Phase 5c JWT 多租户认证系统完成，588 测试）
 
 ## 部署状态
 
 - [x] **Phase 5b 服务器迁移完成** — 已移除 Docker，改用 systemd + Nginx + PostgreSQL 直接部署
+- [x] **Phase 5c 完成** — JWT 多租户认证系统，官网管理面板，超级管理员
 
 ---
 
@@ -38,7 +39,8 @@
 - [x] Python HTTP 服务器 + SQLite 数据库
 - [x] Node.js HTTP 服务器（Fastify + TypeScript）
 - [x] **数据库抽象层重构** — `IDatabase` 接口 + `SqliteAdapter` / `PostgresAdapter`（Phase 5a）
-- [x] **Cookie Session 临时认证** — 部署密码 + 登录页（Phase 5b）
+- [x] **JWT 多租户认证系统** — Hash 码预授权 + token_version 吊销 + 租户行级隔离（Phase 5c）
+- [x] **Cookie Session 临时认证** — 部署密码 + 登录页（Phase 5b，已替换为 JWT）
 - [x] **PostgreSQL 迁移脚本** — `migrate-to-pg.ts` 逐表迁移 + 行数校验
 - [x] **部署脚本 + systemd service** — `scripts/deploy.sh` + `papacheck.service`
 - [x] **服务器已迁移到 systemd + Nginx** — 移除 Docker，Nginx 反向代理 + HTTPS Let's Encrypt
@@ -55,14 +57,14 @@
 - [x] JS/TS 代码覆盖率 85.22%（Stmts）| 71.89%（Branch）| 90.94%（Funcs）| 87.06%（Lines）
 - [x] Python 代码覆盖率 18%（release.py 32%）
 - [x] **自定义科目**：科目从硬编码改为 settings 可配置，设置页可添加/删除/恢复/重置
+- [x] **官网管理面板**：落地页增量添加家庭管理（注册/登录/成员管理）+ 超级管理员控制台
 
 ---
 
 ## 待开发功能
 
-- [ ] Phase 5c: JWT 多租户用户认证系统（替换临时 Cookie Session）
-- [ ] Phase 5d: 运维增强（CI/CD + 备份 + 监控）
-- [ ] Phase 5e: 客户端适配（Windows/Android 远程配置）
+- [ ] Phase 5d: 运维增强（增强 release.py + 备份日报 + 巡检）
+- [ ] Phase 5e: 客户端适配（Android 远程配置 + Web 登录状态持久化）
 - [ ] iOS 端
 - [ ] 多孩子支持（数据模型已有，UI 未实现）
 - [ ] 更丰富的数据分析与报告
@@ -85,6 +87,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-15 | **Phase 5c: JWT 多租户认证系统完成** — Hash 码预授权认证 + token_version 吊销 + tenant_id 行级隔离 + JWT 中间件 + 认证/管理员/超管 API（12 个端点）+ 官网管理面板 + 登录页改造；修复 postgres-adapter.ts 4 处代码损坏；全量 588 测试通过 |
 | 2026-06-15 | **修复孩子端奖励兑换/撤回在离线→在线转换期间的竞态条件 Bug**：`guardOnline()` 守卫 + `reconnecting` API 降级 + 服务端 409 兜底 + 19 个 TDD 测试；全量 554 测试通过 |
 | 2026-06-15 | **LICENSE 填写版权信息 + 删除 CNAME 关闭 GitHub Pages** |
 | 2026-06-13 | **修复管理端删光作业后孩子端评级界面不关闭 Bug**：`pollServer` 结算清除逻辑嵌套在 homework 替换块内导致不执行；新增独立结算清理检查 + `submitForRating()` 防御性守卫；新增 TDD 测试 9 个；全量 535 测试通过 |

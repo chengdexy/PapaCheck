@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 import Database from 'better-sqlite3';
 import pg from 'pg';
 
@@ -30,6 +31,22 @@ async function main() {
   await pool.query(schema);
   console.log('✅ Schema 初始化完成');
 
+  // 2b. 创建默认租户（如果 tenants 表为空）
+  const tenantCheck = await pool.query('SELECT COUNT(*) as count FROM tenants');
+  let defaultTenantId: string;
+  if (parseInt(tenantCheck.rows[0].count, 10) === 0) {
+    defaultTenantId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO tenants (id, name) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [defaultTenantId, '默认家庭']
+    );
+    console.log(`  ✅ 创建默认租户: ${defaultTenantId}`);
+  } else {
+    const existing = await pool.query('SELECT id FROM tenants LIMIT 1');
+    defaultTenantId = existing.rows[0].id;
+    console.log(`  ✅ 使用已有租户: ${defaultTenantId}`);
+  }
+
   // 3. 逐表迁移
 
   // 3a. 单行 JSON 表
@@ -41,8 +58,8 @@ async function main() {
     const row = sqlite.prepare(`SELECT data FROM ${table} WHERE id = 1`).get() as { data: string } | undefined;
     const data = row ? row.data : (table === 'settings' ? '{}' : '[]');
     await pool.query(
-      `INSERT INTO ${table} (id, data) VALUES (1, $1) ON CONFLICT (id) DO UPDATE SET data = $1`,
-      [data]
+      `INSERT INTO ${table} (tenant_id, id, data) VALUES ($1, 1, $2) ON CONFLICT (tenant_id, id) DO UPDATE SET data = $2`,
+      [defaultTenantId, data]
     );
     console.log(`  ✅ ${table}`);
   }
@@ -50,7 +67,10 @@ async function main() {
   // 3b. points
   const pointsRow = sqlite.prepare('SELECT balance FROM points WHERE id = 1').get() as { balance: number } | undefined;
   if (pointsRow) {
-    await pool.query('UPDATE points SET balance = $1 WHERE id = 1', [pointsRow.balance]);
+    await pool.query(
+      'INSERT INTO points (tenant_id, id, balance) VALUES ($1, 1, $2) ON CONFLICT (tenant_id, id) DO UPDATE SET balance = $2',
+      [defaultTenantId, pointsRow.balance]
+    );
   }
   console.log('  ✅ points');
 
@@ -58,8 +78,8 @@ async function main() {
   const historyRows = sqlite.prepare('SELECT * FROM points_history ORDER BY id ASC').all() as any[];
   for (const h of historyRows) {
     await pool.query(
-      `INSERT INTO points_history (date, earned, spent, balance, detail) VALUES ($1, $2, $3, $4, $5)`,
-      [h.date, h.earned, h.spent, h.balance, h.detail]
+      `INSERT INTO points_history (tenant_id, date, earned, spent, balance, detail) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [defaultTenantId, h.date, h.earned, h.spent, h.balance, h.detail]
     );
   }
   console.log(`  ✅ points_history (${historyRows.length} rows)`);
@@ -73,8 +93,8 @@ async function main() {
     const rows = sqlite.prepare(`SELECT date_key, data FROM ${table}`).all() as { date_key: string; data: string }[];
     for (const row of rows) {
       await pool.query(
-        `INSERT INTO ${table} (date_key, data) VALUES ($1, $2) ON CONFLICT (date_key) DO UPDATE SET data = $2`,
-        [row.date_key, row.data]
+        `INSERT INTO ${table} (tenant_id, date_key, data) VALUES ($1, $2, $3) ON CONFLICT (tenant_id, date_key) DO UPDATE SET data = $3`,
+        [defaultTenantId, row.date_key, row.data]
       );
     }
     console.log(`  ✅ ${table} (${rows.length} rows)`);
@@ -84,8 +104,8 @@ async function main() {
   const notifRows = sqlite.prepare('SELECT * FROM notifications').all() as any[];
   for (const n of notifRows) {
     await pool.query(
-      `INSERT INTO notifications (id, text, created_at) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING`,
-      [n.id, n.text, n.created_at]
+      `INSERT INTO notifications (tenant_id, id, text, created_at) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, id) DO NOTHING`,
+      [defaultTenantId, n.id, n.text, n.created_at]
     );
   }
   console.log(`  ✅ notifications (${notifRows.length} rows)`);
@@ -94,8 +114,8 @@ async function main() {
   const lmRows = sqlite.prepare('SELECT * FROM last_modified').all() as any[];
   for (const lm of lmRows) {
     await pool.query(
-      `INSERT INTO last_modified (table_name, record_key, last_modified) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-      [lm.table_name, lm.record_key, lm.last_modified]
+      `INSERT INTO last_modified (tenant_id, table_name, record_key, last_modified) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, table_name, record_key) DO NOTHING`,
+      [defaultTenantId, lm.table_name, lm.record_key, lm.last_modified]
     );
   }
   console.log(`  ✅ last_modified (${lmRows.length} rows)`);
@@ -104,8 +124,8 @@ async function main() {
   const crdtRows = sqlite.prepare('SELECT * FROM crdt_operations').all() as any[];
   for (const op of crdtRows) {
     await pool.query(
-      `INSERT INTO crdt_operations (id, type, table_name, resource_id, field, value, timestamp, node_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING`,
-      [op.id, op.type, op.table_name, op.resource_id, op.field, op.value, op.timestamp, op.node_id]
+      `INSERT INTO crdt_operations (tenant_id, id, type, table_name, resource_id, field, value, timestamp, node_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (tenant_id, id) DO NOTHING`,
+      [defaultTenantId, op.id, op.type, op.table_name, op.resource_id, op.field, op.value, op.timestamp, op.node_id]
     );
   }
   console.log(`  ✅ crdt_operations (${crdtRows.length} rows)`);

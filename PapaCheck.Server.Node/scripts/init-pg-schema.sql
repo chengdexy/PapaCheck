@@ -1,48 +1,95 @@
--- PostgreSQL Schema for PapaCheck
--- 与 PostgresAdapter._initSchema 完全等价
+-- PostgreSQL Schema for PapaCheck (Multi-Tenant)
+
+-- ==================== Multi-Tenant Tables ====================
+
+CREATE TABLE IF NOT EXISTS tenants (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  display_name TEXT,
+  admin_id UUID,  -- 可空：管理员注册时填写，迁移时无管理员
+  created_at TIMESTAMP DEFAULT NOW(),
+  is_active BOOLEAN DEFAULT true
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  role TEXT NOT NULL CHECK (role IN ('parent', 'child')),
+  nickname TEXT NOT NULL,
+  access_hash TEXT NOT NULL,
+  token_version INTEGER NOT NULL DEFAULT 1,
+  is_active BOOLEAN DEFAULT true,
+  is_super_admin BOOLEAN DEFAULT false,
+  needs_password_change BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  last_login TIMESTAMP,
+  email TEXT,
+  password_hash TEXT,
+  UNIQUE(tenant_id, nickname)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL;
+
+-- ==================== Business Tables ====================
 
 CREATE TABLE IF NOT EXISTS points (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  balance INTEGER NOT NULL DEFAULT 0
+  tenant_id TEXT NOT NULL,
+  id INTEGER NOT NULL,
+  balance INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS points_history (
-  id SERIAL PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  id SERIAL,
   date TEXT NOT NULL,
   earned INTEGER NOT NULL DEFAULT 0,
   spent INTEGER NOT NULL DEFAULT 0,
   balance INTEGER NOT NULL DEFAULT 0,
-  detail TEXT NOT NULL DEFAULT ''
+  detail TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS homeworks (
-  date_key TEXT PRIMARY KEY,
-  data TEXT NOT NULL DEFAULT '[]'
+  tenant_id TEXT NOT NULL,
+  date_key TEXT NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, date_key)
 );
 
 CREATE TABLE IF NOT EXISTS daily_settlement (
-  date_key TEXT PRIMARY KEY,
-  data TEXT NOT NULL DEFAULT '{}'
+  tenant_id TEXT NOT NULL,
+  date_key TEXT NOT NULL,
+  data TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (tenant_id, date_key)
 );
 
 CREATE TABLE IF NOT EXISTS shop_items (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  data TEXT NOT NULL DEFAULT '[]'
+  tenant_id TEXT NOT NULL,
+  id INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS redemptions (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  data TEXT NOT NULL DEFAULT '[]'
+  tenant_id TEXT NOT NULL,
+  id INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS efficiency_history (
-  date_key TEXT PRIMARY KEY,
-  data TEXT NOT NULL DEFAULT '{}'
+  tenant_id TEXT NOT NULL,
+  date_key TEXT NOT NULL,
+  data TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (tenant_id, date_key)
 );
 
 CREATE TABLE IF NOT EXISTS free_time_tasks (
-  date_key TEXT PRIMARY KEY,
-  data TEXT NOT NULL DEFAULT '[]'
+  tenant_id TEXT NOT NULL,
+  date_key TEXT NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, date_key)
 );
 
 CREATE TABLE IF NOT EXISTS meta (
@@ -51,60 +98,80 @@ CREATE TABLE IF NOT EXISTS meta (
 );
 
 CREATE TABLE IF NOT EXISTS badges (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  data TEXT NOT NULL DEFAULT '[]'
+  tenant_id TEXT NOT NULL,
+  id INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS reward_box (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  data TEXT NOT NULL DEFAULT '[]'
+  tenant_id TEXT NOT NULL,
+  id INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS settings (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  data TEXT NOT NULL DEFAULT '{}'
+  tenant_id TEXT NOT NULL,
+  id INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS active_buffs (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  data TEXT NOT NULL DEFAULT '[]'
+  tenant_id TEXT NOT NULL,
+  id INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS bounty_tasks (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  data TEXT NOT NULL DEFAULT '[]'
+  tenant_id TEXT NOT NULL,
+  id INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS email_config (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  data TEXT NOT NULL DEFAULT '{}'
+  tenant_id TEXT NOT NULL,
+  id INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS bounty_submissions (
-  date_key TEXT PRIMARY KEY,
-  data TEXT NOT NULL DEFAULT '[]'
+  tenant_id TEXT NOT NULL,
+  date_key TEXT NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, date_key)
 );
 
 CREATE TABLE IF NOT EXISTS bounty_completions (
-  date_key TEXT PRIMARY KEY,
-  data TEXT NOT NULL DEFAULT '{}'
+  tenant_id TEXT NOT NULL,
+  date_key TEXT NOT NULL,
+  data TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (tenant_id, date_key)
 );
 
 CREATE TABLE IF NOT EXISTS notifications (
-  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  id TEXT NOT NULL,
   text TEXT NOT NULL,
-  created_at BIGINT NOT NULL
+  created_at BIGINT NOT NULL,
+  PRIMARY KEY (tenant_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS last_modified (
+  tenant_id TEXT NOT NULL,
   table_name TEXT NOT NULL,
   record_key TEXT NOT NULL,
   last_modified TEXT NOT NULL,
-  PRIMARY KEY (table_name, record_key)
+  PRIMARY KEY (tenant_id, table_name, record_key)
 );
 
 CREATE TABLE IF NOT EXISTS crdt_operations (
-  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  id TEXT NOT NULL,
   type TEXT NOT NULL,
   table_name TEXT NOT NULL,
   resource_id TEXT NOT NULL,
@@ -112,16 +179,6 @@ CREATE TABLE IF NOT EXISTS crdt_operations (
   value TEXT NOT NULL,
   timestamp TEXT NOT NULL,
   node_id TEXT NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (tenant_id, id)
 );
-
--- 默认数据
-INSERT INTO points (id, balance) VALUES (1, 0) ON CONFLICT DO NOTHING;
-INSERT INTO shop_items (id, data) VALUES (1, '[]') ON CONFLICT DO NOTHING;
-INSERT INTO redemptions (id, data) VALUES (1, '[]') ON CONFLICT DO NOTHING;
-INSERT INTO badges (id, data) VALUES (1, '[]') ON CONFLICT DO NOTHING;
-INSERT INTO reward_box (id, data) VALUES (1, '[]') ON CONFLICT DO NOTHING;
-INSERT INTO settings (id, data) VALUES (1, '{}') ON CONFLICT DO NOTHING;
-INSERT INTO active_buffs (id, data) VALUES (1, '[]') ON CONFLICT DO NOTHING;
-INSERT INTO bounty_tasks (id, data) VALUES (1, '[]') ON CONFLICT DO NOTHING;
-INSERT INTO email_config (id, data) VALUES (1, '{}') ON CONFLICT DO NOTHING;

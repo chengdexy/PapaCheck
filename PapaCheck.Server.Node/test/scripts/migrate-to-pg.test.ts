@@ -11,10 +11,11 @@ describe('Migration Script', () => {
     expect(existsSync(schemaPath)).toBe(true);
   });
 
-  it('should contain all 17+ tables in schema', () => {
+  it('should contain all 20+ tables in schema', () => {
     const schemaPath = resolve(__dirname, '../../scripts/init-pg-schema.sql');
     const schema = readFileSync(schemaPath, 'utf-8');
     const tableNames = [
+      'tenants', 'users',
       'points', 'points_history', 'homeworks', 'daily_settlement',
       'shop_items', 'redemptions', 'efficiency_history', 'free_time_tasks',
       'meta', 'badges', 'reward_box', 'settings', 'active_buffs',
@@ -26,10 +27,17 @@ describe('Migration Script', () => {
     }
   });
 
-  it('should have default data inserts with ON CONFLICT DO NOTHING', () => {
+  it('should include multi-tenant schema features', () => {
     const schemaPath = resolve(__dirname, '../../scripts/init-pg-schema.sql');
     const schema = readFileSync(schemaPath, 'utf-8');
-    expect(schema).toContain('ON CONFLICT DO NOTHING');
+    // 多租户表
+    expect(schema).toContain('CREATE TABLE IF NOT EXISTS tenants');
+    expect(schema).toContain('CREATE TABLE IF NOT EXISTS users');
+    // 所有业务表有 tenant_id
+    expect(schema).toContain('tenant_id TEXT NOT NULL');
+    // 复合主键
+    expect(schema).toContain('PRIMARY KEY (tenant_id, date_key)');
+    expect(schema).toContain('PRIMARY KEY (tenant_id, id)');
   });
 
   it('should have migration script', () => {

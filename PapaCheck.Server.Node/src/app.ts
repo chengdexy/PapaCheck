@@ -11,10 +11,13 @@ import type { HomeworkItem } from './email/ai.js';
 import fastifyStatic from '@fastify/static';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
-import cookie from '@fastify/cookie';
 import { AppError, ErrorCodes } from './errors.js';
 import type { CRDTOperation } from './crdt/types.js';
-import { authPlugin } from './auth-plugin.js';
+import { authMiddleware } from './auth/middleware.js';
+import { authRoutes } from './auth/routes.js';
+import { adminRoutes } from './admin/routes.js';
+import { superAdminRoutes } from './auth/super-admin-routes.js';
+import { ensureSuperAdmin } from './auth/super-admin.js';
 
 export interface AppOptions {
   port: number;
@@ -22,7 +25,7 @@ export interface AppOptions {
   dbPath: string;
   ttsPython?: string;
   showPollingLog?: boolean;
-  /** 启用 Cookie Session 临时认证（生产环境设为 true） */
+  /** 启用 JWT Bearer 认证（生产环境设为 true） */
   enableAuth?: boolean;
 }
 
@@ -186,11 +189,28 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
   });
 
-  // ==================== Cookie 解析 & 临时认证 ====================
+  // ==================== JWT Bearer 认证 (Phase 5c, 替代旧的 Cookie Session authPlugin) ====================
 
   if (options.enableAuth) {
-    await app.register(cookie);
-    await authPlugin(app, db);
+    await authMiddleware(app, { db });
+    await authRoutes(app, db);
+    await adminRoutes(app, db);
+    await superAdminRoutes(app, db);
+
+    // Try to create super admin on startup
+    try {
+      const result = await ensureSuperAdmin(db);
+      if (result) {
+        console.log('========================================');
+        console.log('🔑 超级管理员账号已创建');
+        console.log(`   用户名: ${result.username}`);
+        console.log(`   密码: ${result.password}`);
+        console.log('   首次登录后请立即修改！');
+        console.log('========================================');
+      }
+    } catch (e) {
+      // Super admin creation may fail in SQLite mode - that's OK
+    }
   }
 
   // ==================== Swagger Docs（必须在路由之前注册才能捕获到路由） ====================
@@ -331,75 +351,89 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   // 3. GET /api/data - 完整数据
-  app.get('/api/data', { schema: dataSchema }, async (_request, reply) => {
-    return sendJson(reply, await await await await db.getFullData());
+  app.get('/api/data', { schema: dataSchema }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    return sendJson(reply, await await await await db.getFullData(tenantId));
   });
 
   // 4. GET /api/homeworks/:date
-  app.get<{ Params: { date: string } }>('/api/homeworks/:date', async (request, reply) => {
-    return sendJson(reply, await await await await db.getHomeworks(request.params.date));
+  app.get<{ Params: { date: string } }>('/api/homeworks/:date', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    return sendJson(reply, await await await await db.getHomeworks(request.params.date, tenantId));
   });
 
   // 5. GET /api/settlement/:date
-  app.get<{ Params: { date: string } }>('/api/settlement/:date', async (request, reply) => {
-    return sendJson(reply, await await await await db.getSettlement(request.params.date));
+  app.get<{ Params: { date: string } }>('/api/settlement/:date', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    return sendJson(reply, await await await await db.getSettlement(request.params.date, tenantId));
   });
 
   // 6. GET /api/shop
-  app.get('/api/shop', async (_request, reply) => {
-    return sendJson(reply, await await await await db.getShopItems());
+  app.get('/api/shop', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    return sendJson(reply, await await await await db.getShopItems(tenantId));
   });
 
   // 7. GET /api/redemptions
-  app.get('/api/redemptions', async (_request, reply) => {
-    return sendJson(reply, await await await await db.getRedemptions());
+  app.get('/api/redemptions', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    return sendJson(reply, await await await await db.getRedemptions(tenantId));
   });
 
   // 8. GET /api/reward-box
-  app.get('/api/reward-box', async (_request, reply) => {
-    return sendJson(reply, await await await await db.getRewardBox());
+  app.get('/api/reward-box', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    return sendJson(reply, await await await await db.getRewardBox(tenantId));
   });
 
   // 9. GET /api/settings
-  app.get('/api/settings', async (_request, reply) => {
-    return sendJson(reply, await await await await db.getSettings());
+  app.get('/api/settings', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    return sendJson(reply, await await await await db.getSettings(tenantId));
   });
 
   // 10. GET /api/active-buffs
-  app.get('/api/active-buffs', async (_request, reply) => {
-    return sendJson(reply, await await await await db.getActiveBuffs());
+  app.get('/api/active-buffs', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    return sendJson(reply, await await await await db.getActiveBuffs(tenantId));
   });
 
   // 11. GET /api/efficiency/:date
-  app.get<{ Params: { date: string } }>('/api/efficiency/:date', async (request, reply) => {
-    return sendJson(reply, await await await await db.getEfficiency(request.params.date));
+  app.get<{ Params: { date: string } }>('/api/efficiency/:date', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    return sendJson(reply, await await await await db.getEfficiency(request.params.date, tenantId));
   });
 
   // 12. GET /api/freetime/:date
-  app.get<{ Params: { date: string } }>('/api/freetime/:date', async (request, reply) => {
-    return sendJson(reply, await await await await db.getFreeTime(request.params.date));
+  app.get<{ Params: { date: string } }>('/api/freetime/:date', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    return sendJson(reply, await await await await db.getFreeTime(request.params.date, tenantId));
   });
 
   // 13. GET /api/bounty-tasks
-  app.get('/api/bounty-tasks', async (_request, reply) => {
-    return sendJson(reply, await await await await db.getBountyTasks());
+  app.get('/api/bounty-tasks', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    return sendJson(reply, await await await await db.getBountyTasks(tenantId));
   });
 
   // 14. GET /api/bounty-submissions/:date
-  app.get<{ Params: { date: string } }>('/api/bounty-submissions/:date', async (request, reply) => {
-    return sendJson(reply, await await await await db.getBountySubmissions(request.params.date));
+  app.get<{ Params: { date: string } }>('/api/bounty-submissions/:date', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    return sendJson(reply, await await await await db.getBountySubmissions(request.params.date, tenantId));
   });
 
   // 15. GET /api/bounty-completions/:date
-  app.get<{ Params: { date: string } }>('/api/bounty-completions/:date', async (request, reply) => {
-    return sendJson(reply, await await await await db.getBountyCompletions(request.params.date));
+  app.get<{ Params: { date: string } }>('/api/bounty-completions/:date', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    return sendJson(reply, await await await await db.getBountyCompletions(request.params.date, tenantId));
   });
 
   // 16. GET /api/sync/pull - 同步拉取
-  app.get('/api/sync/pull', async (request, reply) => {
+  app.get('/api/sync/pull', async (request: any, reply) => {
     const query = request.query as { lastSync?: string };
     const lastSync = query.lastSync || '1970-01-01T00:00:00+00:00';
-    const changes = await await await await db.getModifiedSince(lastSync);
+    const tenantId = request.jwtPayload?.tenant_id;
+    const changes = await await await await db.getModifiedSince(lastSync, tenantId);
     return sendJson(reply, { changes, serverTime: new Date().toISOString() });
   });
 
@@ -423,7 +457,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // ==================== POST Endpoints ====================
 
   // 18. POST /api/data - 导入完整数据
-  app.post('/api/data', async (request, reply) => {
+  app.post('/api/data', async (request: any, reply) => {
     const body = request.body;
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
       return reply.status(400).send({ error: '请求体必须是 JSON 对象' });
@@ -433,18 +467,20 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     if (raw.length > 10 * 1024 * 1024) {
       return reply.status(413).send({ error: '数据过大，最大允许 10MB' });
     }
-    await await await await db.importFullData(body);
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.importFullData(body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 19. PUT /api/homeworks — 全量替换当日作业列表（body 含 dateKey + homeworks）
-  app.put('/api/homeworks', async (request, reply) => {
+  app.put('/api/homeworks', async (request: any, reply) => {
     const body = request.body as { dateKey?: string; homeworks: unknown[] };
     const dateKey = body.dateKey;
     if (!dateKey) {
       return reply.status(400).send({ error: '缺少 dateKey' });
     }
-    await await await await db.saveHomeworks(dateKey, body.homeworks);
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.saveHomeworks(dateKey, body.homeworks, tenantId);
     return sendJson(reply, { ok: true });
   });
 
@@ -462,136 +498,152 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   };
 
   // 20. PUT /api/settlement/:date — 全量替换结算数据
-  app.put<{ Params: { date: string } }>('/api/settlement/:date', async (request, reply) => {
+  app.put<{ Params: { date: string } }>('/api/settlement/:date', async (request: any, reply) => {
     const body = request.body as any;
+    const tenantId = request.jwtPayload?.tenant_id;
     // 同时兼容 { settlement: data } 和直接 data 两种 payload 格式
-    await await await await db.saveSettlement(request.params.date, body.settlement ?? body);
+    await await await await db.saveSettlement(request.params.date, body.settlement ?? body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 21. PATCH /api/points - 更新积分
-  app.patch('/api/points', async (request, reply) => {
+  app.patch('/api/points', async (request: any, reply) => {
     const body = request.body as any;
+    const tenantId = request.jwtPayload?.tenant_id;
     if (body.action) {
       if (body.action !== 'earn' && body.action !== 'spend') {
         return reply.status(400).send({ error: 'action 必须是 earn 或 spend' });
       }
       // 全量替换风格（原 POST /api/points）
-      const balance = await await await await db.updatePoints(body.action, body.amount, body.detail);
+      const balance = await await await await db.updatePoints(body.action, body.amount, body.detail, tenantId);
       return sendJson(reply, { ok: true, balance });
     }
     // 增量更新风格（原 PATCH /api/points）
-    const balance = await await await await db.patchPoints(body);
+    const balance = await await await await db.patchPoints(body, tenantId);
     return sendJson(reply, { ok: true, balance });
   });
 
   // 22. PUT /api/shop
-  app.put('/api/shop', async (request, reply) => {
+  app.put('/api/shop', async (request: any, reply) => {
     const body = request.body as { items: unknown[] };
-    await await await await db.saveShopItems(body.items);
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.saveShopItems(body.items, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 23. PUT /api/redemptions
-  app.put('/api/redemptions', async (request, reply) => {
+  app.put('/api/redemptions', async (request: any, reply) => {
     const body = request.body as { redemptions: unknown[] };
-    await await await await db.saveRedemptions(body.redemptions);
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.saveRedemptions(body.redemptions, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 23b. DELETE /api/redemptions/fulfilled — 清空已兑现记录
-  app.delete('/api/redemptions/fulfilled', async (_request, reply) => {
-    await await await await db.clearFulfilledRedemptions();
+  app.delete('/api/redemptions/fulfilled', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.clearFulfilledRedemptions(tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 24. PUT /api/reward-box
-  app.put('/api/reward-box', async (request, reply) => {
+  app.put('/api/reward-box', async (request: any, reply) => {
     const body = request.body as { items: unknown[] };
-    await await await await db.saveRewardBox(body.items);
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.saveRewardBox(body.items, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 25. PUT /api/settings — 全量替换设置
-  app.put('/api/settings', async (request, reply) => {
+  app.put('/api/settings', async (request: any, reply) => {
     const body = request.body as any;
+    const tenantId = request.jwtPayload?.tenant_id;
     // 同时兼容 { settings: data } 和直接 data 两种 payload 格式
-    await await await await db.saveSettings(body.settings ?? body);
+    await await await await db.saveSettings(body.settings ?? body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 26. PUT /api/active-buffs
-  app.put('/api/active-buffs', async (request, reply) => {
+  app.put('/api/active-buffs', async (request: any, reply) => {
     const body = request.body as { buffs: unknown[] };
-    await await await await db.saveActiveBuffs(body.buffs);
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.saveActiveBuffs(body.buffs, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 27. PUT /api/efficiency/:date — 全量替换效率数据
-  app.put<{ Params: { date: string } }>('/api/efficiency/:date', async (request, reply) => {
+  app.put<{ Params: { date: string } }>('/api/efficiency/:date', async (request: any, reply) => {
     const body = request.body as any;
+    const tenantId = request.jwtPayload?.tenant_id;
     // 同时兼容 { efficiency: data } 和直接 data 两种 payload 格式
-    await await await await db.saveEfficiency(request.params.date, body.efficiency ?? body);
+    await await await await db.saveEfficiency(request.params.date, body.efficiency ?? body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 28. PUT /api/freetime — 全量替换自由时间（body 含 dateKey + tasks）
-  app.put('/api/freetime', async (request, reply) => {
+  app.put('/api/freetime', async (request: any, reply) => {
     const body = request.body as { dateKey?: string; tasks: unknown[] };
     if (!body.dateKey) {
       return reply.status(400).send({ error: '缺少 dateKey' });
     }
-    await await await await db.saveFreeTime(body.dateKey, body.tasks);
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.saveFreeTime(body.dateKey, body.tasks, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 28b. PUT /api/freetime/:id — 单条自由时间 upsert
-  app.put<{ Params: { id: string } }>('/api/freetime/:id', { schema: idParamSchema }, async (request, reply) => {
-    await await await await db.putFreeTimeTask(request.params.id, request.body);
+  app.put<{ Params: { id: string } }>('/api/freetime/:id', { schema: idParamSchema }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.putFreeTimeTask(request.params.id, request.body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 29. PUT /api/bounty-tasks
-  app.put('/api/bounty-tasks', async (request, reply) => {
+  app.put('/api/bounty-tasks', async (request: any, reply) => {
     const body = request.body as { items: unknown[] };
-    await await await await db.saveBountyTasks(body.items);
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.saveBountyTasks(body.items, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 30. PUT /api/bounty-submissions — 全量替换赏金提交（body 含 dateKey + submissions）
-  app.put('/api/bounty-submissions', async (request, reply) => {
+  app.put('/api/bounty-submissions', async (request: any, reply) => {
     const body = request.body as { dateKey?: string; submissions: unknown[] };
     if (!body.dateKey) {
       return reply.status(400).send({ error: '缺少 dateKey' });
     }
-    await await await await db.saveBountySubmissions(body.dateKey, body.submissions);
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.saveBountySubmissions(body.dateKey, body.submissions, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 30b. PUT /api/bounty-submissions/:id — 单条赏金提交 upsert
-  app.put<{ Params: { id: string } }>('/api/bounty-submissions/:id', { schema: idParamSchema }, async (request, reply) => {
-    await await await await db.putBountySubmission(request.params.id, request.body);
+  app.put<{ Params: { id: string } }>('/api/bounty-submissions/:id', { schema: idParamSchema }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.putBountySubmission(request.params.id, request.body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 31. PUT /api/bounty-completions — 全量替换赏金完成（body 含 dateKey + completions）
-  app.put('/api/bounty-completions', async (request, reply) => {
+  app.put('/api/bounty-completions', async (request: any, reply) => {
     const body = request.body as { dateKey?: string; completions: unknown[] };
     if (!body.dateKey) {
       return reply.status(400).send({ error: '缺少 dateKey' });
     }
-    await await await await db.saveBountyCompletions(body.dateKey, body.completions);
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.saveBountyCompletions(body.dateKey, body.completions, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 31b. PUT /api/bounty-completions/:id — 单条赏金完成 upsert
-  app.put<{ Params: { id: string } }>('/api/bounty-completions/:id', { schema: idParamSchema }, async (request, reply) => {
-    await await await await db.putBountyCompletion(request.params.id, request.body);
+  app.put<{ Params: { id: string } }>('/api/bounty-completions/:id', { schema: idParamSchema }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.putBountyCompletion(request.params.id, request.body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 32. POST /api/defer-homework - 延迟作业（请求/批准/拒绝）
-  app.post('/api/defer-homework', async (request, reply) => {
+  app.post('/api/defer-homework', async (request: any, reply) => {
     const body = request.body as {
       date: string;
       hwId: string;
@@ -599,22 +651,23 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       requestedAt?: string;
     };
     const { date, hwId, action, requestedAt } = body;
+    const tenantId = request.jwtPayload?.tenant_id;
 
     if (action === 'request') {
-      const homeworks = await await await await db.getHomeworks(date);
+      const homeworks = await await await await db.getHomeworks(date, tenantId);
       const found = homeworks.find((h: any) => h.id === hwId);
       if (found && found.status === 'pending' && !found.deferRequest) {
         found.deferRequest = {
           requestedAt: requestedAt || new Date().toISOString(),
           status: 'pending',
         };
-        await await await await db.saveHomeworks(date, homeworks);
+        await await await await db.saveHomeworks(date, homeworks, tenantId);
       }
       return sendJson(reply, { ok: true });
     }
 
     if (action === 'approve') {
-      const homeworks = await await await await db.getHomeworks(date);
+      const homeworks = await await await await db.getHomeworks(date, tenantId);
       const idx = homeworks.findIndex((h: any) => h.id === hwId);
       if (idx !== -1) {
         const hw = { ...homeworks[idx] };
@@ -623,14 +676,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
         // 从当前日期移除
         homeworks.splice(idx, 1);
-        await await await await db.saveHomeworks(date, homeworks);
+        await await await await db.saveHomeworks(date, homeworks, tenantId);
 
         // 添加到次日
         const tomorrow = getTomorrow(date);
         hw.date = tomorrow;
-        const tomorrowHw = await await await await db.getHomeworks(tomorrow);
+        const tomorrowHw = await await await await db.getHomeworks(tomorrow, tenantId);
         tomorrowHw.push(hw);
-        await await await await db.saveHomeworks(tomorrow, tomorrowHw);
+        await await await await db.saveHomeworks(tomorrow, tomorrowHw, tenantId);
 
         return sendJson(reply, { ok: true, homework: hw });
       }
@@ -638,11 +691,11 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
 
     if (action === 'reject') {
-      const homeworks = await await await await db.getHomeworks(date);
+      const homeworks = await await await await db.getHomeworks(date, tenantId);
       const found = homeworks.find((h: any) => h.id === hwId);
       if (found) {
         delete found.deferRequest;
-        await await await await db.saveHomeworks(date, homeworks);
+        await await await await db.saveHomeworks(date, homeworks, tenantId);
       }
       return sendJson(reply, { ok: true });
     }
@@ -651,16 +704,18 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   // 33. POST /api/reset-date - 重置日期数据
-  app.post('/api/reset-date', async (request, reply) => {
+  app.post('/api/reset-date', async (request: any, reply) => {
     const body = request.body as { date: string };
-    await await await await db.resetDate(body.date);
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.resetDate(body.date, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 34. POST /api/sync/push - 同步推送
-  app.post('/api/sync/push', async (request, reply) => {
+  app.post('/api/sync/push', async (request: any, reply) => {
     const body = request.body as { changes: unknown[] };
-    const result = await await await await db.pushMerge(body.changes);
+    const tenantId = request.jwtPayload?.tenant_id;
+    const result = await await await await db.pushMerge(body.changes, tenantId);
     return sendJson(reply, result);
   });
 
@@ -674,7 +729,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   // 36. POST /api/email/config - 保存邮箱配置
-  app.post('/api/email/config', async (request, reply) => {
+  app.post('/api/email/config', async (request: any, reply) => {
     const body = request.body as {
       host?: string;
       port?: number;
@@ -693,7 +748,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       });
     }
 
-    await await await await db.saveEmailConfig(body);
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.saveEmailConfig(body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
@@ -729,8 +785,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   }
 
   // 37. POST /api/email/sync - 触发邮件同步
-  app.post('/api/email/sync', async (request, reply) => {
-    const config = await await await await db.getEmailConfig();
+  app.post('/api/email/sync', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    const config = await await await await db.getEmailConfig(tenantId);
 
     if (!config) {
       return reply.status(400).send({
@@ -782,14 +839,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
             basePoints: hw.basePoints ?? 10,
             mode: 'pending',
             actualDuration: null,
-          });
+          }, tenantId);
           insertedIds.push(hwId);
         }
       } catch (err) {
         console.error('[email/sync] 插入作业时出错，已插入 %d 条，尝试回滚...', insertedIds.length, err);
         // 尝试删除已插入的作业（幂等回滚）
         for (const id of insertedIds) {
-          try { await await await await db.deleteHomework(id); } catch { /* 忽略单个删除失败 */ }
+          try { await await await await db.deleteHomework(id, tenantId); } catch { /* 忽略单个删除失败 */ }
         }
         return reply.status(500).send({
           error: '邮件同步插入作业失败，已回滚',
@@ -798,14 +855,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       }
 
       // 添加通知：有新作业来自云端
-      await await await await db.addNotification('收到云端作业，请查看');
+      await await await await db.addNotification('收到云端作业，请查看', undefined, tenantId);
     }
 
     return sendJson(reply, { ok: true, homeworks: expanded || [], hasAttachments: result.hasAttachments ?? false });
   });
 
   // 通知：创建通知
-  app.post('/api/notify', async (request, reply) => {
+  app.post('/api/notify', async (request: any, reply) => {
     const body = request.body as { text?: string };
     if (!body.text || !body.text.trim()) {
       return reply.status(400).send({
@@ -813,54 +870,60 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         code: 'VALIDATION_ERROR',
       });
     }
-    const id = await await await await db.addNotification(body.text.trim());
+    const tenantId = request.jwtPayload?.tenant_id;
+    const id = await await await await db.addNotification(body.text.trim(), undefined, tenantId);
     return sendJson(reply, { ok: true, id });
   });
 
   // 通知：拉取待消费通知（自动清理过期）
-  app.get('/api/notify/pending', async (_request, reply) => {
-    const items = await await await await db.getPendingNotifications();
+  app.get('/api/notify/pending', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    const items = await await await await db.getPendingNotifications(tenantId);
     return sendJson(reply, { items });
   });
 
   // 通知：消费通知
-  app.delete('/api/notify/consumed', async (request, reply) => {
+  app.delete('/api/notify/consumed', async (request: any, reply) => {
     const query = request.query as { ids?: string };
+    const tenantId = request.jwtPayload?.tenant_id;
     if (query.ids) {
       const ids = query.ids.split(',').filter(Boolean);
       if (ids.length > 0) {
-        await await await await db.consumeNotifications(ids);
+        await await await await db.consumeNotifications(ids, tenantId);
       }
     }
     return sendJson(reply, { ok: true });
   });
 
   // CRDT 同步推送
-  app.post('/api/sync/crdt-push', async (request, reply) => {
+  app.post('/api/sync/crdt-push', async (request: any, reply) => {
     const body = request.body as { operations: CRDTOperation[] };
     if (!body.operations || !Array.isArray(body.operations)) {
       return reply.status(400).send({ error: '缺少 operations 数组', code: 'VALIDATION_ERROR' });
     }
+    const tenantId = request.jwtPayload?.tenant_id;
     for (const op of body.operations) {
-      await await await await db.saveCRDTOperation(op);
-      await await await await db.applyCRDTOperation(op);
+      await await await await db.saveCRDTOperation(op, tenantId);
+      await await await await db.applyCRDTOperation(op, tenantId);
     }
     return sendJson(reply, { ok: true });
   });
 
   // CRDT 增量拉取
-  app.get('/api/sync/crdt-pull', async (request, reply) => {
+  app.get('/api/sync/crdt-pull', async (request: any, reply) => {
     const query = request.query as { since?: string };
     const since = query.since || '1970-01-01T00:00:00Z';
-    const operations = await await await await db.getCRDTOperationsSince(since);
+    const tenantId = request.jwtPayload?.tenant_id;
+    const operations = await await await await db.getCRDTOperationsSince(since, tenantId);
     return sendJson(reply, { operations });
   });
 
   // CRDT 确认消费
-  app.delete('/api/sync/crdt-pull', async (request, reply) => {
+  app.delete('/api/sync/crdt-pull', async (request: any, reply) => {
     const query = request.query as { ack?: string };
+    const tenantId = request.jwtPayload?.tenant_id;
     if (query.ack) {
-      await await await await db.ackCRDTOperations(query.ack);
+      await await await await db.ackCRDTOperations(query.ack, tenantId);
     }
     return sendJson(reply, { ok: true });
   });
@@ -868,23 +931,26 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // ==================== PUT Endpoints（单资源 upsert） ====================
 
   // 35. PUT /api/homeworks/:id
-  app.put<{ Params: { id: string } }>('/api/homeworks/:id', { schema: idParamSchema }, async (request, reply) => {
-    await await await await db.putHomework(request.params.id, request.body);
+  app.put<{ Params: { id: string } }>('/api/homeworks/:id', { schema: idParamSchema }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.putHomework(request.params.id, request.body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 37. PUT /api/shop/:id
-  app.put<{ Params: { id: string } }>('/api/shop/:id', { schema: idParamSchema }, async (request, reply) => {
-    await await await await db.putShopItem(request.params.id, request.body);
+  app.put<{ Params: { id: string } }>('/api/shop/:id', { schema: idParamSchema }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.putShopItem(request.params.id, request.body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 38. PUT /api/redemptions/:id
-  app.put<{ Params: { id: string } }>('/api/redemptions/:id', { schema: idParamSchema }, async (request, reply) => {
+  app.put<{ Params: { id: string } }>('/api/redemptions/:id', { schema: idParamSchema }, async (request: any, reply) => {
     const data = request.body as any;
+    const tenantId = request.jwtPayload?.tenant_id;
     // 检查同一 rewardBoxItemId 是否已有 pending 兑换（服务端兜底）
     if (data && data.fromRewardBox && data.status === 'pending' && data.rewardBoxItemId) {
-      const redemptions = await db.getRedemptions();
+      const redemptions = await db.getRedemptions(tenantId);
       const existing = redemptions.find((r: any) =>
         r.rewardBoxItemId === data.rewardBoxItemId &&
         r.status === 'pending' &&
@@ -894,85 +960,97 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         return reply.code(409).send({ ok: false, error: 'duplicate_pending_redemption', message: '该物品已有待处理兑换申请' });
       }
     }
-    await db.putRedemption(request.params.id, request.body);
+    await db.putRedemption(request.params.id, request.body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 39. PUT /api/reward-box/:id
-  app.put<{ Params: { id: string } }>('/api/reward-box/:id', { schema: idParamSchema }, async (request, reply) => {
-    await await await await db.putRewardBoxItem(request.params.id, request.body);
+  app.put<{ Params: { id: string } }>('/api/reward-box/:id', { schema: idParamSchema }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.putRewardBoxItem(request.params.id, request.body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 40. DELETE /api/reward-box/:id
-  app.delete<{ Params: { id: string } }>('/api/reward-box/:id', { schema: deleteParamSchema }, async (request, reply) => {
-    await await await await db.deleteRewardBoxItem(request.params.id);
+  app.delete<{ Params: { id: string } }>('/api/reward-box/:id', { schema: deleteParamSchema }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.deleteRewardBoxItem(request.params.id, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 41. PUT /api/active-buffs/:id
-  app.put<{ Params: { id: string } }>('/api/active-buffs/:id', { schema: idParamSchema }, async (request, reply) => {
-    await await await await db.putBuff(request.params.id, request.body);
+  app.put<{ Params: { id: string } }>('/api/active-buffs/:id', { schema: idParamSchema }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.putBuff(request.params.id, request.body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 44. PUT /api/bounty-tasks/:id
-  app.put<{ Params: { id: string } }>('/api/bounty-tasks/:id', { schema: idParamSchema }, async (request, reply) => {
-    await await await await db.putBountyTask(request.params.id, request.body);
+  app.put<{ Params: { id: string } }>('/api/bounty-tasks/:id', { schema: idParamSchema }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.putBountyTask(request.params.id, request.body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // ==================== PATCH Endpoints ====================
 
   // 47. PATCH /api/homeworks/:id
-  app.patch<{ Params: { id: string } }>('/api/homeworks/:id', { schema: idParamSchema }, async (request, reply) => {
-    await await await await db.patchHomework(request.params.id, request.body);
+  app.patch<{ Params: { id: string } }>('/api/homeworks/:id', { schema: idParamSchema }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.patchHomework(request.params.id, request.body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 48. PATCH /api/settlement/:date
-  app.patch<{ Params: { date: string } }>('/api/settlement/:date', { schema: dateParamSchema }, async (request, reply) => {
-    await await await await db.patchSettlement(request.params.date, request.body);
+  app.patch<{ Params: { date: string } }>('/api/settlement/:date', { schema: dateParamSchema }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.patchSettlement(request.params.date, request.body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 50. PATCH /api/settings
-  app.patch('/api/settings', { schema: { body: { type: 'object' } } }, async (request, reply) => {
-    await await await await db.patchSettings(request.body);
+  app.patch('/api/settings', { schema: { body: { type: 'object' } } }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.patchSettings(request.body, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // ==================== DELETE Endpoints ====================
 
   // 51. DELETE /api/homeworks/:id
-  app.delete<{ Params: { id: string } }>('/api/homeworks/:id', { schema: deleteParamSchema }, async (request, reply) => {
-    await await await await db.deleteHomework(request.params.id);
+  app.delete<{ Params: { id: string } }>('/api/homeworks/:id', { schema: deleteParamSchema }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.deleteHomework(request.params.id, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 52. DELETE /api/shop/:id
-  app.delete<{ Params: { id: string } }>('/api/shop/:id', { schema: deleteParamSchema }, async (request, reply) => {
-    await await await await db.deleteShopItem(request.params.id);
+  app.delete<{ Params: { id: string } }>('/api/shop/:id', { schema: deleteParamSchema }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.deleteShopItem(request.params.id, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 53. DELETE /api/active-buffs/:id
-  app.delete<{ Params: { id: string } }>('/api/active-buffs/:id', { schema: deleteParamSchema }, async (request, reply) => {
-    await await await await db.deleteBuff(request.params.id);
+  app.delete<{ Params: { id: string } }>('/api/active-buffs/:id', { schema: deleteParamSchema }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.deleteBuff(request.params.id, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // 54. DELETE /api/bounty-tasks/:id
-  app.delete<{ Params: { id: string } }>('/api/bounty-tasks/:id', { schema: deleteParamSchema }, async (request, reply) => {
-    await await await await db.deleteBountyTask(request.params.id);
+  app.delete<{ Params: { id: string } }>('/api/bounty-tasks/:id', { schema: deleteParamSchema }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    await await await await db.deleteBountyTask(request.params.id, tenantId);
     return sendJson(reply, { ok: true });
   });
 
   // ==================== HEAD Endpoints ====================
 
   // 55. HEAD /api/shop/:id
-  app.head<{ Params: { id: string } }>('/api/shop/:id', { schema: { params: idParamSchema.params } }, async (request, reply) => {
-    const item = await await await await db.getShopItemById(request.params.id);
+  app.head<{ Params: { id: string } }>('/api/shop/:id', { schema: { params: idParamSchema.params } }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    const item = await await await await db.getShopItemById(request.params.id, tenantId);
     if (!item) {
       return reply.status(404).send();
     }
@@ -980,8 +1058,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   // 56. HEAD /api/bounty-tasks/:id
-  app.head<{ Params: { id: string } }>('/api/bounty-tasks/:id', { schema: { params: idParamSchema.params } }, async (request, reply) => {
-    const item = await await await await db.getBountyTaskById(request.params.id);
+  app.head<{ Params: { id: string } }>('/api/bounty-tasks/:id', { schema: { params: idParamSchema.params } }, async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    const item = await await await await db.getBountyTaskById(request.params.id, tenantId);
     if (!item) {
       return reply.status(404).send();
     }

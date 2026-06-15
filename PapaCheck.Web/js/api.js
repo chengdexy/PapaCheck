@@ -1,3 +1,12 @@
+function getAuthHeaders() {
+  try {
+    const token = localStorage.getItem('papacheck_token');
+    return token ? { 'Authorization': 'Bearer ' + token } : {};
+  } catch (e) {
+    return {};
+  }
+}
+
 let isServerMode = false;
 let cachedData = null;
 
@@ -70,6 +79,9 @@ const API = {
         fetchOptions.headers['Content-Type'] = 'application/json';
       }
     }
+    // 注入 Bearer token
+    if (!fetchOptions.headers) fetchOptions.headers = {};
+    Object.assign(fetchOptions.headers, getAuthHeaders());
     var resp = await fetch(url, fetchOptions);
     // 未认证，跳转到登录页
     if (resp.status === 401) {
@@ -535,7 +547,7 @@ const API = {
         try {
           var dk = data.dateKey || data.date || new Date().toISOString().slice(0, 10);
           var list = await DB.getHomeworks(dk);
-          var idx = list.findIndex(function(h) { return h.id === id || h.uuid === id; });
+          var idx = list.findIndex(function (h) { return h.id === id || h.uuid === id; });
           if (idx !== -1) { list[idx] = data; }
           else { list.push(data); }
           await DB.saveHomeworks(dk, list);
@@ -560,7 +572,7 @@ const API = {
         if (dateKey) {
           try {
             var list = await DB.getHomeworks(dateKey);
-            var idx = list.findIndex(function(h) { return h.id === id || h.uuid === id; });
+            var idx = list.findIndex(function (h) { return h.id === id || h.uuid === id; });
             if (idx !== -1) {
               Object.assign(list[idx], fields);
               await DB.saveHomeworks(dateKey, list);
@@ -587,7 +599,7 @@ const API = {
         if (dateKey) {
           try {
             var list = await DB.getHomeworks(dateKey);
-            var idx = list.findIndex(function(h) { return h.id === id || h.uuid === id; });
+            var idx = list.findIndex(function (h) { return h.id === id || h.uuid === id; });
             if (idx !== -1) {
               list.splice(idx, 1);
               await DB.saveHomeworks(dateKey, list);
@@ -604,7 +616,7 @@ const API = {
     var mode = ConnectionManager.getMode();
     if (mode === 'offline') return false;
     try {
-      var resp = await fetch('/api/homeworks/' + id, { method: 'HEAD' });
+      var resp = await fetch('/api/homeworks/' + id, { method: 'HEAD', headers: getAuthHeaders() });
       return resp.ok;
     } catch (e) {
       return false;
@@ -676,7 +688,7 @@ const API = {
         // 离线降级：在本地 DB 中创建/更新
         try {
           var items = await DB.getShopItems();
-          var idx = items.findIndex(function(s) { return s.id === id || s.uuid === id; });
+          var idx = items.findIndex(function (s) { return s.id === id || s.uuid === id; });
           if (idx !== -1) items[idx] = data;
           else items.push(data);
           await DB.saveShopItems(items);
@@ -716,7 +728,7 @@ const API = {
     var mode = ConnectionManager.getMode();
     if (mode === 'offline') return false;
     try {
-      var resp = await fetch('/api/shop/' + id, { method: 'HEAD' });
+      var resp = await fetch('/api/shop/' + id, { method: 'HEAD', headers: getAuthHeaders() });
       return resp.ok;
     } catch (e) {
       return false;
@@ -738,7 +750,7 @@ const API = {
         // 离线降级：在本地 DB 中创建/更新
         try {
           var items = await DB.getRedemptions();
-          var idx = items.findIndex(function(r) { return r.id === id || r.uuid === id; });
+          var idx = items.findIndex(function (r) { return r.id === id || r.uuid === id; });
           if (idx !== -1) items[idx] = data;
           else items.push(data);
           await DB.saveRedemptions(items);
@@ -764,7 +776,7 @@ const API = {
         // 离线降级：在本地 DB 中创建/更新
         try {
           var items = await DB.getRewardBox();
-          var idx = items.findIndex(function(r) { return r.id === id || r.uuid === id; });
+          var idx = items.findIndex(function (r) { return r.id === id || r.uuid === id; });
           if (idx !== -1) items[idx] = data;
           else items.push(data);
           await DB.saveRewardBox(items);
@@ -788,7 +800,7 @@ const API = {
         // 离线降级：在本地 DB 中删除
         try {
           var items = await DB.getRewardBox();
-          var idx = items.findIndex(function(r) { return r.id === id || r.uuid === id; });
+          var idx = items.findIndex(function (r) { return r.id === id || r.uuid === id; });
           if (idx !== -1) {
             items.splice(idx, 1);
             await DB.saveRewardBox(items);
@@ -849,7 +861,7 @@ const API = {
         // 离线降级：在本地 DB 中创建/更新
         try {
           var items = await DB.getActiveBuffs();
-          var idx = items.findIndex(function(b) { return b.id === id || b.uuid === id; });
+          var idx = items.findIndex(function (b) { return b.id === id || b.uuid === id; });
           if (idx !== -1) items[idx] = data;
           else items.push(data);
           await DB.saveActiveBuffs(items);
@@ -873,7 +885,7 @@ const API = {
         // 离线降级：从本地缓存中删除该 Buff
         try {
           var buffs = await DB.getActiveBuffs();
-          var idx = buffs.findIndex(function(b) { return b.id === id || b.uuid === id; });
+          var idx = buffs.findIndex(function (b) { return b.id === id || b.uuid === id; });
           if (idx !== -1) {
             buffs.splice(idx, 1);
             await DB.saveActiveBuffs(buffs);
@@ -921,7 +933,7 @@ const API = {
         try {
           var dk = data.dateKey || data.date || new Date().toISOString().slice(0, 10);
           var list = await DB.getFreeTime(dk);
-          var idx = list.findIndex(function(t) { return t.id === id || t.uuid === id; });
+          var idx = list.findIndex(function (t) { return t.id === id || t.uuid === id; });
           if (idx !== -1) list[idx] = data;
           else list.push(data);
           await DB.saveFreeTime(dk, list);
@@ -947,7 +959,7 @@ const API = {
         // 离线降级：在本地 DB 中创建/更新
         try {
           var items = await DB.getBountyTasks();
-          var idx = items.findIndex(function(t) { return t.id === id || t.uuid === id; });
+          var idx = items.findIndex(function (t) { return t.id === id || t.uuid === id; });
           if (idx !== -1) items[idx] = data;
           else items.push(data);
           await DB.saveBountyTasks(items);
@@ -971,7 +983,7 @@ const API = {
         // 离线降级：从本地缓存中删除该赏金任务
         try {
           var tasks = await DB.getBountyTasks();
-          var idx = tasks.findIndex(function(t) { return t.id === id || t.uuid === id; });
+          var idx = tasks.findIndex(function (t) { return t.id === id || t.uuid === id; });
           if (idx !== -1) {
             tasks.splice(idx, 1);
             await DB.saveBountyTasks(tasks);
@@ -987,7 +999,7 @@ const API = {
     var mode = ConnectionManager.getMode();
     if (mode === 'offline') return false;
     try {
-      var resp = await fetch('/api/bounty-tasks/' + id, { method: 'HEAD' });
+      var resp = await fetch('/api/bounty-tasks/' + id, { method: 'HEAD', headers: getAuthHeaders() });
       return resp.ok;
     } catch (e) {
       return false;
@@ -1010,7 +1022,7 @@ const API = {
         try {
           var dk = data.dateKey || data.date || new Date().toISOString().slice(0, 10);
           var list = await DB.getBountySubmissions(dk);
-          var idx = list.findIndex(function(s) { return s.id === id || s.uuid === id; });
+          var idx = list.findIndex(function (s) { return s.id === id || s.uuid === id; });
           if (idx !== -1) list[idx] = data;
           else list.push(data);
           await DB.saveBountySubmissions(dk, list);
