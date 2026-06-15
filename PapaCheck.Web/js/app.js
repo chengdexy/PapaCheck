@@ -697,7 +697,7 @@ async function calculateSettlement() {
     // 检查当天是否已有 settlement 并已评级
     const existingSettlement = cachedData?.dailySettlement?.[dateKey];
 
-    if (existingSettlement) {
+    if (existingSettlement && (existingSettlement.rating || existingSettlement.submittedAt)) {
       const prevHomeworkBonus = existingSettlement.homeworkBonus || 0;
 
       const currentHomeworkBonus = challengeSuccess.reduce(

@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-15（Bug 修复：放弃的常驻型赏金任务不可见 + 评级加分）
+> 最后更新：2026-06-15（Bug 修复：评级加分回归修复 + 赏金放弃可见性）
 
 ## 当前版本
 
@@ -87,6 +87,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-15 | **修复评级加分回归**：外层条件误改为 `if (existingSettlement)` 导致新的未评级 settlement 跳过计算，恢复为 `(rating || submittedAt)`；全量 628 测试通过
 | 2026-06-15 | **修复放弃的常驻型赏金任务孩子端不再可见**：`availableBounty` 过滤增加 abandoned 排除 + `startBountyTask` 守卫允许重试；新增 1 个 TDD 测试；全量 628 测试通过
 | 2026-06-15 | **修复评级后新增作业完成不加分**：`calculateSettlement()` 中 `submittedAt`/`rating` 分支分离 + pollServer 删除保护；新增 2 个 TDD 测试；全量 627 测试通过
 | 2026-06-15 | **修复数据库 PK 缺少 tenant_id**：19 张业务表 PK 缺失 tenant_id 列，导致新增作业 UPSERT 失败；已手动迁移修复；测试数 625

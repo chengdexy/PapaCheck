@@ -25,10 +25,10 @@ async function calculateSettlementLogic({
 
     const dateKey = Util.dateKey(currentDate);
 
-    // === BUG FIX: 检查当天是否已有 settlement ===
+    // === BUG FIX: 检查当天是否已有 settlement 并已评级/已提交 ===
     const existingSettlement = cachedData?.dailySettlement?.[dateKey];
 
-    if (existingSettlement) {
+    if (existingSettlement && (existingSettlement.rating || existingSettlement.submittedAt)) {
         const prevHomeworkBonus = existingSettlement.homeworkBonus || 0;
 
         // 当前总分（作业奖励）
