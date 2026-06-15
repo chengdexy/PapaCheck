@@ -13,6 +13,7 @@
 - **测试覆盖补齐**：新增 29 个测试（Super Admin Routes 16 个、Admin Routes 成员管理 11 个、Middleware PUBLIC_PATHS 2 个），全量 625 测试通过
 
 ### Fixed
+- **修复评级后新增作业完成不加分**：`calculateSettlement()` 中 `submittedAt` 和 `rating` 共用同一分支导致 multiplier=null 时无法加分且 `homeworkBonus` 未更新；分离为独立分支，已提交状态正确更新 `homeworkBonus`/`totalBeforeRating`，已评级状态正常追加积分。同时修复 pollServer 在 `!allDone` 时错误删除已提交 settlement 的问题
 - **修复新增作业不显示在列表中**：生产数据库中所有 19 张业务表的 PRIMARY KEY 缺少 `tenant_id` 列，导致 `ON CONFLICT (tenant_id, date_key)` UPSERT 失败 → 服务器返回 500 错误 → 前端静默回退到离线存储 → 作业不显示。已手动执行数据库迁移修复所有 PK
 - **修复赏金任务放弃/提交按钮无反应**：`abandonBountyTask` 和 `submitBountyTask` 中当 `API.getBountySubmissions` 返回空数组时静默返回，用户无任何反馈；新增 `console.warn` + `showToast` 提示用户刷新重试
 - **修复 `release.py` 部署缺失 TypeScript 编译**：打包时 `--exclude=dist` 排除了编译产物，远程命令未执行 `npm run build`，服务器一直运行旧版 JS；修复为打包前本地编译 + 打包 dist/

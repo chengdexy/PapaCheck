@@ -25,13 +25,10 @@ async function calculateSettlementLogic({
 
     const dateKey = Util.dateKey(currentDate);
 
-    // === BUG FIX: 检查当天是否已有 settlement 并已评级 ===
+    // === BUG FIX: 检查当天是否已有 settlement ===
     const existingSettlement = cachedData?.dailySettlement?.[dateKey];
 
-    if (existingSettlement && existingSettlement.rating) {
-        // 当天已评级：只计算新增作业的分数，不含每日基础分
-        // 找出新增的作业（之前 settlement 中没有计入的作业）
-        const prevDoneCount = existingSettlement.doneCount || 0;
+    if (existingSettlement) {
         const prevHomeworkBonus = existingSettlement.homeworkBonus || 0;
 
         // 当前总分（作业奖励）
@@ -42,40 +39,66 @@ async function calculateSettlementLogic({
         // 新增的作业奖励分
         const newHomeworkBonus = currentHomeworkBonus - prevHomeworkBonus;
 
-        if (newHomeworkBonus > 0) {
-            // 用已有倍率计算新增积分（不含每日基础分）
-            const multiplier = existingSettlement.multiplier;
-            const additionalPoints = Math.round(newHomeworkBonus * multiplier);
+        if (existingSettlement.rating) {
+            // 当天已评级：只计算新增作业的分数，不含每日基础分
+            if (newHomeworkBonus > 0) {
+                // 用已有倍率计算新增积分（不含每日基础分）
+                const multiplier = existingSettlement.multiplier;
+                const additionalPoints = Math.round(newHomeworkBonus * multiplier);
 
-            // 更新 settlement：累加作业奖励和总积分
-            const updatedSettlement = {
-                ...existingSettlement,
-                homeworkBonus: currentHomeworkBonus,
-                totalBeforeRating: existingSettlement.dailyBase + currentHomeworkBonus,
-                doneCount: doneHw.length,
-                finalPoints: (existingSettlement.finalPoints || 0) + additionalPoints,
-            };
+                // 更新 settlement：累加作业奖励和总积分
+                const updatedSettlement = {
+                    ...existingSettlement,
+                    homeworkBonus: currentHomeworkBonus,
+                    totalBeforeRating: existingSettlement.dailyBase + currentHomeworkBonus,
+                    doneCount: doneHw.length,
+                    finalPoints: (existingSettlement.finalPoints || 0) + additionalPoints,
+                };
 
-            window._settlement = updatedSettlement;
-            await API.saveSettlement(dateKey, updatedSettlement);
-            if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
-            cachedData.dailySettlement[dateKey] = updatedSettlement;
+                window._settlement = updatedSettlement;
+                await API.saveSettlement(dateKey, updatedSettlement);
+                if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
+                cachedData.dailySettlement[dateKey] = updatedSettlement;
 
-            // 自动增加积分
-            if (additionalPoints > 0) {
-                await API.updatePoints('earn', additionalPoints,
-                    `追加完成作业，按${existingSettlement.rating}评级倍率计算`);
+                // 自动增加积分
+                if (additionalPoints > 0) {
+                    await API.updatePoints('earn', additionalPoints,
+                        `追加完成作业，按${existingSettlement.rating}评级倍率计算`);
+                }
+            } else {
+                // 没有新作业加分，只更新 doneCount
+                const updatedSettlement = {
+                    ...existingSettlement,
+                    doneCount: doneHw.length,
+                };
+                window._settlement = updatedSettlement;
+                await API.saveSettlement(dateKey, updatedSettlement);
+                if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
+                cachedData.dailySettlement[dateKey] = updatedSettlement;
             }
-        } else {
-            // 没有新作业加分，只更新 doneCount
-            const updatedSettlement = {
-                ...existingSettlement,
-                doneCount: doneHw.length,
-            };
-            window._settlement = updatedSettlement;
-            await API.saveSettlement(dateKey, updatedSettlement);
-            if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
-            cachedData.dailySettlement[dateKey] = updatedSettlement;
+        } else if (existingSettlement.submittedAt) {
+            // 已提交等待评级：只更新 homeworkBonus/totalBeforeRating，不加分（尚未评级，无倍率）
+            if (newHomeworkBonus > 0) {
+                const updatedSettlement = {
+                    ...existingSettlement,
+                    homeworkBonus: currentHomeworkBonus,
+                    totalBeforeRating: existingSettlement.dailyBase + currentHomeworkBonus,
+                    doneCount: doneHw.length,
+                };
+                window._settlement = updatedSettlement;
+                await API.saveSettlement(dateKey, updatedSettlement);
+                if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
+                cachedData.dailySettlement[dateKey] = updatedSettlement;
+            } else {
+                const updatedSettlement = {
+                    ...existingSettlement,
+                    doneCount: doneHw.length,
+                };
+                window._settlement = updatedSettlement;
+                await API.saveSettlement(dateKey, updatedSettlement);
+                if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
+                cachedData.dailySettlement[dateKey] = updatedSettlement;
+            }
         }
 
         // 保存 efficiency 数据
@@ -196,8 +219,8 @@ test('当天未评级时正常计算结算', async () => {
         async saveSettlement(key, data) {
             savedSettlement = { key, data };
         },
-        async saveEfficiency(key, data) {},
-        async updatePoints(type, amount, note) {},
+        async saveEfficiency(key, data) { },
+        async updatePoints(type, amount, note) { },
     };
 
     let updateBigScreenCalled = false;
@@ -268,8 +291,8 @@ test('当天已评级后完成新作业保留已有评级', async () => {
         async saveSettlement(key, data) {
             savedSettlement = { key, data };
         },
-        async saveEfficiency(key, data) {},
-        async updatePoints(type, amount, note) {},
+        async saveEfficiency(key, data) { },
+        async updatePoints(type, amount, note) { },
     };
 
     let updateBigScreenCalled = false;
@@ -340,7 +363,7 @@ test('当天已评级后新作业分数不含每日基础分且自动增加积�
         async saveSettlement(key, data) {
             savedSettlement = { key, data };
         },
-        async saveEfficiency(key, data) {},
+        async saveEfficiency(key, data) { },
         async updatePoints(type, amount, note) {
             updatedPoints = { type, amount, note };
         },
@@ -411,8 +434,8 @@ test('当天已评级已查看后新作业完成保留 viewedAt', async () => {
         async saveSettlement(key, data) {
             savedSettlement = { key, data };
         },
-        async saveEfficiency(key, data) {},
-        async updatePoints(type, amount, note) {},
+        async saveEfficiency(key, data) { },
+        async updatePoints(type, amount, note) { },
     };
 
     let updateBigScreenCalled = false;
@@ -474,8 +497,8 @@ test('多天内各自独立评级互不干扰', async () => {
         async saveSettlement(key, data) {
             savedSettlement = { key, data };
         },
-        async saveEfficiency(key, data) {},
-        async updatePoints(type, amount, note) {},
+        async saveEfficiency(key, data) { },
+        async updatePoints(type, amount, note) { },
     };
 
     let updateBigScreenCalled = false;
@@ -497,4 +520,159 @@ test('多天内各自独立评级互不干扰', async () => {
     assert.strictEqual(savedSettlement.data.dailyBase, 50);
     assert.strictEqual(savedSettlement.data.homeworkBonus, 10);
     assert.strictEqual(cachedData.dailySettlement['2026-06-04'].rating, '优', '昨天评级不受影响');
+});
+
+//   Scenario: 已提交等待评级后完成新作业应更新 homeworkBonus 但不加分
+//     Given 当天已有 settlement，submittedAt 已设置，rating=null，multiplier=null
+//     And 新增一项挑战成功作业 basePoints=8
+//     When 调用 calculateSettlement()
+//     Then homeworkBonus 从 20 更新为 28
+//     And totalBeforeRating 从 70 更新为 78
+//     And finalPoints 保持不变（仍为 null）
+//     And API.updatePoints 不应被调用
+
+test('已提交等待评级后完成新作业更新 homeworkBonus 但不加分', async () => {
+    const currentDate = new Date('2026-06-04');
+    const dateKey = '2026-06-04';
+    const Util = makeUtil(currentDate);
+
+    // 之前有 2 项作业已提交等待评级，现在新增第 3 项
+    const homeworks = [
+        { id: 'hw1', subject: '数学', content: '练习册', status: 'done', mode: 'challenge', rejected: false, basePoints: 10, actualDuration: 15, suggestedDuration: 20 },
+        { id: 'hw2', subject: '语文', content: '阅读', status: 'done', mode: 'challenge', rejected: false, basePoints: 10, actualDuration: 8, suggestedDuration: 10 },
+        { id: 'hw3', subject: '英语', content: '单词', status: 'done', mode: 'challenge', rejected: false, basePoints: 8, actualDuration: 10, suggestedDuration: 10 },
+    ];
+
+    const existingSettlement = {
+        dailyBase: 50,
+        homeworkBonus: 20,
+        totalBeforeRating: 70,
+        doneCount: 2,
+        rating: null,
+        multiplier: null,
+        finalPoints: null,
+        submittedAt: '18:30',
+        ratedAt: null,
+    };
+
+    const cachedData = {
+        settings: { dailyBasePoints: 50, homeworkBonusPerTask: 10 },
+        dailySettlement: {
+            [dateKey]: { ...existingSettlement },
+        },
+    };
+
+    let savedSettlement = null;
+    let updatedPoints = null;
+    const API = {
+        async saveSettlement(key, data) {
+            savedSettlement = { key, data };
+        },
+        async saveEfficiency(key, data) { },
+        async updatePoints(type, amount, note) {
+            updatedPoints = { type, amount, note };
+        },
+    };
+
+    let updateBigScreenCalled = false;
+    const updateBigScreen = () => { updateBigScreenCalled = true; };
+
+    await calculateSettlementLogic({
+        homeworks,
+        currentDate,
+        Util,
+        cachedData,
+        API,
+        updateBigScreen,
+        window: {},
+    });
+
+    assert.ok(savedSettlement, '应保存了 settlement');
+    // homeworkBonus 应包含新作业
+    assert.strictEqual(savedSettlement.data.homeworkBonus, 28, 'homeworkBonus 应更新为 28');
+    assert.strictEqual(savedSettlement.data.totalBeforeRating, 78, 'totalBeforeRating 应更新为 78');
+    assert.strictEqual(savedSettlement.data.doneCount, 3, 'doneCount 应更新为 3');
+    // 评级信息应保持不变
+    assert.strictEqual(savedSettlement.data.rating, null, 'rating 仍为 null');
+    assert.strictEqual(savedSettlement.data.finalPoints, null, 'finalPoints 仍为 null（未评级）');
+    assert.strictEqual(savedSettlement.data.submittedAt, '18:30', 'submittedAt 应保持');
+    // API.updatePoints 不应被调用（未评级无倍率）
+    assert.strictEqual(updatedPoints, null, '未评级不应调用 updatePoints');
+});
+
+//   Scenario: 已提交等待评级后完成新作业，之后评级时应使用更新后的 totalBeforeRating
+//     Given 当天已有 settlement，submittedAt 已设置，rating=null
+//     And 新增一项挑战成功作业 basePoints=8 并已完成
+//     When submitRating 根据 settlement.totalBeforeRating 计算最终积分
+//     Then totalBeforeRating 应为 78（50+28）而不是 70（50+20）
+
+test('已提交后新作业完成使 settlement.totalBeforeRating 包含新作业', async () => {
+    const currentDate = new Date('2026-06-04');
+    const dateKey = '2026-06-04';
+    const Util = makeUtil(currentDate);
+
+    const homeworks = [
+        { id: 'hw1', subject: '数学', content: '练习册', status: 'done', mode: 'challenge', rejected: false, basePoints: 10, actualDuration: 15, suggestedDuration: 20 },
+        { id: 'hw2', subject: '语文', content: '阅读', status: 'done', mode: 'challenge', rejected: false, basePoints: 10, actualDuration: 8, suggestedDuration: 10 },
+        { id: 'hw3', subject: '英语', content: '单词', status: 'done', mode: 'challenge', rejected: false, basePoints: 8, actualDuration: 10, suggestedDuration: 10 },
+    ];
+
+    const existingSettlement = {
+        dailyBase: 50,
+        homeworkBonus: 20,
+        totalBeforeRating: 70,
+        doneCount: 2,
+        rating: null,
+        multiplier: null,
+        finalPoints: null,
+        submittedAt: '18:30',
+        ratedAt: null,
+    };
+
+    const cachedData = {
+        settings: { dailyBasePoints: 50, homeworkBonusPerTask: 10 },
+        dailySettlement: {
+            [dateKey]: { ...existingSettlement },
+        },
+    };
+
+    let savedSettlement = null;
+    let updatedPoints = null;
+    const API = {
+        async saveSettlement(key, data) {
+            savedSettlement = { key, data };
+        },
+        async saveEfficiency(key, data) { },
+        async updatePoints(type, amount, note) {
+            updatedPoints = { type, amount, note };
+        },
+    };
+
+    let updateBigScreenCalled = false;
+    const updateBigScreen = () => { updateBigScreenCalled = true; };
+
+    await calculateSettlementLogic({
+        homeworks,
+        currentDate,
+        Util,
+        cachedData,
+        API,
+        updateBigScreen,
+        window: {},
+    });
+
+    // 验证 settlement 已更新 homeworkBonus
+    assert.ok(savedSettlement, '应保存了 settlement');
+    assert.strictEqual(savedSettlement.data.homeworkBonus, 28, 'homeworkBonus 包含新作业');
+    assert.strictEqual(savedSettlement.data.totalBeforeRating, 78, 'totalBeforeRating 已更新');
+
+    // 模拟管理员评级：使用 updated settlement 的 totalBeforeRating 计算
+    // 这模拟了 admin.js 中 submitRating() 的行为
+    const rating = '优';
+    const multiplier = 2.0;
+    const finalPoints = Math.round(savedSettlement.data.totalBeforeRating * multiplier);
+
+    assert.strictEqual(finalPoints, 156, '评级时应基于 78 计算最终积分，得到 156');
+    // 如果使用旧的 totalBeforeRating=70，会得到 140，丢失 16 分
+    assert.notStrictEqual(Math.round(70 * multiplier), finalPoints, '不应基于旧的 totalBeforeRating 计算');
 });

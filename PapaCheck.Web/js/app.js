@@ -15,14 +15,14 @@
     // 通过 API 验证 token 是否仍有效（未被删除/吊销）
     fetch('/api/auth/me', {
       headers: { 'Authorization': 'Bearer ' + token }
-    }).then(function(resp) {
+    }).then(function (resp) {
       if (resp.status === 401) {
         localStorage.removeItem('papacheck_token');
         localStorage.removeItem('papacheck_role');
         localStorage.removeItem('papacheck_nickname');
         window.location.href = '/login.html?redirect=' + encodeURIComponent('/app/');
       }
-    }).catch(function() {});
+    }).catch(function () { });
   } catch (e) {
     // 测试环境中 localStorage 不可用，跳过检查
   }
@@ -697,8 +697,7 @@ async function calculateSettlement() {
     // 检查当天是否已有 settlement 并已评级
     const existingSettlement = cachedData?.dailySettlement?.[dateKey];
 
-    if (existingSettlement && (existingSettlement.rating || existingSettlement.submittedAt)) {
-      // 当天已评级 或 已提交等待评级：只处理追加作业，不覆写 submittedAt
+    if (existingSettlement) {
       const prevHomeworkBonus = existingSettlement.homeworkBonus || 0;
 
       const currentHomeworkBonus = challengeSuccess.reduce(
@@ -707,39 +706,65 @@ async function calculateSettlement() {
 
       const newHomeworkBonus = currentHomeworkBonus - prevHomeworkBonus;
 
-      if (newHomeworkBonus > 0) {
-        // 用已有倍率计算新增积分（不含每日基础分）
-        const multiplier = existingSettlement.multiplier;
-        const additionalPoints = Math.round(newHomeworkBonus * multiplier);
+      if (existingSettlement.rating) {
+        // 当天已评级：只处理追加作业的加分，不覆写 submittedAt
+        if (newHomeworkBonus > 0) {
+          // 用已有倍率计算新增积分（不含每日基础分）
+          const multiplier = existingSettlement.multiplier;
+          const additionalPoints = Math.round(newHomeworkBonus * multiplier);
 
-        const updatedSettlement = {
-          ...existingSettlement,
-          homeworkBonus: currentHomeworkBonus,
-          totalBeforeRating: existingSettlement.dailyBase + currentHomeworkBonus,
-          doneCount: doneHw.length,
-          finalPoints: (existingSettlement.finalPoints || 0) + additionalPoints,
-        };
+          const updatedSettlement = {
+            ...existingSettlement,
+            homeworkBonus: currentHomeworkBonus,
+            totalBeforeRating: existingSettlement.dailyBase + currentHomeworkBonus,
+            doneCount: doneHw.length,
+            finalPoints: (existingSettlement.finalPoints || 0) + additionalPoints,
+          };
 
-        window._settlement = updatedSettlement;
-        await _putSettlementIdempotent(dateKey, updatedSettlement);
+          window._settlement = updatedSettlement;
+          await _putSettlementIdempotent(dateKey, updatedSettlement);
 
-        if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
-        cachedData.dailySettlement[dateKey] = updatedSettlement;
+          if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
+          cachedData.dailySettlement[dateKey] = updatedSettlement;
 
-        if (additionalPoints > 0) {
-          await API.updatePoints('earn', additionalPoints,
-            `追加完成作业，按${existingSettlement.rating}评级倍率计算`);
+          if (additionalPoints > 0) {
+            await API.updatePoints('earn', additionalPoints,
+              `追加完成作业，按${existingSettlement.rating}评级倍率计算`);
+          }
+        } else {
+          // 没有新作业加分，只更新 doneCount
+          const updatedSettlement = {
+            ...existingSettlement,
+            doneCount: doneHw.length,
+          };
+          window._settlement = updatedSettlement;
+          await _putSettlementIdempotent(dateKey, updatedSettlement);
+          if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
+          cachedData.dailySettlement[dateKey] = updatedSettlement;
         }
-      } else {
-        // 没有新作业加分，只更新 doneCount
-        const updatedSettlement = {
-          ...existingSettlement,
-          doneCount: doneHw.length,
-        };
-        window._settlement = updatedSettlement;
-        await _putSettlementIdempotent(dateKey, updatedSettlement);
-        if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
-        cachedData.dailySettlement[dateKey] = updatedSettlement;
+      } else if (existingSettlement.submittedAt) {
+        // 已提交等待评级：只更新 homeworkBonus/totalBeforeRating，不加分（尚未评级，无倍率）
+        if (newHomeworkBonus > 0) {
+          const updatedSettlement = {
+            ...existingSettlement,
+            homeworkBonus: currentHomeworkBonus,
+            totalBeforeRating: existingSettlement.dailyBase + currentHomeworkBonus,
+            doneCount: doneHw.length,
+          };
+          window._settlement = updatedSettlement;
+          await _putSettlementIdempotent(dateKey, updatedSettlement);
+          if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
+          cachedData.dailySettlement[dateKey] = updatedSettlement;
+        } else {
+          const updatedSettlement = {
+            ...existingSettlement,
+            doneCount: doneHw.length,
+          };
+          window._settlement = updatedSettlement;
+          await _putSettlementIdempotent(dateKey, updatedSettlement);
+          if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
+          cachedData.dailySettlement[dateKey] = updatedSettlement;
+        }
       }
 
       // 保存 efficiency 数据
@@ -948,7 +973,7 @@ function startPoll(intervalMs) {
           needsFullRender = true;
           const allDone = newHw.length > 0 && newHw.every(h => h.status === 'done');
           const settlement = getSettlementData();
-          if (settlement && !settlement.rating) {
+          if (settlement && !settlement.rating && !settlement.submittedAt) {
             if (!allDone) {
               cachedData._settlement = null;
               window._settlement = null;
