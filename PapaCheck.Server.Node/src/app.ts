@@ -18,6 +18,7 @@ import { authRoutes } from './auth/routes.js';
 import { adminRoutes } from './admin/routes.js';
 import { superAdminRoutes } from './auth/super-admin-routes.js';
 import { ensureSuperAdmin } from './auth/super-admin.js';
+import rateLimit from '@fastify/rate-limit';
 
 export interface AppOptions {
   port: number;
@@ -27,6 +28,8 @@ export interface AppOptions {
   showPollingLog?: boolean;
   /** 启用 JWT Bearer 认证（生产环境设为 true） */
   enableAuth?: boolean;
+  /** 速率限制配置，设为 false 可禁用 */
+  rateLimit?: false | { max?: number; timeWindow?: string };
 }
 
 /** 设置 Content-Type: application/json; charset=utf-8 并返回数据 */
@@ -101,6 +104,20 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     logger: false,
   });
 
+  // ==================== 速率限制 ====================
+
+  if (options.rateLimit !== false) {
+    await app.register(rateLimit, {
+      max: options.rateLimit?.max ?? 60,
+      timeWindow: options.rateLimit?.timeWindow ?? '1 minute',
+      errorResponseBuilder: (request, context) => ({
+        error: '请求过于频繁，请稍后再试',
+        code: 'RATE_LIMIT_EXCEEDED',
+        retryAfter: context.after,
+      }),
+    });
+  }
+
   // ==================== 请求日志 ====================
 
   app.addHook('onResponse', (request, reply, done) => {
@@ -128,6 +145,15 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         error: '请求参数校验失败',
         code: ErrorCodes.VALIDATION_ERROR,
         details: fastifyErr.validation,
+      });
+    }
+
+    // Fastify 插件抛出的结构化错误（如 @fastify/rate-limit 返回 { error, code }）
+    const plainErr = error as any;
+    if (plainErr && typeof plainErr === 'object' && !(error instanceof Error) && plainErr.code) {
+      return reply.status(plainErr.statusCode || 429).send({
+        error: plainErr.error || '请求被拒绝',
+        code: plainErr.code,
       });
     }
 

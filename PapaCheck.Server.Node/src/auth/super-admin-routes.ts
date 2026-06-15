@@ -4,15 +4,88 @@ import type { JWTPayload } from './types.js';
 import { signToken } from './jwt.js';
 import bcrypt from 'bcryptjs';
 
+const errorResponse = {
+  400: {
+    type: 'object',
+    properties: { error: { type: 'string' }, code: { type: 'string' } },
+  },
+  401: {
+    type: 'object',
+    properties: { error: { type: 'string' }, code: { type: 'string' } },
+  },
+  403: {
+    type: 'object',
+    properties: { error: { type: 'string' }, code: { type: 'string' } },
+  },
+};
+
+const superLoginSchema = {
+  body: {
+    type: 'object',
+    required: ['username', 'password'],
+    properties: {
+      username: { type: 'string', minLength: 1 },
+      password: { type: 'string', minLength: 1 },
+    },
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        token: { type: 'string' },
+        username: { type: 'string' },
+        needs_password_change: { type: 'boolean' },
+      },
+    },
+    ...errorResponse,
+  },
+};
+
+const credentialsSchema = {
+  body: {
+    type: 'object',
+    required: ['username', 'password', 'current_password'],
+    properties: {
+      username: { type: 'string', minLength: 1 },
+      password: { type: 'string', minLength: 6 },
+      current_password: { type: 'string', minLength: 1 },
+    },
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        ok: { type: 'boolean' },
+        message: { type: 'string' },
+      },
+    },
+    ...errorResponse,
+  },
+};
+
+const tenantToggleSchema = {
+  body: {
+    type: 'object',
+    required: ['is_active'],
+    properties: {
+      is_active: { type: 'boolean' },
+    },
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        ok: { type: 'boolean' },
+      },
+    },
+    ...errorResponse,
+  },
+};
+
 export async function superAdminRoutes(app: FastifyInstance, db: IDatabase): Promise<void> {
   // POST /api/admin/super/login — 超级管理员登录
-  app.post('/api/admin/super/login', async (request, reply) => {
-    const body = request.body as any;
-    const { username, password } = body ?? {};
-
-    if (!username || !password) {
-      return reply.status(400).send({ error: '缺少必填字段：username、password', code: 'VALIDATION_ERROR' });
-    }
+  app.post('/api/admin/super/login', { schema: superLoginSchema, config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const { username, password } = request.body as { username: string; password: string };
 
     const admin = await db.findSuperAdmin(username);
     if (!admin || !bcrypt.compareSync(password, admin.password_hash)) {
@@ -29,20 +102,13 @@ export async function superAdminRoutes(app: FastifyInstance, db: IDatabase): Pro
   });
 
   // PUT /api/admin/super/credentials — 修改超级管理员凭证
-  app.put('/api/admin/super/credentials', async (request: any, reply) => {
+  app.put('/api/admin/super/credentials', { schema: credentialsSchema }, async (request: any, reply) => {
     const payload = request.jwtPayload as JWTPayload;
     if (!payload || payload.role !== 'super_admin') {
       return reply.status(403).send({ error: '仅超级管理员可执行此操作', code: 'FORBIDDEN' });
     }
 
-    const body = request.body as any;
-    const { username: newUsername, password: newPassword, current_password } = body ?? {};
-    if (!newUsername || !newPassword || !current_password) {
-      return reply.status(400).send({ error: '缺少必填字段：username、password、current_password', code: 'VALIDATION_ERROR' });
-    }
-    if (newPassword.length < 6) {
-      return reply.status(400).send({ error: '密码长度不能少于6位', code: 'VALIDATION_ERROR' });
-    }
+    const { username: newUsername, password: newPassword, current_password } = request.body as { username: string; password: string; current_password: string };
 
     // Verify current password by querying the database directly
     const pool = (db as any).pool;
@@ -70,19 +136,14 @@ export async function superAdminRoutes(app: FastifyInstance, db: IDatabase): Pro
   });
 
   // PATCH /api/admin/super/tenants/:id — 启用/禁用租户
-  app.patch('/api/admin/super/tenants/:id', async (request: any, reply) => {
+  app.patch('/api/admin/super/tenants/:id', { schema: tenantToggleSchema }, async (request: any, reply) => {
     const payload = request.jwtPayload as JWTPayload;
     if (!payload || payload.role !== 'super_admin') {
       return reply.status(403).send({ error: '仅超级管理员可执行此操作', code: 'FORBIDDEN' });
     }
 
     const { id } = request.params as { id: string };
-    const body = request.body as any;
-    const { is_active } = body ?? {};
-
-    if (typeof is_active !== 'boolean') {
-      return reply.status(400).send({ error: '缺少必填字段：is_active（布尔值）', code: 'VALIDATION_ERROR' });
-    }
+    const { is_active } = request.body as { is_active: boolean };
 
     await db.setTenantActive(id, is_active);
     return { ok: true };

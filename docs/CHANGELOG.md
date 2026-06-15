@@ -7,6 +7,8 @@
 ## [Unreleased]
 
 ### Added
+- **认证端点添加速率限制**：安装 `@fastify/rate-limit`，全局 60 次/分钟兜底；`POST /api/auth/login` 和 `POST /api/auth/exchange` 各 10 次/分钟，`POST /api/admin/super/login` 5 次/分钟；新增 429 限流测试；`AppOptions.rateLimit` 支持测试中禁用
+- **JSON Schema 请求体验证**：为 10 个认证/管理路由添加 JSON Schema 定义（auth 2 个、admin 5 个、super-admin 3 个），移除 handler 内重复的手动字段校验；添加 4xx 错误响应 schema 完善 Swagger 文档
 - **PapaCheck.Site 官网子项目**：新建 `PapaCheck.Site/` 子项目，将官网从 `docs/` 搬出；管理面板从落地页底部内嵌改为独立 `admin.html` 页面；docs/index.html 移除管理面板代码；更新 release.py 排除项
 - **作业 CRUD 流程测试**：新增 `homework-flow.test.ts`（5 测试），验证新增/更新/删除/租户隔离
 - **赏金任务放弃/提交反馈测试**：新增 `bounty_abandon_feedback.test.js`（4 测试），验证找不到任务记录时 toast 提示用户

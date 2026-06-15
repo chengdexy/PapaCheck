@@ -220,6 +220,18 @@ describe('Admin Routes', () => {
   beforeAll(async () => {
     app = Fastify();
 
+    // 注册全局错误处理器，处理 Fastify schema 校验错误
+    app.setErrorHandler((error: any, _request, reply) => {
+      if (error.validation) {
+        return reply.status(400).send({
+          error: '请求参数校验失败',
+          code: 'VALIDATION_ERROR',
+          details: error.validation,
+        });
+      }
+      return reply.status(500).send({ error: '服务器内部错误', code: 'INTERNAL_ERROR' });
+    });
+
     // 注册 auth 中间件
     await authMiddleware(app, { db: mockDb });
 

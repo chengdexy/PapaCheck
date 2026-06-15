@@ -9,7 +9,7 @@ let app: FastifyInstance;
 let db: any;
 
 beforeAll(async () => {
-  app = await buildApp({ port: 0, webDir: '', dbPath: ':memory:', showPollingLog: false });
+  app = await buildApp({ port: 0, webDir: '', dbPath: ':memory:', showPollingLog: false, rateLimit: false });
   await app.listen({ port: 0, host: '127.0.0.1' });
   db = (app as any).papaCheckDB;
 });

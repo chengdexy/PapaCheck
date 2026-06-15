@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@fastify/cookie": "^9.4.0",
+    "@fastify/rate-limit": "^9.1.0",
     "@fastify/static": "^7.0.0",
     "@fastify/swagger": "^8.15.0",
     "@fastify/swagger-ui": "^3.0.0",

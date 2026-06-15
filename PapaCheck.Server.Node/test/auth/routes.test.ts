@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, test, beforeAll, afterAll } from 'vitest';
 import Fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
 import { authRoutes } from '../../src/auth/routes.js';
 import { authMiddleware } from '../../src/auth/middleware.js';
 import { signToken } from '../../src/auth/jwt.js';
 import type { IDatabase, UserRecord } from '../../src/db/types.js';
+import { buildApp } from '../../src/app.js';
 
 describe('Auth Routes', () => {
   let app: FastifyInstance;
@@ -114,6 +115,18 @@ describe('Auth Routes', () => {
   beforeAll(async () => {
     app = Fastify();
 
+    // 注册全局错误处理器，处理 Fastify schema 校验错误
+    app.setErrorHandler((error: any, _request, reply) => {
+      if (error.validation) {
+        return reply.status(400).send({
+          error: '请求参数校验失败',
+          code: 'VALIDATION_ERROR',
+          details: error.validation,
+        });
+      }
+      return reply.status(500).send({ error: '服务器内部错误', code: 'INTERNAL_ERROR' });
+    });
+
     // 先注册 authMiddleware（注入 jwtPayload）
     await authMiddleware(app, { db: mockDb });
 
@@ -141,7 +154,7 @@ describe('Auth Routes', () => {
     });
     expect(res.statusCode).toBe(400);
     const body = res.json();
-    expect(body.code).toBe('INVALID_ACCESS_CODE');
+    expect(body.code).toBe('VALIDATION_ERROR');
   });
 
   // Feature: POST /api/auth/exchange
@@ -158,7 +171,7 @@ describe('Auth Routes', () => {
     });
     expect(res.statusCode).toBe(400);
     const body = res.json();
-    expect(body.code).toBe('INVALID_ACCESS_CODE');
+    expect(body.code).toBe('VALIDATION_ERROR');
   });
 
   // Feature: POST /api/auth/exchange
@@ -238,4 +251,29 @@ describe('Auth Routes', () => {
     expect(body.role).toBe(mockUser.role);
     expect(body.tenant_id).toBe(mockUser.tenant_id);
   });
+});
+
+// ==================== 速率限制测试 ====================
+
+test('POST /api/auth/exchange 超出速率限制应返回 429', async () => {
+  const app = await buildApp({ port: 0, webDir: '', dbPath: ':memory:', enableAuth: true });
+  // 连续发送 11 次请求，第 11 次应返回 429
+  for (let i = 0; i < 10; i++) {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/exchange',
+      payload: { access_code: 'invalid-code' },
+    });
+    // 前 10 次不应限流（可能返回 400 或 401，但不能是 429）
+    expect(res.statusCode).not.toBe(429);
+  }
+  const res = await app.inject({
+    method: 'POST',
+    url: '/api/auth/exchange',
+    payload: { access_code: 'invalid-code' },
+  });
+  expect(res.statusCode).toBe(429);
+  const body = JSON.parse(res.body);
+  expect(body.code).toBe('RATE_LIMIT_EXCEEDED');
+  await app.close();
 });
