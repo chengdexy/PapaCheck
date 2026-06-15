@@ -16,6 +16,7 @@
 - **测试覆盖补齐**：新增 29 个测试（Super Admin Routes 16 个、Admin Routes 成员管理 11 个、Middleware PUBLIC_PATHS 2 个），全量 625 测试通过
 
 ### Fixed
+- **修复 rate-limit 错误处理器分支无效**：`!(error instanceof Error)` 将 `@fastify/rate-limit` 抛出的 Error 实例排除在外，导致 429 错误落入 500 兜底；移除该条件使 rate-limit 正确返回 429
 - **修复放弃的常驻型赏金任务孩子端不再可见**：`availableBounty` 过滤条件增加了 abandoned 状态排除；`startBountyTask` 守卫允许放弃的任务重新开始并复用已放弃的提交记录。新增 1 个 TDD 测试，全量 628 测试通过
 - **修复评级后新增作业完成不加分**：`calculateSettlement()` 中 `submittedAt` 和 `rating` 共用同一分支导致 multiplier=null 时无法加分且 `homeworkBonus` 未更新；分离为独立分支，已提交状态正确更新 `homeworkBonus`/`totalBeforeRating`，已评级状态正常追加积分。同时修复 pollServer 在 `!allDone` 时错误删除已提交 settlement 的问题。**[后续修复]** 外层条件误改为 `if (existingSettlement)` 导致既无 `rating` 也无 `submittedAt` 的 settlement 跳过"未评级"逻辑，已恢复为 `(rating || submittedAt)`
 - **修复新增作业不显示在列表中**：生产数据库中所有 19 张业务表的 PRIMARY KEY 缺少 `tenant_id` 列，导致 `ON CONFLICT (tenant_id, date_key)` UPSERT 失败 → 服务器返回 500 错误 → 前端静默回退到离线存储 → 作业不显示。已手动执行数据库迁移修复所有 PK

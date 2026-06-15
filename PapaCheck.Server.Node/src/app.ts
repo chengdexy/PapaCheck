@@ -148,9 +148,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       });
     }
 
-    // Fastify 插件抛出的结构化错误（如 @fastify/rate-limit 返回 { error, code }）
+    // Fastify 插件抛出的结构化错误（@fastify/rate-limit 等附加 statusCode/code 属性的 Error 实例）
     const plainErr = error as any;
-    if (plainErr && typeof plainErr === 'object' && !(error instanceof Error) && plainErr.code) {
+    if (plainErr && typeof plainErr === 'object' && plainErr.code) {
       return reply.status(plainErr.statusCode || 429).send({
         error: plainErr.error || '请求被拒绝',
         code: plainErr.code,

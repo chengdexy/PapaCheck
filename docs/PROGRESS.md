@@ -87,6 +87,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-15 | **修复 rate-limit 错误处理器分支无效**：`!(error instanceof Error)` 将 `@fastify/rate-limit` 抛出的 Error 实例排除在外，导致 429 错误落入 500 兜底；移除该条件使 rate-limit 正确返回 429 |
 | 2026-06-15 | **添加速率限制 + JSON Schema 验证**：认证端点添加 `@fastify/rate-limit` 速率限制（login/exchange 各 10 次/分钟, super-login 5 次/分钟）；为 10 个路由添加 JSON Schema 定义+4xx 响应文档，移除重复手动校验；代码审查修复测试错误处理器 throw 问题 + 补充 4xx 响应 schema；全量 629 测试通过 |
 | 2026-06-15 | **修复事件委托绑定时机脆弱**：`document.getElementById` 依赖 DOM 已存在，改为绑定 `document` + CSS 选择器限定作用域，不受加载时机影响 |
 | 2026-06-15 | **修复管理面板事件委托重复绑定**：`loadMembers`/`loadSuperTenants` 每次调用重复添加 click 监听器，移出到文件末尾单次绑定 |
