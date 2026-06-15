@@ -62,11 +62,22 @@ def cloud_publish(server_ip, server_user):
         return False
     print('✓')
 
-    # 2. 打包代码
-    print(f'  ▶ [2/5] 打包代码 ... ', end='', flush=True)
+    # 2. 编译 TypeScript
+    print(f'  ▶ [2/5] 编译 TypeScript ... ', end='', flush=True)
+    build_result = subprocess.run(
+        'npm run build', cwd=NODE_DIR, shell=True,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if build_result.returncode != 0:
+        print('✗')
+        print('  TypeScript 编译失败')
+        return False
+    print('✓')
+
+    # 3. 打包代码（包含编译产物 dist/）
+    print(f'  ▶ [3/5] 打包代码 ... ', end='', flush=True)
     tar_path = os.path.join(ROOT, '.publish.tar.gz')
     tar_cmd = [
-        'tar', '--exclude=node_modules', '--exclude=dist', '--exclude=test',
+        'tar', '--exclude=node_modules', '--exclude=test',
         '--exclude=PapaCheck.Android', '--exclude=PapaCheck.Windows',
         '--exclude=PapaCheck.Email', '--exclude=PapaCheck.Tests',
         '--exclude=PapaCheck.Server', '--exclude=docs', '--exclude=.trae',
@@ -99,7 +110,7 @@ def cloud_publish(server_ip, server_user):
         apk_local = APK_BUILD_OUTPUT
 
     if apk_local:
-        print(f'  ▶ [3/5] 上传 APK ({os.path.basename(apk_local)}) ... ', end='', flush=True)
+        print(f'  ▶ [4/5] 上传 APK ({os.path.basename(apk_local)}) ... ', end='', flush=True)
         result = subprocess.run(
             ['scp', '-o', 'StrictHostKeyChecking=accept-new',
              apk_local, f'{server_user}@{server_ip}:/opt/papacheck/PapaCheck.Web/apk/'])
@@ -118,10 +129,10 @@ def cloud_publish(server_ip, server_user):
                 ['ssh', '-o', 'StrictHostKeyChecking=accept-new',
                  f'{server_user}@{server_ip}', cleanup_cmd])
     else:
-        print(f'  ▶ [3/5] 无 APK 可上传，跳过')
+        print(f'  ▶ [4/5] 无 APK 可上传，跳过')
 
-    # 4. 上传代码包
-    print(f'  ▶ [4/5] 上传代码到服务器 ... ', end='', flush=True)
+    # 5. 上传代码包
+    print(f'  ▶ [5/5] 上传代码到服务器 ... ', end='', flush=True)
     result = subprocess.run(
         ['scp', '-o', 'StrictHostKeyChecking=accept-new',
          tar_path, f'{server_user}@{server_ip}:/opt/'])
@@ -133,8 +144,8 @@ def cloud_publish(server_ip, server_user):
     os.remove(tar_path)
     print('✓')
 
-    # 5. 服务器端构建并重启
-    print(f'  ▶ [5/5] 云端构建并重启 ... ', end='', flush=True)
+    # 6. 服务器端安装依赖并重启
+    print(f'  ▶ [6/6] 服务器端安装依赖并重启 ... ', end='', flush=True)
     remote_cmd = (
         'mkdir -p /opt/papacheck && '
         'cd /opt && tar xzf .publish.tar.gz -C /opt/papacheck && '
