@@ -5,9 +5,9 @@ import { signToken } from '../auth/jwt.js';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 
-function generateAccessHash(): { raw: string; hashed: string } {
+async function generateAccessHash(): Promise<{ raw: string; hashed: string }> {
   const raw = 'pc-' + crypto.randomBytes(16).toString('hex');
-  const hashed = bcrypt.hashSync(raw, 10);
+  const hashed = await bcrypt.hash(raw, 10);
   return { raw, hashed };
 }
 
@@ -36,8 +36,8 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
     }
 
     const userId = crypto.randomUUID();
-    const { raw, hashed } = generateAccessHash();
-    const passwordHash = bcrypt.hashSync(password, 10);
+    const { raw, hashed } = await generateAccessHash();
+    const passwordHash = await bcrypt.hash(password, 10);
 
     await db.createUser({
       id: userId,
@@ -64,7 +64,7 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
     }
 
     const admin = await db.findAdminByEmail(email);
-    if (!admin || !bcrypt.compareSync(password, admin.password_hash)) {
+    if (!admin || !(await bcrypt.compare(password, admin.password_hash))) {
       return reply.status(401).send({ error: '邮箱或密码错误', code: 'INVALID_CREDENTIALS' });
     }
 
@@ -113,7 +113,7 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
     }
 
     const userId = crypto.randomUUID();
-    const { raw, hashed } = generateAccessHash();
+    const { raw, hashed } = await generateAccessHash();
     await db.createUser({
       id: userId,
       tenant_id: payload.tenant_id,
@@ -134,7 +134,7 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
     }
 
     const { id } = request.params as { id: string };
-    const { raw, hashed } = generateAccessHash();
+    const { raw, hashed } = await generateAccessHash();
     await db.regenerateMemberHash(id, payload.tenant_id, hashed);
     return { id, access_hash: raw, message: '已重新生成，旧访问码已失效' };
   });

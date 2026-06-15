@@ -1271,6 +1271,8 @@ export class SqliteAdapter extends DatabaseAdapter {
           access_hash: row.access_hash,
           token_version: row.token_version,
           is_active: !!row.is_active,
+          is_super_admin: !!row.is_super_admin,
+          needs_password_change: !!row.needs_password_change,
           created_at: row.created_at,
           last_login: row.last_login ?? undefined,
         };
@@ -1290,6 +1292,8 @@ export class SqliteAdapter extends DatabaseAdapter {
       access_hash: row.access_hash,
       token_version: row.token_version,
       is_active: !!row.is_active,
+      is_super_admin: !!row.is_super_admin,
+      needs_password_change: !!row.needs_password_change,
       created_at: row.created_at,
       last_login: row.last_login ?? undefined,
     };

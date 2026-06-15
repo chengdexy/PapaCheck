@@ -213,8 +213,11 @@ describe('Admin Routes', () => {
     updateTenantName: async (tenantId: string, newName: string) => { const t = storedTenants.find(t => t.id === tenantId); if (t) t.name = newName; },
   };
 
-  beforeAll(async () => {
+  beforeEach(() => {
     resetState();
+  });
+
+  beforeAll(async () => {
     app = Fastify();
 
     // 注册 auth 中间件

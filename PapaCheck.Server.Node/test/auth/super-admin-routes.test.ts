@@ -55,7 +55,18 @@ describe('Super Admin Routes', () => {
   resetState();
 
   // ==================== 模拟 DB ====================
-  const mockDb: IDatabase = {
+  const mockDb: IDatabase & { pool?: any } = {
+    pool: {
+      query: async (sql: string, params: any[]) => {
+        if (sql.includes('SELECT password_hash FROM users')) {
+          if (params[0] === superAdminId) {
+            return { rows: [{ password_hash: superAdminPasswordHash }] };
+          }
+          return { rows: [] };
+        }
+        return { rows: [] };
+      },
+    },
     // Super Admin 方法
     findSuperAdmin: async (username: string) => {
       if (username === storedSuperAdmin.email) {
@@ -160,8 +171,11 @@ describe('Super Admin Routes', () => {
   };
 
   // ==================== 应用启动 ====================
-  beforeAll(async () => {
+  beforeEach(() => {
     resetState();
+  });
+
+  beforeAll(async () => {
     app = Fastify();
 
     await authMiddleware(app, { db: mockDb });
@@ -335,7 +349,7 @@ describe('Super Admin Routes', () => {
       method: 'PUT',
       url: '/api/admin/super/credentials',
       headers: { Authorization: `Bearer ${superToken}` },
-      payload: { username: 'updated-admin', password: 'newpass123' },
+      payload: { username: 'updated-admin', password: 'newpass123', current_password: superAdminPassword },
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().ok).toBe(true);
@@ -387,7 +401,7 @@ describe('Super Admin Routes', () => {
       sub: superAdminId,
       tenant_id: '__super_admin__',
       role: 'super_admin',
-      token_version: 2,
+      token_version: 1,
     });
     const res = await app.inject({
       method: 'GET',
@@ -450,7 +464,7 @@ describe('Super Admin Routes', () => {
       sub: superAdminId,
       tenant_id: '__super_admin__',
       role: 'super_admin',
-      token_version: 2,
+      token_version: 1,
     });
     const res = await app.inject({
       method: 'PATCH',
@@ -472,7 +486,7 @@ describe('Super Admin Routes', () => {
       sub: superAdminId,
       tenant_id: '__super_admin__',
       role: 'super_admin',
-      token_version: 2,
+      token_version: 1,
     });
     expect(storedTenants.find(t => t.id === tenant1Id)?.is_active).toBe(true);
     const res = await app.inject({

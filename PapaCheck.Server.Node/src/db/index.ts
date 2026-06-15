@@ -10,7 +10,7 @@ export async function createDatabase(options: { dbPath?: string; databaseUrl?: s
   const url = options.databaseUrl ?? process.env['DATABASE_URL'];
   if (url) {
     const { PostgresAdapter } = await import('./postgres-adapter.js');
-    return new PostgresAdapter(url);
+    return await PostgresAdapter.create(url);
   }
   return new SqliteAdapter(options.dbPath ?? 'data.db');
 }

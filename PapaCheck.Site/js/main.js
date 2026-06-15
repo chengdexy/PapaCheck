@@ -102,19 +102,23 @@ document.getElementById('admin-register-form')?.addEventListener('submit', async
         email: form.querySelector('[name="email"]').value,
         password: form.querySelector('[name="password"]').value
     };
-    const res = await fetch(`${ADMIN_API_BASE}/api/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-    });
-    if (res.ok) {
-        const result = await res.json();
-        alert(`注册成功！\n\n家庭已创建。\n管理员的访问码是：\n${result.admin_hash}\n\n请务必保存此访问码！`);
-        // 切换到登录
-        document.querySelectorAll('.admin-tab')[0].click();
-    } else {
-        const err = await res.json();
-        alert('注册失败: ' + (err.error || '未知错误'));
+    try {
+        const res = await fetch(`${ADMIN_API_BASE}/api/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (res.ok) {
+            const result = await res.json();
+            showModal('注册成功', `家庭已创建。<br>管理员的访问码是：<br><code style="font-size:1.2em">${result.admin_hash}</code><br><br>请务必保存此访问码！`);
+            // 切换到登录
+            document.querySelectorAll('.admin-tab')[0].click();
+        } else {
+            const err = await res.json();
+            alert('注册失败: ' + (err.error || '未知错误'));
+        }
+    } catch (err) {
+        alert('网络错误，请检查服务器连接');
     }
 });
 
@@ -126,17 +130,26 @@ document.getElementById('admin-login-form')?.addEventListener('submit', async (e
         email: form.querySelector('[name="email"]').value,
         password: form.querySelector('[name="password"]').value,
     };
-    const res = await fetch(`${ADMIN_API_BASE}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-    });
-    if (res.ok) {
-        const result = await res.json();
-        localStorage.setItem(ADMIN_TOKEN_KEY, result.token);
-        await checkAdminAuth();
-    } else {
-        alert('登录失败，请检查邮箱和密码');
+    try {
+        const res = await fetch(`${ADMIN_API_BASE}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (res.ok) {
+            const result = await res.json();
+            localStorage.setItem(ADMIN_TOKEN_KEY, result.token);
+            await checkAdminAuth();
+        } else {
+            try {
+                const err = await res.json();
+                alert('登录失败: ' + (err.error || '请检查邮箱和密码'));
+            } catch {
+                alert('登录失败，请检查邮箱和密码');
+            }
+        }
+    } catch (err) {
+        alert('网络错误，请检查服务器连接');
     }
 });
 
@@ -147,37 +160,41 @@ document.getElementById('admin-logout-btn')?.addEventListener('click', () => {
 });
 
 async function loadMembers(token) {
-    const res = await fetch(`${ADMIN_API_BASE}/api/admin/members`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-    });
-    if (res.ok) {
-        const members = await res.json();
-        const tbody = document.getElementById('member-tbody');
-        tbody.innerHTML = members.map(m => `
-      <tr>
-        <td>${escapeHtml(m.nickname)}</td>
-        <td>${m.role === 'parent' ? '家长' : '孩子'}</td>
-        <td><code>${escapeHtml(m.access_hash)}</code> <button class="copy-btn" data-hash="${escapeHtml(m.access_hash)}">复制</button></td>
-        <td>${m.last_login || '从未'}</td>
-        <td>
-          <button onclick="regenerateMemberHash('${m.id}')">重新生成</button>
-          <button onclick="removeMember('${m.id}')">移除</button>
-        </td>
-      </tr>
-    `).join('');
+    try {
+        const res = await fetch(`${ADMIN_API_BASE}/api/admin/members`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (res.ok) {
+            const members = await res.json();
+            const tbody = document.getElementById('member-tbody');
+            tbody.innerHTML = members.map(m => `
+          <tr>
+            <td>${escapeHtml(m.nickname)}</td>
+            <td>${m.role === 'parent' ? '家长' : '孩子'}</td>
+            <td><code>${escapeHtml(m.access_hash)}</code> <button class="copy-btn" data-hash="${escapeHtml(m.access_hash)}">复制</button></td>
+            <td>${m.last_login || '从未'}</td>
+            <td>
+              <button onclick="regenerateMemberHash('${m.id}')">重新生成</button>
+              <button onclick="removeMember('${m.id}')">移除</button>
+            </td>
+          </tr>
+        `).join('');
 
-        // Copy buttons
-        tbody.querySelectorAll('.copy-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                navigator.clipboard.writeText(btn.dataset.hash).then(() => {
-                    btn.textContent = '已复制';
-                    setTimeout(() => { btn.textContent = '复制'; }, 2000);
+            // Copy buttons
+            tbody.querySelectorAll('.copy-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    navigator.clipboard.writeText(btn.dataset.hash).then(() => {
+                        btn.textContent = '已复制';
+                        setTimeout(() => { btn.textContent = '复制'; }, 2000);
+                    });
                 });
             });
-        });
-    } else if (res.status === 401) {
-        localStorage.removeItem(ADMIN_TOKEN_KEY);
-        checkAdminAuth();
+        } else if (res.status === 401) {
+            localStorage.removeItem(ADMIN_TOKEN_KEY);
+            checkAdminAuth();
+        }
+    } catch (err) {
+        alert('网络错误，请检查服务器连接');
     }
 }
 
@@ -185,6 +202,12 @@ function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+}
+
+function showModal(title, bodyHtml) {
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-body').innerHTML = bodyHtml;
+    document.getElementById('result-modal').style.display = 'flex';
 }
 
 // Add member
@@ -196,48 +219,60 @@ document.getElementById('add-member-form')?.addEventListener('submit', async (e)
         nickname: form.querySelector('[name="nickname"]').value,
     };
     const token = localStorage.getItem(ADMIN_TOKEN_KEY);
-    const res = await fetch(`${ADMIN_API_BASE}/api/admin/members`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(data),
-    });
-    if (res.ok) {
-        const result = await res.json();
-        alert(`添加成功！\n\n${result.nickname} 的访问码是：\n${result.access_hash}\n\n请务必保存此访问码！`);
-        form.reset();
-        await loadMembers(token);
-    } else {
-        alert('添加失败');
+    try {
+        const res = await fetch(`${ADMIN_API_BASE}/api/admin/members`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(data),
+        });
+        if (res.ok) {
+            const result = await res.json();
+            showModal('添加成功', `${result.nickname} 的访问码是：<br><code style="font-size:1.2em">${result.access_hash}</code><br><br>请务必保存此访问码！`);
+            form.reset();
+            await loadMembers(token);
+        } else {
+            alert('添加失败');
+        }
+    } catch (err) {
+        alert('网络错误，请检查服务器连接');
     }
 });
 
 async function regenerateMemberHash(userId) {
     if (!confirm('确定重新生成访问码？旧访问码将立即失效。')) return;
     const token = localStorage.getItem(ADMIN_TOKEN_KEY);
-    const res = await fetch(`${ADMIN_API_BASE}/api/admin/members/${userId}/regenerate`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-    });
-    if (res.ok) {
-        const result = await res.json();
-        alert(`已重新生成！\n\n新访问码：\n${result.access_hash}`);
-        await loadMembers(token);
-    } else {
-        alert('操作失败');
+    try {
+        const res = await fetch(`${ADMIN_API_BASE}/api/admin/members/${userId}/regenerate`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (res.ok) {
+            const result = await res.json();
+            showModal('已重新生成', `新访问码：<br><code style="font-size:1.2em">${result.access_hash}</code>`);
+            await loadMembers(token);
+        } else {
+            alert('操作失败');
+        }
+    } catch (err) {
+        alert('网络错误，请检查服务器连接');
     }
 }
 
 async function removeMember(userId) {
     if (!confirm('确定移除此成员？此操作不可撤销。')) return;
     const token = localStorage.getItem(ADMIN_TOKEN_KEY);
-    const res = await fetch(`${ADMIN_API_BASE}/api/admin/members/${userId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-    });
-    if (res.ok) {
-        await loadMembers(token);
-    } else {
-        alert('移除失败');
+    try {
+        const res = await fetch(`${ADMIN_API_BASE}/api/admin/members/${userId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (res.ok) {
+            await loadMembers(token);
+        } else {
+            alert('移除失败');
+        }
+    } catch (err) {
+        alert('网络错误，请检查服务器连接');
     }
 }
 
@@ -264,20 +299,24 @@ document.getElementById('super-login-form')?.addEventListener('submit', async (e
         username: form.querySelector('[name="super-username"]').value,
         password: form.querySelector('[name="super-password"]').value,
     };
-    const res = await fetch(`${ADMIN_API_BASE}/api/admin/super/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-    });
-    if (res.ok) {
-        const result = await res.json();
-        localStorage.setItem(ADMIN_TOKEN_KEY, result.token);
-        document.getElementById('admin-auth-view').style.display = 'none';
-        document.getElementById('admin-dashboard').style.display = 'none';
-        document.getElementById('super-dashboard').style.display = 'block';
-        await loadSuperTenants(result.token);
-    } else {
-        alert('超级管理员登录失败，请检查用户名和密码');
+    try {
+        const res = await fetch(`${ADMIN_API_BASE}/api/admin/super/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (res.ok) {
+            const result = await res.json();
+            localStorage.setItem(ADMIN_TOKEN_KEY, result.token);
+            document.getElementById('admin-auth-view').style.display = 'none';
+            document.getElementById('admin-dashboard').style.display = 'none';
+            document.getElementById('super-dashboard').style.display = 'block';
+            await loadSuperTenants(result.token);
+        } else {
+            alert('超级管理员登录失败，请检查用户名和密码');
+        }
+    } catch (err) {
+        alert('网络错误，请检查服务器连接');
     }
 });
 
@@ -290,30 +329,34 @@ document.getElementById('super-logout-btn')?.addEventListener('click', () => {
 
 // 加载租户列表
 async function loadSuperTenants(token) {
-    const res = await fetch(`${ADMIN_API_BASE}/api/admin/super/tenants`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-    });
-    if (res.ok) {
-        const tenants = await res.json();
-        const tbody = document.getElementById('super-tenant-tbody');
-        tbody.innerHTML = tenants.map(t => `
-      <tr>
-        <td>${escapeHtml(t.name)}</td>
-        <td>${t.member_count}</td>
-        <td>${t.is_active ? '✅ 启用' : '❌ 禁用'}</td>
-        <td>${t.created_at || '-'}</td>
-        <td>
-          ${t.is_active
-                ? `<button onclick="toggleTenant('${t.id}', false)" class="btn-danger">禁用</button>`
-                : `<button onclick="toggleTenant('${t.id}', true)" class="btn-success">启用</button>`
-            }
-        </td>
-      </tr>
-    `).join('');
-    } else if (res.status === 401) {
-        localStorage.removeItem(ADMIN_TOKEN_KEY);
-        document.getElementById('super-dashboard').style.display = 'none';
-        document.getElementById('admin-auth-view').style.display = 'block';
+    try {
+        const res = await fetch(`${ADMIN_API_BASE}/api/admin/super/tenants`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (res.ok) {
+            const tenants = await res.json();
+            const tbody = document.getElementById('super-tenant-tbody');
+            tbody.innerHTML = tenants.map(t => `
+          <tr>
+            <td>${escapeHtml(t.name)}</td>
+            <td>${t.member_count}</td>
+            <td>${t.is_active ? '✅ 启用' : '❌ 禁用'}</td>
+            <td>${t.created_at || '-'}</td>
+            <td>
+              ${t.is_active
+                    ? `<button onclick="toggleTenant('${t.id}', false)" class="btn-danger">禁用</button>`
+                    : `<button onclick="toggleTenant('${t.id}', true)" class="btn-success">启用</button>`
+                }
+            </td>
+          </tr>
+        `).join('');
+        } else if (res.status === 401) {
+            localStorage.removeItem(ADMIN_TOKEN_KEY);
+            document.getElementById('super-dashboard').style.display = 'none';
+            document.getElementById('admin-auth-view').style.display = 'block';
+        }
+    } catch (err) {
+        alert('网络错误，请检查服务器连接');
     }
 }
 
@@ -322,15 +365,19 @@ async function toggleTenant(tenantId, isActive) {
     const action = isActive ? '启用' : '禁用';
     if (!confirm(`确定${action}该租户？`)) return;
     const token = localStorage.getItem(ADMIN_TOKEN_KEY);
-    const res = await fetch(`${ADMIN_API_BASE}/api/admin/super/tenants/${tenantId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ is_active: isActive }),
-    });
-    if (res.ok) {
-        await loadSuperTenants(token);
-    } else {
-        alert('操作失败');
+    try {
+        const res = await fetch(`${ADMIN_API_BASE}/api/admin/super/tenants/${tenantId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ is_active: isActive }),
+        });
+        if (res.ok) {
+            await loadSuperTenants(token);
+        } else {
+            alert('操作失败');
+        }
+    } catch (err) {
+        alert('网络错误，请检查服务器连接');
     }
 }
 
@@ -345,30 +392,39 @@ checkAdminAuth = async function () {
         return;
     }
     // Try normal admin first
-    const res = await fetch(`${ADMIN_API_BASE}/api/admin/members`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-    });
-    if (res.ok) {
-        document.getElementById('admin-auth-view').style.display = 'none';
-        document.getElementById('admin-dashboard').style.display = 'block';
-        document.getElementById('super-dashboard').style.display = 'none';
-        await loadMembers(token);
-        return;
-    }
-    // Try super admin
-    const superRes = await fetch(`${ADMIN_API_BASE}/api/admin/super/tenants`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-    });
-    if (superRes.ok) {
-        document.getElementById('admin-auth-view').style.display = 'none';
+    try {
+        const res = await fetch(`${ADMIN_API_BASE}/api/admin/members`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (res.ok) {
+            document.getElementById('admin-auth-view').style.display = 'none';
+            document.getElementById('admin-dashboard').style.display = 'block';
+            document.getElementById('super-dashboard').style.display = 'none';
+            await loadMembers(token);
+            return;
+        }
+        // Try super admin
+        try {
+            const superRes = await fetch(`${ADMIN_API_BASE}/api/admin/super/tenants`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (superRes.ok) {
+                document.getElementById('admin-auth-view').style.display = 'none';
+                document.getElementById('admin-dashboard').style.display = 'none';
+                document.getElementById('super-dashboard').style.display = 'block';
+                await loadSuperTenants(token);
+                return;
+            }
+        } catch (err) {
+            alert('网络错误，请检查服务器连接');
+            return;
+        }
+        // Not authenticated
+        localStorage.removeItem(ADMIN_TOKEN_KEY);
+        document.getElementById('admin-auth-view').style.display = 'block';
         document.getElementById('admin-dashboard').style.display = 'none';
-        document.getElementById('super-dashboard').style.display = 'block';
-        await loadSuperTenants(token);
-        return;
+        document.getElementById('super-dashboard').style.display = 'none';
+    } catch (err) {
+        alert('网络错误，请检查服务器连接');
     }
-    // Not authenticated
-    localStorage.removeItem(ADMIN_TOKEN_KEY);
-    document.getElementById('admin-auth-view').style.display = 'block';
-    document.getElementById('admin-dashboard').style.display = 'none';
-    document.getElementById('super-dashboard').style.display = 'none';
 };

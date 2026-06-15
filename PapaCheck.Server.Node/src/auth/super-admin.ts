@@ -49,23 +49,29 @@ export async function ensureSuperAdmin(db: IDatabase): Promise<{ username: strin
   // Try Postgres insert if available
   const pool = (db as any).pool;
   if (pool) {
+    const client = await pool.connect();
     try {
+      await client.query('BEGIN');
       // Create a system tenant for the super admin
       const tenantId = crypto.randomUUID();
-      await pool.query(
+      await client.query(
         `INSERT INTO tenants (id, name) VALUES ($1, '系统管理') ON CONFLICT DO NOTHING`,
         [tenantId]
       );
-      await pool.query(
+      await client.query(
         `INSERT INTO users (id, tenant_id, role, nickname, access_hash, token_version, email, password_hash, is_super_admin, is_active)
          VALUES ($1, $2, 'parent', '超级管理员', '', 1, $3, $4, true, true)
          ON CONFLICT (id) DO NOTHING`,
         [id, tenantId, SUPER_ADMIN_USERNAME, passwordHash]
       );
+      await client.query('COMMIT');
       return { username: SUPER_ADMIN_USERNAME, password };
     } catch (e) {
+      await client.query('ROLLBACK');
       console.error('Postgres 创建超级管理员失败，尝试 JSON 文件:', e);
       // Fall through to JSON approach
+    } finally {
+      client.release();
     }
   }
 

@@ -3,6 +3,8 @@ import type { IDatabase } from '../db/types.js';
 import type { JWTPayload } from './types.js';
 import { verifyToken } from './jwt.js';
 
+// PUBLIC_PATHS: 放行的公开 API 路径
+// 新增公开路由时请同步更新此集合，避免意外拦截
 const PUBLIC_PATHS = new Set([
   '/api/ping',
   '/api/version',
@@ -51,6 +53,7 @@ export async function authMiddleware(app: FastifyInstance, opts: { db: IDatabase
         return reply.status(401).send({ error: '认证已过期，请重新登录', code: 'SESSION_EXPIRED' });
       }
     } catch {
+      console.warn('[auth] 查询 token_version 失败，放行请求');
       // 数据库查询失败时放行（兼容无 users 表的旧数据库）
     }
 

@@ -40,10 +40,15 @@ const __dirname = dirname(__filename);
 export class PostgresAdapter extends DatabaseAdapter {
   pool: PoolType;
 
-  constructor(connectionString: string) {
+  private constructor(connectionString: string) {
     super();
     this.pool = new Pool({ connectionString });
-    this._initSchema();
+  }
+
+  static async create(connectionString: string): Promise<PostgresAdapter> {
+    const instance = new PostgresAdapter(connectionString);
+    await instance._initSchema();
+    return instance;
   }
 
   // ==================== Schema Init ====================
@@ -477,8 +482,8 @@ export class PostgresAdapter extends DatabaseAdapter {
       );
     } else {
       await this.pool.query(
-        'INSERT INTO notifications (id, text, created_at) VALUES ($1, $2, $3)',
-        [id, text, now]
+        'INSERT INTO notifications (tenant_id, id, text, created_at) VALUES ($1, $2, $3, $4)',
+        ['00000000-0000-0000-0000-000000000000', id, text, now]
       );
     }
     return id;
@@ -574,7 +579,7 @@ export class PostgresAdapter extends DatabaseAdapter {
         [tenantId, today, action === 'earn' ? amount : 0, action === 'spend' ? amount : 0, balance, detail]
       );
     } else {
-      await this.pool.query("UPDATE points SET balance = $1 WHE RE id = 1", [balance]);
+      await this.pool.query("UPDATE points SET balance = $1 WHERE id = 1", [balance]);
       const today = new Date().toISOString().slice(0, 10);
       await this.pool.query(
         "INSERT INTO points_history (date, earned, spent, balance, detail) VALUES ($1, $2, $3, $4, $5)",
@@ -1260,6 +1265,11 @@ export class PostgresAdapter extends DatabaseAdapter {
           } else {
             existingList.push(data);
           }
+          await this._setJson(table, existingList, tenantId, 1);
+          await this.recordModification(table, '1', timestamp, tenantId);
+        } else if (existingDict) {
+          await this._setJson(table, data, tenantId, 1);
+          await this.recordModification(table, '1', timestamp, tenantId);
         }
       }
 }
@@ -1450,6 +1460,8 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
           access_hash: row.access_hash,
           token_version: row.token_version,
           is_active: row.is_active,
+          is_super_admin: row.is_super_admin ?? false,
+          needs_password_change: row.needs_password_change ?? false,
           created_at: row.created_at,
           last_login: row.last_login ?? undefined,
         };
@@ -1473,6 +1485,8 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
       access_hash: row.access_hash,
       token_version: row.token_version,
       is_active: row.is_active,
+      is_super_admin: row.is_super_admin ?? false,
+      needs_password_change: row.needs_password_change ?? false,
       created_at: row.created_at,
       last_login: row.last_login ?? undefined,
     };

@@ -23,6 +23,24 @@
 - **修复孩子端语音播报 401 问题**：`/api/speak` 未加入 JWT 中间件的 `PUBLIC_PATHS` 白名单，孩子端语音请求被拦截返回 401，表现为 toast "语音异常: speak fail"
 - **修复 `getTenantMembers` 残留已删除字段**：postgres-adapter 和 sqlite-adapter 的 `getTenantMembers` 仍使用 `SELECT *` 并映射已删除的 `access_code_plaintext` 列
 - **修复成员列表 `access_hash` 返回占位符**：admin/routes.ts 中成员列表返回 `'已生成'` 固定值，改为返回实际的 bcrypt hash
+- **修复 postgres-adapter.ts SQL 语法错误**：`WHE RE` 拼写错误 → `WHERE`；`pushMerge` 中 `SINGLE_ROW_TABLES` 路径缺少 `_setJson` + `recordModification` 持久化调用，导致多端同步时单行表数据丢失
+- **修复 `_initSchema` 构造函数未 await 竞态条件**：构造函数改为 `private`，新增静态异步工厂方法 `PostgresAdapter.create()`
+- **修复 `addNotification` 无 tenantId 违反 NOT NULL 约束**：PG 模式下补充默认 UUID 占位
+- **补全 `findUserByAccessHash`/`getUserById` 返回字段**：补充 `is_super_admin` 和 `needs_password_change` 字段（postgres-adapter + sqlite-adapter）
+- **修复 app.ts 约 70 处多重 await 代码异味**：`await await await await` → 单次 `await`
+- **修复测试状态污染**：`super-admin-routes.test.ts` 和 `admin/routes.test.ts` 添加 `beforeEach(resetState)`，消除测试间状态依赖
+- **修复 PapaCheck.Site 前端 fetch 缺少错误处理**：所有 10 处 `fetch` 调用增加 try-catch；`alert()` 展示关键凭据改为 `showModal()` 页面内模态框；登录失败显示服务端具体错误信息
+
+### Changed
+- **PostgresAdapter 初始化重构**：构造函数私有化，使用 `PostgresAdapter.create()` 静态工厂方法确保 `_initSchema` 在实例可用前完成
+- **`admin/routes.ts` bcrypt 操作异步化**：`hashSync`/`compareSync` → `await hash`/`await compare`，消除事件循环阻塞
+
+### Security
+- **JWT 有效期从 365 天缩短至 30 天**：降低令牌泄露风险
+- **修改超级管理员凭证需验证当前密码**：`PUT /api/admin/super/credentials` 新增必填字段 `current_password`
+- **`auth/types.ts` JWTPayload 补充 `nickname` 字段**：与 `db/types.ts` 类型定义对齐，消除类型不一致
+- **超管创建操作包裹事务**：Postgres 路径下租户+用户插入使用 `BEGIN`/`COMMIT`/`ROLLBACK` 保证原子性
+- **中间件异常处理增强**：`queryUserTokenVersion` 失败的 catch 块从静默吞异常改为 `console.warn` 记录
 
 ### Security
 - **安全加固**：不再明文存储访问码，仅创建/重新生成时 API 返回一次，成员列表显示"已生成"占位符

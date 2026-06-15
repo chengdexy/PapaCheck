@@ -31,7 +31,7 @@ function loadOrCreateSecret(): string {
 }
 
 const JWT_SECRET: string = loadOrCreateSecret();
-const JWT_EXPIRY = '365d';
+const JWT_EXPIRY = '30d';
 
 export function signToken(payload: JWTPayload): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY });
