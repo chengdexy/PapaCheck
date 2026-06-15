@@ -163,10 +163,10 @@ export class PostgresAdapter extends DatabaseAdapter {
     let resetQuery: string;
     let resetParams: any[];
     if (tenantId) {
-      resetQuery = "SELECT value FROM meta WHERE key = 'last_shop_reset' AND tenant_id = $1";
+      resetQuery = "SELECT value FROM meta WHERE tenant_id = $1 AND key = 'last_shop_reset'";
       resetParams = [tenantId];
     } else {
-      resetQuery = "SELECT value FROM meta WHERE key = 'last_shop_reset'";
+      resetQuery = "SELECT value FROM meta WHERE tenant_id IS NULL AND key = 'last_shop_reset'";
       resetParams = [];
     }
     const result = await this.pool.query(resetQuery, resetParams);
@@ -199,8 +199,10 @@ export class PostgresAdapter extends DatabaseAdapter {
           [tenantId, today]
         );
       } else {
+        // 无 tenantId 时使用 NULL 作为租户标识（SQLite 兼容模式）
+        await this.pool.query("DELETE FROM meta WHERE tenant_id IS NULL AND key = 'last_shop_reset'");
         await this.pool.query(
-          "INSERT INTO meta (key, value) VALUES ('last_shop_reset', $1) ON CONFLICT (key) DO UPDATE SET value = $1",
+          "INSERT INTO meta (tenant_id, key, value) VALUES (NULL, 'last_shop_reset', $1)",
           [today]
         );
       }
@@ -1311,7 +1313,11 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
       await this._setJson('active_buffs', filteredBuffs, tenantId);
     }
 
-    await this.pool.query("DELETE FROM meta WHERE key = 'last_shop_reset'");
+    if (tenantId) {
+      await this.pool.query("DELETE FROM meta WHERE tenant_id = $1 AND key = 'last_shop_reset'", [tenantId]);
+    } else {
+      await this.pool.query("DELETE FROM meta WHERE tenant_id IS NULL AND key = 'last_shop_reset'");
+    }
   }                          
 
   // ==================== CRDT Operations ====================
