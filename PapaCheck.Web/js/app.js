@@ -228,6 +228,10 @@ function isAnyTaskActive() {
 
 async function requestDeferHomework(hwId) {
   if (_requestingDefer) return;
+  if (ConnectionManager.getMode() === 'reconnecting') {
+    showToast('网络正在恢复，请稍候…');
+    return;
+  }
   const hw = homeworks.find(h => h.id === hwId);
   if (!hw || hw.status !== 'pending' || hw.deferRequest) return;
 

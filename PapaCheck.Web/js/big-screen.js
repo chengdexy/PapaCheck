@@ -27,6 +27,18 @@ let _requestingDefer = false;
 let _startingBounty = false;
 let _submittingBounty = false;
 
+/**
+ * 重连守卫：reconnecting 模式时禁止数据操作
+ * 在数据变更 handler 的入口调用，确保转换期间用户无法修改数据
+ */
+function guardOnline() {
+  if (ConnectionManager.getMode() === 'reconnecting') {
+    showToast('网络正在恢复，请稍候…');
+    return false;
+  }
+  return true;
+}
+
 function isTomorrowHoliday() {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -763,6 +775,7 @@ function updateFreeTimeGrid() {
 
 async function startBountyTask(taskId) {
   if (_startingBounty) return;
+  if (!guardOnline()) return;
   if (isAnyTaskActive()) {
     showToast('请先完成当前任务');
     return;
@@ -789,6 +802,7 @@ async function startBountyTask(taskId) {
 
 async function abandonBountyTask(taskId) {
   if (_submittingBounty) return;
+  if (!guardOnline()) return;
   _submittingBounty = true;
   try {
     const dateKey = Util.dateKey(currentDate);
@@ -1005,6 +1019,7 @@ function hideMyRewards() {
 
 async function redeemFromRewardBox(itemId) {
   if (_redeemingRewardBox) return;
+  if (!guardOnline()) return;
   const rewardBox = cachedData?.rewardBox || [];
   const item = rewardBox.find(i => i.id === itemId);
   if (!item || (item.quantity || 0) <= 0) {
@@ -1048,6 +1063,7 @@ async function redeemFromRewardBox(itemId) {
 
 async function cancelRedemption(redemptionId) {
   if (_redeemingRewardBox) return;
+  if (!guardOnline()) return;
   _redeemingRewardBox = true;
   try {
     const redemptions = cachedData?.redemptions || [];
@@ -1139,6 +1155,7 @@ async function updateShopPage() {
 
 async function redeemItem(itemId) {
   if (_redeemingItem) return;
+  if (!guardOnline()) return;
   const items = cachedData?.shopItems || [];
   const item = items.find(i => i.id === itemId);
   if (!item) return;

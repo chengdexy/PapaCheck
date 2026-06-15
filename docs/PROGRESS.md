@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-13
+> 最后更新：2026-06-15
 
 ## 当前版本
 
@@ -85,6 +85,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-15 | **修复孩子端奖励兑换/撤回在离线→在线转换期间的竞态条件 Bug**：`guardOnline()` 守卫 + `reconnecting` API 降级 + 服务端 409 兜底 + 19 个 TDD 测试；全量 554 测试通过 |
 | 2026-06-13 | **修复管理端删光作业后孩子端评级界面不关闭 Bug**：`pollServer` 结算清除逻辑嵌套在 homework 替换块内导致不执行；新增独立结算清理检查 + `submitForRating()` 防御性守卫；新增 TDD 测试 9 个；全量 535 测试通过 |
 | 2026-06-13 | **修复孩子端暂停作业后计时器仍在计时的竞态条件 Bug**：`pollServer` 替换 `homeworks` 数组时丢失 `paused` 标记，导致计时器重启；修复后捕获并恢复 in-memory pause 状态；新增 TDD 测试 5 个；全量 526 测试通过 |
 | 2026-06-12 | **修复 Node.js 服务关闭时 WAL 未合并 Bug**：`SqliteAdapter.close()` 加 WAL checkpoint，`gracefulShutdown` 调用 `db.close()`，避免备份/迁移时丢数据；新增 TDD 测试 1 个；全量 521 测试通过 |

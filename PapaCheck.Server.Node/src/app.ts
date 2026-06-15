@@ -881,7 +881,20 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   // 38. PUT /api/redemptions/:id
   app.put<{ Params: { id: string } }>('/api/redemptions/:id', { schema: idParamSchema }, async (request, reply) => {
-    await await await await db.putRedemption(request.params.id, request.body);
+    const data = request.body as any;
+    // 检查同一 rewardBoxItemId 是否已有 pending 兑换（服务端兜底）
+    if (data && data.fromRewardBox && data.status === 'pending' && data.rewardBoxItemId) {
+      const redemptions = await db.getRedemptions();
+      const existing = redemptions.find((r: any) =>
+        r.rewardBoxItemId === data.rewardBoxItemId &&
+        r.status === 'pending' &&
+        r.id !== request.params.id
+      );
+      if (existing) {
+        return reply.code(409).send({ ok: false, error: 'duplicate_pending_redemption', message: '该物品已有待处理兑换申请' });
+      }
+    }
+    await db.putRedemption(request.params.id, request.body);
     return sendJson(reply, { ok: true });
   });
 

@@ -22,7 +22,7 @@ const API = {
     // 优先在线，失败降级到本地
     'online-first': async function (onlineFn, offlineFn, options) {
       var mode = ConnectionManager.getMode();
-      if (mode === 'offline') {
+      if (mode === 'offline' || mode === 'reconnecting') {
         return await offlineFn();
       }
       try {
