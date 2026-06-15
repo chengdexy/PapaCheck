@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理面板 - PapaCheck</title>
+    <meta name="description" content="PapaCheck 家庭管理面板 — 注册、登录、管理家庭成员">
+    <link rel="icon" type="image/png" href="imgs/favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <nav>
+        <div class="nav-inner">
+            <div class="logo" onclick="location.href='index.html'">
+                <img src="imgs/favicon.png" alt="PapaCheck Logo" class="logo-icon">
+                <span class="logo-text">PapaCheck</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="index.html">返回首页</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- 管理面板 -->
+    <section id="admin-panel" class="admin-panel">
+        <div class="container">
+            <h2>家庭管理面板</h2>
+
+            <!-- 未登录: 注册/登录切换 -->
+            <div id="admin-auth-view">
+                <div class="admin-tabs">
+                    <button class="admin-tab active" data-tab="login">登录</button>
+                    <button class="admin-tab" data-tab="register">注册</button>
+                </div>
+
+                <!-- 登录表单 -->
+                <form id="admin-login-form" class="admin-form">
+                    <input type="email" name="email" placeholder="邮箱" required>
+                    <input type="password" name="password" placeholder="密码" required>
+                    <button type="submit">登录</button>
+                </form>
+
+                <!-- 超级管理员登录（隐藏，点击按钮切换） -->
+                <form id="super-login-form" class="admin-form" style="display:none">
+                    <input type="text" name="super-username" placeholder="超级管理员用户名" required>
+                    <input type="password" name="super-password" placeholder="超级管理员密码" required>
+                    <button type="submit">超级管理员登录</button>
+                </form>
+
+                <div class="admin-toggle-super">
+                    <button id="btn-super-admin" class="btn-link">🔑 超级管理员登录</button>
+                </div>
+
+                <!-- 注册表单 -->
+                <form id="admin-register-form" class="admin-form" style="display:none">
+                    <input type="text" name="family_name" placeholder="家庭名称（如：张家）" required>
+                    <input type="email" name="email" placeholder="邮箱" required>
+                    <input type="password" name="password" placeholder="密码（至少6位）" required>
+                    <button type="submit">注册</button>
+                </form>
+            </div>
+
+            <!-- 已登录: 管理面板 -->
+            <div id="admin-dashboard" style="display:none">
+                <div class="admin-header">
+                    <h3 id="family-name-display"></h3>
+                    <button id="admin-logout-btn" class="btn-secondary">退出</button>
+                </div>
+
+                <div class="admin-section">
+                    <h4>家庭成员</h4>
+                    <table id="member-table" class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>昵称</th>
+                                <th>角色</th>
+                                <th>访问码</th>
+                                <th>最后登录</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="member-tbody"></tbody>
+                    </table>
+                </div>
+
+                <div class="admin-section">
+                    <h4>添加成员</h4>
+                    <form id="add-member-form" class="admin-form inline">
+                        <select name="role">
+                            <option value="child">孩子</option>
+                            <option value="parent">家长</option>
+                        </select>
+                        <input type="text" name="nickname" placeholder="昵称" required>
+                        <button type="submit">添加</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 已登录: 超级管理员面板 -->
+            <div id="super-dashboard" style="display:none">
+                <div class="admin-header">
+                    <h3>🔑 超级管理员</h3>
+                    <button id="super-logout-btn" class="btn-secondary">退出</button>
+                </div>
+
+                <div class="admin-section">
+                    <h4>所有租户</h4>
+                    <table id="super-tenant-table" class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>家庭名称</th>
+                                <th>成员数</th>
+                                <th>状态</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="super-tenant-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script src="js/main.js"></script>
+    <script>
+        // 页面加载时自动检查登录状态
+        document.addEventListener('DOMContentLoaded', checkAdminAuth);
+    </script>
+</body>
+
+</html>

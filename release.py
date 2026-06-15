@@ -80,7 +80,7 @@ def cloud_publish(server_ip, server_user):
         'tar', '--exclude=node_modules', '--exclude=test',
         '--exclude=PapaCheck.Android', '--exclude=PapaCheck.Windows',
         '--exclude=PapaCheck.Email', '--exclude=PapaCheck.Tests',
-        '--exclude=PapaCheck.Server', '--exclude=docs', '--exclude=.trae',
+        '--exclude=PapaCheck.Server', '--exclude=PapaCheck.Site', '--exclude=.trae',
         '--exclude=*.md', '--exclude=publish.ps1', '--exclude=.publish.tar.gz',
         '--exclude=docker-compose.yml', '--exclude=.dockerignore',
         '--exclude=nginx.conf', '--exclude=papacheck.service',

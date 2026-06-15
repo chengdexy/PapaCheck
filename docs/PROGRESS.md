@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-15（Bug 修复：评级加分回归修复 + 赏金放弃可见性）
+> 最后更新：2026-06-15（PapaCheck.Site 官网子项目）
 
 ## 当前版本
 
@@ -57,7 +57,7 @@
 - [x] JS/TS 代码覆盖率 85.22%（Stmts）| 71.89%（Branch）| 90.94%（Funcs）| 87.06%（Lines）
 - [x] Python 代码覆盖率 18%（release.py 32%）
 - [x] **自定义科目**：科目从硬编码改为 settings 可配置，设置页可添加/删除/恢复/重置
-- [x] **官网管理面板**：落地页增量添加家庭管理（注册/登录/成员管理）+ 超级管理员控制台
+- [x] **PapaCheck.Site 官网子项目**：从 `docs/` 搬出官网到独立子项目，管理面板拆为独立页面
 
 ---
 
@@ -87,6 +87,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-15 | **PapaCheck.Site 官网子项目**：新建 `PapaCheck.Site/`，官网从 `docs/` 搬出；管理面板从落地页内嵌改为独立 `admin.html`；修复 admin.html 自动初始化、docs/index.html CSS 回补；更新 release.py 排除项；代码审查通过 |
 | 2026-06-15 | **修复评级加分回归**：外层条件误改为 `if (existingSettlement)` 导致新的未评级 settlement 跳过计算，恢复为 `(rating || submittedAt)`；全量 628 测试通过
 | 2026-06-15 | **修复放弃的常驻型赏金任务孩子端不再可见**：`availableBounty` 过滤增加 abandoned 排除 + `startBountyTask` 守卫允许重试；新增 1 个 TDD 测试；全量 628 测试通过
 | 2026-06-15 | **修复评级后新增作业完成不加分**：`calculateSettlement()` 中 `submittedAt`/`rating` 分支分离 + pollServer 删除保护；新增 2 个 TDD 测试；全量 627 测试通过

@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- **PapaCheck.Site 官网子项目**：新建 `PapaCheck.Site/` 子项目，将官网从 `docs/` 搬出；管理面板从落地页底部内嵌改为独立 `admin.html` 页面；docs/index.html 移除管理面板代码；更新 release.py 排除项
 - **作业 CRUD 流程测试**：新增 `homework-flow.test.ts`（5 测试），验证新增/更新/删除/租户隔离
 - **赏金任务放弃/提交反馈测试**：新增 `bounty_abandon_feedback.test.js`（4 测试），验证找不到任务记录时 toast 提示用户
 - **编译产物验证测试**：新增 `compiled-middleware.test.ts`（3 测试），验证 `dist/auth/middleware.js` 中 `PUBLIC_PATHS` 与源码一致，防止部署时 dist/ 过旧
