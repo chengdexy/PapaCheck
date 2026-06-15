@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-15（Phase 5c 完成 + 测试补齐）
+> 最后更新：2026-06-15（Phase 5c 完成 + 测试补齐 + 赏金反馈修复）
 
 ## 当前版本
 
-**v1.3.1-beta**（Phase 5c JWT 多租户认证系统完成，616 测试）
+**v1.3.1-beta**（Phase 5c JWT 多租户认证系统完成，620 测试）
 
 ## 部署状态
 
@@ -87,6 +87,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-15 | **修复赏金任务放弃/提交静默失败**：abandonBountyTask/submitBountyTask 找不到提交记录时新增 toast 反馈；测试数 620
 | 2026-06-15 | **修复 release.py 部署缺失 tsc 编译**：打包时 `--exclude=dist` + 远程缺 `npm run build`，语音播报 401 修复未生效；测试数 616
 | 2026-06-15 | **测试补齐 + 3 个 Bug 修复**：`/api/speak` 未加入 PUBLIC_PATHS 导致语音播报 401；`getTenantMembers` 残留已删除字段；成员列表返回 `'已生成'` 占位符；新增 29 个测试；全量 613 测试通过 |
 | 2026-06-15 | **Phase 5c: JWT 多租户认证系统完成** — Hash 码预授权认证 + token_version 吊销 + tenant_id 行级隔离 + JWT 中间件 + 认证/管理员/超管 API（12 个端点）+ 官网管理面板 + 登录页改造；修复 postgres-adapter.ts 4 处代码损坏；全量 588 测试通过 |

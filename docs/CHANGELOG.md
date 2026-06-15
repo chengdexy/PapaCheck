@@ -7,10 +7,12 @@
 ## [Unreleased]
 
 ### Added
+- **赏金任务放弃/提交反馈测试**：新增 `bounty_abandon_feedback.test.js`（4 测试），验证找不到任务记录时 toast 提示用户
 - **编译产物验证测试**：新增 `compiled-middleware.test.ts`（3 测试），验证 `dist/auth/middleware.js` 中 `PUBLIC_PATHS` 与源码一致，防止部署时 dist/ 过旧
-- **测试覆盖补齐**：新增 29 个测试（Super Admin Routes 16 个、Admin Routes 成员管理 11 个、Middleware PUBLIC_PATHS 2 个），全量 616 测试通过
+- **测试覆盖补齐**：新增 29 个测试（Super Admin Routes 16 个、Admin Routes 成员管理 11 个、Middleware PUBLIC_PATHS 2 个），全量 620 测试通过
 
 ### Fixed
+- **修复赏金任务放弃/提交按钮无反应**：`abandonBountyTask` 和 `submitBountyTask` 中当 `API.getBountySubmissions` 返回空数组时静默返回，用户无任何反馈；新增 `console.warn` + `showToast` 提示用户刷新重试
 - **修复 `release.py` 部署缺失 TypeScript 编译**：打包时 `--exclude=dist` 排除了编译产物，远程命令未执行 `npm run build`，服务器一直运行旧版 JS；修复为打包前本地编译 + 打包 dist/
 - **修复 Super Admin Routes 测试 TypeScript 类型错误**：`storedSuperAdmin` 使用了 `AdminUser` 接口不存在的 `username`/`is_active` 字段，改用 `email`
 - **修复孩子端语音播报 401 问题**：`/api/speak` 未加入 JWT 中间件的 `PUBLIC_PATHS` 白名单，孩子端语音请求被拦截返回 401，表现为 toast "语音异常: speak fail"

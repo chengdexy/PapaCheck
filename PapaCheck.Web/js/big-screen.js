@@ -808,7 +808,11 @@ async function abandonBountyTask(taskId) {
     const dateKey = Util.dateKey(currentDate);
     const submissions = await API.getBountySubmissions(dateKey) || [];
     const sub = submissions.find(s => s.taskId === taskId);
-    if (!sub) return;
+    if (!sub) {
+      console.warn('abandonBountyTask: submission not found for taskId', taskId);
+      showToast('未找到任务记录，请刷新后重试');
+      return;
+    }
     sub.status = 'abandoned';
     await API.putBountySubmission(sub.id, sub);
     if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
@@ -827,7 +831,11 @@ async function submitBountyTask(taskId) {
     const dateKey = Util.dateKey(currentDate);
     const submissions = await API.getBountySubmissions(dateKey) || [];
     const sub = submissions.find(s => s.taskId === taskId);
-    if (!sub || sub.status !== 'doing') return;
+    if (!sub || sub.status !== 'doing') {
+      console.warn('submitBountyTask: submission not found for taskId', taskId, 'sub:', sub);
+      if (!sub) showToast('未找到任务记录，请刷新后重试');
+      return;
+    }
     sub.status = 'submitted';
     sub.submittedAt = new Date().toISOString();
     await API.putBountySubmission(sub.id, sub);
