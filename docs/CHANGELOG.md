@@ -9,9 +9,9 @@
 ### Fixed
 - **修复孩子端奖励兑换/撤回在离线→在线转换期间的竞态条件 Bug**：解锁平板或从桌面切回孩子端时，Android 限制后台网络触发离线→在线转换。转换期间用户点击兑换/撤回，操作走离线降级写入本地，但随后 `_doReconnect()` 的 CRDT 全量同步会通过 `API.getData()` 用服务端旧数据覆盖本地新数据，导致新建兑换记录"丢失"。用户看到"兑换"按钮再次点击，创建第二条兑换。同时 CRDT 日志中的第一条在下次重连推送，导致服务端出现两条同物品的待处理兑换。
   - **根本修复**：所有数据操作 handler 入口增加 `guardOnline()` 守卫，`reconnecting` 模式时 toast 提示并直接返回，阻止操作进入逻辑体
-  - **防御深度**：`_requestWithStrategy('online-first')` 将 `reconnecting` 视为 `offline` 降级处理
+  - **防御深度**：`_requestWithStrategy('online-first')` 将 `reconnecting` 视为 `offline` 降级处理；`online-only` 同步增加 `reconnecting` 检查
   - **服务端兜底**：`PUT /api/redemptions/:id` 增加同一 `rewardBoxItemId` 的重复 pending 检查，返回 409 Conflict
-  - 新增 TDD 测试 19 个（3 个文件），全量 554 测试通过
+  - 新增 TDD 测试 20 个（4 个文件），全量 555 测试通过
 - **修复孩子端作业全部完成弹出评级后，管理端删光作业时评级界面不会自动关闭的 Bug**：`pollServer` 的结算清除逻辑嵌套在 homework 替换块内部，若 homework 数据未变化（如第二次轮询）或 `_completingHomework` 保护开启时，清除不执行。修复：新增独立结算清理检查（每次 pollServer 都执行），无已完成作业时自动清除未评级结算；`submitForRating()` 添加防御性守卫，无已完成作业时拒绝提交（535 测试通过）
   - 新增 TDD 测试 9 个：`settlement_clear_on_delete.test.js`
 - **修复孩子端作业暂停后计时器仍在计时的竞态条件 Bug**：`pollServer` 在替换 `homeworks` 数组时，若 `pauseActiveTask` 的异步 PATCH 请求尚未被服务端处理，服务端返回的数据不含 `paused:true`，导致 `homeworks = newHw` 覆写掉本地 `paused` 标记，`isAnyTaskPaused()` 返回 false → `startTickTimer()` 重启计时器。修复：替换前捕获旧 active homework 的 in-memory pause 状态，替换后恢复（526 测试通过）

@@ -234,6 +234,22 @@ describe('online-only 策略', () => {
             )
         ).rejects.toThrow('当前为离线模式，无法完成此操作');
     });
+
+    // Scenario: 重连模式下抛出错误
+    //   Given ConnectionManager 模式为 reconnecting
+    //   When 调用 _requestWithStrategy('online-only', onlineFn, offlineFn, {})
+    //   Then 抛出错误"当前为离线模式，无法完成此操作"
+    test('重连模式下抛出错误', async () => {
+        const ctx = createTestContext('reconnecting');
+        await expect(
+            ctx.API._requestWithStrategy(
+                'online-only',
+                async () => 'online-result',
+                async () => 'offline-result',
+                {}
+            )
+        ).rejects.toThrow('当前为离线模式，无法完成此操作');
+    });
 });
 
 // ========== Feature: offline-only 策略 ==========

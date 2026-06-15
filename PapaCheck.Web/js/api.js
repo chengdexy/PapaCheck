@@ -41,7 +41,7 @@ const API = {
     // 仅在线模式，不允许降级
     'online-only': async function (onlineFn, offlineFn, options) {
       var mode = ConnectionManager.getMode();
-      if (mode === 'offline') {
+      if (mode === 'offline' || mode === 'reconnecting') {
         throw new Error('当前为离线模式，无法完成此操作');
       }
       return await onlineFn();
