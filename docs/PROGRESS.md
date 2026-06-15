@@ -87,6 +87,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-15 | **修复管理面板 XSS 漏洞**：成员列表和租户列表 `id` 字段直接拼入 `onclick` 属性存 XSS 风险；改用 `data-*` 属性 + 事件委托，用户输入经 `escapeHtml()` 过滤 |
 | 2026-06-15 | **代码审查修复 — 17 个问题修复完成**：修复 CRITICAL SQL 语法错误（`WHE RE`→`WHERE`）、pushMerge 单行表数据丢失、app.ts 约 70 处多重 await；JWT 有效期从 365d 缩短至 30d；超管创建包裹事务；修改凭证增加旧密码验证；bcrypt 异步化；PostgresAdapter 静态工厂初始化；前端 fetch try-catch + 模态框替代 alert；测试状态污染 beforeEach 修复；全量 628 测试通过 |
 | 2026-06-15 | **PapaCheck.Site 官网子项目**：新建 `PapaCheck.Site/`，官网从 `docs/` 搬出；管理面板从落地页内嵌改为独立 `admin.html`；修复 admin.html 自动初始化、docs/index.html CSS 回补；更新 release.py 排除项；代码审查通过 |
 | 2026-06-15 | **修复评级加分回归**：外层条件误改为 `if (existingSettlement)` 导致新的未评级 settlement 跳过计算，恢复为 `(rating || submittedAt)`；全量 628 测试通过

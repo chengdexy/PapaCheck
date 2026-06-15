@@ -174,11 +174,21 @@ async function loadMembers(token) {
             <td><code>${escapeHtml(m.access_hash)}</code> <button class="copy-btn" data-hash="${escapeHtml(m.access_hash)}">复制</button></td>
             <td>${m.last_login || '从未'}</td>
             <td>
-              <button onclick="regenerateMemberHash('${m.id}')">重新生成</button>
-              <button onclick="removeMember('${m.id}')">移除</button>
+              <button data-action="regenerate" data-member-id="${escapeHtml(m.id)}">重新生成</button>
+              <button data-action="remove" data-member-id="${escapeHtml(m.id)}">移除</button>
             </td>
           </tr>
         `).join('');
+
+            // Event delegation for member action buttons
+            tbody.addEventListener('click', async (e) => {
+                const btn = e.target.closest('[data-action]');
+                if (!btn) return;
+                const memberId = btn.dataset.memberId;
+                const action = btn.dataset.action;
+                if (action === 'regenerate') await regenerateMemberHash(memberId);
+                else if (action === 'remove') await removeMember(memberId);
+            });
 
             // Copy buttons
             tbody.querySelectorAll('.copy-btn').forEach(btn => {
@@ -344,12 +354,21 @@ async function loadSuperTenants(token) {
             <td>${t.created_at || '-'}</td>
             <td>
               ${t.is_active
-                    ? `<button onclick="toggleTenant('${t.id}', false)" class="btn-danger">禁用</button>`
-                    : `<button onclick="toggleTenant('${t.id}', true)" class="btn-success">启用</button>`
+                    ? `<button data-action="toggle-tenant" data-tenant-id="${escapeHtml(t.id)}" data-active="false" class="btn-danger">禁用</button>`
+                    : `<button data-action="toggle-tenant" data-tenant-id="${escapeHtml(t.id)}" data-active="true" class="btn-success">启用</button>`
                 }
             </td>
           </tr>
         `).join('');
+
+            // Event delegation for tenant action buttons
+            tbody.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-action="toggle-tenant"]');
+                if (!btn) return;
+                const tenantId = btn.dataset.tenantId;
+                const isActive = btn.dataset.active === 'true';
+                toggleTenant(tenantId, isActive);
+            });
         } else if (res.status === 401) {
             localStorage.removeItem(ADMIN_TOKEN_KEY);
             document.getElementById('super-dashboard').style.display = 'none';

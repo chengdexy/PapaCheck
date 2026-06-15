@@ -36,6 +36,7 @@
 - **`admin/routes.ts` bcrypt 操作异步化**：`hashSync`/`compareSync` → `await hash`/`await compare`，消除事件循环阻塞
 
 ### Security
+- **修复管理面板 XSS 漏洞**：成员列表和租户列表中的 `id` 字段直接拼接进 `onclick` 属性，攻击者可注入恶意 JS；改用 `data-*` 属性 + 事件委托模式，所有用户输入经 `escapeHtml()` 过滤
 - **JWT 有效期从 365 天缩短至 30 天**：降低令牌泄露风险
 - **修改超级管理员凭证需验证当前密码**：`PUT /api/admin/super/credentials` 新增必填字段 `current_password`
 - **`auth/types.ts` JWTPayload 补充 `nickname` 字段**：与 `db/types.ts` 类型定义对齐，消除类型不一致
