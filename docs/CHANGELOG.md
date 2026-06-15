@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### Changed
+- **LICENSE 填写版权信息**：模板占位符替换为 `PapaCheck / Copyright (C) 2026 chengdexy`
+- **移除 CNAME 文件**：停止 GitHub Pages 服务，删除 `docs/CNAME`
+
 ### Fixed
 - **修复孩子端奖励兑换/撤回在离线→在线转换期间的竞态条件 Bug**：解锁平板或从桌面切回孩子端时，Android 限制后台网络触发离线→在线转换。转换期间用户点击兑换/撤回，操作走离线降级写入本地，但随后 `_doReconnect()` 的 CRDT 全量同步会通过 `API.getData()` 用服务端旧数据覆盖本地新数据，导致新建兑换记录"丢失"。用户看到"兑换"按钮再次点击，创建第二条兑换。同时 CRDT 日志中的第一条在下次重连推送，导致服务端出现两条同物品的待处理兑换。
   - **根本修复**：所有数据操作 handler 入口增加 `guardOnline()` 守卫，`reconnecting` 模式时 toast 提示并直接返回，阻止操作进入逻辑体
