@@ -198,6 +198,13 @@ export class PostgresAdapter extends DatabaseAdapter {
           "INSERT INTO meta (tenant_id, key, value) VALUES ($1, 'last_shop_reset', $2) ON CONFLICT (tenant_id, key) DO UPDATE SET value = $2",
           [tenantId, today]
         );
+      } else {
+        // 无 tenantId 时（SQLite 兼容模式），使用 NULL 标识
+        await this.pool.query("DELETE FROM meta WHERE tenant_id IS NULL AND key = 'last_shop_reset'");
+        await this.pool.query(
+          "INSERT INTO meta (tenant_id, key, value) VALUES (NULL, 'last_shop_reset', $1)",
+          [today]
+        );
       }
     }
   }
