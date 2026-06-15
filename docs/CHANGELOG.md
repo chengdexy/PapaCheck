@@ -10,6 +10,7 @@
 - **测试覆盖补齐**：新增 29 个测试（Super Admin Routes 16 个、Admin Routes 成员管理 11 个、Middleware PUBLIC_PATHS 2 个），全量 613 测试通过
 
 ### Fixed
+- **修复 Super Admin Routes 测试 TypeScript 类型错误**：`storedSuperAdmin` 使用了 `AdminUser` 接口不存在的 `username`/`is_active` 字段，改用 `email`
 - **修复孩子端语音播报 401 问题**：`/api/speak` 未加入 JWT 中间件的 `PUBLIC_PATHS` 白名单，孩子端语音请求被拦截返回 401，表现为 toast "语音异常: speak fail"
 - **修复 `getTenantMembers` 残留已删除字段**：postgres-adapter 和 sqlite-adapter 的 `getTenantMembers` 仍使用 `SELECT *` 并映射已删除的 `access_code_plaintext` 列
 - **修复成员列表 `access_hash` 返回占位符**：admin/routes.ts 中成员列表返回 `'已生成'` 固定值，改为返回实际的 bcrypt hash

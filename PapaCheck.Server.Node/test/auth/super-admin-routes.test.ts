@@ -28,11 +28,9 @@ describe('Super Admin Routes', () => {
   let storedSuperAdmin: AdminUser = {
     id: superAdminId,
     tenant_id: '__super_admin__',
-    username: 'admin',
     email: 'admin',
     password_hash: superAdminPasswordHash,
     token_version: 1,
-    is_active: true,
   };
 
   let storedTenants: Array<{ id: string; name: string; is_active: boolean; member_count: number; created_at: string }> = [];
@@ -45,11 +43,9 @@ describe('Super Admin Routes', () => {
     storedSuperAdmin = {
       id: superAdminId,
       tenant_id: '__super_admin__',
-      username: 'admin',
       email: 'admin',
       password_hash: superAdminPasswordHash,
       token_version: 1,
-      is_active: true,
     };
     storedTenants = [
       { id: tenant1Id, name: '家庭A', is_active: true, member_count: 3, created_at: '2024-01-01T00:00:00.000Z' },
@@ -62,14 +58,14 @@ describe('Super Admin Routes', () => {
   const mockDb: IDatabase = {
     // Super Admin 方法
     findSuperAdmin: async (username: string) => {
-      if (username === storedSuperAdmin.username) {
+      if (username === storedSuperAdmin.email) {
         return { ...storedSuperAdmin };
       }
       return null;
     },
-    updateSuperAdminCredentials: async (userId: string, username: string, passwordHash: string) => {
+    updateSuperAdminCredentials: async (userId: string, email: string, passwordHash: string) => {
       if (userId === storedSuperAdmin.id) {
-        storedSuperAdmin.username = username;
+        storedSuperAdmin.email = email;
         storedSuperAdmin.password_hash = passwordHash;
         storedSuperAdmin.token_version += 1;
       }
@@ -346,7 +342,7 @@ describe('Super Admin Routes', () => {
     expect(res.json().message).toBe('凭证已更新');
     // 验证 token_version 已递增
     expect(storedSuperAdmin.token_version).toBe(2);
-    expect(storedSuperAdmin.username).toBe('updated-admin');
+    expect(storedSuperAdmin.email).toBe('updated-admin');
   });
 
   // ==================== 租户列表 ====================
