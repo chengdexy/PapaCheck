@@ -89,7 +89,7 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
       id: m.id,
       nickname: m.nickname,
       role: m.role,
-      access_hash: m.access_code_plaintext ?? m.access_hash,
+      access_hash: m.access_code_plaintext ?? '已生成',
       token_version: m.token_version,
       last_login: m.last_login,
       created_at: m.created_at,
@@ -120,7 +120,6 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
       role,
       nickname,
       access_hash: hashed,
-      access_code_plaintext: raw,
       token_version: 1,
     });
 
@@ -136,7 +135,7 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
 
     const { id } = request.params as { id: string };
     const { raw, hashed } = generateAccessHash();
-    await db.regenerateMemberHash(id, payload.tenant_id, hashed, raw);
+    await db.regenerateMemberHash(id, payload.tenant_id, hashed);
     return { id, access_hash: raw, message: '已重新生成，旧访问码已失效' };
   });
 

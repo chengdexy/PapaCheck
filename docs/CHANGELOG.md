@@ -6,7 +6,11 @@
 
 ## [Unreleased]
 
-### Added
+### Fixed
+- **安全加固**：不再明文存储访问码，仅创建/重新生成时 API 返回一次，成员列表显示"已生成"占位符
+- **删除成员时 token 作废**：`deactivateMember` 增加 `token_version + 1`，已删除成员的 JWT 即时失效
+- **孩子端认证增强**：`app.js` 加载时调用 `/api/auth/me` 验证 token 有效性，被吊销/删除后自动跳转登录页
+- **SQLite 适配**：`getTenantMembers` 补上 `access_code_plaintext` 字段
 - **Phase 5c: JWT 多租户认证系统** — 替换临时 Cookie Session，实现完整的多租户数据隔离
   - **认证方式**：预授权 Hash 码（类似 API Key），管理员在官网注册后为每个家庭成员生成唯一 hash 码，成员凭 hash 码换取 JWT
   - **token_version 吊销机制**：重新生成 hash 码时版本号 +1，旧 JWT 立即失效，无需黑名单

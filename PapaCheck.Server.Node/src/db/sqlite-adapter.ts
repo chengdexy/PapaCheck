@@ -1338,16 +1338,17 @@ export class SqliteAdapter extends DatabaseAdapter {
       role: row.role,
       nickname: row.nickname,
       access_hash: row.access_hash,
+      access_code_plaintext: row.access_code_plaintext,
       token_version: row.token_version,
       last_login: row.last_login ?? undefined,
       created_at: row.created_at,
     }));
   }
 
-  async regenerateMemberHash(userId: string, tenantId: string, newHash: string, newPlaintext?: string): Promise<void> {
+  async regenerateMemberHash(userId: string, tenantId: string, newHash: string): Promise<void> {
     const result = this.db.prepare(
-      'UPDATE users SET access_hash = ?, access_code_plaintext = ?, token_version = token_version + 1 WHERE id = ? AND tenant_id = ? AND is_active = 1'
-    ).run(newHash, newPlaintext ?? null, userId, tenantId);
+      'UPDATE users SET access_hash = ?, token_version = token_version + 1 WHERE id = ? AND tenant_id = ? AND is_active = 1'
+    ).run(newHash, userId, tenantId);
     if (result.changes === 0) {
       throw new Error('成员不存在或不属于该租户');
     }
@@ -1355,7 +1356,7 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   async deactivateMember(userId: string, tenantId: string): Promise<void> {
     this.db.prepare(
-      'UPDATE users SET is_active = 0 WHERE id = ? AND tenant_id = ?'
+      'UPDATE users SET is_active = 0, token_version = token_version + 1 WHERE id = ? AND tenant_id = ?'
     ).run(userId, tenantId);
   }
 

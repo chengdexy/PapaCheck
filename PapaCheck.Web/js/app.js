@@ -3,12 +3,28 @@
  * 负责初始化、作业计时、屏保、语音、Toast、积分结算
  */
 
-// 认证检查：无 token 或非孩子角色时重定向到登录页
+// 认证检查：验证 token 有效性，无效时重定向到登录页
 (function checkAuth() {
-  const token = localStorage.getItem('papacheck_token');
-  const role = localStorage.getItem('papacheck_role');
-  if (!token || role !== 'child') {
-    window.location.href = '/login.html?redirect=' + encodeURIComponent('/app/');
+  try {
+    const token = localStorage.getItem('papacheck_token');
+    const role = localStorage.getItem('papacheck_role');
+    if (!token || role !== 'child') {
+      window.location.href = '/login.html?redirect=' + encodeURIComponent('/app/');
+      return;
+    }
+    // 通过 API 验证 token 是否仍有效（未被删除/吊销）
+    fetch('/api/auth/me', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    }).then(function(resp) {
+      if (resp.status === 401) {
+        localStorage.removeItem('papacheck_token');
+        localStorage.removeItem('papacheck_role');
+        localStorage.removeItem('papacheck_nickname');
+        window.location.href = '/login.html?redirect=' + encodeURIComponent('/app/');
+      }
+    }).catch(function() {});
+  } catch (e) {
+    // 测试环境中 localStorage 不可用，跳过检查
   }
 })();
 

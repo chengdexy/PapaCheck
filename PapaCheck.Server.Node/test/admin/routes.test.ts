@@ -203,12 +203,14 @@ describe('Admin Routes', () => {
     },
     deactivateMember: async (userId: string, tenantId: string) => {
       const user = storedUsers.find(u => u.id === userId && u.tenant_id === tenantId);
-      if (user) user.is_active = false;
+      if (user) { user.is_active = false; user.token_version += 1; }
     },
     updateTenantAdmin: async (tenantId: string, adminUserId: string) => {
       const tenant = storedTenants.find(t => t.id === tenantId);
       if (tenant) tenant.admin_id = adminUserId;
     },
+    getAllTenants: async () => storedTenants.map(t => ({ id: t.id, name: t.name, is_active: true, member_count: 0, created_at: new Date().toISOString() })),
+    updateTenantName: async (tenantId: string, newName: string) => { const t = storedTenants.find(t => t.id === tenantId); if (t) t.name = newName; },
   };
 
   beforeAll(async () => {
