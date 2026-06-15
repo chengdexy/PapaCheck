@@ -523,7 +523,8 @@ function updateHomeworkGrid() {
     const availableBounty = bountyTasks.filter(task => {
       if (task.enabled === false) return false;
       if (task.type === 'once' && task.completedAt) return false;
-      if (task.type !== 'once' && submissions.some(s => s.taskId === task.id)) return false;
+      // 常驻型任务：仅当有进行中或待审核的提交时才不可领取（放弃的不算）
+      if (task.type !== 'once' && submissions.some(s => s.taskId === task.id && s.status !== 'abandoned')) return false;
       return true;
     });
     const doingSubs = submissions.filter(s => s.status === 'doing');
@@ -784,6 +785,23 @@ async function startBountyTask(taskId) {
   try {
     const dateKey = Util.dateKey(currentDate);
     const submissions = await API.getBountySubmissions(dateKey) || [];
+    // 检查是否已有进行中或待审核的提交（放弃的可以重新开始）
+    const existingAbandoned = submissions.find(s => s.taskId === taskId && s.status === 'abandoned');
+    if (existingAbandoned) {
+      // 复用已放弃的提交，恢复为进行中
+      existingAbandoned.status = 'doing';
+      existingAbandoned.startedAt = new Date().toISOString();
+      existingAbandoned.submittedAt = null;
+      await API.putBountySubmission(existingAbandoned.id, existingAbandoned);
+      if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
+      cachedData.bountySubmissions[dateKey] = submissions;
+      const task = (cachedData?.bountyTasks || []).find(t => t.id === taskId);
+      Voice.clear();
+      Voice.speak('开始' + (task ? task.name : '') + '！');
+      needsFullRender = true;
+      updateBigScreen();
+      return;
+    }
     if (submissions.some(s => s.taskId === taskId)) return;
     const newSubmission = { id: Util.genId(), taskId, status: 'doing', startedAt: new Date().toISOString(), submittedAt: null };
     submissions.push(newSubmission);

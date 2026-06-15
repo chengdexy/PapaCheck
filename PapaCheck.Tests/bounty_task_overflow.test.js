@@ -46,7 +46,7 @@ function simulateBuggyBountyRender(card, grid, options = {}) {
 
   cards.push(...availableBounty
     .filter(t => !doingSubs.some(s => s.taskId === t.id)
-              && !submittedSubs.some(s => s.taskId === t.id))
+      && !submittedSubs.some(s => s.taskId === t.id))
     .map(task => buildBountyCardHTML(task, historyCounts, {})));
 
   const nonEmpty = cards.filter(c => c !== '');
@@ -89,7 +89,7 @@ function simulateFixedBountyRender(card, grid, options = {}) {
 
   cards.push(...availableBounty
     .filter(t => !doingSubs.some(s => s.taskId === t.id)
-              && !submittedSubs.some(s => s.taskId === t.id))
+      && !submittedSubs.some(s => s.taskId === t.id))
     .map(task => buildBountyCardHTML(task, historyCounts, {})));
 
   const nonEmpty = cards.filter(c => c !== '');
@@ -157,7 +157,8 @@ function filterAvailableBounty(bountyTasks, submissions) {
   return bountyTasks.filter(task => {
     if (task.enabled === false) return false;
     if (task.type === 'once' && task.completedAt) return false;
-    if (task.type !== 'once' && submissions.some(s => s.taskId === task.id)) return false;
+    // 常驻型任务：仅当有进行中或待审核的提交时才不可领取（放弃的不算）
+    if (task.type !== 'once' && submissions.some(s => s.taskId === task.id && s.status !== 'abandoned')) return false;
     return true;
   });
 }
@@ -241,7 +242,7 @@ function buildBountyCardsHTML({ bountyTasks, submissions, bountyCompletions }) {
   // 3. 可领取
   cards.push(...availableBounty
     .filter(t => !doingSubs.some(s => s.taskId === t.id)
-              && !submittedSubs.some(s => s.taskId === t.id))
+      && !submittedSubs.some(s => s.taskId === t.id))
     .map(task => buildBountyCardHTML(task, historyCounts, {})));
 
   const nonEmpty = cards.filter(c => c !== '');
@@ -458,4 +459,29 @@ test('disabled 和 once 已完成的任务不展示', () => {
   // 只有 t3（已提交）应该出现；t1 是 disabled，t2 是 once 已完成
   assert.strictEqual(result.cards.length, 1, '只有已提交的常驻任务应展示');
   assert.ok(result.cards[0].includes('常驻已提交'), '展示的应为常驻已提交任务');
+});
+
+// ============================================================
+// 附加测试：常驻型任务放弃后仍然可领取
+// ============================================================
+test('常驻型任务放弃后仍然可以领取', () => {
+  const tasks = [
+    makeBountyTask('t1', '常驻被放弃', 'always', 5),
+  ];
+
+  const submissions = [
+    makeSubmission('t1', 'abandoned'),
+  ];
+
+  const result = buildBountyCardsHTML({
+    bountyTasks: tasks,
+    submissions,
+    bountyCompletions: {},
+  });
+
+  // 放弃后常驻任务应该出现在可领取列表中（1 张 available 卡片）
+  assert.strictEqual(result.cards.length, 1, '放弃的常驻任务应出现在可领取列表中');
+  assert.ok(result.cards[0].includes('常驻被放弃'), '展示的应为被放弃的常驻任务');
+  // 确保卡片不是 submitted/doing 样式（没有"等待审核"标签）
+  assert.ok(!result.cards[0].includes('等待审核'), '放弃的任务不应显示等待审核');
 });
