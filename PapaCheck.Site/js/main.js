@@ -429,10 +429,10 @@ checkAdminAuth = async function () {
     }
 };
 
-// ===== 单次绑定事件委托（避免重复监听器） =====
+// ===== 单次绑定事件委托（绑定到 document，不受 DOM 加载时机影响） =====
 
-document.getElementById('member-tbody')?.addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-action]');
+document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('#member-tbody [data-action]');
     if (!btn) return;
     const memberId = btn.dataset.memberId;
     const action = btn.dataset.action;
@@ -440,8 +440,8 @@ document.getElementById('member-tbody')?.addEventListener('click', async (e) => 
     else if (action === 'remove') await removeMember(memberId);
 });
 
-document.getElementById('super-tenant-tbody')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-action="toggle-tenant"]');
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('#super-tenant-tbody [data-action="toggle-tenant"]');
     if (!btn) return;
     const tenantId = btn.dataset.tenantId;
     const isActive = btn.dataset.active === 'true';

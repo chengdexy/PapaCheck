@@ -31,6 +31,7 @@
 - **修复测试状态污染**：`super-admin-routes.test.ts` 和 `admin/routes.test.ts` 添加 `beforeEach(resetState)`，消除测试间状态依赖
 - **修复 PapaCheck.Site 前端 fetch 缺少错误处理**：所有 10 处 `fetch` 调用增加 try-catch；`alert()` 展示关键凭据改为 `showModal()` 页面内模态框；登录失败显示服务端具体错误信息
 - **修复管理面板事件委托重复绑定**：`loadMembers` 和 `loadSuperTenants` 每次调用都向 tbody 添加新的 click 监听器，多次刷新后按钮点击会触发多次；移出到文件末尾单次绑定
+- **修复事件委托绑定时机脆弱**：绑定到 `document.getElementById()` 依赖 DOM 元素已存在，改为绑定到 `document`，通过 CSS 选择器 `#member-tbody [data-action]` 自动限定作用域，不受 DOM 加载时机影响
 
 ### Changed
 - **PostgresAdapter 初始化重构**：构造函数私有化，使用 `PostgresAdapter.create()` 静态工厂方法确保 `_initSchema` 在实例可用前完成

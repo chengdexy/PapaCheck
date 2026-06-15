@@ -87,6 +87,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-15 | **修复事件委托绑定时机脆弱**：`document.getElementById` 依赖 DOM 已存在，改为绑定 `document` + CSS 选择器限定作用域，不受加载时机影响 |
 | 2026-06-15 | **修复管理面板事件委托重复绑定**：`loadMembers`/`loadSuperTenants` 每次调用重复添加 click 监听器，移出到文件末尾单次绑定 |
 | 2026-06-15 | **修复管理面板 XSS 漏洞**：成员列表和租户列表 `id` 字段直接拼入 `onclick` 属性存 XSS 风险；改用 `data-*` 属性 + 事件委托，用户输入经 `escapeHtml()` 过滤 |
 | 2026-06-15 | **代码审查修复 — 17 个问题修复完成**：修复 CRITICAL SQL 语法错误（`WHE RE`→`WHERE`）、pushMerge 单行表数据丢失、app.ts 约 70 处多重 await；JWT 有效期从 365d 缩短至 30d；超管创建包裹事务；修改凭证增加旧密码验证；bcrypt 异步化；PostgresAdapter 静态工厂初始化；前端 fetch try-catch + 模态框替代 alert；测试状态污染 beforeEach 修复；全量 628 测试通过 |
