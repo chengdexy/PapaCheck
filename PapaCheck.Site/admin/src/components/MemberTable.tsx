@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApi } from '../hooks/useApi';
+import { useAuth } from '../hooks/useAuth';
 import { useToast } from './Toast';
 import LoadingSpinner from './LoadingSpinner';
 
@@ -17,6 +18,7 @@ type LoadState = 'loading' | 'loaded' | 'error' | 'empty';
 
 export default function MemberTable({ refreshKey }: { refreshKey: number }) {
   const { fetch: apiFetch } = useApi();
+  const { state: { userId } } = useAuth();
   const { showToast } = useToast();
   const [members, setMembers] = useState<Member[]>([]);
   const [loadState, setLoadState] = useState<LoadState>('loading');
@@ -113,8 +115,14 @@ export default function MemberTable({ refreshKey }: { refreshKey: number }) {
               </td>
               <td className="py-3 pr-4 text-zinc-400">{m.last_login || '从未'}</td>
               <td className="py-3">
-                <button onClick={() => handleRegenerate(m.id)} className="text-xs text-zinc-600 hover:text-zinc-900 mr-3">重新生成</button>
-                <button onClick={() => handleRemove(m.id)} className="text-xs text-red-600 hover:text-red-700">移除</button>
+                {m.id !== userId ? (
+                  <>
+                    <button onClick={() => handleRegenerate(m.id)} className="text-xs text-zinc-600 hover:text-zinc-900 mr-3">重新生成</button>
+                    <button onClick={() => handleRemove(m.id)} className="text-xs text-red-600 hover:text-red-700">移除</button>
+                  </>
+                ) : (
+                  <span className="text-xs text-zinc-400">（自己）</span>
+                )}
               </td>
             </tr>
           ))}

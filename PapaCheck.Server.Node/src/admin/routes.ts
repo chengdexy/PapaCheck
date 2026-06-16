@@ -241,6 +241,9 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
     }
 
     const { id } = request.params as { id: string };
+    if (id === payload.sub) {
+      return reply.status(400).send({ error: '不能重新生成自己的访问码', code: 'CANNOT_REGENERATE_SELF' });
+    }
     const { raw, hashed } = await generateAccessHash();
     await db.regenerateMemberHash(id, payload.tenant_id, hashed, raw);
     return { id, access_code: raw, message: '已重新生成，旧访问码已失效' };
@@ -254,6 +257,9 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
     }
 
     const { id } = request.params as { id: string };
+    if (id === payload.sub) {
+      return reply.status(400).send({ error: '不能移除自己', code: 'CANNOT_DELETE_SELF' });
+    }
     await db.deactivateMember(id, payload.tenant_id);
     return { ok: true };
   });

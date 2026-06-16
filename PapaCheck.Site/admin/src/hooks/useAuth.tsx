@@ -5,13 +5,14 @@ type Role = 'parent' | 'super_admin' | null;
 type AuthState = {
   status: 'idle' | 'loading' | 'authenticated' | 'error';
   role: Role;
+  userId: string | null;
   token: string | null;
   error: string | null;
 };
 
 type AuthAction =
   | { type: 'LOADING' }
-  | { type: 'AUTHENTICATED'; token: string | null; role: Role }
+  | { type: 'AUTHENTICATED'; token: string | null; role: Role; userId?: string | null }
   | { type: 'ERROR'; error: string }
   | { type: 'LOGOUT' }
   | { type: 'IDLE' };
@@ -21,13 +22,13 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
     case 'LOADING':
       return { ...state, status: 'loading', error: null };
     case 'AUTHENTICATED':
-      return { status: 'authenticated', token: action.token, role: action.role, error: null };
+      return { status: 'authenticated', token: action.token, role: action.role, userId: action.userId ?? null, error: null };
     case 'ERROR':
       return { ...state, status: 'error', error: action.error };
     case 'LOGOUT':
-      return { status: 'idle', token: null, role: null, error: null };
+      return { status: 'idle', token: null, role: null, userId: null, error: null };
     case 'IDLE':
-      return { status: 'idle', token: null, role: null, error: null };
+      return { status: 'idle', token: null, role: null, userId: null, error: null };
     default:
       return state;
   }
@@ -35,14 +36,17 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 
 const ADMIN_TOKEN_KEY = 'papacheck_admin_token';
 
-function decodeJWTRole(token: string): Role {
+function decodeJWT(token: string): { role: Role; userId: string } | null {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
     // Check expiry
     if (payload.exp && payload.exp * 1000 < Date.now()) {
       return null;
     }
-    return payload.role === 'super_admin' ? 'super_admin' : 'parent';
+    return {
+      role: payload.role === 'super_admin' ? 'super_admin' : 'parent',
+      userId: payload.sub,
+    };
   } catch {
     return null;
   }
@@ -60,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, {
     status: 'loading',
     role: null,
+    userId: null,
     token: null,
     error: null,
   });
@@ -67,9 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checkAuth = useCallback(() => {
     const token = localStorage.getItem(ADMIN_TOKEN_KEY);
     if (token) {
-      const role = decodeJWTRole(token);
-      if (role) {
-        dispatch({ type: 'AUTHENTICATED', token, role });
+      const decoded = decodeJWT(token);
+      if (decoded) {
+        dispatch({ type: 'AUTHENTICATED', token, role: decoded.role, userId: decoded.userId });
       } else {
         localStorage.removeItem(ADMIN_TOKEN_KEY);
         dispatch({ type: 'IDLE' });
@@ -97,7 +102,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const data = await res.json();
       localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
-      dispatch({ type: 'AUTHENTICATED', token: data.token, role: 'parent' });
+      const decoded = decodeJWT(data.token);
+      dispatch({ type: 'AUTHENTICATED', token: data.token, role: 'parent', userId: decoded?.userId });
     } catch (e) {
       dispatch({ type: 'ERROR', error: (e as Error).message });
     }
@@ -139,7 +145,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const data = await res.json();
       localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
-      dispatch({ type: 'AUTHENTICATED', token: data.token, role: 'super_admin' });
+      const decoded = decodeJWT(data.token);
+      dispatch({ type: 'AUTHENTICATED', token: data.token, role: 'super_admin', userId: decoded?.userId });
     } catch (e) {
       dispatch({ type: 'ERROR', error: (e as Error).message });
     }
