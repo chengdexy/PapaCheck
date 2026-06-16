@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Fixed
+- **删除废弃的 `regenerateMemberHash` 和 `deactivateMember` 方法**：两个方法已无调用方，参数名沿用旧模型语义（`userId` 实为 access_code_id、`tenantId` 实为 user_id），SQL 绑定易误解。直接从 PG 和 SQLite 适配器中删除
 - **修复 `deactivateMember` 和 `regenerateMemberHash` 引用已删除的列**：两个方法引用了 `users.tenant_id`/`access_hash`（已删除），PG 和 SQLite 中均会报 column-not-found 错误。且 `deactivateMember` 参数顺序颠倒、SQLite 版误改为 `DELETE FROM access_codes`。已统一修复为正确的 `UPDATE users` 或指向 `access_codes` 表，标注废弃
 - **移除测试文件中的调试 `console.log`**
 - **修复 SQLite 适配器表结构与 PG 不一致**：`users` 表仍含已删除的 `tenant_id`/`access_hash` 列，`access_codes` 表缺少 `last_login`/`access_code` 列，导致 SQLite 模式下测试和服务均失败（`NOT NULL constraint failed`）。已对齐 PG 表结构并修复 8 个查询方法

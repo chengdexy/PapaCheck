@@ -88,6 +88,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-17 | **删除废弃的 `regenerateMemberHash`/`deactivateMember`**：两方法已无调用方，参数名易误解，从 PG 和 SQLite 适配器中删除 |
 | 2026-06-17 | **代码审查修复 3 个 Issue**：`deactivateMember` 参数颠倒 + 引用已删列修复（SQLite+PG 对齐）；`regenerateMemberHash` 弃用标注并指向 `access_codes`；移除测试中残留的 `console.log` |
 | 2026-06-17 | **修复 SQLite 适配器 + 速率限制 429**：SQLite `users` 表结构对齐 PG；修复 `errorResponseBuilder` 缺少 `statusCode` 导致限流返回 500；修复 4 个测试 mock DB 缺少 `updateAccessCodeLastLogin`。全量 639 测试通过 |
 | 2026-06-17 | **修复 release.py site_publish 卡死**：`site_publish` 第 2 步缺少超时保护且 `scp -r dist/*` glob 在 Windows PowerShell 下不展开导致永久卡住；改为 tar 打包+SSH 管道解压，加超时和 `UserKnownHostsFile=NUL`；全量测试通过 |

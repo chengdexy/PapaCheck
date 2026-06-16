@@ -1445,19 +1445,6 @@ export class SqliteAdapter extends DatabaseAdapter {
     ).all(tenantId) as any[];
   }
 
-  async regenerateMemberHash(userId: string, tenantId: string, newHash: string, accessCode?: string): Promise<void> {
-    // 废弃：新模型使用 regenerateAccessCode（access_codes 表）
-    this.db.prepare(
-      'UPDATE access_codes SET code_hash = ? WHERE id = ? AND user_id = ?'
-    ).run(newHash, userId, tenantId);
-  }
-
-  async deactivateMember(userId: string, tenantId: string): Promise<void> {
-    this.db.prepare(
-      'UPDATE users SET is_active = 0, token_version = token_version + 1 WHERE id = ?'
-    ).run(userId);
-  }
-
   async updateTenantAdmin(tenantId: string, adminUserId: string): Promise<void> {
     this.db.prepare(
       'UPDATE tenants SET admin_id = ? WHERE id = ?'

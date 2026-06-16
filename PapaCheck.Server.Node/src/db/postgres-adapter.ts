@@ -1575,21 +1575,6 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
     return result.rows;
   }
 
-  async regenerateMemberHash(userId: string, tenantId: string, newHash: string, accessCode?: string): Promise<void> {
-    // 废弃：新模型使用 regenerateAccessCode（access_codes 表）
-    await this.pool.query(
-      'UPDATE access_codes SET code_hash = $1 WHERE id = $2 AND user_id = $3',
-      [newHash, userId, tenantId]
-    );
-  }
-
-  async deactivateMember(userId: string, tenantId: string): Promise<void> {
-    await this.pool.query(
-      'UPDATE users SET is_active = false, token_version = token_version + 1 WHERE id = $1',
-      [userId]
-    );
-  }
-
   async updateTenantAdmin(tenantId: string, adminUserId: string): Promise<void> {
     await this.pool.query(
       'UPDATE tenants SET admin_id = $1 WHERE id = $2',
