@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS access_codes (
   type TEXT NOT NULL CHECK (type IN ('parent', 'child')),
   code_hash TEXT NOT NULL,
   nickname TEXT NOT NULL,
+  token_version INTEGER NOT NULL DEFAULT 1,
   created_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(user_id, nickname)
 );

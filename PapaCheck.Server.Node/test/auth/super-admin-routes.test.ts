@@ -81,7 +81,7 @@ describe('Super Admin Routes', () => {
       }
       return null;
     },
-    updateSuperAdminCredentials: async (userId: string, email: string, passwordHash: string) => {
+    updateUserCredentials: async (userId: string, email: string, passwordHash: string) => {
       if (userId === storedSuperAdmin.id) {
         storedSuperAdmin.email = email;
         storedSuperAdmin.password_hash = passwordHash;
@@ -190,6 +190,11 @@ describe('Super Admin Routes', () => {
     getAccessCodeById: async () => null,
     regenerateAccessCode: async () => 'new-code',
     deleteAccessCode: async () => {},
+    getAllTenants: async () => storedTenants,
+    setTenantActive: async (tenantId: string, isActive: boolean) => {
+      const tenant = storedTenants.find(t => t.id === tenantId);
+      if (tenant) tenant.is_active = isActive;
+    },
   };
 
   // ==================== 应用启动 ====================
@@ -381,8 +386,7 @@ describe('Super Admin Routes', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(Array.isArray(body)).toBe(true);
-    // GET /api/admin/super/tenants 当前为存根实现，返回空数组
-    expect(body.length).toBe(0);
+    expect(body.length).toBe(storedTenants.length);
   });
 
   // ==================== 启用/禁用租户 ====================

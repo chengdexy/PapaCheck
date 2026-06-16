@@ -1623,7 +1623,7 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
     };
   }
 
-  async updateSuperAdminCredentials(userId: string, email: string, passwordHash: string): Promise<void> {
+  async updateUserCredentials(userId: string, email: string, passwordHash: string): Promise<void> {
     await this.pool.query(
       'UPDATE users SET email = $1, password_hash = $2, first_login = false, token_version = token_version + 1 WHERE id = $3',
       [email, passwordHash, userId]
@@ -1632,15 +1632,16 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
 
   async getAllTenants(): Promise<TenantListItem[]> {
     const result = await this.pool.query(`
-      SELECT t.id, t.name, t.is_active, t.created_at,
-        (SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id AND u.is_active = true) AS member_count
-      FROM tenants t
-      ORDER BY t.created_at ASC
+      SELECT u.id, u.family_name AS name, u.is_active, u.created_at,
+        (SELECT COUNT(*) FROM access_codes a WHERE a.user_id = u.id) AS member_count
+      FROM users u
+      WHERE u.role = 'user'
+      ORDER BY u.created_at ASC
     `);
     return result.rows.map(row => ({
       id: row.id,
       name: row.name,
-      member_count: parseInt(row.member_count, 10),
+      member_count: parseInt(row.member_count, 10) || 0,
       is_active: !!row.is_active,
       created_at: row.created_at,
     }));
@@ -1648,8 +1649,8 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
 
   async setTenantActive(tenantId: string, isActive: boolean): Promise<void> {
     await this.pool.query(
-      'UPDATE tenants SET is_active = $2 WHERE id = $1',
-      [tenantId, isActive]
+      'UPDATE users SET is_active = $2 WHERE id = $1 AND role = $3',
+      [tenantId, isActive, 'user']
     );
   }
 
@@ -1712,7 +1713,7 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
   async regenerateAccessCode(id: string, userId: string): Promise<string> {
     const { raw, hashed } = await generateAccessHash();
     const result = await this.pool.query(
-      'UPDATE access_codes SET code_hash = $1 WHERE id = $2 AND user_id = $3',
+      'UPDATE access_codes SET code_hash = $1, token_version = token_version + 1 WHERE id = $2 AND user_id = $3',
       [hashed, id, userId]
     );
     if (result.rowCount === 0) throw new Error('访问码不存在或不属于该用户');

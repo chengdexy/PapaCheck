@@ -140,7 +140,7 @@ export async function authRoutes(app: FastifyInstance, db: IDatabase): Promise<v
       sub: record.id,
       tenant_id: record.user_id,
       role: record.type,
-      token_version: 1,
+      token_version: record.token_version,
     });
     return { token, role: record.type, nickname: record.nickname };
   });
@@ -232,7 +232,7 @@ export async function authRoutes(app: FastifyInstance, db: IDatabase): Promise<v
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    await db.updateSuperAdminCredentials(payload.sub, newEmail ?? user.email, passwordHash);
+    await db.updateUserCredentials(payload.sub, newEmail ?? user.email, passwordHash);
 
     return { ok: true, message: '凭证已更新' };
   });
@@ -244,9 +244,9 @@ export async function authRoutes(app: FastifyInstance, db: IDatabase): Promise<v
       return reply.status(401).send({ error: '未授权', code: 'UNAUTHORIZED' });
     }
 
-    // admin/user 从 users 表查询
+    // admin/user 从 users 表查询（通过 ID）
     if (payload.role === 'admin' || payload.role === 'user') {
-      const user = await db.findUserByEmail(payload.sub);
+      const user = await db.getUserById(payload.sub);
       if (!user) {
         return reply.status(404).send({ error: '用户不存在', code: 'USER_NOT_FOUND' });
       }

@@ -274,7 +274,7 @@ describe('Auth Refactor — 认证体系重构测试', () => {
     findUserByEmail: async (email: string) => {
       return storedUsers.find(u => u.email === email) || null;
     },
-    updateSuperAdminCredentials: async (userId: string, email: string, passwordHash: string) => {
+    updateUserCredentials: async (userId: string, email: string, passwordHash: string) => {
       const user = storedUsers.find(u => u.id === userId);
       if (user) {
         user.email = email;

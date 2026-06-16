@@ -76,7 +76,7 @@ export async function superAdminRoutes(app: FastifyInstance, db: IDatabase): Pro
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    await db.updateSuperAdminCredentials(payload.sub, newEmail, passwordHash);
+    await db.updateUserCredentials(payload.sub, newEmail, passwordHash);
     return { ok: true, message: '凭证已更新' };
   });
 
@@ -87,12 +87,8 @@ export async function superAdminRoutes(app: FastifyInstance, db: IDatabase): Pro
       return reply.status(403).send({ error: '仅超级管理员可执行此操作', code: 'FORBIDDEN' });
     }
 
-    // 从 users 表查询所有 role='user' 的行
-    // 注意：getAllTenants 方法在 IDatabase 中已移除，需要用新的方法
-    // 临时方案：通过 db.pool.query 直接查询（PostgreSQL 模式）
-    // 或者使用 db.getUserByRole 如果存在
-    // 这里直接返回空数组，实际迁移后使用 PostgreSQL 的 pool 查询
-    return [];
+    const tenants = await db.getAllTenants();
+    return tenants;
   });
 
   // PATCH /api/admin/super/tenants/:id — 启用/禁用家庭

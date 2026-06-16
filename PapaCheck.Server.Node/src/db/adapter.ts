@@ -1,4 +1,4 @@
-import type { IDatabase, FullDataSnapshot, ModifiedEntry, NotificationItem, AccessCodeRecord, CreateAccessCodeInput } from './types.js';
+import type { IDatabase, FullDataSnapshot, ModifiedEntry, NotificationItem, AccessCodeRecord, CreateAccessCodeInput, TenantListItem } from './types.js';
 import type { CRDTOperation } from '../crdt/types.js';
 
 // ==================== DatabaseAdapter 抽象基类 ====================
@@ -134,7 +134,11 @@ export abstract class DatabaseAdapter implements IDatabase {
   abstract findUserByEmail(email: string): Promise<any | null>;
   abstract findUserByAccessHash(accessHash: string): Promise<any | null>;
   abstract findUserByAccessCode(accessCode: string): Promise<any | null>;
-  abstract updateSuperAdminCredentials(userId: string, email: string, passwordHash: string): Promise<void>;
+  abstract updateUserCredentials(userId: string, email: string, passwordHash: string): Promise<void>;
+
+  // Tenants
+  abstract getAllTenants(): Promise<TenantListItem[]>;
+  abstract setTenantActive(tenantId: string, isActive: boolean): Promise<void>;
 
   // Access Codes
   abstract createAccessCode(input: CreateAccessCodeInput): Promise<string>;

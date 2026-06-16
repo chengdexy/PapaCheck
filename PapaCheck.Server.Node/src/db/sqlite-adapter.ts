@@ -191,6 +191,7 @@ export class SqliteAdapter extends DatabaseAdapter {
         type TEXT NOT NULL CHECK (type IN ('parent', 'child')),
         code_hash TEXT NOT NULL,
         nickname TEXT NOT NULL,
+        token_version INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY (user_id) REFERENCES users(id)
       );
@@ -1310,7 +1311,7 @@ export class SqliteAdapter extends DatabaseAdapter {
   async regenerateAccessCode(id: string, userId: string): Promise<string> {
     const { raw, hashed } = await this._generateAccessHash();
     const result = this.db.prepare(
-      'UPDATE access_codes SET code_hash = ? WHERE id = ? AND user_id = ?'
+      'UPDATE access_codes SET code_hash = ?, token_version = token_version + 1 WHERE id = ? AND user_id = ?'
     ).run(hashed, id, userId);
     if (result.changes === 0) throw new Error('访问码不存在或不属于该用户');
     return raw;
@@ -1476,7 +1477,7 @@ export class SqliteAdapter extends DatabaseAdapter {
     };
   }
 
-  async updateSuperAdminCredentials(userId: string, email: string, passwordHash: string): Promise<void> {
+  async updateUserCredentials(userId: string, email: string, passwordHash: string): Promise<void> {
     this.db.prepare(
       'UPDATE users SET email = ?, password_hash = ?, first_login = 0, token_version = token_version + 1 WHERE id = ?'
     ).run(email, passwordHash, userId);

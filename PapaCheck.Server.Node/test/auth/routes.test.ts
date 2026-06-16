@@ -27,9 +27,13 @@ describe('Auth Routes', () => {
     tenant_id: 'test-tenant-1',
     role: 'user',
     nickname: '测试家长',
+    email: 'test@example.com',
+    family_name: '测试家庭',
     access_hash: '$2a$10$dummy',
     token_version: 1,
     is_active: true,
+    is_super_admin: false,
+    needs_password_change: false,
     created_at: '2024-01-01T00:00:00.000Z',
     last_login: undefined,
   };
@@ -59,7 +63,7 @@ describe('Auth Routes', () => {
     },
     getUserById: async (userId: string) => {
       if (userId === mockUser.id) {
-        return { ...mockUser, password_hash: '$2a$10$dummy', email: undefined, family_name: undefined };
+        return { ...mockUser, password_hash: '$2a$10$dummy' };
       }
       return null;
     },
@@ -179,7 +183,7 @@ describe('Auth Routes', () => {
     },
     createUser: async () => {},
     findAdminByEmail: async () => null,
-    updateSuperAdminCredentials: async () => {},
+    updateUserCredentials: async () => {},
   };
 
   beforeEach(() => {

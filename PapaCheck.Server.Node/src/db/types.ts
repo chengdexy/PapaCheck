@@ -129,6 +129,7 @@ export interface AccessCodeRecord {
   type: 'parent' | 'child';
   code_hash: string;
   nickname: string;
+  token_version: number;
   created_at: string;
 }
 
@@ -219,7 +220,9 @@ putHomework(id: string, data: any, tenantId?: string): Promise<void>;
   createUser(input: CreateUserInput): Promise<void>;
   findAdminByEmail(email: string): Promise<AdminUser | null>;
   findUserByEmail(email: string): Promise<any | null>;
-  updateSuperAdminCredentials(userId: string, email: string, passwordHash: string): Promise<void>;
+  updateUserCredentials(userId: string, email: string, passwordHash: string): Promise<void>;
+  getAllTenants(): Promise<TenantListItem[]>;
+  setTenantActive(tenantId: string, isActive: boolean): Promise<void>;
   createAccessCode(input: CreateAccessCodeInput): Promise<string>;
   getAccessCodesByUser(userId: string): Promise<AccessCodeRecord[]>;
   findAccessCodeByCode(code: string): Promise<AccessCodeRecord | null>;

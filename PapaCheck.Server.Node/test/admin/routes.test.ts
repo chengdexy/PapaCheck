@@ -238,7 +238,7 @@ describe('Admin Routes', () => {
       if (tenant) tenant.admin_id = adminUserId;
     },
     updateTenantName: async (tenantId: string, newName: string) => { const t = storedTenants.find(t => t.id === tenantId); if (t) t.name = newName; },
-    updateSuperAdminCredentials: async () => {},
+    updateUserCredentials: async () => {},
   };
 
   beforeEach(() => {
