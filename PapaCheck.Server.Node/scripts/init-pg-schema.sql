@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
   role TEXT NOT NULL CHECK (role IN ('parent', 'child')),
   nickname TEXT NOT NULL,
   access_hash TEXT NOT NULL,
+  access_code TEXT,
   token_version INTEGER NOT NULL DEFAULT 1,
   is_active BOOLEAN DEFAULT true,
   is_super_admin BOOLEAN DEFAULT false,

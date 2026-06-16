@@ -195,10 +195,11 @@ describe('Admin Routes', () => {
           created_at: u.created_at,
         }));
     },
-    regenerateMemberHash: async (userId: string, tenantId: string, newHash: string) => {
+    regenerateMemberHash: async (userId: string, tenantId: string, newHash: string, accessCode?: string) => {
       const user = storedUsers.find(u => u.id === userId && u.tenant_id === tenantId && u.is_active);
       if (!user) throw new Error('成员不存在或不属于该租户');
       user.access_hash = newHash;
+      if (accessCode) (user as any).access_code = accessCode;
       user.token_version += 1;
     },
     deactivateMember: async (userId: string, tenantId: string) => {
@@ -268,7 +269,7 @@ describe('Admin Routes', () => {
     expect(body.ok).toBe(true);
     expect(body).toHaveProperty('tenant_id');
     expect(body).toHaveProperty('admin_hash');
-    expect(body.admin_hash).toMatch(/^pc-/);
+    expect(body.admin_hash).toMatch(/^[A-Za-z2-9]{6}$/);
     expect(body.message).toBe('注册成功');
   });
 
@@ -550,7 +551,7 @@ describe('Admin Routes', () => {
     expect(body).toHaveProperty('id');
     expect(body.nickname).toBe('新孩子');
     expect(body.role).toBe('child');
-    expect(body.access_hash).toMatch(/^pc-/); // 返回明文访问码
+    expect(body.access_hash).toMatch(/^[A-Za-z2-9]{6}$/); // 返回明文访问码
     // 验证成员已存入存储
     const newMember = storedUsers.find(u => u.id === body.id);
     expect(newMember).toBeDefined();
@@ -614,7 +615,7 @@ describe('Admin Routes', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.id).toBe(childId);
-    expect(body.access_hash).toMatch(/^pc-/); // 返回明文访问码
+    expect(body.access_code).toMatch(/^[A-Za-z2-9]{6}$/); // 返回明文访问码
     expect(body.message).toBe('已重新生成，旧访问码已失效');
     // 验证 token_version 已递增
     const updatedUser = storedUsers.find(u => u.id === childId);

@@ -1510,8 +1510,8 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
 
   async createUser(input: any): Promise<void> {
     await this.pool.query(
-      'INSERT INTO users (id, tenant_id, role, nickname, access_hash, token_version, email, password_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING',
-      [input.id, input.tenant_id, input.role, input.nickname, input.access_hash, input.token_version, input.email ?? null, input.password_hash ?? null]
+      'INSERT INTO users (id, tenant_id, role, nickname, access_hash, access_code, token_version, email, password_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO NOTHING',
+      [input.id, input.tenant_id, input.role, input.nickname, input.access_hash, input.access_code ?? null, input.token_version, input.email ?? null, input.password_hash ?? null]
     );
   }
 
@@ -1533,7 +1533,7 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
 
   async getTenantMembers(tenantId: string): Promise<any[]> {
     const result = await this.pool.query(
-      'SELECT id, tenant_id, role, nickname, access_hash, token_version, last_login, created_at FROM users WHERE tenant_id = $1 AND is_active = true ORDER BY created_at ASC',
+      'SELECT id, tenant_id, role, nickname, access_code, access_hash, token_version, last_login, created_at FROM users WHERE tenant_id = $1 AND is_active = true ORDER BY created_at ASC',
       [tenantId]
     );
     return result.rows.map(row => ({
@@ -1541,6 +1541,7 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
       tenant_id: row.tenant_id,
       role: row.role,
       nickname: row.nickname,
+      access_code: row.access_code,
       access_hash: row.access_hash,
       token_version: row.token_version,
       last_login: row.last_login ?? undefined,
@@ -1548,10 +1549,10 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
     }));
   }
 
-  async regenerateMemberHash(userId: string, tenantId: string, newHash: string): Promise<void> {
+  async regenerateMemberHash(userId: string, tenantId: string, newHash: string, accessCode?: string): Promise<void> {
     const result = await this.pool.query(
-      'UPDATE users SET access_hash = $1, token_version = token_version + 1 WHERE id = $2 AND tenant_id = $3 AND is_active = true',
-      [newHash, userId, tenantId]
+      'UPDATE users SET access_hash = $1, access_code = $4, token_version = token_version + 1 WHERE id = $2 AND tenant_id = $3 AND is_active = true',
+      [newHash, userId, tenantId, accessCode ?? null]
     );
     if (result.rowCount === 0) {
       throw new Error('成员不存在或不属于该租户');

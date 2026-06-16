@@ -8,6 +8,7 @@ interface Member {
   nickname: string;
   role: string;
   access_hash: string;
+  access_code?: string | null;
   last_login?: string;
   created_at: string;
 }
@@ -48,7 +49,7 @@ export default function MemberTable({ refreshKey }: { refreshKey: number }) {
     if (!confirm('确定重新生成访问码？旧访问码将立即失效。')) return;
     try {
       const result = await apiFetch(`/api/admin/members/${id}/regenerate`, { method: 'POST' });
-      showToast('success', `新访问码：${result.access_hash}`);
+      showToast('success', `新访问码：${result.access_code}`);
       loadMembers();
     } catch {
       showToast('error', '操作失败');
@@ -101,8 +102,14 @@ export default function MemberTable({ refreshKey }: { refreshKey: number }) {
               <td className="py-3 pr-4">{m.nickname}</td>
               <td className="py-3 pr-4">{m.role === 'parent' ? '家长' : '孩子'}</td>
               <td className="py-3 pr-4">
-                <code className="text-xs bg-zinc-100 px-2 py-0.5 rounded">{m.access_hash}</code>
-                <button onClick={() => handleCopy(m.access_hash)} className="ml-2 text-xs text-orange-600 hover:text-orange-700">复制</button>
+                {m.access_code ? (
+                  <>
+                    <code className="text-xs bg-zinc-100 px-2 py-0.5 rounded">{m.access_code}</code>
+                    <button onClick={() => handleCopy(m.access_code!)} className="ml-2 text-xs text-orange-600 hover:text-orange-700">复制</button>
+                  </>
+                ) : (
+                  <span className="text-xs text-zinc-400">需重新生成</span>
+                )}
               </td>
               <td className="py-3 pr-4 text-zinc-400">{m.last_login || '从未'}</td>
               <td className="py-3">

@@ -134,7 +134,7 @@ export abstract class DatabaseAdapter implements IDatabase {
   abstract createUser(input: any): Promise<void>;
   abstract findAdminByEmail(email: string): Promise<any | null>;
   abstract getTenantMembers(tenantId: string): Promise<any[]>;
-  abstract regenerateMemberHash(userId: string, tenantId: string, newHash: string): Promise<void>;
+  abstract regenerateMemberHash(userId: string, tenantId: string, newHash: string, accessCode?: string): Promise<void>;
   abstract deactivateMember(userId: string, tenantId: string): Promise<void>;
   abstract updateTenantAdmin(tenantId: string, adminUserId: string): Promise<void>;
   abstract updateTenantName(tenantId: string, newName: string): Promise<void>;

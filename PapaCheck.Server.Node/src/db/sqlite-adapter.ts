@@ -1312,10 +1312,10 @@ export class SqliteAdapter extends DatabaseAdapter {
   }
 
   async createUser(input: any): Promise<void> {
-    const { id, tenant_id, role, nickname, access_hash, token_version, email, password_hash } = input;
+    const { id, tenant_id, role, nickname, access_hash, access_code, token_version, email, password_hash } = input;
     this.db.prepare(
-      'INSERT INTO users (id, tenant_id, role, nickname, access_hash, token_version, email, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(id, tenant_id, role, nickname, access_hash, token_version, email ?? null, password_hash ?? null);
+      'INSERT INTO users (id, tenant_id, role, nickname, access_hash, access_code, token_version, email, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, tenant_id, role, nickname, access_hash, access_code ?? null, token_version, email ?? null, password_hash ?? null);
   }
 
   async findAdminByEmail(email: string): Promise<any | null> {
@@ -1334,13 +1334,14 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   async getTenantMembers(tenantId: string): Promise<any[]> {
     const rows = this.db.prepare(
-      'SELECT id, tenant_id, role, nickname, access_hash, token_version, last_login, created_at FROM users WHERE tenant_id = ? AND is_active = 1 ORDER BY created_at ASC'
+      'SELECT id, tenant_id, role, nickname, access_code, access_hash, token_version, last_login, created_at FROM users WHERE tenant_id = ? AND is_active = 1 ORDER BY created_at ASC'
     ).all(tenantId) as any[];
     return rows.map(row => ({
       id: row.id,
       tenant_id: row.tenant_id,
       role: row.role,
       nickname: row.nickname,
+      access_code: row.access_code,
       access_hash: row.access_hash,
       token_version: row.token_version,
       last_login: row.last_login ?? undefined,
@@ -1348,10 +1349,10 @@ export class SqliteAdapter extends DatabaseAdapter {
     }));
   }
 
-  async regenerateMemberHash(userId: string, tenantId: string, newHash: string): Promise<void> {
+  async regenerateMemberHash(userId: string, tenantId: string, newHash: string, accessCode?: string): Promise<void> {
     const result = this.db.prepare(
-      'UPDATE users SET access_hash = ?, token_version = token_version + 1 WHERE id = ? AND tenant_id = ? AND is_active = 1'
-    ).run(newHash, userId, tenantId);
+      'UPDATE users SET access_hash = ?, access_code = ?, token_version = token_version + 1 WHERE id = ? AND tenant_id = ? AND is_active = 1'
+    ).run(newHash, accessCode ?? null, userId, tenantId);
     if (result.changes === 0) {
       throw new Error('成员不存在或不属于该租户');
     }

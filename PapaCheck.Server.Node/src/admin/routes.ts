@@ -104,7 +104,7 @@ const regenerateResponseSchema = {
       type: 'object',
       properties: {
         id: { type: 'string' },
-        access_hash: { type: 'string' },
+        access_code: { type: 'string' },
         message: { type: 'string' },
       },
     },
@@ -125,7 +125,13 @@ const deleteMemberResponseSchema = {
 };
 
 async function generateAccessHash(): Promise<{ raw: string; hashed: string }> {
-  const raw = 'pc-' + crypto.randomBytes(16).toString('hex');
+  // 6位字母数字码，排除易混淆字符 0/O/1/I/l
+  const chars = '23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz';
+  let raw = '';
+  const bytes = crypto.randomBytes(6);
+  for (let i = 0; i < 6; i++) {
+    raw += chars[bytes[i] % chars.length];
+  }
   const hashed = await bcrypt.hash(raw, 10);
   return { raw, hashed };
 }
@@ -156,6 +162,7 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
       role: 'parent',
       nickname: email.split('@')[0],
       access_hash: hashed,
+      access_code: raw,
       token_version: 1,
       email,
       password_hash: passwordHash,
@@ -195,7 +202,7 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
       id: m.id,
       nickname: m.nickname,
       role: m.role,
-      access_hash: m.access_hash,
+      access_code: m.access_code || null,
       token_version: m.token_version,
       last_login: m.last_login,
       created_at: m.created_at,
@@ -219,6 +226,7 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
       role,
       nickname,
       access_hash: hashed,
+      access_code: raw,
       token_version: 1,
     });
 
@@ -234,8 +242,8 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
 
     const { id } = request.params as { id: string };
     const { raw, hashed } = await generateAccessHash();
-    await db.regenerateMemberHash(id, payload.tenant_id, hashed);
-    return { id, access_hash: raw, message: '已重新生成，旧访问码已失效' };
+    await db.regenerateMemberHash(id, payload.tenant_id, hashed, raw);
+    return { id, access_code: raw, message: '已重新生成，旧访问码已失效' };
   });
 
   // DELETE /api/admin/members/:id — 移除成员

@@ -112,6 +112,7 @@ export interface CreateUserInput {
   role: 'parent' | 'child';
   nickname: string;
   access_hash: string;
+  access_code?: string;
   token_version: number;
   email?: string;
   password_hash?: string;
@@ -196,7 +197,7 @@ putHomework(id: string, data: any, tenantId?: string): Promise<void>;
   createUser(input: CreateUserInput): Promise<void>;
   findAdminByEmail(email: string): Promise<AdminUser | null>;
   getTenantMembers(tenantId: string): Promise<any[]>;
-  regenerateMemberHash(userId: string, tenantId: string, newHash: string): Promise<void>;
+  regenerateMemberHash(userId: string, tenantId: string, newHash: string, accessCode?: string): Promise<void>;
   deactivateMember(userId: string, tenantId: string): Promise<void>;
   updateTenantAdmin(tenantId: string, adminUserId: string): Promise<void>;
   updateTenantName(tenantId: string, newName: string): Promise<void>;
