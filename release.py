@@ -6,6 +6,8 @@ import argparse
 import zipfile
 import json
 import re
+import tarfile
+import io
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 ANDROID_DIR = os.path.join(ROOT, 'PapaCheck.Android')
@@ -253,7 +255,6 @@ def site_publish(server_ip, server_user):
     # 用 tar 打包后通过 SSH 管道解压，避免 Windows 下 SCP glob 不展开的问题
     try:
         # 先 tar 打包 dist 内容，通过 ssh 管道在远端解压
-        import tarfile, io
         buf = io.BytesIO()
         with tarfile.open(fileobj=buf, mode='w:gz') as tar:
             for fname in os.listdir(dist_dir):
