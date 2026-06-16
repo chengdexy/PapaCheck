@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- **修复 release.py site_publish 第 2 步卡死**：`site_publish` 的 SSH `mkdir` 和 `scp -r dist/*` 缺少超时保护，且 `dist/*` glob 在 Windows PowerShell 下不展开导致永久卡住；改为 tar 打包+SSH 管道解压替代 SCP glob，所有命令加超时和 `UserKnownHostsFile=NUL`
+
 ### Added
 - **访问码最后登录时间**：`access_codes` 表新增 `last_login` 列，`POST /api/auth/exchange` 时自动记录；管理面板成员列表"最后登录"列显示实际时间，不再始终显示"从未"
 - **Member ID 字段**：JWT Payload 新增 `member_id`，子端访问码交换时 `sub` 指向 user 账号（避免依赖已删除的 parent/child 行），`member_id` 指向 `access_codes.id` 用于区分家庭成员

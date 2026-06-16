@@ -235,21 +235,44 @@ def site_publish(server_ip, server_user):
     # 2. 上传静态文件到 webDir/admin/
     print(f'  ▶ [2/3] 上传静态文件 ... ', end='', flush=True)
     dist_dir = os.path.join(site_dir, 'dist')
-    result = subprocess.run([
-        'ssh', '-o', 'StrictHostKeyChecking=accept-new',
-        f'{server_user}@{server_ip}',
-        'mkdir -p /opt/papacheck/PapaCheck.Web/admin'
-    ])
-    if result.returncode != 0:
+    try:
+        result = _run_with_timeout([
+            'ssh', '-o', 'StrictHostKeyChecking=accept-new',
+            '-o', 'UserKnownHostsFile=NUL',
+            f'{server_user}@{server_ip}',
+            'mkdir -p /opt/papacheck/PapaCheck.Web/admin'
+        ], SSH_TIMEOUT)
+        if result.returncode != 0:
+            print('✗')
+            return False
+    except subprocess.TimeoutExpired:
         print('✗')
+        print('  SSH 创建目录超时')
         return False
-    result = subprocess.run([
-        'scp', '-o', 'StrictHostKeyChecking=accept-new', '-r',
-        f'{dist_dir}/*', f'{server_user}@{server_ip}:/opt/papacheck/PapaCheck.Web/admin/'
-    ])
-    if result.returncode != 0:
+
+    # 用 tar 打包后通过 SSH 管道解压，避免 Windows 下 SCP glob 不展开的问题
+    try:
+        # 先 tar 打包 dist 内容，通过 ssh 管道在远端解压
+        import tarfile, io
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode='w:gz') as tar:
+            for fname in os.listdir(dist_dir):
+                fpath = os.path.join(dist_dir, fname)
+                tar.add(fpath, arcname=fname)
+        buf.seek(0)
+        result = _run_with_timeout(
+            ['ssh', '-o', 'StrictHostKeyChecking=accept-new',
+             '-o', 'UserKnownHostsFile=NUL',
+             f'{server_user}@{server_ip}',
+             'tar xzf - -C /opt/papacheck/PapaCheck.Web/admin/'],
+            SCP_TIMEOUT, input=buf.getvalue())
+        if result.returncode != 0:
+            print('✗')
+            print('  Site 文件上传失败')
+            return False
+    except subprocess.TimeoutExpired:
         print('✗')
-        print('  Site 文件上传失败')
+        print('  上传静态文件超时')
         return False
     print('✓')
 
