@@ -1531,6 +1531,15 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
     };
   }
 
+  async findUserByEmail(email: string): Promise<any | null> {
+    const result = await this.pool.query(
+      'SELECT id, email, is_active FROM users WHERE email = $1 LIMIT 1',
+      [email]
+    );
+    if (result.rows.length === 0) return null;
+    return result.rows[0];
+  }
+
   async getTenantMembers(tenantId: string): Promise<any[]> {
     const result = await this.pool.query(
       'SELECT id, tenant_id, role, nickname, access_code, access_hash, token_version, last_login, created_at FROM users WHERE tenant_id = $1 AND is_active = true ORDER BY created_at ASC',

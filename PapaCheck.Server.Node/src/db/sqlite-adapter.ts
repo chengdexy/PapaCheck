@@ -1332,6 +1332,13 @@ export class SqliteAdapter extends DatabaseAdapter {
     };
   }
 
+  async findUserByEmail(email: string): Promise<any | null> {
+    const row = this.db.prepare(
+      'SELECT id, email, is_active FROM users WHERE email = ? LIMIT 1'
+    ).get(email) as any;
+    return row || null;
+  }
+
   async getTenantMembers(tenantId: string): Promise<any[]> {
     const rows = this.db.prepare(
       'SELECT id, tenant_id, role, nickname, access_code, access_hash, token_version, last_login, created_at FROM users WHERE tenant_id = ? AND is_active = 1 ORDER BY created_at ASC'

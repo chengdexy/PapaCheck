@@ -196,6 +196,7 @@ putHomework(id: string, data: any, tenantId?: string): Promise<void>;
   createTenant(id: string, name: string): Promise<void>;
   createUser(input: CreateUserInput): Promise<void>;
   findAdminByEmail(email: string): Promise<AdminUser | null>;
+  findUserByEmail(email: string): Promise<any | null>;
   getTenantMembers(tenantId: string): Promise<any[]>;
   regenerateMemberHash(userId: string, tenantId: string, newHash: string, accessCode?: string): Promise<void>;
   deactivateMember(userId: string, tenantId: string): Promise<void>;

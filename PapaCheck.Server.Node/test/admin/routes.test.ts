@@ -181,6 +181,9 @@ describe('Admin Routes', () => {
         token_version: user.token_version,
       };
     },
+    findUserByEmail: async (email: string) => {
+      return storedUsers.find(u => u.email === email) || null;
+    },
     getTenantMembers: async (tenantId: string) => {
       return storedUsers
         .filter(u => u.tenant_id === tenantId && u.is_active)
@@ -271,6 +274,41 @@ describe('Admin Routes', () => {
     expect(body).toHaveProperty('admin_hash');
     expect(body.admin_hash).toMatch(/^[A-Za-z2-9]{6}$/);
     expect(body.message).toBe('注册成功');
+  });
+
+  // Feature: 管理员注册
+  //   Scenario: 重复邮箱注册
+  //     Given 邮箱已被注册（含已禁用用户）
+  //     When  调用 POST /api/auth/register
+  //     Then  返回 409 冲突错误
+
+  it('should return 409 when email already registered', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { email: adminEmail, password: 'testpass123', family_name: '张家' },
+    });
+    expect(res.statusCode).toBe(409);
+    const body = res.json();
+    expect(body.error).toContain('邮箱');
+    expect(body.code).toBe('EMAIL_EXISTS');
+  });
+
+  it('should return 409 when email belongs to disabled user', async () => {
+    // 先禁用已注册用户，模拟故障家庭清理后的场景
+    const disabledUser = storedUsers.find(u => u.email === adminEmail);
+    expect(disabledUser).toBeDefined();
+    disabledUser!.is_active = false;
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { email: adminEmail, password: 'testpass123', family_name: '张家' },
+    });
+    expect(res.statusCode).toBe(409);
+    const body = res.json();
+    expect(body.error).toContain('邮箱');
+    expect(body.code).toBe('EMAIL_EXISTS');
   });
 
   // Feature: 管理员注册

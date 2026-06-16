@@ -141,6 +141,12 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
   app.post('/api/auth/register', { schema: registerSchema }, async (request, reply) => {
     const { email, password, family_name } = request.body as { email: string; password: string; family_name: string };
 
+    // 检查邮箱是否已被注册（含已禁用用户）
+    const existingUser = await db.findUserByEmail(email);
+    if (existingUser) {
+      return reply.status(409).send({ error: '该邮箱已被注册', code: 'EMAIL_EXISTS' });
+    }
+
     // 优先复用已有默认租户（含旧数据），不存在则创建新租户
     const existingTenants = await db.getAllTenants();
     const defaultTenant = existingTenants.find(t => t.name === '默认租户');
