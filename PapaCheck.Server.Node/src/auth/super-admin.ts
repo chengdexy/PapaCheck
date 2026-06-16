@@ -1,86 +1,39 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { IDatabase } from '../db/types.js';
 
-const SUPER_ADMIN_USERNAME = 'admin';
+export async function ensureSuperAdmin(db: IDatabase): Promise<{ email: string; password: string } | null> {
+  // Check if super admin already exists (look for any user with role='admin')
+  const checkEmail = 'admin@papacheck.internal';
+  const existing = await db.findUserByEmail(checkEmail);
+  if (existing) return null;
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-function getAdminsPath(): string {
-  const dataDir = resolve(__dirname, '../../data');
-  if (!existsSync(dataDir)) {
-    mkdirSync(dataDir, { recursive: true });
-  }
-  return resolve(dataDir, 'admins.json');
-}
-
-function saveAdminToJson(id: string, username: string, email: string, passwordHash: string): void {
-  const adminsPath = getAdminsPath();
-  let admins: any[] = [];
-  if (existsSync(adminsPath)) {
-    const content = readFileSync(adminsPath, 'utf-8');
-    admins = JSON.parse(content);
-  }
-  admins.push({
-    id,
-    username,
-    email,
-    password_hash: passwordHash,
-    token_version: 1,
-    created_at: new Date().toISOString(),
-  });
-  writeFileSync(adminsPath, JSON.stringify(admins, null, 2), 'utf-8');
-}
-
-export async function ensureSuperAdmin(db: IDatabase): Promise<{ username: string; password: string } | null> {
-  // Check if super admin already exists
-  const existing = await db.findSuperAdmin(SUPER_ADMIN_USERNAME);
-  if (existing) return null; // already exists
-
-  // Create super admin credentials
   const password = 'admin-' + crypto.randomBytes(4).toString('hex');
   const passwordHash = bcrypt.hashSync(password, 10);
   const id = crypto.randomUUID();
+  const email = 'admin-' + crypto.randomBytes(3).toString('hex') + '@papacheck.internal';
 
-  // Try Postgres insert if available
-  const pool = (db as any).pool;
-  if (pool) {
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      // Create a system tenant for the super admin
-      const tenantId = crypto.randomUUID();
-      await client.query(
-        `INSERT INTO tenants (id, name) VALUES ($1, '系统管理') ON CONFLICT DO NOTHING`,
-        [tenantId]
-      );
-      await client.query(
-        `INSERT INTO users (id, tenant_id, role, nickname, access_hash, token_version, email, password_hash, is_super_admin, is_active)
-         VALUES ($1, $2, 'parent', '超级管理员', '', 1, $3, $4, true, true)
-         ON CONFLICT (id) DO NOTHING`,
-        [id, tenantId, SUPER_ADMIN_USERNAME, passwordHash]
-      );
-      await client.query('COMMIT');
-      return { username: SUPER_ADMIN_USERNAME, password };
-    } catch (e) {
-      await client.query('ROLLBACK');
-      console.error('Postgres 创建超级管理员失败，尝试 JSON 文件:', e);
-      // Fall through to JSON approach
-    } finally {
-      client.release();
-    }
-  }
-
-  // Fallback: write to data/admins.json (works for SqliteAdapter and as fallback)
   try {
-    saveAdminToJson(id, SUPER_ADMIN_USERNAME, SUPER_ADMIN_USERNAME, passwordHash);
-    return { username: SUPER_ADMIN_USERNAME, password };
+    await db.createUser({
+      id,
+      role: 'admin',
+      email,
+      password_hash: passwordHash,
+      family_name: null,
+      token_version: 1,
+    });
   } catch (e) {
+    // Check if another admin was created in a race condition
+    const stillExists = await db.findUserByEmail(checkEmail);
+    if (stillExists) return null;
     console.error('创建超级管理员失败:', e);
     return null;
   }
+
+  console.log(`\n🔐 超级管理员已创建`);
+  console.log(`   邮箱: ${email}`);
+  console.log(`   密码: ${password}`);
+  console.log(`   首次登录后请立即修改凭证\n`);
+
+  return { email, password };
 }

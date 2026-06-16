@@ -230,7 +230,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       if (result) {
         console.log('========================================');
         console.log('🔑 超级管理员账号已创建');
-        console.log(`   用户名: ${result.username}`);
+        console.log(`   邮箱: ${result.email}`);
         console.log(`   密码: ${result.password}`);
         console.log('   首次登录后请立即修改！');
         console.log('========================================');

@@ -1,11 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
-interface Props {
-  onRegistered: (accessHash: string) => void;
-}
-
-export default function RegisterForm({ onRegistered }: Props) {
+export default function RegisterForm() {
   const { state, register } = useAuth();
   const [familyName, setFamilyName] = useState('');
   const [email, setEmail] = useState('');
@@ -17,8 +13,8 @@ export default function RegisterForm({ onRegistered }: Props) {
     e.preventDefault();
     setError('');
     try {
-      const result = await register(email, password, familyName);
-      onRegistered(result.admin_hash);
+      await register(email, password, familyName);
+      // 注册成功后自动登录，由 useAuth 的 register 方法处理
       setFamilyName('');
       setEmail('');
       setPassword('');

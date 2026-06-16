@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-16（release.py 超时保护 + 访问码快速查找，全量 671 测试通过）
+> 最后更新：2026-06-16（认证体系重构完成，全量 639 测试通过）
 
 ## 当前版本
 
-**v1.3.4-beta**（release.py 超时保护，671 测试）
+**v1.4.0-beta**（认证体系重构，639 测试）
 
 ## 部署状态
 
@@ -58,6 +58,7 @@
 - [x] Python 代码覆盖率 18%（release.py 32%）
 - [x] **自定义科目**：科目从硬编码改为 settings 可配置，设置页可添加/删除/恢复/重置
 - [x] **PapaCheck.Site 官网子项目**：从 `docs/` 搬出官网到独立子项目，管理面板拆为独立页面
+- [x] **认证体系重构（Phase 5f）**：分离账号与访问码，`users` 表合并 `tenants` 表，新增 `access_codes` 表。角色简化为 `admin`/`user`（账号）和 `parent`/`child`（访问码）。统一登录入口，超级管理员首次登录强制修改凭证。639 测试
 
 ---
 
@@ -87,6 +88,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-16 | **认证体系重构 v1.4.0**：分离账号与访问码，`users` 表合并 `tenants` 表，新增 `access_codes` 表。角色简化为 `admin`/`user`（账号）和 `parent`/`child`（访问码）。统一 `POST /api/auth/login` 登录入口。超级管理员首次登录强制修改凭证（`needs_password_change`）。管理面板前端适配新模型。新增 9 个 TDD 测试，全量 639 测试通过 |
 | 2026-06-16 | **release.py 超时保护 + 访问码快速查找 + v1.3.4**：`cloud_publish` 所有 subprocess 调用增加 timeout（SSH 30s/SCP 120s/构建 180s/远程 300s），防止网络问题永久阻塞；新增 `findUserByAccessCode()` 数据库方法支持 access_code 列直接匹配，减少 bcrypt 计算开销；schema 验证 minLength 8→6；版本号递增 1.3.3→1.3.4 |
 | 2026-06-16 | **PapaCheck.Site 重构 + 代码审查修复**：管理面板 React + Vite + TypeScript（40 个 TDD 测试）；14 个审查问题全部修复（含 Critical 注册 Modal、JWT 过期检查、useApi 统一、内存泄漏修复等）；落地页清理；`release.py` 新增 `--site` ；全量 671 测试通过 |
 | 2026-06-16 | **第 4 期开发周报**：基于 CHANGELOG + git log 生成 2026.06.08 ~ 06.16 开发周报，涵盖 Phase 5c JWT 认证、管理面板翻新、安全加固等更新，已转为微信公众号 HTML |

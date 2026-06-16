@@ -2,14 +2,14 @@ import { useState, type FormEvent } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function SuperLoginForm() {
-  const { state, superLogin } = useAuth();
+  const { state, login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const isLoading = state.status === 'loading';
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    await superLogin(username, password);
+    await login(username, password);
   }
 
   const canSubmit = username.trim() && password && !isLoading;

@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
 import { DatabaseAdapter } from './adapter.js';
-import type { FullDataSnapshot, PointsHistoryEntry, ModifiedEntry, NotificationItem } from './types.js';
+import type { FullDataSnapshot, PointsHistoryEntry, ModifiedEntry, NotificationItem, AccessCodeRecord, CreateAccessCodeInput } from './types.js';
 import type { CRDTOperation } from '../crdt/types.js';
 
 /** date_key 表：以日期为主键，存储 JSON 数据 */
@@ -173,7 +173,7 @@ export class SqliteAdapter extends DatabaseAdapter {
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         tenant_id TEXT NOT NULL,
-        role TEXT NOT NULL CHECK (role IN ('parent', 'child')),
+        role TEXT NOT NULL CHECK (role IN ('parent', 'child', 'admin', 'user')),
         nickname TEXT NOT NULL,
         access_hash TEXT NOT NULL,
         token_version INTEGER NOT NULL DEFAULT 1,
@@ -184,11 +184,25 @@ export class SqliteAdapter extends DatabaseAdapter {
         password_hash TEXT,
         UNIQUE(tenant_id, nickname)
       );
+
+      CREATE TABLE IF NOT EXISTS access_codes (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        type TEXT NOT NULL CHECK (type IN ('parent', 'child')),
+        code_hash TEXT NOT NULL,
+        nickname TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      );
     `);
 
     // 为已有数据库添加 email/password_hash 列（若不存在则静默失败）
     try { this.db.exec('ALTER TABLE users ADD COLUMN email TEXT'); } catch { }
     try { this.db.exec('ALTER TABLE users ADD COLUMN password_hash TEXT'); } catch { }
+
+    // 迁移列
+    try { this.db.exec('ALTER TABLE users ADD COLUMN family_name TEXT'); } catch { }
+    try { this.db.exec('ALTER TABLE users ADD COLUMN first_login INTEGER NOT NULL DEFAULT 0'); } catch { }
 
     // 插入默认行
     this.db.prepare(
@@ -1254,6 +1268,58 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   // ==================== Auth ====================
 
+  private async _generateAccessHash(): Promise<{ raw: string; hashed: string }> {
+    const chars = '23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz';
+    let raw = '';
+    const bytes = crypto.randomBytes(6);
+    for (let i = 0; i < 6; i++) {
+      raw += chars[bytes[i] % chars.length];
+    }
+    const hashed = await bcrypt.hash(raw, 10);
+    return { raw, hashed };
+  }
+
+  async createAccessCode(input: CreateAccessCodeInput): Promise<string> {
+    this.db.prepare(
+      'INSERT INTO access_codes (id, user_id, type, code_hash, nickname) VALUES (?, ?, ?, ?, ?)'
+    ).run(input.id, input.user_id, input.type, input.code_hash, input.nickname);
+    return input.id;
+  }
+
+  async getAccessCodesByUser(userId: string): Promise<AccessCodeRecord[]> {
+    return this.db.prepare(
+      'SELECT * FROM access_codes WHERE user_id = ? ORDER BY created_at ASC'
+    ).all(userId) as AccessCodeRecord[];
+  }
+
+  async findAccessCodeByCode(code: string): Promise<AccessCodeRecord | null> {
+    const rows = this.db.prepare('SELECT * FROM access_codes').all() as AccessCodeRecord[];
+    for (const row of rows) {
+      if (bcrypt.compareSync(code, row.code_hash)) {
+        return row;
+      }
+    }
+    return null;
+  }
+
+  async getAccessCodeById(id: string): Promise<AccessCodeRecord | null> {
+    const row = this.db.prepare('SELECT * FROM access_codes WHERE id = ?').get(id) as AccessCodeRecord | undefined;
+    return row ?? null;
+  }
+
+  async regenerateAccessCode(id: string, userId: string): Promise<string> {
+    const { raw, hashed } = await this._generateAccessHash();
+    const result = this.db.prepare(
+      'UPDATE access_codes SET code_hash = ? WHERE id = ? AND user_id = ?'
+    ).run(hashed, id, userId);
+    if (result.changes === 0) throw new Error('访问码不存在或不属于该用户');
+    return raw;
+  }
+
+  async deleteAccessCode(id: string, userId: string): Promise<void> {
+    this.db.prepare('DELETE FROM access_codes WHERE id = ? AND user_id = ?').run(id, userId);
+  }
+
   async queryUserTokenVersion(userId: string): Promise<number> {
     const row = this.db.prepare("SELECT token_version FROM users WHERE id = ? AND is_active = 1").get(userId) as any;
     return row?.token_version ?? 1;
@@ -1334,10 +1400,10 @@ export class SqliteAdapter extends DatabaseAdapter {
   }
 
   async createUser(input: any): Promise<void> {
-    const { id, tenant_id, role, nickname, access_hash, access_code, token_version, email, password_hash } = input;
+    const { id, role, email, password_hash, family_name, token_version } = input;
     this.db.prepare(
-      'INSERT INTO users (id, tenant_id, role, nickname, access_hash, access_code, token_version, email, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(id, tenant_id, role, nickname, access_hash, access_code ?? null, token_version, email ?? null, password_hash ?? null);
+      'INSERT INTO users (id, role, email, password_hash, family_name, token_version, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)'
+    ).run(id, role, email ?? null, password_hash ?? null, family_name ?? null, token_version ?? 1);
   }
 
   async findAdminByEmail(email: string): Promise<any | null> {
@@ -1356,35 +1422,22 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   async findUserByEmail(email: string): Promise<any | null> {
     const row = this.db.prepare(
-      'SELECT id, email, is_active FROM users WHERE email = ? LIMIT 1'
+      'SELECT id, role, email, password_hash, token_version, family_name, first_login, is_active FROM users WHERE email = ? AND is_active = 1 LIMIT 1'
     ).get(email) as any;
     return row || null;
   }
 
   async getTenantMembers(tenantId: string): Promise<any[]> {
-    const rows = this.db.prepare(
-      'SELECT id, tenant_id, role, nickname, access_code, access_hash, token_version, last_login, created_at FROM users WHERE tenant_id = ? AND is_active = 1 ORDER BY created_at ASC'
+    return this.db.prepare(
+      'SELECT id, user_id, type, nickname, created_at FROM access_codes WHERE user_id = ? ORDER BY created_at ASC'
     ).all(tenantId) as any[];
-    return rows.map(row => ({
-      id: row.id,
-      tenant_id: row.tenant_id,
-      role: row.role,
-      nickname: row.nickname,
-      access_code: row.access_code,
-      access_hash: row.access_hash,
-      token_version: row.token_version,
-      last_login: row.last_login ?? undefined,
-      created_at: row.created_at,
-    }));
   }
 
   async regenerateMemberHash(userId: string, tenantId: string, newHash: string, accessCode?: string): Promise<void> {
-    const result = this.db.prepare(
-      'UPDATE users SET access_hash = ?, access_code = ?, token_version = token_version + 1 WHERE id = ? AND tenant_id = ? AND is_active = 1'
-    ).run(newHash, accessCode ?? null, userId, tenantId);
-    if (result.changes === 0) {
-      throw new Error('成员不存在或不属于该租户');
-    }
+    // 废弃：新模型使用 regenerateAccessCode
+    this.db.prepare(
+      'UPDATE access_codes SET code_hash = ? WHERE id = ? AND user_id = ?'
+    ).run(newHash, userId, tenantId);
   }
 
   async deactivateMember(userId: string, tenantId: string): Promise<void> {
@@ -1408,52 +1461,25 @@ export class SqliteAdapter extends DatabaseAdapter {
   // ==================== Super Admin ====================
 
   async findSuperAdmin(username: string): Promise<any | null> {
-    // SQLite 模式下从 data/admins.json 读取
-    try {
-      const { readFileSync, existsSync } = await import('node:fs');
-      const { resolve, dirname } = await import('node:path');
-      const { fileURLToPath } = await import('node:url');
-      const dbDir = dirname(fileURLToPath(import.meta.url));
-      const adminsPath = resolve(dbDir, '../../data/admins.json');
-      if (!existsSync(adminsPath)) return null;
-      const content = readFileSync(adminsPath, 'utf-8');
-      const admins = JSON.parse(content);
-      const admin = admins.find((a: any) => a.username === username);
-      if (!admin) return null;
-      return {
-        id: admin.id,
-        tenant_id: '__super_admin__',
-        email: admin.email,
-        password_hash: admin.password_hash,
-        token_version: admin.token_version ?? 1,
-      };
-    } catch {
-      return null;
-    }
+    // 新模型：搜索 users 表中 role='admin' 的行
+    const row = this.db.prepare(
+      'SELECT id, role, email, password_hash, token_version, first_login FROM users WHERE email = ? AND role = ? AND is_active = 1 LIMIT 1'
+    ).get(username, 'admin') as any;
+    if (!row) return null;
+    return {
+      id: row.id,
+      tenant_id: row.id,
+      email: row.email,
+      password_hash: row.password_hash,
+      token_version: row.token_version,
+      first_login: !!row.first_login,
+    };
   }
 
   async updateSuperAdminCredentials(userId: string, email: string, passwordHash: string): Promise<void> {
-    try {
-      const { readFileSync, writeFileSync, existsSync } = await import('node:fs');
-      const { resolve, dirname } = await import('node:path');
-      const { fileURLToPath } = await import('node:url');
-      const dbDir = dirname(fileURLToPath(import.meta.url));
-      const adminsPath = resolve(dbDir, '../../data/admins.json');
-      let admins: any[] = [];
-      if (existsSync(adminsPath)) {
-        const content = readFileSync(adminsPath, 'utf-8');
-        admins = JSON.parse(content);
-      }
-      const idx = admins.findIndex((a: any) => a.id === userId);
-      if (idx !== -1) {
-        admins[idx].email = email;
-        admins[idx].password_hash = passwordHash;
-        admins[idx].token_version = (admins[idx].token_version ?? 1) + 1;
-      }
-      writeFileSync(adminsPath, JSON.stringify(admins, null, 2), 'utf-8');
-    } catch (e) {
-      console.error('更新超级管理员失败:', e);
-    }
+    this.db.prepare(
+      'UPDATE users SET email = ?, password_hash = ?, first_login = 0, token_version = token_version + 1 WHERE id = ?'
+    ).run(email, passwordHash, userId);
   }
 
   async getAllTenants(): Promise<any[]> {

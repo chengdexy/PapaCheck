@@ -1,6 +1,7 @@
 import { describe, it, expect, test, beforeAll, afterAll } from 'vitest';
 import Fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
+import bcrypt from 'bcryptjs';
 import { authRoutes } from '../../src/auth/routes.js';
 import { authMiddleware } from '../../src/auth/middleware.js';
 import { signToken } from '../../src/auth/jwt.js';
@@ -10,11 +11,21 @@ import { buildApp } from '../../src/app.js';
 describe('Auth Routes', () => {
   let app: FastifyInstance;
 
+  // 用于测试的内存状态
+  let storedAccessCodes: Array<{
+    id: string;
+    user_id: string;
+    type: 'parent' | 'child';
+    code_hash: string;
+    nickname: string;
+    created_at: string;
+  }> = [];
+
   // 创建一个模拟 DB
   const mockUser: UserRecord = {
     id: 'test-user-1',
     tenant_id: 'test-tenant-1',
-    role: 'parent',
+    role: 'user',
     nickname: '测试家长',
     access_hash: '$2a$10$dummy',
     token_version: 1,
@@ -23,24 +34,60 @@ describe('Auth Routes', () => {
     last_login: undefined,
   };
 
+  // 预设有效的访问码
+  const validCode = 'valid-code-123';
+  const validCodeHash = bcrypt.hashSync(validCode, 10);
+  const accessCodeRecord = {
+    id: 'access-code-001',
+    user_id: mockUser.id,
+    type: 'parent' as const,
+    code_hash: validCodeHash,
+    nickname: '测试家长',
+    created_at: '2024-01-01T00:00:00.000Z',
+  };
+
   const mockDb: IDatabase = {
     queryUserTokenVersion: async (_userId: string) => 1,
-    findUserByAccessHash: async (accessHash: string) => {
-      // 模拟：仅当 access_code 为 'valid-code-123' 时返回用户（兼容旧格式）
-      if (accessHash === 'valid-code-123') {
-        return { ...mockUser };
+    findAccessCodeByCode: async (code: string) => {
+      for (const c of storedAccessCodes) {
+        if (bcrypt.compareSync(code, c.code_hash)) return c;
       }
       return null;
     },
-    findUserByAccessCode: async () => null,
+    getAccessCodeById: async (id: string) => {
+      return storedAccessCodes.find(c => c.id === id) ?? null;
+    },
     getUserById: async (userId: string) => {
       if (userId === mockUser.id) {
-        return { ...mockUser };
+        return { ...mockUser, password_hash: '$2a$10$dummy', email: undefined, family_name: undefined };
       }
       return null;
     },
     updateUserLastLogin: async (_userId: string) => {
       // no-op
+    },
+    createAccessCode: async (input) => {
+      storedAccessCodes.push({
+        id: input.id,
+        user_id: input.user_id,
+        type: input.type,
+        code_hash: input.code_hash,
+        nickname: input.nickname,
+        created_at: new Date().toISOString(),
+      });
+      return input.id;
+    },
+    getAccessCodesByUser: async (userId) => storedAccessCodes.filter(c => c.user_id === userId),
+    regenerateAccessCode: async (id, userId) => {
+      const code = 'NEW' + require('crypto').randomBytes(2).toString('hex');
+      const hash = bcrypt.hashSync(code, 10);
+      const idx = storedAccessCodes.findIndex(c => c.id === id && c.user_id === userId);
+      if (idx === -1) throw new Error('not found');
+      storedAccessCodes[idx].code_hash = hash;
+      return code;
+    },
+    deleteAccessCode: async (id, userId) => {
+      storedAccessCodes = storedAccessCodes.filter(c => !(c.id === id && c.user_id === userId));
     },
     // 以下为 IDatabase 其他方法的桩实现
     close: async () => {},
@@ -111,7 +158,33 @@ describe('Auth Routes', () => {
     applyCRDTOperation: async () => {},
     getCRDTOperationsSince: async () => [],
     ackCRDTOperations: async () => {},
+    findUserByAccessHash: async () => null,
+    findUserByAccessCode: async () => null,
+    findUserByEmail: async (emailOrId: string) => {
+      // GET /me 会传入 payload.sub（用户 ID）而不是 email
+      // 返回 mockUser 让 /me 能正常响应
+      if (emailOrId === mockUser.id) {
+        return {
+          id: mockUser.id,
+          role: mockUser.role,
+          email: 'test@example.com',
+          family_name: '测试家庭',
+          password_hash: '$2a$10$dummy',
+          token_version: 1,
+          is_active: true,
+          created_at: mockUser.created_at,
+        } as any;
+      }
+      return null;
+    },
+    createUser: async () => {},
+    findAdminByEmail: async () => null,
+    updateSuperAdminCredentials: async () => {},
   };
+
+  beforeEach(() => {
+    storedAccessCodes = [accessCodeRecord];
+  });
 
   beforeAll(async () => {
     app = Fastify();
@@ -248,9 +321,9 @@ describe('Auth Routes', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.id).toBe(mockUser.id);
-    expect(body.nickname).toBe(mockUser.nickname);
     expect(body.role).toBe(mockUser.role);
-    expect(body.tenant_id).toBe(mockUser.tenant_id);
+    expect(body.email).toBe('test@example.com');
+    expect(body.family_name).toBe('测试家庭');
   });
 });
 

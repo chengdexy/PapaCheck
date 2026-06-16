@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import type { IDatabase } from '../db/types.js';
 import type { JWTPayload } from './types.js';
 import { signToken } from './jwt.js';
+import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
 
 const errorResponse = {
   400: {
@@ -48,6 +50,76 @@ const meSchema = {
         nickname: { type: 'string' },
         role: { type: 'string' },
         tenant_id: { type: 'string' },
+        email: { type: 'string' },
+        family_name: { type: 'string' },
+      },
+    },
+    ...errorResponse,
+  },
+};
+
+const loginSchema = {
+  body: {
+    type: 'object',
+    required: ['email', 'password'],
+    properties: {
+      email: { type: 'string', format: 'email' },
+      password: { type: 'string', minLength: 6 },
+    },
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        token: { type: 'string' },
+        role: { type: 'string' },
+        family_name: { type: 'string' },
+        needs_password_change: { type: 'boolean' },
+      },
+    },
+    ...errorResponse,
+  },
+};
+
+const registerSchema = {
+  body: {
+    type: 'object',
+    required: ['email', 'password', 'family_name'],
+    properties: {
+      email: { type: 'string', format: 'email' },
+      password: { type: 'string', minLength: 6 },
+      family_name: { type: 'string', minLength: 1 },
+    },
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        token: { type: 'string' },
+        role: { type: 'string' },
+        family_name: { type: 'string' },
+      },
+    },
+    ...errorResponse,
+  },
+};
+
+const credentialsSchema = {
+  body: {
+    type: 'object',
+    required: ['password'],
+    properties: {
+      email: { type: 'string' },
+      password: { type: 'string', minLength: 6 },
+      current_password: { type: 'string' },
+    },
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        ok: { type: 'boolean' },
+        message: { type: 'string' },
       },
     },
     ...errorResponse,
@@ -55,28 +127,114 @@ const meSchema = {
 };
 
 export async function authRoutes(app: FastifyInstance, db: IDatabase): Promise<void> {
-  // POST /api/auth/exchange — hash码换取JWT
+  // POST /api/auth/exchange — 访问码换取JWT
   app.post('/api/auth/exchange', { schema: exchangeSchema, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     const { access_code } = request.body as { access_code: string };
-    // 先快速查找新格式（access_code 列直接匹配），再回退到 bcrypt 扫描兼容旧数据
-    let user = await db.findUserByAccessCode(access_code);
-    if (!user) {
-      user = await db.findUserByAccessHash(access_code);
-    }
-    if (!user) {
+
+    const record = await db.findAccessCodeByCode(access_code);
+    if (!record) {
       return reply.status(401).send({ error: '访问码无效', code: 'INVALID_ACCESS_CODE' });
     }
-    if (!user.is_active) {
-      return reply.status(401).send({ error: '该账号已被停用', code: 'USER_DISABLED' });
+
+    const token = signToken({
+      sub: record.id,
+      tenant_id: record.user_id,
+      role: record.type,
+      token_version: 1,
+    });
+    return { token, role: record.type, nickname: record.nickname };
+  });
+
+  // POST /api/auth/login — 统一登录（admin + user）
+  app.post('/api/auth/login', { schema: loginSchema, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const { email, password } = request.body as { email: string; password: string };
+
+    const user = await db.findUserByEmail(email);
+    if (!user || !user.password_hash) {
+      return reply.status(401).send({ error: '邮箱或密码错误', code: 'INVALID_CREDENTIALS' });
     }
-    await db.updateUserLastLogin(user.id);
+
+    if (!bcrypt.compareSync(password, user.password_hash)) {
+      return reply.status(401).send({ error: '邮箱或密码错误', code: 'INVALID_CREDENTIALS' });
+    }
+
+    if (user.role !== 'admin' && user.role !== 'user') {
+      return reply.status(403).send({ error: '请使用访问码登录', code: 'USE_ACCESS_CODE' });
+    }
+
     const token = signToken({
       sub: user.id,
-      tenant_id: user.tenant_id,
+      tenant_id: user.id,
       role: user.role,
       token_version: user.token_version,
     });
-    return { token, role: user.role, nickname: user.nickname };
+
+    const response: any = { token, role: user.role };
+    if (user.role === 'admin') {
+      response.needs_password_change = !!user.first_login;
+    }
+    if (user.role === 'user') {
+      response.family_name = user.family_name;
+    }
+    return response;
+  });
+
+  // POST /api/auth/register — 注册用户账号（role='user'）
+  app.post('/api/auth/register', { schema: registerSchema, config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const { email, password, family_name } = request.body as { email: string; password: string; family_name: string };
+
+    const existing = await db.findUserByEmail(email);
+    if (existing) {
+      return reply.status(409).send({ error: '该邮箱已被注册', code: 'EMAIL_EXISTS' });
+    }
+
+    const userId = crypto.randomUUID();
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    await db.createUser({
+      id: userId,
+      role: 'user',
+      email,
+      password_hash: passwordHash,
+      family_name: family_name,
+      token_version: 1,
+    });
+
+    const token = signToken({
+      sub: userId,
+      tenant_id: userId,
+      role: 'user',
+      token_version: 1,
+    });
+
+    return { token, role: 'user', family_name };
+  });
+
+  // PUT /api/auth/credentials — 修改凭证（admin/user 通用）
+  app.put('/api/auth/credentials', { schema: credentialsSchema }, async (request: any, reply) => {
+    const payload = request.jwtPayload as JWTPayload;
+    if (!payload) {
+      return reply.status(401).send({ error: '未授权', code: 'UNAUTHORIZED' });
+    }
+
+    const user = await db.getUserById(payload.sub);
+    if (!user) {
+      return reply.status(404).send({ error: '用户不存在', code: 'USER_NOT_FOUND' });
+    }
+
+    const { email: newEmail, password: newPassword, current_password } = request.body as { email?: string; password: string; current_password?: string };
+
+    // 首次登录：不需要 current_password
+    if (!user.first_login) {
+      if (!current_password || !bcrypt.compareSync(current_password, user.password_hash)) {
+        return reply.status(401).send({ error: '当前密码错误', code: 'INVALID_CREDENTIALS' });
+      }
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await db.updateSuperAdminCredentials(payload.sub, newEmail ?? user.email, passwordHash);
+
+    return { ok: true, message: '凭证已更新' };
   });
 
   // GET /api/auth/me — 当前用户信息
@@ -85,15 +243,30 @@ export async function authRoutes(app: FastifyInstance, db: IDatabase): Promise<v
     if (!payload) {
       return reply.status(401).send({ error: '未授权', code: 'UNAUTHORIZED' });
     }
-    const user = await db.getUserById(payload.sub);
-    if (!user) {
-      return reply.status(404).send({ error: '用户不存在', code: 'USER_NOT_FOUND' });
+
+    // admin/user 从 users 表查询
+    if (payload.role === 'admin' || payload.role === 'user') {
+      const user = await db.findUserByEmail(payload.sub);
+      if (!user) {
+        return reply.status(404).send({ error: '用户不存在', code: 'USER_NOT_FOUND' });
+      }
+      return {
+        id: user.id,
+        role: user.role,
+        email: user.email,
+        family_name: user.family_name,
+      };
+    }
+
+    // parent/child 从 access_codes 表查询
+    const record = await db.getAccessCodeById(payload.sub);
+    if (!record) {
+      return reply.status(404).send({ error: '访问码不存在', code: 'NOT_FOUND' });
     }
     return {
-      id: user.id,
-      nickname: user.nickname,
-      role: user.role,
-      tenant_id: user.tenant_id,
+      id: record.id,
+      nickname: record.nickname,
+      role: record.type,
     };
   });
 }

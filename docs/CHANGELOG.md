@@ -7,6 +7,10 @@
 ## [Unreleased]
 
 ### Added
+- **认证体系重构**：分离账号与访问码概念。新增 `access_codes` 表，`users` 表合并 `tenants` 表。角色简化为 `admin`/`user`（账号）和 `parent`/`child`（访问码）
+- **统一登录入口**：超级管理员和用户账号均通过 `POST /api/auth/login` 邮箱+密码登录，移除独立超级管理员登录按钮
+- **超级管理员首次登录强制修改凭证**：首次登录时返回 `needs_password_change: true`，前端自动跳转修改凭证页
+- **pgweb 数据库管理工具**：新增 systemd 服务文件，通过 SSH 隧道 + 只读模式安全访问 PostgreSQL
 - **访问码快速查找**：新增 `findUserByAccessCode()` 数据库方法，支持直接匹配 `access_code` 列快速查找，仅在无匹配时回退到 bcrypt 扫描兼容旧格式数据；减少每次 exchange 的 bcrypt 计算开销
 - **第 4 期开发周报**：基于 CHANGELOG + git log 生成 `weekly-2026-06-w3.html`，涵盖 Phase 5c JWT 认证、管理面板翻新、安全加固等更新，面向普通读者的公众号风格
 - **PapaCheck.Site 管理面板 React 子项目**：新建 `PapaCheck.Site/admin/` 独立 React + Vite + TypeScript 子项目，使用 Tailwind CSS 4 + Vitest 测试框架；新增 30 个 TDD 测试覆盖所有组件

@@ -3,7 +3,7 @@
 export interface JWTPayload {
   sub: string;
   tenant_id: string;
-  role: 'parent' | 'child' | 'super_admin';
+  role: 'admin' | 'user' | 'parent' | 'child';
   nickname?: string;
   token_version: number;
   iat?: number;

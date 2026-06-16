@@ -1,15 +1,9 @@
 import { useState } from 'react';
 import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
-import SuperLoginForm from './SuperLoginForm';
 
-interface Props {
-  onRegistered: (accessHash: string) => void;
-}
-
-export default function AuthView({ onRegistered }: Props) {
+export default function AuthView() {
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
-  const [showSuper, setShowSuper] = useState(false);
 
   return (
     <div className="max-w-sm mx-auto mt-20">
@@ -35,28 +29,7 @@ export default function AuthView({ onRegistered }: Props) {
           注册
         </button>
       </div>
-
-      {showSuper ? (
-        <>
-          <SuperLoginForm />
-          <button
-            onClick={() => setShowSuper(false)}
-            className="mt-3 text-sm text-zinc-500 hover:text-zinc-700"
-          >
-            返回普通登录
-          </button>
-        </>
-      ) : (
-        <>
-          {activeTab === 'login' ? <LoginForm /> : <RegisterForm onRegistered={onRegistered} />}
-          <button
-            onClick={() => setShowSuper(true)}
-            className="mt-3 text-sm text-zinc-400 hover:text-zinc-600"
-          >
-            超级管理员登录
-          </button>
-        </>
-      )}
+      {activeTab === 'login' ? <LoginForm /> : <RegisterForm />}
     </div>
   );
 }

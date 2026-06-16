@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import Fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
+import crypto from 'node:crypto';
 import { adminRoutes } from '../../src/admin/routes.js';
+import { authRoutes } from '../../src/auth/routes.js';
 import { authMiddleware } from '../../src/auth/middleware.js';
 import { signToken } from '../../src/auth/jwt.js';
 import bcrypt from 'bcryptjs';
@@ -26,17 +28,26 @@ describe('Admin Routes', () => {
     password_hash: string | null;
   }> = [];
 
-  // 预设一个已注册的管理员
+  let storedAccessCodes: Array<{
+    id: string;
+    user_id: string;
+    type: 'parent' | 'child';
+    code_hash: string;
+    nickname: string;
+    created_at: string;
+  }> = [];
+
+  // 预设一个已注册的管理员（user 角色）
   const adminPassword = 'testpass123';
   const adminPasswordHash = bcrypt.hashSync(adminPassword, 10);
   const adminId = 'admin-001';
   const adminTenantId = 'tenant-001';
-  const adminAccessHash = bcrypt.hashSync('pc-admin-hash', 10);
   const adminEmail = 'admin@test.com';
 
-  // 预设一个 child 成员
+  // 预设一个 child 访问码
   const childId = 'child-001';
-  const childAccessHash = bcrypt.hashSync('pc-child-hash', 10);
+  const childCode = 'pc-child';
+  const childCodeHash = bcrypt.hashSync(childCode, 10);
 
   function resetState(): void {
     storedTenants = [
@@ -46,9 +57,9 @@ describe('Admin Routes', () => {
       {
         id: adminId,
         tenant_id: adminTenantId,
-        role: 'parent',
+        role: 'user',
         nickname: 'admin',
-        access_hash: adminAccessHash,
+        access_hash: '',
         token_version: 1,
         is_active: true,
         created_at: '2024-01-01T00:00:00.000Z',
@@ -56,18 +67,15 @@ describe('Admin Routes', () => {
         email: adminEmail,
         password_hash: adminPasswordHash,
       },
+    ];
+    storedAccessCodes = [
       {
         id: childId,
-        tenant_id: adminTenantId,
-        role: 'child',
+        user_id: adminId,
+        type: 'child',
+        code_hash: childCodeHash,
         nickname: '测试孩子',
-        access_hash: childAccessHash,
-        token_version: 1,
-        is_active: true,
         created_at: '2024-01-02T00:00:00.000Z',
-        last_login: null,
-        email: null,
-        password_hash: null,
       },
     ];
   }
@@ -147,14 +155,49 @@ describe('Admin Routes', () => {
       const user = storedUsers.find(u => u.id === _userId);
       return user?.token_version ?? 1;
     },
-    findUserByAccessHash: async (_accessHash: string) => null,
-    findUserByAccessCode: async (accessCode: string) => {
-      return storedUsers.find(u => u.access_code === accessCode && u.is_active) || null;
-    },
+    findUserByAccessHash: async () => null,
+    findUserByAccessCode: async () => null,
     getUserById: async (_userId: string) => null,
     updateUserLastLogin: async () => {},
 
-    // === 新增的管理员/成员方法 ===
+    // === access_codes 相关方法 ===
+    createAccessCode: async (input: any) => {
+      storedAccessCodes.push({
+        id: input.id,
+        user_id: input.user_id,
+        type: input.type,
+        code_hash: input.code_hash,
+        nickname: input.nickname,
+        created_at: new Date().toISOString(),
+      });
+      return input.id;
+    },
+    getAccessCodesByUser: async (userId: string) => storedAccessCodes.filter(c => c.user_id === userId),
+    findAccessCodeByCode: async (code: string) => {
+      for (const c of storedAccessCodes) {
+        if (bcrypt.compareSync(code, c.code_hash)) return c;
+      }
+      return null;
+    },
+    getAccessCodeById: async (id: string) => storedAccessCodes.find(c => c.id === id) ?? null,
+    regenerateAccessCode: async (id: string, userId: string) => {
+      const chars = '23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz';
+      let raw = '';
+      const bytes = crypto.randomBytes(6);
+      for (let i = 0; i < 6; i++) {
+        raw += chars[bytes[i] % chars.length];
+      }
+      const hash = bcrypt.hashSync(raw, 10);
+      const idx = storedAccessCodes.findIndex(c => c.id === id && c.user_id === userId);
+      if (idx === -1) throw new Error('not found');
+      storedAccessCodes[idx].code_hash = hash;
+      return raw;
+    },
+    deleteAccessCode: async (id: string, userId: string) => {
+      storedAccessCodes = storedAccessCodes.filter(c => !(c.id === id && c.user_id === userId));
+    },
+
+    // === auth routes 需要的方法 ===
     createTenant: async (id: string, name: string) => {
       storedTenants.push({ id, name, admin_id: null });
     },
@@ -164,10 +207,10 @@ describe('Admin Routes', () => {
     createUser: async (input: any) => {
       storedUsers.push({
         id: input.id,
-        tenant_id: input.tenant_id,
+        tenant_id: input.tenant_id ?? '',
         role: input.role,
-        nickname: input.nickname,
-        access_hash: input.access_hash,
+        nickname: input.nickname ?? '',
+        access_hash: input.access_hash ?? '',
         token_version: input.token_version,
         is_active: true,
         created_at: new Date().toISOString(),
@@ -190,37 +233,12 @@ describe('Admin Routes', () => {
     findUserByEmail: async (email: string) => {
       return storedUsers.find(u => u.email === email) || null;
     },
-    getTenantMembers: async (tenantId: string) => {
-      return storedUsers
-        .filter(u => u.tenant_id === tenantId && u.is_active)
-        .map(u => ({
-          id: u.id,
-          tenant_id: u.tenant_id,
-          role: u.role,
-          nickname: u.nickname,
-          access_hash: u.access_hash,
-          token_version: u.token_version,
-          last_login: u.last_login ?? undefined,
-          created_at: u.created_at,
-        }));
-    },
-    regenerateMemberHash: async (userId: string, tenantId: string, newHash: string, accessCode?: string) => {
-      const user = storedUsers.find(u => u.id === userId && u.tenant_id === tenantId && u.is_active);
-      if (!user) throw new Error('成员不存在或不属于该租户');
-      user.access_hash = newHash;
-      if (accessCode) (user as any).access_code = accessCode;
-      user.token_version += 1;
-    },
-    deactivateMember: async (userId: string, tenantId: string) => {
-      const user = storedUsers.find(u => u.id === userId && u.tenant_id === tenantId);
-      if (user) { user.is_active = false; user.token_version += 1; }
-    },
     updateTenantAdmin: async (tenantId: string, adminUserId: string) => {
       const tenant = storedTenants.find(t => t.id === tenantId);
       if (tenant) tenant.admin_id = adminUserId;
     },
-    getAllTenants: async () => storedTenants.map(t => ({ id: t.id, name: t.name, is_active: true, member_count: 0, created_at: new Date().toISOString() })),
     updateTenantName: async (tenantId: string, newName: string) => { const t = storedTenants.find(t => t.id === tenantId); if (t) t.name = newName; },
+    updateSuperAdminCredentials: async () => {},
   };
 
   beforeEach(() => {
@@ -245,6 +263,9 @@ describe('Admin Routes', () => {
     // 注册 auth 中间件
     await authMiddleware(app, { db: mockDb });
 
+    // 注册 auth 路由（register/login 端点）
+    await authRoutes(app, mockDb);
+
     // 注册 admin 路由
     await adminRoutes(app, mockDb);
 
@@ -257,11 +278,11 @@ describe('Admin Routes', () => {
 
   // ==================== 注册 ====================
 
-  // Feature: 管理员注册
+  // Feature: 用户注册
   //   Scenario: 成功注册
   //     Given 有效的邮箱、密码和家庭名称
   //     When  调用 POST /api/auth/register
-  //     Then  返回 200 包含 tenant_id 和 admin_hash
+  //     Then  返回 200 包含 token、role 和 family_name
 
   it('should register a new admin successfully', async () => {
     const res = await app.inject({
@@ -275,11 +296,9 @@ describe('Admin Routes', () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.ok).toBe(true);
-    expect(body).toHaveProperty('tenant_id');
-    expect(body).toHaveProperty('admin_hash');
-    expect(body.admin_hash).toMatch(/^[A-Za-z2-9]{6}$/);
-    expect(body.message).toBe('注册成功');
+    expect(body).toHaveProperty('token');
+    expect(body.role).toBe('user');
+    expect(body.family_name).toBe('新家庭');
   });
 
   // Feature: 管理员注册
@@ -300,9 +319,7 @@ describe('Admin Routes', () => {
     expect(body.code).toBe('EMAIL_EXISTS');
   });
 
-  it('should delete tenant if user creation fails', async () => {
-    // 模拟 createUser 抛出异常（比如 DB 错误），确认租户被清理
-    const tenantCountBefore = storedTenants.length;
+  it('should return 500 when user creation fails', async () => {
     const originalCreateUser = mockDb.createUser;
     mockDb.createUser = async () => { throw new Error('DB error'); };
 
@@ -312,8 +329,6 @@ describe('Admin Routes', () => {
       payload: { email: 'newuser@test.com', password: 'testpass123', family_name: '张家' },
     });
     expect(res.statusCode).toBe(500);
-    // 租户数不应增加
-    expect(storedTenants.length).toBe(tenantCountBefore);
 
     mockDb.createUser = originalCreateUser;
   });
@@ -375,11 +390,11 @@ describe('Admin Routes', () => {
 
   // ==================== 登录 ====================
 
-  // Feature: 管理员登录
+  // Feature: 用户登录
   //   Scenario: 成功登录
   //     Given 正确的邮箱和密码
   //     When  调用 POST /api/auth/login
-  //     Then  返回 200 包含 token 和 tenant_id
+  //     Then  返回 200 包含 token 和 role
 
   it('should login successfully with valid credentials', async () => {
     const res = await app.inject({
@@ -393,8 +408,7 @@ describe('Admin Routes', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body).toHaveProperty('token');
-    expect(body).toHaveProperty('tenant_id');
-    expect(body.tenant_id).toBe(adminTenantId);
+    expect(body.role).toBe('user');
   });
 
   // Feature: 管理员登录
@@ -479,16 +493,16 @@ describe('Admin Routes', () => {
   });
 
   // Feature: GET /api/admin/members
-  //   Scenario: 管理员获取成员列表
-  //     Given 一个 parent 角色的 JWT token
+  //   Scenario: 管理员获取访问码列表
+  //     Given 一个 user 角色的 JWT token
   //     When  调用 GET /api/admin/members
-  //     Then  返回 200 包含成员列表
+  //     Then  返回 200 包含访问码列表
 
   it('should return members list for admin', async () => {
     const adminToken = signToken({
       sub: adminId,
       tenant_id: adminTenantId,
-      role: 'parent',
+      role: 'user',
       token_version: 1,
     });
     const res = await app.inject({
@@ -501,11 +515,12 @@ describe('Admin Routes', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(Array.isArray(body)).toBe(true);
-    // 至少包含管理员自己和 child
-    expect(body.length).toBeGreaterThanOrEqual(2);
-    const adminUser = body.find((m: any) => m.id === adminId);
-    expect(adminUser).toBeDefined();
-    expect(adminUser.role).toBe('parent');
+    // 返回该用户下的所有访问码
+    expect(body.length).toBeGreaterThanOrEqual(1);
+    const childEntry = body.find((m: any) => m.id === childId);
+    expect(childEntry).toBeDefined();
+    expect(childEntry.role).toBe('child');
+    expect(childEntry.nickname).toBe('测试孩子');
   });
 
   // ==================== 添加成员 ====================
@@ -555,7 +570,7 @@ describe('Admin Routes', () => {
     const adminToken = signToken({
       sub: adminId,
       tenant_id: adminTenantId,
-      role: 'parent',
+      role: 'user',
       token_version: 1,
     });
     const res = await app.inject({
@@ -577,7 +592,7 @@ describe('Admin Routes', () => {
     const adminToken = signToken({
       sub: adminId,
       tenant_id: adminTenantId,
-      role: 'parent',
+      role: 'user',
       token_version: 1,
     });
     const res = await app.inject({
@@ -591,15 +606,15 @@ describe('Admin Routes', () => {
   });
 
   // Feature: POST /api/admin/members
-  //   Scenario: 管理员成功添加成员
-  //     Given 有效的 parent JWT
-  //     When  调用 POST /api/admin/members 添加一个 child 角色
-  //     Then  返回 200 包含 id、access_hash（明文）
+  //   Scenario: 管理员成功添加访问码
+  //     Given 有效的 user JWT
+  //     When  调用 POST /api/admin/members 添加一个 child 类型访问码
+  //     Then  返回 200 包含 id、access_code（明文）
   it('should add a new member successfully', async () => {
     const adminToken = signToken({
       sub: adminId,
       tenant_id: adminTenantId,
-      role: 'parent',
+      role: 'user',
       token_version: 1,
     });
     const res = await app.inject({
@@ -613,11 +628,11 @@ describe('Admin Routes', () => {
     expect(body).toHaveProperty('id');
     expect(body.nickname).toBe('新孩子');
     expect(body.role).toBe('child');
-    expect(body.access_hash).toMatch(/^[A-Za-z2-9]{6}$/); // 返回明文访问码
-    // 验证成员已存入存储
-    const newMember = storedUsers.find(u => u.id === body.id);
-    expect(newMember).toBeDefined();
-    expect(newMember?.nickname).toBe('新孩子');
+    expect(body.access_code).toMatch(/^[A-Za-z2-9]{6}$/); // 返回明文访问码
+    // 验证访问码已存入存储
+    const newCode = storedAccessCodes.find(c => c.id === body.id);
+    expect(newCode).toBeDefined();
+    expect(newCode?.nickname).toBe('新孩子');
   });
 
   // ==================== 重新生成访问码 ====================
@@ -658,17 +673,17 @@ describe('Admin Routes', () => {
 
   // Feature: POST /api/admin/members/:id/regenerate
   //   Scenario: 管理员成功重新生成访问码
-  //     Given 有效的 parent JWT
+  //     Given 有效的 user JWT
   //     When  调用 POST /api/admin/members/:id/regenerate
-  //     Then  返回 200 包含新 access_hash 明文，token_version 递增
+  //     Then  返回 200 包含新访问码明文
   it('should regenerate hash successfully', async () => {
     const adminToken = signToken({
       sub: adminId,
       tenant_id: adminTenantId,
-      role: 'parent',
+      role: 'user',
       token_version: 1,
     });
-    const oldTokenVersion = storedUsers.find(u => u.id === childId)?.token_version ?? 0;
+    const oldCodeHash = storedAccessCodes.find(c => c.id === childId)?.code_hash;
     const res = await app.inject({
       method: 'POST',
       url: `/api/admin/members/${childId}/regenerate`,
@@ -679,9 +694,9 @@ describe('Admin Routes', () => {
     expect(body.id).toBe(childId);
     expect(body.access_code).toMatch(/^[A-Za-z2-9]{6}$/); // 返回明文访问码
     expect(body.message).toBe('已重新生成，旧访问码已失效');
-    // 验证 token_version 已递增
-    const updatedUser = storedUsers.find(u => u.id === childId);
-    expect(updatedUser?.token_version).toBe(oldTokenVersion + 1);
+    // 验证 code_hash 已更新
+    const updatedCode = storedAccessCodes.find(c => c.id === childId);
+    expect(updatedCode?.code_hash).not.toBe(oldCodeHash);
   });
 
   // ==================== 移除成员 ====================
@@ -722,33 +737,28 @@ describe('Admin Routes', () => {
   });
 
   // Feature: DELETE /api/admin/members/:id
-  //   Scenario: 管理员成功移除成员
-  //     Given 有效的 parent JWT
+  //   Scenario: 管理员成功删除访问码
+  //     Given 有效的 user JWT
   //     When  调用 DELETE /api/admin/members/:id
-  //     Then  返回 200 且成员 is_active 变为 false，token_version 递增
+  //     Then  返回 200 且访问码被删除
   it('should delete a member successfully', async () => {
     const adminToken = signToken({
       sub: adminId,
       tenant_id: adminTenantId,
-      role: 'parent',
+      role: 'user',
       token_version: 1,
     });
-    // 先添加一个临时成员用于删除
+    // 先添加一个临时访问码用于删除
     const tempId = 'temp-child-001';
-    storedUsers.push({
+    storedAccessCodes.push({
       id: tempId,
-      tenant_id: adminTenantId,
-      role: 'child',
+      user_id: adminId,
+      type: 'child',
+      code_hash: '$2a$10$dummy',
       nickname: '待删除',
-      access_hash: '$2a$10$dummy',
-      token_version: 1,
-      is_active: true,
       created_at: '2024-03-01T00:00:00.000Z',
-      last_login: null,
-      email: null,
-      password_hash: null,
     });
-    const oldTokenVersion = storedUsers.find(u => u.id === tempId)?.token_version ?? 0;
+    expect(storedAccessCodes.find(c => c.id === tempId)).toBeDefined();
     const res = await app.inject({
       method: 'DELETE',
       url: `/api/admin/members/${tempId}`,
@@ -756,24 +766,19 @@ describe('Admin Routes', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().ok).toBe(true);
-    // 验证成员已被停用且 token_version 递增
-    const deletedUser = storedUsers.find(u => u.id === tempId);
-    expect(deletedUser?.is_active).toBe(false);
-    expect(deletedUser?.token_version).toBe(oldTokenVersion + 1);
+    // 验证访问码已被删除
+    expect(storedAccessCodes.find(c => c.id === tempId)).toBeUndefined();
   });
 
   // ==================== 注册不污染超管租户 ====================
 
-  // Feature: 管理员注册 — 不复用超管系统租户
-  //   Scenario: 注册时存在"系统管理"租户，不应复用该租户
-  //     Given 数据库中已存在名为"系统管理"的租户（超管专用）
-  //     When  用户调用 POST /api/auth/register 注册新家庭
-  //     Then  应创建全新的租户，而非复用"系统管理"租户
-  //     Then  注册完成后，新家庭的租户名称应为用户指定的 family_name
-  //     Then  注册完成后，该租户下只有一个家长成员（不含超管）
+  // Feature: 用户注册 — 存在系统管理租户不影响注册
+  //   Scenario: 系统存在"系统管理"租户时仍可正常注册
+  //     Given 数据库中已存在名为"系统管理"的租户
+  //     When  用户调用 POST /api/auth/register
+  //     Then  返回 200 并创建新的 user 账号
 
-  it('注册时存在系统管理租户不应复用', async () => {
-    // 模拟 ensureSuperAdmin 创建的"系统管理"租户
+  it('注册时存在系统管理租户不影响注册', async () => {
     const superTenantId = 'super-tenant-001';
     const superUserId = 'super-user-001';
     storedTenants = [
@@ -783,9 +788,9 @@ describe('Admin Routes', () => {
       {
         id: superUserId,
         tenant_id: superTenantId,
-        role: 'parent',
+        role: 'user',
         nickname: '超级管理员',
-        access_hash: '', // 超管无访问码
+        access_hash: '',
         token_version: 1,
         is_active: true,
         created_at: '2024-01-01T00:00:00.000Z',
@@ -806,42 +811,26 @@ describe('Admin Routes', () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.ok).toBe(true);
+    expect(body.role).toBe('user');
+    expect(body.family_name).toBe('我的新家庭');
 
-    // 不应复用系统管理租户的 ID
-    expect(body.tenant_id).not.toBe(superTenantId);
-
-    // 新租户的 name 应该是 family_name
-    const newTenant = storedTenants.find(t => t.id === body.tenant_id);
-    expect(newTenant).toBeDefined();
-    expect(newTenant!.name).toBe('我的新家庭');
-
-    // "系统管理"租户不应被改名（保持原名）
-    const superTenant = storedTenants.find(t => t.id === superTenantId);
-    expect(superTenant).toBeDefined();
-    expect(superTenant!.name).toBe('系统管理');
-
-    // 新家庭租户下只有一个家长成员（不包含超管用户）
-    const newTenantParents = storedUsers.filter(
-      u => u.tenant_id === body.tenant_id && u.role === 'parent' && u.is_active
-    );
-    expect(newTenantParents).toHaveLength(1);
-    expect(newTenantParents[0].email).toBe('newfamily@test.com');
+    // 验证新用户已创建
+    const newUser = storedUsers.find(u => u.email === 'newfamily@test.com');
+    expect(newUser).toBeDefined();
+    expect(newUser?.role).toBe('user');
   });
 
-  // Feature: 管理员注册 — 仍可复用"默认租户"
-  //   Scenario: 注册时存在"默认租户"（旧版本遗留），应正常复用
-  //     Given 数据库中已存在名为"默认租户"的租户（旧版本迁移遗留）
-  //     When  用户调用 POST /api/auth/register 注册新家庭
-  //     Then  应复用"默认租户"并更新为 family_name
-  //     Then  注册完成后，该租户下只有一个家长成员
+  // Feature: 用户注册 — 存在默认租户不影响注册
+  //   Scenario: 系统存在"默认租户"时仍可正常注册
+  //     Given 数据库中已存在名为"默认租户"的租户
+  //     When  用户调用 POST /api/auth/register
+  //     Then  返回 200 并创建新的 user 账号
 
-  it('注册时存在默认租户应正常复用', async () => {
-    const legacyTenantId = 'legacy-tenant-001';
+  it('注册时存在默认租户不影响注册', async () => {
     storedTenants = [
-      { id: legacyTenantId, name: '默认租户', admin_id: null },
+      { id: 'legacy-tenant-001', name: '默认租户', admin_id: null },
     ];
-    storedUsers = []; // 空用户表
+    storedUsers = [];
 
     const res = await app.inject({
       method: 'POST',
@@ -854,21 +843,12 @@ describe('Admin Routes', () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.ok).toBe(true);
+    expect(body.role).toBe('user');
+    expect(body.family_name).toBe('我的第二个家庭');
 
-    // 应复用"默认租户"的 ID
-    expect(body.tenant_id).toBe(legacyTenantId);
-
-    // 租户 name 应更新为 family_name
-    const reusedTenant = storedTenants.find(t => t.id === legacyTenantId);
-    expect(reusedTenant).toBeDefined();
-    expect(reusedTenant!.name).toBe('我的第二个家庭');
-
-    // 该租户下只有一个家长成员
-    const parents = storedUsers.filter(
-      u => u.tenant_id === legacyTenantId && u.role === 'parent' && u.is_active
-    );
-    expect(parents).toHaveLength(1);
-    expect(parents[0].email).toBe('newfamily2@test.com');
+    // 验证新用户已创建
+    const newUser = storedUsers.find(u => u.email === 'newfamily2@test.com');
+    expect(newUser).toBeDefined();
+    expect(newUser?.role).toBe('user');
   });
 });

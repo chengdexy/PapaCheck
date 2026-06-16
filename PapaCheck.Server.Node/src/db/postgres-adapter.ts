@@ -6,7 +6,7 @@ import { Pool } from 'pg';
 import type { Pool as PoolType, QueryResult } from 'pg';
 import bcrypt from 'bcryptjs';
 import { DatabaseAdapter } from './adapter.js';
-import type { FullDataSnapshot, PointsHistoryEntry, ModifiedEntry, NotificationItem, TenantListItem } from './types.js';
+import type { FullDataSnapshot, PointsHistoryEntry, ModifiedEntry, NotificationItem, TenantListItem, AccessCodeRecord, CreateAccessCodeInput, AdminUser } from './types.js';
 import type { CRDTOperation } from '../crdt/types.js';
 
 /** date_key 表：以日期为主键，存储 JSON 数据 */
@@ -1534,9 +1534,10 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
   }
 
   async createUser(input: any): Promise<void> {
+    const { id, role, email, password_hash, family_name, token_version } = input;
     await this.pool.query(
-      'INSERT INTO users (id, tenant_id, role, nickname, access_hash, access_code, token_version, email, password_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO NOTHING',
-      [input.id, input.tenant_id, input.role, input.nickname, input.access_hash, input.access_code ?? null, input.token_version, input.email ?? null, input.password_hash ?? null]
+      'INSERT INTO users (id, role, email, password_hash, family_name, token_version, is_active) VALUES ($1, $2, $3, $4, $5, $6, true) ON CONFLICT (id) DO NOTHING',
+      [id, role, email ?? null, password_hash ?? null, family_name ?? null, token_version ?? 1]
     );
   }
 
@@ -1558,7 +1559,7 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
 
   async findUserByEmail(email: string): Promise<any | null> {
     const result = await this.pool.query(
-      'SELECT id, email, is_active FROM users WHERE email = $1 LIMIT 1',
+      'SELECT id, role, email, password_hash, token_version, family_name, first_login, is_active FROM users WHERE email = $1 AND is_active = true LIMIT 1',
       [email]
     );
     if (result.rows.length === 0) return null;
@@ -1567,20 +1568,10 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
 
   async getTenantMembers(tenantId: string): Promise<any[]> {
     const result = await this.pool.query(
-      'SELECT id, tenant_id, role, nickname, access_code, access_hash, token_version, last_login, created_at FROM users WHERE tenant_id = $1 AND is_active = true ORDER BY created_at ASC',
+      'SELECT id, user_id as tenant_id, type as role, nickname, code_hash as access_hash, created_at FROM access_codes WHERE user_id = $1 ORDER BY created_at ASC',
       [tenantId]
     );
-    return result.rows.map(row => ({
-      id: row.id,
-      tenant_id: row.tenant_id,
-      role: row.role,
-      nickname: row.nickname,
-      access_code: row.access_code,
-      access_hash: row.access_hash,
-      token_version: row.token_version,
-      last_login: row.last_login ?? undefined,
-      created_at: row.created_at,
-    }));
+    return result.rows;
   }
 
   async regenerateMemberHash(userId: string, tenantId: string, newHash: string, accessCode?: string): Promise<void> {
@@ -1616,16 +1607,16 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
 
   // ==================== Super Admin ====================
 
-  async findSuperAdmin(username: string): Promise<any | null> {
+  async findSuperAdmin(username: string): Promise<AdminUser | null> {
     const result = await this.pool.query(
-      'SELECT * FROM users WHERE email = $1 AND is_super_admin = true AND is_active = true',
-      [username]
+      'SELECT id, role, email, password_hash, token_version, first_login FROM users WHERE email = $1 AND role = $2 AND is_active = true LIMIT 1',
+      [username, 'admin']
     );
     if (result.rows.length === 0) return null;
     const row = result.rows[0];
     return {
       id: row.id,
-      tenant_id: row.tenant_id ?? '__super_admin__',
+      tenant_id: row.id,
       email: row.email,
       password_hash: row.password_hash,
       token_version: row.token_version,
@@ -1634,7 +1625,7 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
 
   async updateSuperAdminCredentials(userId: string, email: string, passwordHash: string): Promise<void> {
     await this.pool.query(
-      'UPDATE users SET email = $1, password_hash = $2, needs_password_change = false, token_version = token_version + 1 WHERE id = $3',
+      'UPDATE users SET email = $1, password_hash = $2, first_login = false, token_version = token_version + 1 WHERE id = $3',
       [email, passwordHash, userId]
     );
   }
@@ -1662,9 +1653,90 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
     );
   }
 
+  // ==================== Access Codes ====================
+
+  async createAccessCode(input: CreateAccessCodeInput): Promise<string> {
+    await this.pool.query(
+      'INSERT INTO access_codes (id, user_id, type, code_hash, nickname) VALUES ($1, $2, $3, $4, $5)',
+      [input.id, input.user_id, input.type, input.code_hash, input.nickname]
+    );
+    return input.id;
+  }
+
+  async getAccessCodesByUser(userId: string): Promise<AccessCodeRecord[]> {
+    const result = await this.pool.query(
+      'SELECT id, user_id, type, code_hash, nickname, created_at FROM access_codes WHERE user_id = $1 ORDER BY created_at ASC',
+      [userId]
+    );
+    return result.rows.map((r: any) => ({
+      id: r.id,
+      user_id: r.user_id,
+      type: r.type,
+      code_hash: r.code_hash,
+      nickname: r.nickname,
+      created_at: typeof r.created_at === 'object' ? r.created_at.toISOString() : r.created_at,
+    }));
+  }
+
+  async findAccessCodeByCode(code: string): Promise<AccessCodeRecord | null> {
+    const result = await this.pool.query('SELECT * FROM access_codes');
+    for (const row of result.rows) {
+      if (bcrypt.compareSync(code, row.code_hash)) {
+        return {
+          id: row.id,
+          user_id: row.user_id,
+          type: row.type,
+          code_hash: row.code_hash,
+          nickname: row.nickname,
+          created_at: typeof row.created_at === 'object' ? row.created_at.toISOString() : row.created_at,
+        };
+      }
+    }
+    return null;
+  }
+
+  async getAccessCodeById(id: string): Promise<AccessCodeRecord | null> {
+    const result = await this.pool.query('SELECT * FROM access_codes WHERE id = $1', [id]);
+    if (result.rows.length === 0) return null;
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      user_id: row.user_id,
+      type: row.type,
+      code_hash: row.code_hash,
+      nickname: row.nickname,
+      created_at: typeof row.created_at === 'object' ? row.created_at.toISOString() : row.created_at,
+    };
+  }
+
+  async regenerateAccessCode(id: string, userId: string): Promise<string> {
+    const { raw, hashed } = await generateAccessHash();
+    const result = await this.pool.query(
+      'UPDATE access_codes SET code_hash = $1 WHERE id = $2 AND user_id = $3',
+      [hashed, id, userId]
+    );
+    if (result.rowCount === 0) throw new Error('访问码不存在或不属于该用户');
+    return raw;
+  }
+
+  async deleteAccessCode(id: string, userId: string): Promise<void> {
+    await this.pool.query('DELETE FROM access_codes WHERE id = $1 AND user_id = $2', [id, userId]);
+  }
+
   // ==================== Connection ====================
 
   async close(): Promise<void> {
     await this.pool.end();
   }
+}
+
+async function generateAccessHash(): Promise<{ raw: string; hashed: string }> {
+  const chars = '23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz';
+  let raw = '';
+  const bytes = crypto.randomBytes(6);
+  for (let i = 0; i < 6; i++) {
+    raw += chars[bytes[i] % chars.length];
+  }
+  const hashed = await bcrypt.hash(raw, 10);
+  return { raw, hashed };
 }

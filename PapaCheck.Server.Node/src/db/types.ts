@@ -57,19 +57,21 @@ export interface Tenant {
 export interface User {
   id: string;
   tenant_id: string;
-  role: 'parent' | 'child';
+  role: 'admin' | 'user' | 'parent' | 'child';
   nickname: string;
-  access_hash: string;
+  access_hash?: string;
   token_version: number;
   is_active?: boolean;
   created_at?: string;
   last_login?: string;
+  family_name?: string;
+  first_login?: boolean;
 }
 
 export interface JWTPayload {
   sub: string;
   tenant_id: string;
-  role: 'parent' | 'child';
+  role: 'admin' | 'user' | 'parent' | 'child';
   nickname: string;
   token_version: number;
   iat?: number;
@@ -79,7 +81,7 @@ export interface JWTPayload {
 export interface UserRecord {
   id: string;
   tenant_id: string;
-  role: 'parent' | 'child';
+  role: 'admin' | 'user' | 'parent' | 'child';
   nickname: string;
   access_hash: string;
   token_version: number;
@@ -88,6 +90,8 @@ export interface UserRecord {
   needs_password_change: boolean;
   created_at: string;
   last_login?: string;
+  family_name?: string;
+  first_login?: boolean;
 }
 
 export interface TenantListItem {
@@ -109,13 +113,31 @@ token_version: number;
 export interface CreateUserInput {
   id: string;
   tenant_id: string;
-  role: 'parent' | 'child';
+  role: 'admin' | 'user' | 'parent' | 'child';
   nickname: string;
-  access_hash: string;
+  access_hash?: string;
   access_code?: string;
   token_version: number;
   email?: string;
   password_hash?: string;
+  family_name?: string;
+}
+
+export interface AccessCodeRecord {
+  id: string;
+  user_id: string;
+  type: 'parent' | 'child';
+  code_hash: string;
+  nickname: string;
+  created_at: string;
+}
+
+export interface CreateAccessCodeInput {
+  id: string;
+  user_id: string;
+  type: 'parent' | 'child';
+  code_hash: string;
+  nickname: string;
 }
 
 // ==================== IDatabase 接口 ====================
@@ -194,20 +216,14 @@ putHomework(id: string, data: any, tenantId?: string): Promise<void>;
   findUserByAccessCode(accessCode: string): Promise<UserRecord | null>;
   getUserById(userId: string): Promise<UserRecord | null>;
   updateUserLastLogin(userId: string): Promise<void>;
-  createTenant(id: string, name: string): Promise<void>;
-  deleteTenant(id: string): Promise<void>;
   createUser(input: CreateUserInput): Promise<void>;
   findAdminByEmail(email: string): Promise<AdminUser | null>;
   findUserByEmail(email: string): Promise<any | null>;
-  getTenantMembers(tenantId: string): Promise<any[]>;
-  regenerateMemberHash(userId: string, tenantId: string, newHash: string, accessCode?: string): Promise<void>;
-  deactivateMember(userId: string, tenantId: string): Promise<void>;
-  updateTenantAdmin(tenantId: string, adminUserId: string): Promise<void>;
-  updateTenantName(tenantId: string, newName: string): Promise<void>;
-
-  // Super Admin
-  findSuperAdmin(username: string): Promise<AdminUser | null>;
   updateSuperAdminCredentials(userId: string, email: string, passwordHash: string): Promise<void>;
-  getAllTenants(): Promise<TenantListItem[]>;
-  setTenantActive(tenantId: string, isActive: boolean): Promise<void>;
+  createAccessCode(input: CreateAccessCodeInput): Promise<string>;
+  getAccessCodesByUser(userId: string): Promise<AccessCodeRecord[]>;
+  findAccessCodeByCode(code: string): Promise<AccessCodeRecord | null>;
+  getAccessCodeById(id: string): Promise<AccessCodeRecord | null>;
+  regenerateAccessCode(id: string, userId: string): Promise<string>;
+  deleteAccessCode(id: string, userId: string): Promise<void>;
 }

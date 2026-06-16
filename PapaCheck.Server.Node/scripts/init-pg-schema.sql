@@ -14,23 +14,34 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_tenants_name ON tenants(name);
 
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id),
-  role TEXT NOT NULL CHECK (role IN ('parent', 'child')),
-  nickname TEXT NOT NULL,
-  access_hash TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('parent', 'child', 'admin', 'user')),
+  email TEXT,
+  password_hash TEXT,
+  family_name TEXT,
+  first_login BOOLEAN DEFAULT true,
+  tenant_id UUID,
+  nickname TEXT,
+  access_hash TEXT,
   access_code TEXT,
   token_version INTEGER NOT NULL DEFAULT 1,
   is_active BOOLEAN DEFAULT true,
   is_super_admin BOOLEAN DEFAULT false,
   needs_password_change BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW(),
-  last_login TIMESTAMP,
-  email TEXT,
-  password_hash TEXT,
-  UNIQUE(tenant_id, nickname)
+  last_login TIMESTAMP
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS access_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id),
+  type TEXT NOT NULL CHECK (type IN ('parent', 'child')),
+  code_hash TEXT NOT NULL,
+  nickname TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(user_id, nickname)
+);
 
 -- ==================== Business Tables ====================
 

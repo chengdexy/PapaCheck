@@ -1,4 +1,4 @@
-import type { IDatabase, FullDataSnapshot, ModifiedEntry, NotificationItem, AdminUser, TenantListItem } from './types.js';
+import type { IDatabase, FullDataSnapshot, ModifiedEntry, NotificationItem, AccessCodeRecord, CreateAccessCodeInput } from './types.js';
 import type { CRDTOperation } from '../crdt/types.js';
 
 // ==================== DatabaseAdapter 抽象基类 ====================
@@ -129,22 +129,18 @@ export abstract class DatabaseAdapter implements IDatabase {
   abstract queryUserTokenVersion(userId: string): Promise<number>;
   abstract getUserById(userId: string): Promise<any | null>;
   abstract updateUserLastLogin(userId: string): Promise<void>;
-  abstract createTenant(id: string, name: string): Promise<void>;
-  abstract deleteTenant(id: string): Promise<void>;
   abstract createUser(input: any): Promise<void>;
   abstract findAdminByEmail(email: string): Promise<any | null>;
   abstract findUserByEmail(email: string): Promise<any | null>;
   abstract findUserByAccessHash(accessHash: string): Promise<any | null>;
   abstract findUserByAccessCode(accessCode: string): Promise<any | null>;
-  abstract getTenantMembers(tenantId: string): Promise<any[]>;
-  abstract regenerateMemberHash(userId: string, tenantId: string, newHash: string, accessCode?: string): Promise<void>;
-  abstract deactivateMember(userId: string, tenantId: string): Promise<void>;
-  abstract updateTenantAdmin(tenantId: string, adminUserId: string): Promise<void>;
-  abstract updateTenantName(tenantId: string, newName: string): Promise<void>;
-
-  // Super Admin
-  abstract findSuperAdmin(username: string): Promise<AdminUser | null>;
   abstract updateSuperAdminCredentials(userId: string, email: string, passwordHash: string): Promise<void>;
-  abstract getAllTenants(): Promise<TenantListItem[]>;
-  abstract setTenantActive(tenantId: string, isActive: boolean): Promise<void>;
+
+  // Access Codes
+  abstract createAccessCode(input: CreateAccessCodeInput): Promise<string>;
+  abstract getAccessCodesByUser(userId: string): Promise<AccessCodeRecord[]>;
+  abstract findAccessCodeByCode(code: string): Promise<AccessCodeRecord | null>;
+  abstract getAccessCodeById(id: string): Promise<AccessCodeRecord | null>;
+  abstract regenerateAccessCode(id: string, userId: string): Promise<string>;
+  abstract deleteAccessCode(id: string, userId: string): Promise<void>;
 }

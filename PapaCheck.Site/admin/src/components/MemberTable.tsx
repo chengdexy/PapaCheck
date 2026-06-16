@@ -8,8 +8,7 @@ interface Member {
   id: string;
   nickname: string;
   role: string;
-  access_hash: string;
-  access_code?: string | null;
+  access_code: string | null;
   last_login?: string;
   created_at: string;
 }
@@ -38,9 +37,9 @@ export default function MemberTable({ refreshKey }: { refreshKey: number }) {
     loadMembers();
   }, [loadMembers, refreshKey]);
 
-  async function handleCopy(hash: string) {
+  async function handleCopy(code: string) {
     try {
-      await navigator.clipboard.writeText(hash);
+      await navigator.clipboard.writeText(code);
       showToast('success', '已复制到剪贴板');
     } catch {
       showToast('error', '复制失败');

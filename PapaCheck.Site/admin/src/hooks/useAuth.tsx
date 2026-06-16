@@ -1,6 +1,6 @@
 import { createContext, useContext, useReducer, useEffect, useCallback, type ReactNode } from 'react';
 
-type Role = 'parent' | 'super_admin' | null;
+type Role = 'parent' | 'super_admin' | 'admin' | 'user' | null;
 
 type AuthState = {
   status: 'idle' | 'loading' | 'authenticated' | 'error';
@@ -8,11 +8,12 @@ type AuthState = {
   userId: string | null;
   token: string | null;
   error: string | null;
+  needsPasswordChange: boolean;
 };
 
 type AuthAction =
   | { type: 'LOADING' }
-  | { type: 'AUTHENTICATED'; token: string | null; role: Role; userId?: string | null }
+  | { type: 'AUTHENTICATED'; token: string | null; role: Role; userId?: string | null; needsPasswordChange?: boolean }
   | { type: 'ERROR'; error: string }
   | { type: 'LOGOUT' }
   | { type: 'IDLE' };
@@ -22,13 +23,21 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
     case 'LOADING':
       return { ...state, status: 'loading', error: null };
     case 'AUTHENTICATED':
-      return { status: 'authenticated', token: action.token, role: action.role, userId: action.userId ?? null, error: null };
+      return {
+        ...state,
+        status: 'authenticated',
+        token: action.token,
+        role: action.role,
+        userId: action.userId ?? null,
+        error: null,
+        needsPasswordChange: action.needsPasswordChange ?? false,
+      };
     case 'ERROR':
       return { ...state, status: 'error', error: action.error };
     case 'LOGOUT':
-      return { status: 'idle', token: null, role: null, userId: null, error: null };
+      return { status: 'idle', token: null, role: null, userId: null, error: null, needsPasswordChange: false };
     case 'IDLE':
-      return { status: 'idle', token: null, role: null, userId: null, error: null };
+      return { status: 'idle', token: null, role: null, userId: null, error: null, needsPasswordChange: false };
     default:
       return state;
   }
@@ -39,14 +48,11 @@ const ADMIN_TOKEN_KEY = 'papacheck_admin_token';
 function decodeJWT(token: string): { role: Role; userId: string } | null {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
-    // Check expiry
     if (payload.exp && payload.exp * 1000 < Date.now()) {
       return null;
     }
-    return {
-      role: payload.role === 'super_admin' ? 'super_admin' : 'parent',
-      userId: payload.sub,
-    };
+    // 直接使用 payload 中的 role
+    return { role: payload.role, userId: payload.sub };
   } catch {
     return null;
   }
@@ -55,8 +61,8 @@ function decodeJWT(token: string): { role: Role; userId: string } | null {
 const AuthContext = createContext<{
   state: AuthState;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, familyName: string) => Promise<{ tenant_id: string; admin_hash: string }>;
-  superLogin: (username: string, password: string) => Promise<void>;
+  register: (email: string, password: string, familyName: string) => Promise<any>;
+  updateCredentials: (email: string, password: string, currentPassword?: string) => Promise<void>;
   logout: () => void;
 } | null>(null);
 
@@ -67,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     userId: null,
     token: null,
     error: null,
+    needsPasswordChange: false,
   });
 
   const checkAuth = useCallback(() => {
@@ -103,7 +110,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
       localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
       const decoded = decodeJWT(data.token);
-      dispatch({ type: 'AUTHENTICATED', token: data.token, role: 'parent', userId: decoded?.userId });
+      dispatch({
+        type: 'AUTHENTICATED',
+        token: data.token,
+        role: data.role,
+        userId: decoded?.userId,
+        needsPasswordChange: data.needs_password_change ?? false,
+      });
     } catch (e) {
       dispatch({ type: 'ERROR', error: (e as Error).message });
     }
@@ -122,35 +135,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(err.error || '注册失败');
       }
       const data = await res.json();
-      // Return to idle so the auth view stays visible for the modal
-      dispatch({ type: 'IDLE' });
-      return { tenant_id: data.tenant_id, admin_hash: data.admin_hash };
+      localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
+      const decoded = decodeJWT(data.token);
+      dispatch({
+        type: 'AUTHENTICATED',
+        token: data.token,
+        role: 'user',
+        userId: decoded?.userId,
+      });
+      return {}; // 不再返回 tenant_id 和 admin_hash
     } catch (e) {
       dispatch({ type: 'IDLE' });
       throw e;
     }
   }, []);
 
-  const superLogin = useCallback(async (username: string, password: string) => {
+  const updateCredentials = useCallback(async (email: string, password: string, currentPassword?: string) => {
     dispatch({ type: 'LOADING' });
     try {
-      const res = await fetch('/api/admin/super/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+      const res = await fetch('/api/auth/credentials', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem(ADMIN_TOKEN_KEY)}`,
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          ...(currentPassword ? { current_password: currentPassword } : {}),
+        }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: '登录失败' }));
-        throw new Error(err.error || '登录失败');
+        const err = await res.json().catch(() => ({ error: '修改失败' }));
+        throw new Error(err.error || '修改失败');
       }
-      const data = await res.json();
-      localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
-      const decoded = decodeJWT(data.token);
-      dispatch({ type: 'AUTHENTICATED', token: data.token, role: 'super_admin', userId: decoded?.userId });
+      // 修改成功后重新登录
+      await login(email, password);
     } catch (e) {
       dispatch({ type: 'ERROR', error: (e as Error).message });
     }
-  }, []);
+  }, [login]);
 
   const logout = useCallback(() => {
     localStorage.removeItem(ADMIN_TOKEN_KEY);
@@ -158,7 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ state, login, register, superLogin, logout }}>
+    <AuthContext.Provider value={{ state, login, register, updateCredentials, logout }}>
       {children}
     </AuthContext.Provider>
   );
