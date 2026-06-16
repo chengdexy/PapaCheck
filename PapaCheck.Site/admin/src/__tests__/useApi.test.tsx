@@ -128,10 +128,10 @@ describe('useApi', () => {
       await result.current.auth.login('t@t.com', 'pass');
     });
 
-    let error: Error | null = null;
-    await act(async () => {
-      try { await result.current.api.fetch('/api/test'); } catch(e) { error = e as Error; }
-    });
-    expect(error?.message).toBe('服务器内部错误');
+    await expect(
+      act(async () => {
+        await result.current.api.fetch('/api/test');
+      })
+    ).rejects.toThrow('服务器内部错误');
   });
 });
