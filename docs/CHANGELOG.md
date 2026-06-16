@@ -7,15 +7,20 @@
 ## [Unreleased]
 
 ### Added
+- **PapaCheck.Site 管理面板 React 子项目**：新建 `PapaCheck.Site/admin/` 独立 React + Vite + TypeScript 子项目，使用 Tailwind CSS 4 + Vitest 测试框架；新增 30 个 TDD 测试覆盖所有组件
 - **认证端点添加速率限制**：安装 `@fastify/rate-limit`，全局 60 次/分钟兜底；`POST /api/auth/login` 和 `POST /api/auth/exchange` 各 10 次/分钟，`POST /api/admin/super/login` 5 次/分钟；新增 429 限流测试；`AppOptions.rateLimit` 支持测试中禁用
 - **JSON Schema 请求体验证**：为 10 个认证/管理路由添加 JSON Schema 定义（auth 2 个、admin 5 个、super-admin 3 个），移除 handler 内重复的手动字段校验；添加 4xx 错误响应 schema 完善 Swagger 文档
 - **PapaCheck.Site 官网子项目**：新建 `PapaCheck.Site/` 子项目，将官网从 `docs/` 搬出；管理面板从落地页底部内嵌改为独立 `admin.html` 页面；docs/index.html 移除管理面板代码；更新 release.py 排除项
 - **作业 CRUD 流程测试**：新增 `homework-flow.test.ts`（5 测试），验证新增/更新/删除/租户隔离
 - **赏金任务放弃/提交反馈测试**：新增 `bounty_abandon_feedback.test.js`（4 测试），验证找不到任务记录时 toast 提示用户
 - **编译产物验证测试**：新增 `compiled-middleware.test.ts`（3 测试），验证 `dist/auth/middleware.js` 中 `PUBLIC_PATHS` 与源码一致，防止部署时 dist/ 过旧
-- **测试覆盖补齐**：新增 29 个测试（Super Admin Routes 16 个、Admin Routes 成员管理 11 个、Middleware PUBLIC_PATHS 2 个），全量 625 测试通过
+- **测试覆盖补齐**：新增 29 个测试（Super Admin Routes 16 个、Admin Routes 成员管理 11 个、Middleware PUBLIC_PATHS 2 个），全量 631 测试通过
+
+### Changed
+- **PapaCheck.Site 重构**：管理面板从纯 HTML/CSS/JS 重构为 React + Vite + TypeScript；交互逻辑全面修复（消除 `alert()`、函数自我替换 hack、重复事件绑定、无加载/空/错误状态）；视觉升级为现代克制风格（Zinc 中性底 + 橘色强调色、系统字体栈、零 emoji）；落地页与管理面板完全隔离独立维护；`release.py` 新增 `--site` 部署选项（含引导模式）
 
 ### Fixed
+- **修复新建家庭时超管用户被误拉入家庭**：`POST /api/auth/register` 注册新家庭时，租户复用逻辑将超管的 `'系统管理'` 租户也纳入搜索范围，导致超管用户 `'超级管理员'`（无访问码）被并入新家庭，与注册家长形成"两个家长"。修复为仅复用 `'默认租户'`（旧版本遗留），不触碰超管租户。新增 TDD 测试 2 个，全量 631 测试通过
 - **修复 rate-limit 错误处理器分支无效**：`!(error instanceof Error)` 将 `@fastify/rate-limit` 抛出的 Error 实例排除在外，导致 429 错误落入 500 兜底；移除该条件使 rate-limit 正确返回 429
 - **修复放弃的常驻型赏金任务孩子端不再可见**：`availableBounty` 过滤条件增加了 abandoned 状态排除；`startBountyTask` 守卫允许放弃的任务重新开始并复用已放弃的提交记录。新增 1 个 TDD 测试，全量 628 测试通过
 - **修复评级后新增作业完成不加分**：`calculateSettlement()` 中 `submittedAt` 和 `rating` 共用同一分支导致 multiplier=null 时无法加分且 `homeworkBonus` 未更新；分离为独立分支，已提交状态正确更新 `homeworkBonus`/`totalBeforeRating`，已评级状态正常追加积分。同时修复 pollServer 在 `!allDone` 时错误删除已提交 settlement 的问题。**[后续修复]** 外层条件误改为 `if (existingSettlement)` 导致既无 `rating` 也无 `submittedAt` 的 settlement 跳过"未评级"逻辑，已恢复为 `(rating || submittedAt)`

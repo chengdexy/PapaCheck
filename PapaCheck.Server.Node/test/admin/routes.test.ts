@@ -698,4 +698,114 @@ describe('Admin Routes', () => {
     expect(deletedUser?.is_active).toBe(false);
     expect(deletedUser?.token_version).toBe(oldTokenVersion + 1);
   });
+
+  // ==================== 注册不污染超管租户 ====================
+
+  // Feature: 管理员注册 — 不复用超管系统租户
+  //   Scenario: 注册时存在"系统管理"租户，不应复用该租户
+  //     Given 数据库中已存在名为"系统管理"的租户（超管专用）
+  //     When  用户调用 POST /api/auth/register 注册新家庭
+  //     Then  应创建全新的租户，而非复用"系统管理"租户
+  //     Then  注册完成后，新家庭的租户名称应为用户指定的 family_name
+  //     Then  注册完成后，该租户下只有一个家长成员（不含超管）
+
+  it('注册时存在系统管理租户不应复用', async () => {
+    // 模拟 ensureSuperAdmin 创建的"系统管理"租户
+    const superTenantId = 'super-tenant-001';
+    const superUserId = 'super-user-001';
+    storedTenants = [
+      { id: superTenantId, name: '系统管理', admin_id: null },
+    ];
+    storedUsers = [
+      {
+        id: superUserId,
+        tenant_id: superTenantId,
+        role: 'parent',
+        nickname: '超级管理员',
+        access_hash: '', // 超管无访问码
+        token_version: 1,
+        is_active: true,
+        created_at: '2024-01-01T00:00:00.000Z',
+        last_login: null,
+        email: 'admin',
+        password_hash: bcrypt.hashSync('admin-test', 10),
+      },
+    ];
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: {
+        email: 'newfamily@test.com',
+        password: 'password123',
+        family_name: '我的新家庭',
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.ok).toBe(true);
+
+    // 不应复用系统管理租户的 ID
+    expect(body.tenant_id).not.toBe(superTenantId);
+
+    // 新租户的 name 应该是 family_name
+    const newTenant = storedTenants.find(t => t.id === body.tenant_id);
+    expect(newTenant).toBeDefined();
+    expect(newTenant!.name).toBe('我的新家庭');
+
+    // "系统管理"租户不应被改名（保持原名）
+    const superTenant = storedTenants.find(t => t.id === superTenantId);
+    expect(superTenant).toBeDefined();
+    expect(superTenant!.name).toBe('系统管理');
+
+    // 新家庭租户下只有一个家长成员（不包含超管用户）
+    const newTenantParents = storedUsers.filter(
+      u => u.tenant_id === body.tenant_id && u.role === 'parent' && u.is_active
+    );
+    expect(newTenantParents).toHaveLength(1);
+    expect(newTenantParents[0].email).toBe('newfamily@test.com');
+  });
+
+  // Feature: 管理员注册 — 仍可复用"默认租户"
+  //   Scenario: 注册时存在"默认租户"（旧版本遗留），应正常复用
+  //     Given 数据库中已存在名为"默认租户"的租户（旧版本迁移遗留）
+  //     When  用户调用 POST /api/auth/register 注册新家庭
+  //     Then  应复用"默认租户"并更新为 family_name
+  //     Then  注册完成后，该租户下只有一个家长成员
+
+  it('注册时存在默认租户应正常复用', async () => {
+    const legacyTenantId = 'legacy-tenant-001';
+    storedTenants = [
+      { id: legacyTenantId, name: '默认租户', admin_id: null },
+    ];
+    storedUsers = []; // 空用户表
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: {
+        email: 'newfamily2@test.com',
+        password: 'password123',
+        family_name: '我的第二个家庭',
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.ok).toBe(true);
+
+    // 应复用"默认租户"的 ID
+    expect(body.tenant_id).toBe(legacyTenantId);
+
+    // 租户 name 应更新为 family_name
+    const reusedTenant = storedTenants.find(t => t.id === legacyTenantId);
+    expect(reusedTenant).toBeDefined();
+    expect(reusedTenant!.name).toBe('我的第二个家庭');
+
+    // 该租户下只有一个家长成员
+    const parents = storedUsers.filter(
+      u => u.tenant_id === legacyTenantId && u.role === 'parent' && u.is_active
+    );
+    expect(parents).toHaveLength(1);
+    expect(parents[0].email).toBe('newfamily2@test.com');
+  });
 });

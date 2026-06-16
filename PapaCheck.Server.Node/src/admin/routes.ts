@@ -137,7 +137,7 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
 
     // 优先复用已有默认租户（含旧数据），不存在则创建新租户
     const existingTenants = await db.getAllTenants();
-    const defaultTenant = existingTenants.find(t => t.name === '默认租户' || t.name === '系统管理');
+    const defaultTenant = existingTenants.find(t => t.name === '默认租户');
     const tenantId = defaultTenant?.id ?? crypto.randomUUID();
     if (defaultTenant) {
       // 复用默认租户，更新为家庭名称

@@ -167,6 +167,49 @@ def cloud_publish(server_ip, server_user):
     return True
 
 
+def site_publish(server_ip, server_user):
+    """构建并部署 PapaCheck.Site 到云端。"""
+    section('PapaCheck.Site 部署')
+    site_dir = os.path.join(ROOT, 'PapaCheck.Site', 'admin')
+
+    # 1. 构建 React
+    print(f'  ▶ [1/3] 构建前端 ... ', end='', flush=True)
+    result = subprocess.run(
+        'npm run build', cwd=site_dir, shell=True,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if result.returncode != 0:
+        print('✗')
+        print('  React 构建失败')
+        return False
+    print('✓')
+
+    # 2. 上传静态文件
+    print(f'  ▶ [2/3] 上传静态文件 ... ', end='', flush=True)
+    dist_dir = os.path.join(site_dir, 'dist')
+    result = subprocess.run([
+        'ssh', '-o', 'StrictHostKeyChecking=accept-new',
+        f'{server_user}@{server_ip}',
+        'mkdir -p /opt/papacheck/PapaCheck.Site/admin'
+    ])
+    if result.returncode != 0:
+        print('✗')
+        return False
+    result = subprocess.run([
+        'scp', '-o', 'StrictHostKeyChecking=accept-new', '-r',
+        f'{dist_dir}/*', f'{server_user}@{server_ip}:/opt/papacheck/PapaCheck.Site/admin/'
+    ])
+    if result.returncode != 0:
+        print('✗')
+        print('  Site 文件上传失败')
+        return False
+    print('✓')
+
+    # 3. 清理本地构建产物
+    shutil.rmtree(dist_dir)
+    done('PapaCheck.Site 部署完成')
+    return True
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description='PapaCheck 发布编排脚本 — 构建 APK / EXE / ZIP 制品，并可选同步到云端',
@@ -229,6 +272,9 @@ def parse_args():
     parser.add_argument('--output-dir', default=DEFAULT_OUTPUT_DIR,
                         metavar='DIR',
                         help=f'输出目录 (默认: {DEFAULT_OUTPUT_DIR})')
+
+    parser.add_argument('--site', action='store_true',
+                        help='构建并部署 PapaCheck.Site')
 
     if len(sys.argv) == 1:
         return run_wizard()
@@ -587,9 +633,20 @@ def run_wizard():
     print(f'  清空输出文件夹: {"是" if clear_output else "否"}')
     print()
 
+    # ---- Step 6.5: 是否部署 PapaCheck.Site ----
+    print('─' * 50)
+    print(f'  Step 6.5/8 — 是否部署 PapaCheck.Site ({CLOUD_SERVER_IP}):')
+    print('    [默认] 不部署 (直接回车)')
+    print('    1) 部署到云端')
+    print('    2) 不部署')
+    choice = ask_int('  请输入序号 [默认:2]: ', 1, 2) or 2
+    do_site = (choice == 1)
+    print(f'  Site 部署: {"是" if do_site else "否"}')
+    print()
+
     # ---- Step 7: 是否同步到云端 (新增) ----
     print('─' * 50)
-    print(f'  Step 7/7 — 同步到云端服务器 ({CLOUD_SERVER_IP}):')
+    print(f'  Step 7/8 — 同步到云端服务器 ({CLOUD_SERVER_IP}):')
     print('    [默认] 不同步 (直接回车)')
     print('    1) 同步到云端')
     print('    2) 不同步')
@@ -622,6 +679,7 @@ def run_wizard():
     print(f'    ZIP 打包: {"否" if no_zip else "是"}')
     print(f'    输出目录: {output_dir}')
     print(f'    清空输出文件夹: {"是" if clear_output else "否"}')
+    print(f'    Site 部署: {"是" if do_site else "否"}')
     print(f'    云同步: {"是" if do_cloud else "否"} ({CLOUD_SERVER_IP})')
     print('=' * 50)
     print()
@@ -663,6 +721,7 @@ def run_wizard():
         output_dir=output_dir,
         cloud=do_cloud,
         cloud_only=False,
+        site=do_site,
         v=None,
     )
 
@@ -759,6 +818,10 @@ def main():
         rebuild_better_sqlite3()
     else:
         done('better-sqlite3 已就绪，无需重建')
+
+    # ── Site 部署 ──
+    if getattr(args, 'site', False):
+        site_publish(CLOUD_SERVER_IP, CLOUD_SERVER_USER)
 
     # ── 云同步 ──
     did_cloud = False
