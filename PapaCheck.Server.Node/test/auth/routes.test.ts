@@ -354,7 +354,6 @@ test('POST /api/auth/exchange 超出速率限制应返回 429', async () => {
     payload: { access_code: 'invalid-code' },
   });
   const body = JSON.parse(res.body);
-  console.log('[rate-limit test] 11th response:', res.statusCode, body);
   expect(res.statusCode).toBe(429);
   expect(body.code).toBe('RATE_LIMIT_EXCEEDED');
   await app.close();

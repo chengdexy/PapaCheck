@@ -7,6 +7,8 @@
 ## [Unreleased]
 
 ### Fixed
+- **修复 `deactivateMember` 和 `regenerateMemberHash` 引用已删除的列**：两个方法引用了 `users.tenant_id`/`access_hash`（已删除），PG 和 SQLite 中均会报 column-not-found 错误。且 `deactivateMember` 参数顺序颠倒、SQLite 版误改为 `DELETE FROM access_codes`。已统一修复为正确的 `UPDATE users` 或指向 `access_codes` 表，标注废弃
+- **移除测试文件中的调试 `console.log`**
 - **修复 SQLite 适配器表结构与 PG 不一致**：`users` 表仍含已删除的 `tenant_id`/`access_hash` 列，`access_codes` 表缺少 `last_login`/`access_code` 列，导致 SQLite 模式下测试和服务均失败（`NOT NULL constraint failed`）。已对齐 PG 表结构并修复 8 个查询方法
 - **修复速率限制返回 500 而非 429**：`errorResponseBuilder` 返回对象缺少 `statusCode` 字段，错误处理器取 `undefined || 500` 返回 500。已补上 `statusCode: 429`
 - **修复测试 mock DB 缺少 `updateAccessCodeLastLogin` 方法**：4 个测试文件的 mockDb 未实现新接口，调用时抛 TypeError，exchange 端点返回 500

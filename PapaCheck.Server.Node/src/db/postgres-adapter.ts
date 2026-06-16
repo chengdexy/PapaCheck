@@ -1576,19 +1576,17 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
   }
 
   async regenerateMemberHash(userId: string, tenantId: string, newHash: string, accessCode?: string): Promise<void> {
-    const result = await this.pool.query(
-      'UPDATE users SET access_hash = $1, access_code = $4, token_version = token_version + 1 WHERE id = $2 AND tenant_id = $3 AND is_active = true',
-      [newHash, userId, tenantId, accessCode ?? null]
+    // 废弃：新模型使用 regenerateAccessCode（access_codes 表）
+    await this.pool.query(
+      'UPDATE access_codes SET code_hash = $1 WHERE id = $2 AND user_id = $3',
+      [newHash, userId, tenantId]
     );
-    if (result.rowCount === 0) {
-      throw new Error('成员不存在或不属于该租户');
-    }
   }
 
   async deactivateMember(userId: string, tenantId: string): Promise<void> {
     await this.pool.query(
-      'UPDATE users SET is_active = false, token_version = token_version + 1 WHERE id = $1 AND tenant_id = $2',
-      [userId, tenantId]
+      'UPDATE users SET is_active = false, token_version = token_version + 1 WHERE id = $1',
+      [userId]
     );
   }
 
