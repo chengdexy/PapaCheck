@@ -1508,6 +1508,10 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
     );
   }
 
+  async deleteTenant(id: string): Promise<void> {
+    await this.pool.query('DELETE FROM tenants WHERE id = $1', [id]);
+  }
+
   async createUser(input: any): Promise<void> {
     await this.pool.query(
       'INSERT INTO users (id, tenant_id, role, nickname, access_hash, access_code, token_version, email, password_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO NOTHING',

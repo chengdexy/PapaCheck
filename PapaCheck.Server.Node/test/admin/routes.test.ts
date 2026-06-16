@@ -155,6 +155,9 @@ describe('Admin Routes', () => {
     createTenant: async (id: string, name: string) => {
       storedTenants.push({ id, name, admin_id: null });
     },
+    deleteTenant: async (id: string) => {
+      storedTenants = storedTenants.filter(t => t.id !== id);
+    },
     createUser: async (input: any) => {
       storedUsers.push({
         id: input.id,
@@ -292,6 +295,24 @@ describe('Admin Routes', () => {
     const body = res.json();
     expect(body.error).toContain('邮箱');
     expect(body.code).toBe('EMAIL_EXISTS');
+  });
+
+  it('should delete tenant if user creation fails', async () => {
+    // 模拟 createUser 抛出异常（比如 DB 错误），确认租户被清理
+    const tenantCountBefore = storedTenants.length;
+    const originalCreateUser = mockDb.createUser;
+    mockDb.createUser = async () => { throw new Error('DB error'); };
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { email: 'newuser@test.com', password: 'testpass123', family_name: '张家' },
+    });
+    expect(res.statusCode).toBe(500);
+    // 租户数不应增加
+    expect(storedTenants.length).toBe(tenantCountBefore);
+
+    mockDb.createUser = originalCreateUser;
   });
 
   it('should return 409 when email belongs to disabled user', async () => {

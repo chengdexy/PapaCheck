@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS tenants (
   created_at TIMESTAMP DEFAULT NOW(),
   is_active BOOLEAN DEFAULT true
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tenants_name ON tenants(name);
 
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

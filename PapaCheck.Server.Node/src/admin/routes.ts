@@ -151,8 +151,8 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
     const existingTenants = await db.getAllTenants();
     const defaultTenant = existingTenants.find(t => t.name === '默认租户');
     const tenantId = defaultTenant?.id ?? crypto.randomUUID();
+    const isNewTenant = !defaultTenant;
     if (defaultTenant) {
-      // 复用默认租户，更新为家庭名称
       await db.updateTenantName(tenantId, family_name);
     } else {
       await db.createTenant(tenantId, family_name);
@@ -162,18 +162,26 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
     const { raw, hashed } = await generateAccessHash();
     const passwordHash = await bcrypt.hash(password, 10);
 
-    await db.createUser({
-      id: userId,
-      tenant_id: tenantId,
-      role: 'parent',
-      nickname: email.split('@')[0],
-      access_hash: hashed,
-      access_code: raw,
-      token_version: 1,
-      email,
-      password_hash: passwordHash,
-    });
-    await db.updateTenantAdmin(tenantId, userId);
+    try {
+      await db.createUser({
+        id: userId,
+        tenant_id: tenantId,
+        role: 'parent',
+        nickname: email.split('@')[0],
+        access_hash: hashed,
+        access_code: raw,
+        token_version: 1,
+        email,
+        password_hash: passwordHash,
+      });
+      await db.updateTenantAdmin(tenantId, userId);
+    } catch (e) {
+      // 新建租户后用户创建失败，需清理空租户
+      if (isNewTenant) {
+        await db.deleteTenant(tenantId).catch(() => {});
+      }
+      throw e;
+    }
 
     return { ok: true, tenant_id: tenantId, admin_hash: raw, message: '注册成功' };
   });

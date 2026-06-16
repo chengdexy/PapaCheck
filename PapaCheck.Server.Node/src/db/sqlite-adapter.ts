@@ -1311,6 +1311,10 @@ export class SqliteAdapter extends DatabaseAdapter {
     ).run(id, name);
   }
 
+  async deleteTenant(id: string): Promise<void> {
+    this.db.prepare('DELETE FROM tenants WHERE id = ?').run(id);
+  }
+
   async createUser(input: any): Promise<void> {
     const { id, tenant_id, role, nickname, access_hash, access_code, token_version, email, password_hash } = input;
     this.db.prepare(

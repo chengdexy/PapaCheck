@@ -194,6 +194,7 @@ putHomework(id: string, data: any, tenantId?: string): Promise<void>;
   getUserById(userId: string): Promise<UserRecord | null>;
   updateUserLastLogin(userId: string): Promise<void>;
   createTenant(id: string, name: string): Promise<void>;
+  deleteTenant(id: string): Promise<void>;
   createUser(input: CreateUserInput): Promise<void>;
   findAdminByEmail(email: string): Promise<AdminUser | null>;
   findUserByEmail(email: string): Promise<any | null>;
