@@ -1313,6 +1313,7 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   async deleteTenant(id: string): Promise<void> {
     this.db.prepare('DELETE FROM tenants WHERE id = ?').run(id);
+    return Promise.resolve();
   }
 
   async createUser(input: any): Promise<void> {
