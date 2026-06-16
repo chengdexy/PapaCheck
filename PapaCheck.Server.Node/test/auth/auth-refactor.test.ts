@@ -241,6 +241,7 @@ describe('Auth Refactor — 认证体系重构测试', () => {
       };
     },
     updateUserLastLogin: async (_userId: string) => {},
+    updateAccessCodeLastLogin: async (_id: string) => {},
     createUser: async (input: any) => {
       storedUsers.push({
         id: input.id,

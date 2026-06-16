@@ -88,6 +88,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-17 | **修复 SQLite 适配器 + 速率限制 429**：SQLite `users` 表结构对齐 PG；修复 `errorResponseBuilder` 缺少 `statusCode` 导致限流返回 500；修复 4 个测试 mock DB 缺少 `updateAccessCodeLastLogin`。全量 639 测试通过 |
 | 2026-06-17 | **修复 release.py site_publish 卡死**：`site_publish` 第 2 步缺少超时保护且 `scp -r dist/*` glob 在 Windows PowerShell 下不展开导致永久卡住；改为 tar 打包+SSH 管道解压，加超时和 `UserKnownHostsFile=NUL`；全量测试通过 |
 | 2026-06-17 | **数据库迁移清理 refactor**：21 张数据表 `tenant_id` 值从旧 tenant UUID 迁移到 user 账号 id；删除 `users` 表 5 个废弃列（`access_hash`、`access_code_plaintext`、`access_code`、`last_login`、`tenant_id`）；`getUserById` 补全 `email`/`password_hash`/`family_name`/`first_login` 字段；`access_codes` 新增 `last_login` 列 + `POST /api/auth/exchange` 自动记录；JWT Payload 新增 `member_id` 字段；修复 `access_codes` 缺失 `token_version` 导致 regenerate 返回 429 问题；修复错误处理器默认状态码 429→500；修复管理面板成员列表访问码始终显示"需重新生成" |
 | 2026-06-16 | **修复结算不弹出 Bug + 诊断日志**：`getSettlementData()` 增加 `dailyBase` 字段防御检查，防止异常结算数据阻断回退路径；`updateBigScreen()` 增加全部完成但结算未显示时的诊断日志和强制重算兜底；全量 639 测试通过 |

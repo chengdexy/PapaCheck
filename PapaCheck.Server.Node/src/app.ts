@@ -114,7 +114,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       errorResponseBuilder: (request, context) => ({
         error: '请求过于频繁，请稍后再试',
         code: 'RATE_LIMIT_EXCEEDED',
-        retryAfter: context.after,
+        statusCode: 429,
       }),
     });
   }

@@ -70,6 +70,9 @@ describe('Auth Routes', () => {
     updateUserLastLogin: async (_userId: string) => {
       // no-op
     },
+    updateAccessCodeLastLogin: async (_id: string) => {
+      // no-op
+    },
     createAccessCode: async (input) => {
       storedAccessCodes.push({
         id: input.id,
@@ -350,8 +353,9 @@ test('POST /api/auth/exchange 超出速率限制应返回 429', async () => {
     url: '/api/auth/exchange',
     payload: { access_code: 'invalid-code' },
   });
-  expect(res.statusCode).toBe(429);
   const body = JSON.parse(res.body);
+  console.log('[rate-limit test] 11th response:', res.statusCode, body);
+  expect(res.statusCode).toBe(429);
   expect(body.code).toBe('RATE_LIMIT_EXCEEDED');
   await app.close();
 });

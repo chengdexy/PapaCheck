@@ -159,6 +159,7 @@ describe('Admin Routes', () => {
     findUserByAccessCode: async () => null,
     getUserById: async (_userId: string) => null,
     updateUserLastLogin: async () => {},
+    updateAccessCodeLastLogin: async () => {},
 
     // === access_codes 相关方法 ===
     createAccessCode: async (input: any) => {

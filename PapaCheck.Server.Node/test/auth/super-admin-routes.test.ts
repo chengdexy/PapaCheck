@@ -181,6 +181,7 @@ describe('Super Admin Routes', () => {
       return null;
     },
     updateUserLastLogin: async () => {},
+    updateAccessCodeLastLogin: async () => {},
     createTenant: async () => {},
     createUser: async () => {},
     findAdminByEmail: async () => null,

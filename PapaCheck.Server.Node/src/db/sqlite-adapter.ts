@@ -172,17 +172,17 @@ export class SqliteAdapter extends DatabaseAdapter {
 
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
-        tenant_id TEXT NOT NULL,
         role TEXT NOT NULL CHECK (role IN ('parent', 'child', 'admin', 'user')),
-        nickname TEXT NOT NULL,
-        access_hash TEXT NOT NULL,
+        nickname TEXT,
         token_version INTEGER NOT NULL DEFAULT 1,
         is_active INTEGER NOT NULL DEFAULT 1,
+        is_super_admin INTEGER NOT NULL DEFAULT 0,
+        needs_password_change INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        last_login TEXT,
         email TEXT,
         password_hash TEXT,
-        UNIQUE(tenant_id, nickname)
+        family_name TEXT,
+        first_login INTEGER NOT NULL DEFAULT 0
       );
 
       CREATE TABLE IF NOT EXISTS access_codes (
@@ -192,6 +192,8 @@ export class SqliteAdapter extends DatabaseAdapter {
         code_hash TEXT NOT NULL,
         nickname TEXT NOT NULL,
         token_version INTEGER NOT NULL DEFAULT 1,
+        access_code TEXT,
+        last_login TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY (user_id) REFERENCES users(id)
       );
@@ -1311,8 +1313,8 @@ export class SqliteAdapter extends DatabaseAdapter {
   async regenerateAccessCode(id: string, userId: string): Promise<string> {
     const { raw, hashed } = await this._generateAccessHash();
     const result = this.db.prepare(
-      'UPDATE access_codes SET code_hash = ?, token_version = token_version + 1 WHERE id = ? AND user_id = ?'
-    ).run(hashed, id, userId);
+      'UPDATE access_codes SET code_hash = ?, access_code = ?, token_version = token_version + 1 WHERE id = ? AND user_id = ?'
+    ).run(hashed, raw, id, userId);
     if (result.changes === 0) throw new Error('访问码不存在或不属于该用户');
     return raw;
   }
@@ -1332,16 +1334,17 @@ export class SqliteAdapter extends DatabaseAdapter {
       if (bcrypt.compareSync(accessHash, row.access_hash)) {
         return {
           id: row.id,
-          tenant_id: row.tenant_id,
           role: row.role,
           nickname: row.nickname,
-          access_hash: row.access_hash,
           token_version: row.token_version,
           is_active: !!row.is_active,
           is_super_admin: !!row.is_super_admin,
           needs_password_change: !!row.needs_password_change,
           created_at: row.created_at,
-          last_login: row.last_login ?? undefined,
+          email: row.email,
+          password_hash: row.password_hash,
+          family_name: row.family_name,
+          first_login: !!row.first_login,
         };
       }
     }
@@ -1353,16 +1356,17 @@ export class SqliteAdapter extends DatabaseAdapter {
     if (!row) return null;
     return {
       id: row.id,
-      tenant_id: row.tenant_id,
       role: row.role,
       nickname: row.nickname,
-      access_hash: row.access_hash,
       token_version: row.token_version,
       is_active: !!row.is_active,
       is_super_admin: !!row.is_super_admin,
       needs_password_change: !!row.needs_password_change,
       created_at: row.created_at,
-      last_login: row.last_login ?? undefined,
+      email: row.email,
+      password_hash: row.password_hash,
+      family_name: row.family_name,
+      first_login: !!row.first_login,
     };
   }
 
@@ -1371,16 +1375,16 @@ export class SqliteAdapter extends DatabaseAdapter {
     if (!row) return null;
     return {
       id: row.id,
-      tenant_id: row.tenant_id,
       role: row.role,
-      nickname: row.nickname,
-      access_hash: row.access_hash,
+      email: row.email,
+      password_hash: row.password_hash,
+      family_name: row.family_name,
+      first_login: !!row.first_login,
       token_version: row.token_version,
       is_active: !!row.is_active,
       is_super_admin: !!row.is_super_admin,
       needs_password_change: !!row.needs_password_change,
       created_at: row.created_at,
-      last_login: row.last_login ?? undefined,
     };
   }
 
@@ -1418,10 +1422,13 @@ export class SqliteAdapter extends DatabaseAdapter {
     if (!row) return null;
     return {
       id: row.id,
-      tenant_id: row.tenant_id,
       email: row.email,
       password_hash: row.password_hash,
       token_version: row.token_version,
+      family_name: row.family_name,
+      first_login: !!row.first_login,
+      is_super_admin: !!row.is_super_admin,
+      needs_password_change: !!row.needs_password_change,
     };
   }
 
@@ -1439,7 +1446,6 @@ export class SqliteAdapter extends DatabaseAdapter {
   }
 
   async regenerateMemberHash(userId: string, tenantId: string, newHash: string, accessCode?: string): Promise<void> {
-    // 废弃：新模型使用 regenerateAccessCode
     this.db.prepare(
       'UPDATE access_codes SET code_hash = ? WHERE id = ? AND user_id = ?'
     ).run(newHash, userId, tenantId);
@@ -1447,8 +1453,8 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   async deactivateMember(userId: string, tenantId: string): Promise<void> {
     this.db.prepare(
-      'UPDATE users SET is_active = 0, token_version = token_version + 1 WHERE id = ? AND tenant_id = ?'
-    ).run(userId, tenantId);
+      'DELETE FROM access_codes WHERE user_id = ? AND id = ?'
+    ).run(tenantId, userId);
   }
 
   async updateTenantAdmin(tenantId: string, adminUserId: string): Promise<void> {

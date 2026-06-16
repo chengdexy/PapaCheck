@@ -7,6 +7,9 @@
 ## [Unreleased]
 
 ### Fixed
+- **修复 SQLite 适配器表结构与 PG 不一致**：`users` 表仍含已删除的 `tenant_id`/`access_hash` 列，`access_codes` 表缺少 `last_login`/`access_code` 列，导致 SQLite 模式下测试和服务均失败（`NOT NULL constraint failed`）。已对齐 PG 表结构并修复 8 个查询方法
+- **修复速率限制返回 500 而非 429**：`errorResponseBuilder` 返回对象缺少 `statusCode` 字段，错误处理器取 `undefined || 500` 返回 500。已补上 `statusCode: 429`
+- **修复测试 mock DB 缺少 `updateAccessCodeLastLogin` 方法**：4 个测试文件的 mockDb 未实现新接口，调用时抛 TypeError，exchange 端点返回 500
 - **修复 release.py site_publish 第 2 步卡死**：`site_publish` 的 SSH `mkdir` 和 `scp -r dist/*` 缺少超时保护，且 `dist/*` glob 在 Windows PowerShell 下不展开导致永久卡住；改为 tar 打包+SSH 管道解压替代 SCP glob，所有命令加超时和 `UserKnownHostsFile=NUL`
 
 ### Added
