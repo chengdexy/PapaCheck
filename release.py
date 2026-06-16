@@ -826,8 +826,8 @@ def main():
         cloud_publish(CLOUD_SERVER_IP, CLOUD_SERVER_USER)
         return
 
-    need_exe = args.exe_only or not (args.apk_only or args.node_only or args.cloud_only or args.site)
-    need_apk = args.apk_only or not (args.exe_only or args.node_only or args.cloud_only or args.site)
+    need_exe = args.exe_only or not (args.apk_only or args.node_only or args.cloud_only)
+    need_apk = args.apk_only or not (args.exe_only or args.node_only or args.cloud_only)
     need_node = args.node_only
 
     output_dir = os.path.abspath(args.output_dir)
