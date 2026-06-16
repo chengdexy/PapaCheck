@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-16（PapaCheck.Site 重构 + 代码审查修复完成，全量 671 测试通过）
+> 最后更新：2026-06-16（PapaCheck.Site 重构 + 代码审查修复完成 + 第 4 期开发周报，全量 671 测试通过）
 
 ## 当前版本
 
@@ -88,6 +88,7 @@
 | 日期 | 变更 |
 |------|------|
 | 2026-06-16 | **PapaCheck.Site 重构 + 代码审查修复**：管理面板 React + Vite + TypeScript（40 个 TDD 测试）；14 个审查问题全部修复（含 Critical 注册 Modal、JWT 过期检查、useApi 统一、内存泄漏修复等）；落地页清理；`release.py` 新增 `--site` ；全量 671 测试通过 |
+| 2026-06-16 | **第 4 期开发周报**：基于 CHANGELOG + git log 生成 2026.06.08 ~ 06.16 开发周报，涵盖 Phase 5c JWT 认证、管理面板翻新、安全加固等更新，已转为微信公众号 HTML |
 | 2026-06-16 | **修复新建家庭超管误入家庭**：`POST /api/auth/register` 注册新家庭时复用了超管 `'系统管理'` 租户，导致超管用户 `'超级管理员'`（无访问码）被并入新家庭形成两个家长；修复为仅复用 `'默认租户'`；新增 TDD 测试 2 个；全量 631 测试通过 |
 | 2026-06-15 | **修复 rate-limit 错误处理器分支无效**：`!(error instanceof Error)` 将 `@fastify/rate-limit` 抛出的 Error 实例排除在外，导致 429 错误落入 500 兜底；移除该条件使 rate-limit 正确返回 429 |
 | 2026-06-15 | **添加速率限制 + JSON Schema 验证**：认证端点添加 `@fastify/rate-limit` 速率限制（login/exchange 各 10 次/分钟, super-login 5 次/分钟）；为 10 个路由添加 JSON Schema 定义+4xx 响应文档，移除重复手动校验；代码审查修复测试错误处理器 throw 问题 + 补充 4xx 响应 schema；全量 629 测试通过 |

@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- **第 4 期开发周报**：基于 CHANGELOG + git log 生成 `weekly-2026-06-w3.html`，涵盖 Phase 5c JWT 认证、管理面板翻新、安全加固等更新，面向普通读者的公众号风格
 - **PapaCheck.Site 管理面板 React 子项目**：新建 `PapaCheck.Site/admin/` 独立 React + Vite + TypeScript 子项目，使用 Tailwind CSS 4 + Vitest 测试框架；新增 30 个 TDD 测试覆盖所有组件
 - **认证端点添加速率限制**：安装 `@fastify/rate-limit`，全局 60 次/分钟兜底；`POST /api/auth/login` 和 `POST /api/auth/exchange` 各 10 次/分钟，`POST /api/admin/super/login` 5 次/分钟；新增 429 限流测试；`AppOptions.rateLimit` 支持测试中禁用
 - **JSON Schema 请求体验证**：为 10 个认证/管理路由添加 JSON Schema 定义（auth 2 个、admin 5 个、super-admin 3 个），移除 handler 内重复的手动字段校验；添加 4xx 错误响应 schema 完善 Swagger 文档
