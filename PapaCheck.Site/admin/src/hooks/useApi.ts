@@ -6,9 +6,13 @@ export function useApi() {
 
   const fetchApi = useCallback(async <T = any>(url: string, options: RequestInit = {}): Promise<T> => {
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
       ...(options.headers as Record<string, string> || {}),
     };
+
+    // Only set Content-Type if there's a body
+    if (options.body) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     if (state.token) {
       headers['Authorization'] = `Bearer ${state.token}`;
