@@ -136,13 +136,21 @@ export async function authRoutes(app: FastifyInstance, db: IDatabase): Promise<v
       return reply.status(401).send({ error: '访问码无效', code: 'INVALID_ACCESS_CODE' });
     }
 
+    // 记录最后登录时间
+    await db.updateAccessCodeLastLogin(record.id).catch(() => {});
+
     const token = signToken({
-      sub: record.id,
+      sub: record.user_id,
       tenant_id: record.user_id,
+      member_id: record.id,
       role: record.type,
       token_version: record.token_version,
     });
-    return { token, role: record.type, nickname: record.nickname };
+    const response: any = { token, role: record.type, nickname: record.nickname };
+    if (record.type === 'child' || record.type === 'parent') {
+      response.needs_setup = true;
+    }
+    return response;
   });
 
   // POST /api/auth/login — 统一登录（admin + user）
@@ -226,13 +234,13 @@ export async function authRoutes(app: FastifyInstance, db: IDatabase): Promise<v
 
     // 首次登录：不需要 current_password
     if (!user.first_login) {
-      if (!current_password || !bcrypt.compareSync(current_password, user.password_hash)) {
+      if (!current_password || !bcrypt.compareSync(current_password, user.password_hash!)) {
         return reply.status(401).send({ error: '当前密码错误', code: 'INVALID_CREDENTIALS' });
       }
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    await db.updateUserCredentials(payload.sub, newEmail ?? user.email, passwordHash);
+    await db.updateUserCredentials(payload.sub, newEmail ?? user.email!, passwordHash);
 
     return { ok: true, message: '凭证已更新' };
   });
@@ -259,7 +267,7 @@ export async function authRoutes(app: FastifyInstance, db: IDatabase): Promise<v
     }
 
     // parent/child 从 access_codes 表查询
-    const record = await db.getAccessCodeById(payload.sub);
+    const record = await db.getAccessCodeById(payload.member_id ?? payload.sub);
     if (!record) {
       return reply.status(404).send({ error: '访问码不存在', code: 'NOT_FOUND' });
     }

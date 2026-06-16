@@ -109,7 +109,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   if (options.rateLimit !== false) {
     await app.register(rateLimit, {
-      max: options.rateLimit?.max ?? 1000,
+      max: options.rateLimit?.max ?? 10000,
       timeWindow: options.rateLimit?.timeWindow ?? '1 minute',
       errorResponseBuilder: (request, context) => ({
         error: '请求过于频繁，请稍后再试',
@@ -152,7 +152,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     // Fastify 插件抛出的结构化错误（@fastify/rate-limit 等附加 statusCode/code 属性的 Error 实例）
     const plainErr = error as any;
     if (plainErr && typeof plainErr === 'object' && plainErr.code) {
-      return reply.status(plainErr.statusCode || 429).send({
+      return reply.status(plainErr.statusCode || 500).send({
         error: plainErr.error || '请求被拒绝',
         code: plainErr.code,
       });

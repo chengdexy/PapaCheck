@@ -71,6 +71,7 @@ export interface User {
 export interface JWTPayload {
   sub: string;
   tenant_id: string;
+  member_id?: string;
   role: 'admin' | 'user' | 'parent' | 'child';
   nickname: string;
   token_version: number;
@@ -88,10 +89,12 @@ export interface UserRecord {
   is_active: boolean;
   is_super_admin: boolean;
   needs_password_change: boolean;
-  created_at: string;
-  last_login?: string;
+  email?: string;
+  password_hash?: string;
   family_name?: string;
   first_login?: boolean;
+  created_at: string;
+  last_login?: string;
 }
 
 export interface TenantListItem {
@@ -112,15 +115,11 @@ token_version: number;
 
 export interface CreateUserInput {
   id: string;
-  tenant_id: string;
   role: 'admin' | 'user' | 'parent' | 'child';
-  nickname: string;
-  access_hash?: string;
-  access_code?: string;
-  token_version: number;
   email?: string;
   password_hash?: string;
   family_name?: string;
+  token_version: number;
 }
 
 export interface AccessCodeRecord {
@@ -128,8 +127,10 @@ export interface AccessCodeRecord {
   user_id: string;
   type: 'parent' | 'child';
   code_hash: string;
+  access_code?: string;
   nickname: string;
   token_version: number;
+  last_login?: string;
   created_at: string;
 }
 
@@ -217,6 +218,7 @@ putHomework(id: string, data: any, tenantId?: string): Promise<void>;
   findUserByAccessCode(accessCode: string): Promise<UserRecord | null>;
   getUserById(userId: string): Promise<UserRecord | null>;
   updateUserLastLogin(userId: string): Promise<void>;
+  updateAccessCodeLastLogin(id: string): Promise<void>;
   createUser(input: CreateUserInput): Promise<void>;
   findAdminByEmail(email: string): Promise<AdminUser | null>;
   findUserByEmail(email: string): Promise<any | null>;

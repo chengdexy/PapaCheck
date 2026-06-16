@@ -71,7 +71,7 @@ export async function superAdminRoutes(app: FastifyInstance, db: IDatabase): Pro
 
     // Verify current password
     const user = await db.getUserById(payload.sub);
-    if (!user || !bcrypt.compareSync(current_password, user.password_hash)) {
+    if (!user || !bcrypt.compareSync(current_password, user.password_hash!)) {
       return reply.status(401).send({ error: '当前密码错误', code: 'INVALID_CREDENTIALS' });
     }
 

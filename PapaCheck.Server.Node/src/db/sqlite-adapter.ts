@@ -1388,6 +1388,10 @@ export class SqliteAdapter extends DatabaseAdapter {
     this.db.prepare("UPDATE users SET last_login = datetime('now') WHERE id = ?").run(userId);
   }
 
+  async updateAccessCodeLastLogin(id: string): Promise<void> {
+    this.db.prepare("UPDATE access_codes SET last_login = datetime('now') WHERE id = ?").run(id);
+  }
+
   // ==================== Admin / Members ====================
 
   async createTenant(id: string, name: string): Promise<void> {

@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-16（修复结算不弹出，全量 639 测试通过）
+> 最后更新：2026-06-17（数据库迁移清理：tenant_id 值迁移、废弃列删除、access_codes.last_login 新增）
 
 ## 当前版本
 
-**v1.4.0-beta**（修复结算不弹出，639 测试）
+**v1.4.0-beta**（数据库迁移清理，639 测试）
 
 ## 部署状态
 
@@ -88,6 +88,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-17 | **数据库迁移清理 refactor**：21 张数据表 `tenant_id` 值从旧 tenant UUID 迁移到 user 账号 id；删除 `users` 表 5 个废弃列（`access_hash`、`access_code_plaintext`、`access_code`、`last_login`、`tenant_id`）；`getUserById` 补全 `email`/`password_hash`/`family_name`/`first_login` 字段；`access_codes` 新增 `last_login` 列 + `POST /api/auth/exchange` 自动记录；JWT Payload 新增 `member_id` 字段；修复 `access_codes` 缺失 `token_version` 导致 regenerate 返回 429 问题；修复错误处理器默认状态码 429→500；修复管理面板成员列表访问码始终显示"需重新生成" |
 | 2026-06-16 | **修复结算不弹出 Bug + 诊断日志**：`getSettlementData()` 增加 `dailyBase` 字段防御检查，防止异常结算数据阻断回退路径；`updateBigScreen()` 增加全部完成但结算未显示时的诊断日志和强制重算兜底；全量 639 测试通过 |
 | 2026-06-16 | **认证体系重构 v1.4.0**：分离账号与访问码，`users` 表合并 `tenants` 表，新增 `access_codes` 表。角色简化为 `admin`/`user`（账号）和 `parent`/`child`（访问码）。统一 `POST /api/auth/login` 登录入口。超级管理员首次登录强制修改凭证（`needs_password_change`）。管理面板前端适配新模型。新增 9 个 TDD 测试，全量 639 测试通过 |
 | 2026-06-16 | **release.py 超时保护 + 访问码快速查找 + v1.3.4**：`cloud_publish` 所有 subprocess 调用增加 timeout（SSH 30s/SCP 120s/构建 180s/远程 300s），防止网络问题永久阻塞；新增 `findUserByAccessCode()` 数据库方法支持 access_code 列直接匹配，减少 bcrypt 计算开销；schema 验证 minLength 8→6；版本号递增 1.3.3→1.3.4 |

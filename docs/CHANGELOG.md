@@ -6,7 +6,20 @@
 
 ## [Unreleased]
 
+### Added
+- **访问码最后登录时间**：`access_codes` 表新增 `last_login` 列，`POST /api/auth/exchange` 时自动记录；管理面板成员列表"最后登录"列显示实际时间，不再始终显示"从未"
+- **Member ID 字段**：JWT Payload 新增 `member_id`，子端访问码交换时 `sub` 指向 user 账号（避免依赖已删除的 parent/child 行），`member_id` 指向 `access_codes.id` 用于区分家庭成员
+
+### Changed
+- **数据库模型清理**：删除 `users` 表废弃列 `access_hash`、`access_code_plaintext`、`access_code`、`last_login`、`tenant_id`（`tenant_id` 已迁移为 `users.id` 自引用）
+- **`tenant_id` 值迁移**：21 张数据表的 `tenant_id` 值从旧 tenant UUID 更新为对应的 user 账号 id，修复迁移后数据查询不到的问题
+- **`getUserById` 返回字段补全**：补充 `email`、`password_hash`、`family_name`、`first_login` 字段
+- **全局速率限制从 1000/min 放宽到 10000/min**：缓解 Nginx 反代后共享限流桶问题
+- **错误处理器默认状态码从 429 改为 500**：避免 PostgreSQL 错误对象无 `statusCode` 属性时误导为"请求过于频繁"
+
 ### Fixed
+- **修复重新生成访问码返回 429 问题**：根因为 `access_codes` 表缺失 `token_version` 列，UPDATE 时 PostgreSQL 报错 `42703`（undefined_column），错误处理器无 `statusCode` 时默认 429 误导。已补加 `token_version` 列并修正错误处理器默认状态码
+- **修复管理面板成员列表访问码显示为"需重新生成"**：`GET /api/admin/members` 未返回 `access_code` 字段，现已返回；同时新增 `access_code` 明文列存储新生成的访问码，复制功能正常可用
 - **修复孩子端全部作业完成后不弹出结算界面**：`getSettlementData()` 对缺少 `dailyBase` 字段的异常结算数据（例如 pollServer 同步过程中可能出现的空对象或格式不符的数据）增加防御性跳过，不再受理并回退到 `window._settlement`；`updateBigScreen()` 在检测到全部作业已完成但结算未显示时，触发诊断日志和强制重算兜底
 
 ### Added

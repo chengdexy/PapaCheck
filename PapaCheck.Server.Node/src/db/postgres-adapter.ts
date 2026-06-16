@@ -1493,17 +1493,18 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
 
   async getUserById(userId: string): Promise<any | null> {
     const result = await this.pool.query(
-      'SELECT * FROM users WHERE id = $1',
+      'SELECT id, role, email, password_hash, family_name, first_login, token_version, is_active, is_super_admin, needs_password_change, created_at, last_login FROM users WHERE id = $1',
       [userId]
     );
     if (result.rows.length === 0) return null;
     const row = result.rows[0];
     return {
       id: row.id,
-      tenant_id: row.tenant_id,
       role: row.role,
-      nickname: row.nickname,
-      access_hash: row.access_hash,
+      email: row.email,
+      password_hash: row.password_hash,
+      family_name: row.family_name,
+      first_login: row.first_login,
       token_version: row.token_version,
       is_active: row.is_active,
       is_super_admin: row.is_super_admin ?? false,
@@ -1666,7 +1667,7 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
 
   async getAccessCodesByUser(userId: string): Promise<AccessCodeRecord[]> {
     const result = await this.pool.query(
-      'SELECT id, user_id, type, code_hash, nickname, created_at FROM access_codes WHERE user_id = $1 ORDER BY created_at ASC',
+      'SELECT id, user_id, type, code_hash, access_code, nickname, last_login, created_at FROM access_codes WHERE user_id = $1 ORDER BY created_at ASC',
       [userId]
     );
     return result.rows.map((r: any) => ({
@@ -1674,7 +1675,10 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
       user_id: r.user_id,
       type: r.type,
       code_hash: r.code_hash,
+      access_code: r.access_code ?? undefined,
       nickname: r.nickname,
+      token_version: r.token_version ?? 1,
+      last_login: r.last_login ? (typeof r.last_login === 'object' ? r.last_login.toISOString() : r.last_login) : undefined,
       created_at: typeof r.created_at === 'object' ? r.created_at.toISOString() : r.created_at,
     }));
   }
@@ -1688,7 +1692,10 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
           user_id: row.user_id,
           type: row.type,
           code_hash: row.code_hash,
+          access_code: row.access_code ?? undefined,
           nickname: row.nickname,
+          token_version: row.token_version ?? 1,
+          last_login: row.last_login ? (typeof row.last_login === 'object' ? row.last_login.toISOString() : row.last_login) : undefined,
           created_at: typeof row.created_at === 'object' ? row.created_at.toISOString() : row.created_at,
         };
       }
@@ -1705,16 +1712,26 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
       user_id: row.user_id,
       type: row.type,
       code_hash: row.code_hash,
+      access_code: row.access_code ?? undefined,
       nickname: row.nickname,
+      token_version: row.token_version ?? 1,
+      last_login: row.last_login ? (typeof row.last_login === 'object' ? row.last_login.toISOString() : row.last_login) : undefined,
       created_at: typeof row.created_at === 'object' ? row.created_at.toISOString() : row.created_at,
     };
+  }
+
+  async updateAccessCodeLastLogin(id: string): Promise<void> {
+    await this.pool.query(
+      "UPDATE access_codes SET last_login = NOW() WHERE id = $1",
+      [id]
+    );
   }
 
   async regenerateAccessCode(id: string, userId: string): Promise<string> {
     const { raw, hashed } = await generateAccessHash();
     const result = await this.pool.query(
-      'UPDATE access_codes SET code_hash = $1, token_version = token_version + 1 WHERE id = $2 AND user_id = $3',
-      [hashed, id, userId]
+      'UPDATE access_codes SET code_hash = $1, access_code = $2, token_version = token_version + 1 WHERE id = $3 AND user_id = $4',
+      [hashed, raw, id, userId]
     );
     if (result.rowCount === 0) throw new Error('访问码不存在或不属于该用户');
     return raw;

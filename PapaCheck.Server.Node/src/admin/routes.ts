@@ -103,6 +103,8 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
       id: c.id,
       nickname: c.nickname,
       role: c.type,
+      access_code: c.access_code ?? null,
+      last_login: c.last_login ?? null,
       created_at: c.created_at,
     }));
   });
@@ -124,7 +126,7 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
   });
 
   // POST /api/admin/members/:id/regenerate — 重新生成访问码
-  app.post('/api/admin/members/:id/regenerate', { schema: { ...memberIdParamSchema, ...regenerateResponseSchema } }, async (request: any, reply) => {
+  app.post('/api/admin/members/:id/regenerate', { schema: { ...memberIdParamSchema, ...regenerateResponseSchema }, config: { rateLimit: false } }, async (request: any, reply) => {
     const payload = request.jwtPayload as JWTPayload;
     if (!payload || payload.role !== 'user') {
       return reply.status(403).send({ error: '仅用户账号可管理成员', code: 'FORBIDDEN' });
