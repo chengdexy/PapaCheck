@@ -44,6 +44,18 @@ def done(text):
 # ───────────────────────────────────────────────────────
 
 
+SSH_TIMEOUT = 30          # 简单 SSH 命令超时
+SCP_TIMEOUT = 120         # 文件上传超时
+BUILD_TIMEOUT = 180       # 构建/测试超时
+REMOTE_INSTALL_TIMEOUT = 300  # 远程安装依赖超时
+
+
+def _run_with_timeout(cmd, timeout, **kwargs):
+    """带超时的 subprocess.run，超时时抛出 TimeoutExpired。"""
+    kwargs['timeout'] = timeout
+    return subprocess.run(cmd, **kwargs)
+
+
 def cloud_publish(server_ip, server_user):
     """同步代码到云端服务器。"""
     print()
@@ -53,23 +65,33 @@ def cloud_publish(server_ip, server_user):
 
     # 1. 运行测试
     print(f'  ▶ [1/5] 运行全量测试 ... ', end='', flush=True)
-    result = subprocess.run(
-        'npm test', cwd=ROOT, shell=True,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    if result.returncode != 0:
+    try:
+        result = _run_with_timeout(
+            'npm test', BUILD_TIMEOUT, cwd=ROOT, shell=True,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if result.returncode != 0:
+            print('✗')
+            print('  测试失败，中止发布')
+            return False
+    except subprocess.TimeoutExpired:
         print('✗')
-        print('  测试失败，中止发布')
+        print('  测试超时，中止发布')
         return False
     print('✓')
 
     # 2. 编译 TypeScript
     print(f'  ▶ [2/5] 编译 TypeScript ... ', end='', flush=True)
-    build_result = subprocess.run(
-        'npm run build', cwd=NODE_DIR, shell=True,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    if build_result.returncode != 0:
+    try:
+        build_result = _run_with_timeout(
+            'npm run build', BUILD_TIMEOUT, cwd=NODE_DIR, shell=True,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if build_result.returncode != 0:
+            print('✗')
+            print('  TypeScript 编译失败')
+            return False
+    except subprocess.TimeoutExpired:
         print('✗')
-        print('  TypeScript 编译失败')
+        print('  TypeScript 编译超时')
         return False
     print('✓')
 
@@ -87,14 +109,19 @@ def cloud_publish(server_ip, server_user):
         '-czf', tar_path,
         'PapaCheck.Server.Node', 'PapaCheck.Web',
     ]
-    result = subprocess.run(tar_cmd, cwd=ROOT)
-    if result.returncode != 0:
+    try:
+        result = _run_with_timeout(tar_cmd, SCP_TIMEOUT, cwd=ROOT)
+        if result.returncode != 0:
+            print('✗')
+            print('  打包失败')
+            return False
+    except subprocess.TimeoutExpired:
         print('✗')
-        print('  打包失败')
+        print('  打包超时')
         return False
     print('✓')
 
-    # 3. 检查并准备 APK
+    # 4. 检查并准备 APK
     apk_local = None
     # 优先从归档目录取
     apk_archive_dir = os.path.join(ROOT, 'PapaCheck.Android', 'apk')
@@ -111,34 +138,50 @@ def cloud_publish(server_ip, server_user):
 
     if apk_local:
         print(f'  ▶ [4/5] 上传 APK ({os.path.basename(apk_local)}) ... ', end='', flush=True)
-        result = subprocess.run(
-            ['scp', '-o', 'StrictHostKeyChecking=accept-new',
-             apk_local, f'{server_user}@{server_ip}:/opt/papacheck/PapaCheck.Web/apk/'])
-        if result.returncode != 0:
+        try:
+            result = _run_with_timeout(
+                ['scp', '-o', 'StrictHostKeyChecking=accept-new',
+                 apk_local, f'{server_user}@{server_ip}:/opt/papacheck/PapaCheck.Web/apk/'],
+                SCP_TIMEOUT)
+            if result.returncode != 0:
+                print('✗')
+                print('  APK 上传失败')
+            else:
+                print('✓')
+                # 清理旧 APK，只保留最新的 3 个
+                cleanup_cmd = (
+                    'cd /opt/papacheck/PapaCheck.Web/apk && '
+                    'ls PapaCheck-*.apk 2>/dev/null | sort -r | tail -n +4 | '
+                    'while read f; do rm -f "$f"; done && '
+                    'echo "  清理旧 APK 完成"')
+                try:
+                    _run_with_timeout(
+                        ['ssh', '-o', 'StrictHostKeyChecking=accept-new',
+                         f'{server_user}@{server_ip}', cleanup_cmd],
+                        SSH_TIMEOUT)
+                except subprocess.TimeoutExpired:
+                    print('  [警告] 清理旧 APK 超时，跳过')
+        except subprocess.TimeoutExpired:
             print('✗')
-            print('  APK 上传失败')
-        else:
-            print('✓')
-            # 清理旧 APK，只保留最新的 3 个
-            cleanup_cmd = (
-                'cd /opt/papacheck/PapaCheck.Web/apk && '
-                'ls PapaCheck-*.apk 2>/dev/null | sort -r | tail -n +4 | '
-                'while read f; do rm -f "$f"; done && '
-                'echo "  清理旧 APK 完成"')
-            subprocess.run(
-                ['ssh', '-o', 'StrictHostKeyChecking=accept-new',
-                 f'{server_user}@{server_ip}', cleanup_cmd])
+            print('  APK 上传超时')
     else:
         print(f'  ▶ [4/5] 无 APK 可上传，跳过')
 
     # 5. 上传代码包
     print(f'  ▶ [5/5] 上传代码到服务器 ... ', end='', flush=True)
-    result = subprocess.run(
-        ['scp', '-o', 'StrictHostKeyChecking=accept-new',
-         tar_path, f'{server_user}@{server_ip}:/opt/'])
-    if result.returncode != 0:
+    try:
+        result = _run_with_timeout(
+            ['scp', '-o', 'StrictHostKeyChecking=accept-new',
+             tar_path, f'{server_user}@{server_ip}:/opt/'],
+            SCP_TIMEOUT)
+        if result.returncode != 0:
+            print('✗')
+            print('  上传失败')
+            # 保留 tar 包以便重试
+            return False
+    except subprocess.TimeoutExpired:
         print('✗')
-        print('  上传失败')
+        print('  上传代码包超时')
         # 保留 tar 包以便重试
         return False
     os.remove(tar_path)
@@ -153,12 +196,18 @@ def cloud_publish(server_ip, server_user):
         'cd /opt/papacheck/PapaCheck.Server.Node && '
         'npm ci --omit=dev --ignore-scripts && '
         'sudo systemctl restart papacheck')
-    result = subprocess.run(
-        ['ssh', '-o', 'StrictHostKeyChecking=accept-new',
-         f'{server_user}@{server_ip}', remote_cmd])
-    if result.returncode != 0:
+    try:
+        result = _run_with_timeout(
+            ['ssh', '-o', 'StrictHostKeyChecking=accept-new',
+             f'{server_user}@{server_ip}', remote_cmd],
+            REMOTE_INSTALL_TIMEOUT)
+        if result.returncode != 0:
+            print('✗')
+            print('  云端构建失败')
+            return False
+    except subprocess.TimeoutExpired:
         print('✗')
-        print('  云端构建失败')
+        print('  云端构建超时（npm ci 或 systemctl 耗时过长）')
         return False
     print('✓')
 

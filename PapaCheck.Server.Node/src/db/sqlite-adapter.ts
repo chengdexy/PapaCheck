@@ -1281,6 +1281,24 @@ export class SqliteAdapter extends DatabaseAdapter {
     return null;
   }
 
+  async findUserByAccessCode(accessCode: string): Promise<any | null> {
+    const row = this.db.prepare('SELECT * FROM users WHERE access_code = ? AND is_active = 1 LIMIT 1').get(accessCode) as any;
+    if (!row) return null;
+    return {
+      id: row.id,
+      tenant_id: row.tenant_id,
+      role: row.role,
+      nickname: row.nickname,
+      access_hash: row.access_hash,
+      token_version: row.token_version,
+      is_active: !!row.is_active,
+      is_super_admin: !!row.is_super_admin,
+      needs_password_change: !!row.needs_password_change,
+      created_at: row.created_at,
+      last_login: row.last_login ?? undefined,
+    };
+  }
+
   async getUserById(userId: string): Promise<any | null> {
     const row = this.db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as any;
     if (!row) return null;

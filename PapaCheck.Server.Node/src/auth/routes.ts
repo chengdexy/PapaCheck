@@ -23,7 +23,7 @@ const exchangeSchema = {
     type: 'object',
     required: ['access_code'],
     properties: {
-      access_code: { type: 'string', minLength: 8 },
+      access_code: { type: 'string', minLength: 6 },
     },
   },
   response: {
@@ -58,7 +58,11 @@ export async function authRoutes(app: FastifyInstance, db: IDatabase): Promise<v
   // POST /api/auth/exchange — hash码换取JWT
   app.post('/api/auth/exchange', { schema: exchangeSchema, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     const { access_code } = request.body as { access_code: string };
-    const user = await db.findUserByAccessHash(access_code);
+    // 先快速查找新格式（access_code 列直接匹配），再回退到 bcrypt 扫描兼容旧数据
+    let user = await db.findUserByAccessCode(access_code);
+    if (!user) {
+      user = await db.findUserByAccessHash(access_code);
+    }
     if (!user) {
       return reply.status(401).send({ error: '访问码无效', code: 'INVALID_ACCESS_CODE' });
     }

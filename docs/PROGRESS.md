@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-16（PapaCheck.Site 重构 + 代码审查修复完成 + 第 4 期开发周报，全量 671 测试通过）
+> 最后更新：2026-06-16（release.py 超时保护 + 访问码快速查找，全量 671 测试通过）
 
 ## 当前版本
 
-**v1.3.3-beta**（PapaCheck.Site 重构完成，671 测试）
+**v1.3.4-beta**（release.py 超时保护，671 测试）
 
 ## 部署状态
 
@@ -87,6 +87,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-16 | **release.py 超时保护 + 访问码快速查找 + v1.3.4**：`cloud_publish` 所有 subprocess 调用增加 timeout（SSH 30s/SCP 120s/构建 180s/远程 300s），防止网络问题永久阻塞；新增 `findUserByAccessCode()` 数据库方法支持 access_code 列直接匹配，减少 bcrypt 计算开销；schema 验证 minLength 8→6；版本号递增 1.3.3→1.3.4 |
 | 2026-06-16 | **PapaCheck.Site 重构 + 代码审查修复**：管理面板 React + Vite + TypeScript（40 个 TDD 测试）；14 个审查问题全部修复（含 Critical 注册 Modal、JWT 过期检查、useApi 统一、内存泄漏修复等）；落地页清理；`release.py` 新增 `--site` ；全量 671 测试通过 |
 | 2026-06-16 | **第 4 期开发周报**：基于 CHANGELOG + git log 生成 2026.06.08 ~ 06.16 开发周报，涵盖 Phase 5c JWT 认证、管理面板翻新、安全加固等更新，已转为微信公众号 HTML |
 | 2026-06-16 | **修复新建家庭超管误入家庭**：`POST /api/auth/register` 注册新家庭时复用了超管 `'系统管理'` 租户，导致超管用户 `'超级管理员'`（无访问码）被并入新家庭形成两个家长；修复为仅复用 `'默认租户'`；新增 TDD 测试 2 个；全量 631 测试通过 |

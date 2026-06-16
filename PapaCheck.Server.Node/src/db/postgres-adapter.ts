@@ -1470,6 +1470,27 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
     return null;
   }
 
+  async findUserByAccessCode(accessCode: string): Promise<any | null> {
+    const row = await this.pool.query(
+      'SELECT * FROM users WHERE access_code = $1 AND is_active = true LIMIT 1',
+      [accessCode]
+    ).then(r => r.rows[0]);
+    if (!row) return null;
+    return {
+      id: row.id,
+      tenant_id: row.tenant_id,
+      role: row.role,
+      nickname: row.nickname,
+      access_hash: row.access_hash,
+      token_version: row.token_version,
+      is_active: row.is_active,
+      is_super_admin: row.is_super_admin ?? false,
+      needs_password_change: row.needs_password_change ?? false,
+      created_at: row.created_at,
+      last_login: row.last_login ?? undefined,
+    };
+  }
+
   async getUserById(userId: string): Promise<any | null> {
     const result = await this.pool.query(
       'SELECT * FROM users WHERE id = $1',

@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- **访问码快速查找**：新增 `findUserByAccessCode()` 数据库方法，支持直接匹配 `access_code` 列快速查找，仅在无匹配时回退到 bcrypt 扫描兼容旧格式数据；减少每次 exchange 的 bcrypt 计算开销
 - **第 4 期开发周报**：基于 CHANGELOG + git log 生成 `weekly-2026-06-w3.html`，涵盖 Phase 5c JWT 认证、管理面板翻新、安全加固等更新，面向普通读者的公众号风格
 - **PapaCheck.Site 管理面板 React 子项目**：新建 `PapaCheck.Site/admin/` 独立 React + Vite + TypeScript 子项目，使用 Tailwind CSS 4 + Vitest 测试框架；新增 30 个 TDD 测试覆盖所有组件
 - **认证端点添加速率限制**：安装 `@fastify/rate-limit`，全局 60 次/分钟兜底；`POST /api/auth/login` 和 `POST /api/auth/exchange` 各 10 次/分钟，`POST /api/admin/super/login` 5 次/分钟；新增 429 限流测试；`AppOptions.rateLimit` 支持测试中禁用
@@ -18,6 +19,8 @@
 - **测试覆盖补齐**：新增 29 个测试（Super Admin Routes 16 个、Admin Routes 成员管理 11 个、Middleware PUBLIC_PATHS 2 个），全量 631 测试通过
 
 ### Changed
+- **访问码 schema 验证长度更新**：`exchangeSchema` 中 `access_code` 最小长度从 8 改为 6，与 6 位短码一致
+- **release.py cloud_publish 超时保护**：所有 `subprocess.run()` 调用增加 timeout 参数（SSH 30s、SCP 120s、本地构建 180s、远程安装 300s），超时时打印明确错误信息并中止，防止网络问题导致进程永久阻塞
 - **PapaCheck.Site 重构**：管理面板从纯 HTML/CSS/JS 重构为 React + Vite + TypeScript；交互逻辑全面修复（消除 `alert()`、函数自我替换 hack、重复事件绑定、无加载/空/错误状态）；视觉升级为现代克制风格（Zinc 中性底 + 橘色强调色、系统字体栈、零 emoji）；落地页与管理面板完全隔离独立维护；`release.py` 新增 `--site` 部署选项（含引导模式）
 
 ### Fixed

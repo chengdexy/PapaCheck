@@ -191,6 +191,7 @@ putHomework(id: string, data: any, tenantId?: string): Promise<void>;
   ackCRDTOperations(timestamp: string, tenantId?: string): Promise<void>;
   queryUserTokenVersion(userId: string): Promise<number>;
   findUserByAccessHash(accessHash: string): Promise<UserRecord | null>;
+  findUserByAccessCode(accessCode: string): Promise<UserRecord | null>;
   getUserById(userId: string): Promise<UserRecord | null>;
   updateUserLastLogin(userId: string): Promise<void>;
   createTenant(id: string, name: string): Promise<void>;
