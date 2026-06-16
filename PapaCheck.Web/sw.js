@@ -3,7 +3,7 @@ var CACHE_NAME = 'papacheck-v3';
 var CORE_RESOURCES = [
   '/',
   '/index.html',
-  '/admin.html',
+  '/admin/',
   '/css/style.css',
   '/css/admin.css',
   '/js/api.js',

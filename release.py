@@ -232,20 +232,20 @@ def site_publish(server_ip, server_user):
         return False
     print('✓')
 
-    # 2. 上传静态文件
+    # 2. 上传静态文件到 webDir/admin/
     print(f'  ▶ [2/3] 上传静态文件 ... ', end='', flush=True)
     dist_dir = os.path.join(site_dir, 'dist')
     result = subprocess.run([
         'ssh', '-o', 'StrictHostKeyChecking=accept-new',
         f'{server_user}@{server_ip}',
-        'mkdir -p /opt/papacheck/PapaCheck.Site/admin'
+        'mkdir -p /opt/papacheck/PapaCheck.Web/admin'
     ])
     if result.returncode != 0:
         print('✗')
         return False
     result = subprocess.run([
         'scp', '-o', 'StrictHostKeyChecking=accept-new', '-r',
-        f'{dist_dir}/*', f'{server_user}@{server_ip}:/opt/papacheck/PapaCheck.Site/admin/'
+        f'{dist_dir}/*', f'{server_user}@{server_ip}:/opt/papacheck/PapaCheck.Web/admin/'
     ])
     if result.returncode != 0:
         print('✗')
@@ -490,7 +490,7 @@ def create_zips(output_dir, exe_ver, apk_ver, apk_src, dist_dir):
     return full_zip, win_zip
 
 
-def print_summary(output_dir, exe_ver, apk_ver, zips, need_exe, need_apk, no_zip, did_cloud):
+def print_summary(output_dir, exe_ver, apk_ver, zips, need_exe, need_apk, no_zip, did_cloud, did_site=False):
     print()
     print('  ' + '═' * SECTION_WIDTH)
     print('  ═══  发布完成  ═══')
@@ -513,6 +513,8 @@ def print_summary(output_dir, exe_ver, apk_ver, zips, need_exe, need_apk, no_zip
             print(f'    • {os.path.basename(z)}')
     if did_cloud:
         print(f'    • 已同步到云端 ({CLOUD_SERVER_IP})')
+    if did_site:
+        print(f'    • PapaCheck.Site 已部署')
     print()
     if need_exe or need_apk:
         print(f'  输出目录  {output_dir}')
@@ -800,23 +802,24 @@ def main():
         cloud_publish(CLOUD_SERVER_IP, CLOUD_SERVER_USER)
         return
 
-    need_exe = args.exe_only or not (args.apk_only or args.node_only or args.cloud_only)
-    need_apk = args.apk_only or not (args.exe_only or args.node_only or args.cloud_only)
+    need_exe = args.exe_only or not (args.apk_only or args.node_only or args.cloud_only or args.site)
+    need_apk = args.apk_only or not (args.exe_only or args.node_only or args.cloud_only or args.site)
     need_node = args.node_only
 
     output_dir = os.path.abspath(args.output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
     # ── 清理 ──
-    section('清理')
-    if need_exe:
-        pyinstaller_work_dir = os.path.join(WINDOWS_DIR, 'dist', 'PapaCheck')
-        if os.path.isdir(pyinstaller_work_dir):
-            shutil.rmtree(pyinstaller_work_dir)
-            done('移除旧版 PyInstaller 构建目录')
-    if need_apk and os.path.exists(APK_BUILD_OUTPUT):
-        os.remove(APK_BUILD_OUTPUT)
-        done('移除旧版 APK 构建产物')
+    if need_exe or need_apk:
+        section('清理')
+        if need_exe:
+            pyinstaller_work_dir = os.path.join(WINDOWS_DIR, 'dist', 'PapaCheck')
+            if os.path.isdir(pyinstaller_work_dir):
+                shutil.rmtree(pyinstaller_work_dir)
+                done('移除旧版 PyInstaller 构建目录')
+        if need_apk and os.path.exists(APK_BUILD_OUTPUT):
+            os.remove(APK_BUILD_OUTPUT)
+            done('移除旧版 APK 构建产物')
 
     # ── 构建 ──
     if need_exe or need_apk:
@@ -835,42 +838,45 @@ def main():
     apk_ver = read_apk_version() if need_apk else ''
 
     # ── 归档 ──
-    section('归档')
-    apk_archive_path = None
-    if need_apk:
-        apk_archive_path = archive_apk(apk_ver)
-
-    dist_exe_dir = DEFAULT_OUTPUT_DIR
-
     zips = None
-    if not args.no_zip:
-        if need_apk and need_exe:
-            zips = create_zips(output_dir, exe_ver, apk_ver,
-                               apk_archive_path, dist_exe_dir)
-        elif need_exe:
-            exe_path = os.path.join(dist_exe_dir,
-                                    f'PapaCheck-{exe_ver}.exe')
-            win_zip = os.path.join(output_dir,
-                                   f'PapaCheck-v{exe_ver}_win.zip')
-            os.makedirs(output_dir, exist_ok=True)
-            with zipfile.ZipFile(win_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
-                zf.write(exe_path, os.path.basename(exe_path))
-            done(f'ZIP 打包 → {os.path.basename(win_zip)}')
-            zips = [win_zip]
-    else:
-        done('跳过 ZIP 打包')
+    if need_exe or need_apk:
+        section('归档')
+        apk_archive_path = None
+        if need_apk:
+            apk_archive_path = archive_apk(apk_ver)
+
+        dist_exe_dir = DEFAULT_OUTPUT_DIR
+
+        if not args.no_zip:
+            if need_apk and need_exe:
+                zips = create_zips(output_dir, exe_ver, apk_ver,
+                                   apk_archive_path, dist_exe_dir)
+            elif need_exe:
+                exe_path = os.path.join(dist_exe_dir,
+                                        f'PapaCheck-{exe_ver}.exe')
+                win_zip = os.path.join(output_dir,
+                                       f'PapaCheck-v{exe_ver}_win.zip')
+                os.makedirs(output_dir, exist_ok=True)
+                with zipfile.ZipFile(win_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
+                    zf.write(exe_path, os.path.basename(exe_path))
+                done(f'ZIP 打包 → {os.path.basename(win_zip)}')
+                zips = [win_zip]
+        else:
+            done('跳过 ZIP 打包')
 
     # ── 后置处理 ──
-    section('后置处理')
-    if check_better_sqlite3():
-        done('better-sqlite3 需要重建')
-        rebuild_better_sqlite3()
-    else:
-        done('better-sqlite3 已就绪，无需重建')
+    if need_exe or need_apk or need_node:
+        section('后置处理')
+        if check_better_sqlite3():
+            done('better-sqlite3 需要重建')
+            rebuild_better_sqlite3()
+        else:
+            done('better-sqlite3 已就绪，无需重建')
 
     # ── Site 部署 ──
+    did_site = False
     if getattr(args, 'site', False):
-        site_publish(CLOUD_SERVER_IP, CLOUD_SERVER_USER)
+        did_site = site_publish(CLOUD_SERVER_IP, CLOUD_SERVER_USER)
 
     # ── 云同步 ──
     did_cloud = False
@@ -878,7 +884,7 @@ def main():
         did_cloud = cloud_publish(CLOUD_SERVER_IP, CLOUD_SERVER_USER)
 
     print_summary(output_dir, exe_ver, apk_ver, zips,
-                  need_exe, need_apk, args.no_zip, did_cloud)
+                  need_exe, need_apk, args.no_zip, did_cloud, did_site)
 
 
 if __name__ == '__main__':
