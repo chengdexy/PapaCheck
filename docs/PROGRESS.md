@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-16（认证体系重构完成，全量 639 测试通过）
+> 最后更新：2026-06-16（修复结算不弹出，全量 639 测试通过）
 
 ## 当前版本
 
-**v1.4.0-beta**（认证体系重构，639 测试）
+**v1.4.0-beta**（修复结算不弹出，639 测试）
 
 ## 部署状态
 
@@ -88,6 +88,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-16 | **修复结算不弹出 Bug + 诊断日志**：`getSettlementData()` 增加 `dailyBase` 字段防御检查，防止异常结算数据阻断回退路径；`updateBigScreen()` 增加全部完成但结算未显示时的诊断日志和强制重算兜底；全量 639 测试通过 |
 | 2026-06-16 | **认证体系重构 v1.4.0**：分离账号与访问码，`users` 表合并 `tenants` 表，新增 `access_codes` 表。角色简化为 `admin`/`user`（账号）和 `parent`/`child`（访问码）。统一 `POST /api/auth/login` 登录入口。超级管理员首次登录强制修改凭证（`needs_password_change`）。管理面板前端适配新模型。新增 9 个 TDD 测试，全量 639 测试通过 |
 | 2026-06-16 | **release.py 超时保护 + 访问码快速查找 + v1.3.4**：`cloud_publish` 所有 subprocess 调用增加 timeout（SSH 30s/SCP 120s/构建 180s/远程 300s），防止网络问题永久阻塞；新增 `findUserByAccessCode()` 数据库方法支持 access_code 列直接匹配，减少 bcrypt 计算开销；schema 验证 minLength 8→6；版本号递增 1.3.3→1.3.4 |
 | 2026-06-16 | **PapaCheck.Site 重构 + 代码审查修复**：管理面板 React + Vite + TypeScript（40 个 TDD 测试）；14 个审查问题全部修复（含 Critical 注册 Modal、JWT 过期检查、useApi 统一、内存泄漏修复等）；落地页清理；`release.py` 新增 `--site` ；全量 671 测试通过 |

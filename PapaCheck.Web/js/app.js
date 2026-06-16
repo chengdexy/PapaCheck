@@ -688,11 +688,17 @@ async function calculateSettlement() {
   if (_calculatingSettlement) return;
   _calculatingSettlement = true;
   try {
+    const dateKey = Util.dateKey(currentDate);
+    console.log('[Settlement] calculateSettlement run', {
+      dateKey,
+      hwCount: homeworks.length,
+      doneCount: homeworks.filter(h => h.status === 'done').length,
+      existingSettlement: cachedData?.dailySettlement?.[dateKey] ? JSON.stringify(cachedData.dailySettlement[dateKey]) : null,
+    });
+
     const doneHw = homeworks.filter(h => h.status === 'done');
     const challengeSuccess = doneHw.filter(h => h.mode === 'challenge' && !h.rejected);
     const efficiencyHw = doneHw.filter(h => !h.rejected);
-
-    const dateKey = Util.dateKey(currentDate);
 
     // 检查当天是否已有 settlement 并已评级
     const existingSettlement = cachedData?.dailySettlement?.[dateKey];
@@ -803,6 +809,13 @@ async function calculateSettlement() {
     if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
     cachedData.dailySettlement[dateKey] = settlementToSave;
 
+    // [诊断] 记录设置後的结算数据
+    console.log('[Settlement] 新结算已设置:', {
+      dateKey,
+      window_settlement: JSON.stringify(window._settlement),
+      cachedData_settlement: JSON.stringify(cachedData.dailySettlement[dateKey]),
+    });
+
     await calculateAndSaveEfficiency(efficiencyHw, dateKey);
 
     needsFullRender = true;
@@ -873,7 +886,18 @@ function startPoll(intervalMs) {
     if (mode === 'offline' || mode === 'reconnecting') return;
 
     try {
+      var _prevSettlement = cachedData?.dailySettlement?.[Util.dateKey(currentDate)];
       cachedData = await API.getData();
+
+      // [诊断] pollServer 替换 cachedData 时记录结算数据变化
+      var _newSettlement = cachedData?.dailySettlement?.[Util.dateKey(currentDate)];
+      if (JSON.stringify(_prevSettlement) !== JSON.stringify(_newSettlement)) {
+        console.log('[Settlement] pollServer 替换 cachedData, 结算数据变化:', {
+          prev: JSON.stringify(_prevSettlement),
+          next: JSON.stringify(_newSettlement),
+          window_settlement: JSON.stringify(window._settlement),
+        });
+      }
 
       API.migrateBountyCompletionsToTotal(cachedData);
       const key = Util.dateKey(currentDate);
@@ -1033,6 +1057,11 @@ function startPoll(intervalMs) {
       const _hasDoneHw = homeworks.some(function (h) { return h.status === 'done'; });
       const _unratedS = getSettlementData();
       if (_unratedS && !_unratedS.rating && !_hasDoneHw) {
+        console.warn('[Settlement] pollServer 清理未评级结算 (无已完成作业):', {
+          hasDoneHw: _hasDoneHw,
+          unratedS: JSON.stringify(_unratedS),
+          hwCount: homeworks.length,
+        });
         cachedData._settlement = null;
         window._settlement = null;
         if (cachedData.dailySettlement) delete cachedData.dailySettlement[key];

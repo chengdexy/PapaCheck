@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- **修复孩子端全部作业完成后不弹出结算界面**：`getSettlementData()` 对缺少 `dailyBase` 字段的异常结算数据（例如 pollServer 同步过程中可能出现的空对象或格式不符的数据）增加防御性跳过，不再受理并回退到 `window._settlement`；`updateBigScreen()` 在检测到全部作业已完成但结算未显示时，触发诊断日志和强制重算兜底
+
 ### Added
 - **认证体系重构**：分离账号与访问码概念。新增 `access_codes` 表，`users` 表合并 `tenants` 表。角色简化为 `admin`/`user`（账号）和 `parent`/`child`（访问码）
 - **统一登录入口**：超级管理员和用户账号均通过 `POST /api/auth/login` 邮箱+密码登录，移除独立超级管理员登录按钮

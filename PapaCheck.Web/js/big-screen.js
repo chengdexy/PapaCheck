@@ -21,6 +21,7 @@ const PAGE = { MAIN: 'main', SHOP: 'shop', SETTLEMENT: 'settlement', RATED: 'rat
 let currentPage = PAGE.MAIN;
 let needsFullRender = true;
 let forceMainPage = false;
+let _updatingBigScreen = false; // 防止递归调用
 let _redeemingItem = false;
 let _redeemingRewardBox = false;
 let _requestingDefer = false;
@@ -224,48 +225,91 @@ function markNeedsRender() {
 
 // ---- Full render (called on data/state changes) ----
 function updateBigScreen() {
-  const now = new Date();
-  document.getElementById('bigDate').textContent = Util.formatDate(now);
-  document.getElementById('bigTime').textContent = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  if (_updatingBigScreen) return; // 防止递归
+  _updatingBigScreen = true;
+  try {
+    const now = new Date();
+    document.getElementById('bigDate').textContent = Util.formatDate(now);
+    document.getElementById('bigTime').textContent = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 
-  const activeHw = getActiveHomework();
-  if (activeHw && !activeHw.paused) {
-    checkReminders(activeHw);
-  }
+    const activeHw = getActiveHomework();
+    if (activeHw && !activeHw.paused) {
+      checkReminders(activeHw);
+    }
 
-  if (currentPage === PAGE.SHOP) {
-    updateShopPage();
-    return;
-  }
+    if (currentPage === PAGE.SHOP) {
+      updateShopPage();
+      return;
+    }
 
-  const settlement = getSettlementData();
-  if (!forceMainPage && settlement && settlement.rating && !settlement.viewedAt) {
-    updateRatedPage();
-    return;
-  }
-  if (!forceMainPage && !getActiveBounty() && settlement && settlement.submittedAt && !settlement.rating) {
-    updateSettlementPage();
-    return;
-  }
-  if (!forceMainPage && !getActiveBounty() && settlement && settlement.dailyBase !== undefined && !settlement.submittedAt && !settlement.rating) {
-    window._settlement = settlement;
-    updateSettlementPage();
-    return;
-  }
+    const settlement = getSettlementData();
+    if (!forceMainPage && settlement && settlement.rating && !settlement.viewedAt) {
+      updateRatedPage();
+      return;
+    }
+    if (!forceMainPage && !getActiveBounty() && settlement && settlement.submittedAt && !settlement.rating) {
+      updateSettlementPage();
+      return;
+    }
+    if (!forceMainPage && !getActiveBounty() && settlement && settlement.dailyBase !== undefined && !settlement.submittedAt && !settlement.rating) {
+      window._settlement = settlement;
+      updateSettlementPage();
+      return;
+    }
 
-  updateMainPage();
-  updateStats();
-  needsFullRender = false;
-  forceMainPage = false;
+    // [诊断+防御] 全部作业已完成但结算页面未显示时记录日志并尝试修复
+    if (homeworks.length > 0 && homeworks.every(h => h.status === 'done')) {
+      const key = Util.dateKey(currentDate);
+      console.warn('[Settlement] 全部完成但未显示结算界面, state:', {
+        settlement: JSON.stringify(settlement),
+        window_settlement: JSON.stringify(window._settlement),
+        cachedData_settlement: cachedData?.dailySettlement?.[key],
+        cachedData_settlement_keys: cachedData?.dailySettlement ? Object.keys(cachedData.dailySettlement) : null,
+        cachedData_has_settlement: cachedData?.dailySettlement ? key in cachedData.dailySettlement : false,
+        forceMainPage,
+        activeBounty: getActiveBounty() ? 'yes' : 'no',
+        currentPage,
+        _calculatingSettlement: typeof _calculatingSettlement !== 'undefined' ? _calculatingSettlement : 'N/A'
+      });
+      // 防御重算：如果 window._settlement 有数据但条件未通过，强制显示结算页
+      if (window._settlement && window._settlement.dailyBase !== undefined) {
+        console.warn('[Settlement] 防御触发: window._settlement 存在但未显示, 强制显示');
+        updateSettlementPage();
+        return;
+      }
+      if (!_calculatingSettlement) {
+        console.warn('[Settlement] 防御触发: 触发重新计算');
+        calculateSettlement();
+        return;
+      }
+    }
+
+    updateMainPage();
+    updateStats();
+    needsFullRender = false;
+    forceMainPage = false;
+  } finally {
+    _updatingBigScreen = false;
+  }
 }
 
 function getSettlementData() {
   if (cachedData && cachedData.dailySettlement) {
     var serverData = cachedData.dailySettlement[Util.dateKey(currentDate)];
-    if (serverData) return serverData;
+    if (serverData) {
+      // 防御：serverData 存在但没有 dailyBase（可能为空对象或数据异常），不受理
+      if (serverData.dailyBase !== undefined) return serverData;
+      console.warn('[Settlement] serverData 缺少 dailyBase, 跳过:', JSON.stringify(serverData));
+    }
   }
-  if (cachedData && cachedData._settlement) return cachedData._settlement;
-  if (window._settlement) return window._settlement;
+  if (cachedData && cachedData._settlement) {
+    if (cachedData._settlement.dailyBase !== undefined) return cachedData._settlement;
+    console.warn('[Settlement] cachedData._settlement 缺少 dailyBase, 跳过:', JSON.stringify(cachedData._settlement));
+  }
+  if (window._settlement) {
+    if (window._settlement.dailyBase !== undefined) return window._settlement;
+    console.warn('[Settlement] window._settlement 缺少 dailyBase, 跳过:', JSON.stringify(window._settlement));
+  }
   return null;
 }
 
