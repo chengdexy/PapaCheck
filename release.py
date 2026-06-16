@@ -798,6 +798,7 @@ def run_wizard():
         cloud_only=False,
         site=do_site,
         v=None,
+        _wizard=True,
     )
 
 
@@ -826,8 +827,14 @@ def main():
         cloud_publish(CLOUD_SERVER_IP, CLOUD_SERVER_USER)
         return
 
-    need_exe = args.exe_only or not (args.apk_only or args.node_only or args.cloud_only)
-    need_apk = args.apk_only or not (args.exe_only or args.node_only or args.cloud_only)
+    if getattr(args, '_wizard', False):
+        # 引导模式：site 只是附加步骤，不影响主构建
+        need_exe = args.exe_only or not args.apk_only
+        need_apk = args.apk_only or not args.exe_only
+    else:
+        # CLI 模式：--site/--cloud-only 是排他标志
+        need_exe = args.exe_only or not (args.apk_only or args.node_only or args.cloud_only or args.site)
+        need_apk = args.apk_only or not (args.exe_only or args.node_only or args.cloud_only or args.site)
     need_node = args.node_only
 
     output_dir = os.path.abspath(args.output_dir)
