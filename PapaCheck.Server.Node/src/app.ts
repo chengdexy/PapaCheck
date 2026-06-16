@@ -108,7 +108,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   if (options.rateLimit !== false) {
     await app.register(rateLimit, {
-      max: options.rateLimit?.max ?? 60,
+      max: options.rateLimit?.max ?? 300,
       timeWindow: options.rateLimit?.timeWindow ?? '1 minute',
       errorResponseBuilder: (request, context) => ({
         error: '请求过于频繁，请稍后再试',
@@ -284,8 +284,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   // ==================== GET Endpoints ====================
 
-  // 1. GET /api/ping - 心跳
-  app.get('/api/ping', { schema: pingSchema }, async (_request, reply) => {
+  // 1. GET /api/ping - 心跳（高限流，避免耗尽全局额度）
+  app.get('/api/ping', { schema: pingSchema, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (_request, reply) => {
     return sendJson(reply, { ok: true, serverTime: new Date().toISOString() });
   });
 
