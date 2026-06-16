@@ -127,7 +127,6 @@ export abstract class DatabaseAdapter implements IDatabase {
   abstract getCRDTOperationsSince(timestamp: string, tenantId?: string): Promise<CRDTOperation[]>;
   abstract ackCRDTOperations(timestamp: string, tenantId?: string): Promise<void>;
   abstract queryUserTokenVersion(userId: string): Promise<number>;
-  abstract findUserByAccessHash(accessHash: string): Promise<any | null>;
   abstract getUserById(userId: string): Promise<any | null>;
   abstract updateUserLastLogin(userId: string): Promise<void>;
   abstract createTenant(id: string, name: string): Promise<void>;

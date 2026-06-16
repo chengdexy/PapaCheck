@@ -148,6 +148,9 @@ describe('Admin Routes', () => {
       return user?.token_version ?? 1;
     },
     findUserByAccessHash: async (_accessHash: string) => null,
+    findUserByAccessCode: async (accessCode: string) => {
+      return storedUsers.find(u => u.access_code === accessCode && u.is_active) || null;
+    },
     getUserById: async (_userId: string) => null,
     updateUserLastLogin: async () => {},
 

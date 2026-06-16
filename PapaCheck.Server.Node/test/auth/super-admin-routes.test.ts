@@ -158,6 +158,7 @@ describe('Super Admin Routes', () => {
     ackCRDTOperations: async () => {},
     queryUserTokenVersion: async () => 1,
     findUserByAccessHash: async () => null,
+    findUserByAccessCode: async () => null,
     getUserById: async () => null,
     updateUserLastLogin: async () => {},
     createTenant: async () => {},

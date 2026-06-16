@@ -26,12 +26,13 @@ describe('Auth Routes', () => {
   const mockDb: IDatabase = {
     queryUserTokenVersion: async (_userId: string) => 1,
     findUserByAccessHash: async (accessHash: string) => {
-      // 模拟：仅当 access_code 为 'valid-code-123' 时返回用户
+      // 模拟：仅当 access_code 为 'valid-code-123' 时返回用户（兼容旧格式）
       if (accessHash === 'valid-code-123') {
         return { ...mockUser };
       }
       return null;
     },
+    findUserByAccessCode: async () => null,
     getUserById: async (userId: string) => {
       if (userId === mockUser.id) {
         return { ...mockUser };
