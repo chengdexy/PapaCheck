@@ -9,7 +9,7 @@
     const token = localStorage.getItem('papacheck_token');
     const role = localStorage.getItem('papacheck_role');
     if (!token || role !== 'child') {
-      window.location.href = '/login.html?redirect=' + encodeURIComponent('/app/');
+      window.location.href = '/login.html?redirect=' + encodeURIComponent('/child');
       return;
     }
     // 通过 API 验证 token 是否仍有效（未被删除/吊销）
@@ -20,7 +20,7 @@
         localStorage.removeItem('papacheck_token');
         localStorage.removeItem('papacheck_role');
         localStorage.removeItem('papacheck_nickname');
-        window.location.href = '/login.html?redirect=' + encodeURIComponent('/app/');
+        window.location.href = '/login.html?redirect=' + encodeURIComponent('/child');
       }
     }).catch(function () { });
   } catch (e) {

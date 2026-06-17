@@ -1110,6 +1110,41 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // HEAD /api/homeworks/:id 由 Fastify 从 GET /api/homeworks/:date 自动生成
   // 由于该路由按日期查询返回数组，HEAD 始终返回 200（含空数组），不做存在性检查
 
+  // ==================== 语义化路由 ====================
+
+  // GET /child - 孩子端大屏
+  app.get('/child', async (_request, reply) => {
+    const indexPath = join(options.webDir, 'index.html');
+    try {
+      await stat(indexPath);
+      return reply.type('text/html; charset=utf-8').send(createReadStream(indexPath));
+    } catch {
+      return reply.status(404).send({ error: 'File not found', code: ErrorCodes.NOT_FOUND });
+    }
+  });
+
+  // GET /parent - 家长管理端
+  app.get('/parent', async (_request, reply) => {
+    const adminPath = join(options.webDir, 'admin.html');
+    try {
+      await stat(adminPath);
+      return reply.type('text/html; charset=utf-8').send(createReadStream(adminPath));
+    } catch {
+      return reply.status(404).send({ error: 'File not found', code: ErrorCodes.NOT_FOUND });
+    }
+  });
+
+  // GET /login - 统一登录页
+  app.get('/login', async (_request, reply) => {
+    const loginPath = join(options.webDir, 'login.html');
+    try {
+      await stat(loginPath);
+      return reply.type('text/html; charset=utf-8').send(createReadStream(loginPath));
+    } catch {
+      return reply.status(404).send({ error: 'File not found', code: ErrorCodes.NOT_FOUND });
+    }
+  });
+
   // ==================== Static Files ====================
 
   if (options.webDir) {

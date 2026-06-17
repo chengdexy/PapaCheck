@@ -1853,4 +1853,37 @@ footer {
     animation: bounce 2s infinite;
 }
 
+/* 角色入口按钮 */
+.nav-entry-links {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.btn-entry {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: 1.5px solid;
+    background: transparent;
+}
+.btn-entry-child {
+    color: #22c55e;
+    border-color: #22c55e;
+}
+.btn-entry-child:hover {
+    background: #22c55e;
+    color: #fff;
+}
+.btn-entry-parent {
+    color: #3b82f6;
+    border-color: #3b82f6;
+}
+.btn-entry-parent:hover {
+    background: #3b82f6;
+    color: #fff;
+}
+
 

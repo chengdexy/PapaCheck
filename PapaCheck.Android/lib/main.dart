@@ -121,7 +121,8 @@ class BatteryMonitor {
   }
 
   void _onBatteryStateChanged(BatteryState state) {
-    if (_lastState == BatteryState.discharging && state == BatteryState.charging) {
+    if (_lastState == BatteryState.discharging &&
+        state == BatteryState.charging) {
       // 检测到从 discharging 切换到 charging，重置阈值标记
       _alerted20 = false;
       _alerted10 = false;
@@ -292,9 +293,11 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         caseSensitive: false,
       );
       html = await _inlineResources(
-        html, cssPattern,
+        html,
+        cssPattern,
         (css) => '  <style>$css</style>\n',
-        baseUrl, client,
+        baseUrl,
+        client,
       );
 
       // 内联 <script src="...">
@@ -303,9 +306,11 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         caseSensitive: false,
       );
       html = await _inlineResources(
-        html, jsPattern,
+        html,
+        jsPattern,
         (js) => '  <script>$js</script>\n',
-        baseUrl, client,
+        baseUrl,
+        client,
       );
 
       await OfflineSnapshotService.save(fullUrl, html);
@@ -555,20 +560,15 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   }
 
   String _buildFullUrl(String baseUrl, DeviceRole role) {
-    // 标准 Web 端口（80/443）视为云端部署，需要 /app/ 前缀
-    final uri = Uri.tryParse(baseUrl);
-    final isCloud = uri != null && (uri.port == 80 || uri.port == 443);
-    final appPrefix = isCloud ? '/app' : '';
-
     // 防止 baseUrl 尾部已有斜杠时拼接出双斜杠
     final base = baseUrl.isNotEmpty && baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
 
     if (role == DeviceRole.parent) {
-      return '$base$appPrefix/admin.html';
+      return '$base/parent';
     }
-    return '$base$appPrefix/';
+    return '$base/child';
   }
 
   void _applyOrientation(DeviceRole role) {
@@ -588,7 +588,8 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   }
 
   String _getBaseUrl(String fullUrl) {
-    return fullUrl.replaceAll('/admin.html', '');
+    // 精确匹配末尾的 /child、/parent 或 /login 后缀，避免误替换域名中的匹配段
+    return fullUrl.replaceFirst(RegExp(r'/(?:child|parent|login)$'), '');
   }
 
   void _startBatteryMonitor() {

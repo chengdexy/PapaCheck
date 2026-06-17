@@ -5,7 +5,13 @@
 //     Then 返回 { ok: true, serverTime: "..." }
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { buildApp } from '../src/app.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+/** 测试用的 webDir，指向 PapaCheck.Web 目录 */
+const testWebDir = resolve(__dirname, '../../PapaCheck.Web');
 
 let app: Awaited<ReturnType<typeof buildApp>>;
 
@@ -42,5 +48,35 @@ describe('GET /api/static-version', () => {
     const body = JSON.parse(res.body);
     expect(body).toHaveProperty('version');
     expect(typeof body.version).toBe('string');
+  });
+});
+
+describe('GET /child', () => {
+  it('返回 index.html（状态码 200，Content-Type 含 text/html）', async () => {
+    const app2 = await buildApp({ port: 0, webDir: testWebDir, dbPath: ':memory:' });
+    const res = await app2.inject({ method: 'GET', url: '/child' });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toMatch(/text\/html/);
+    await app2.close();
+  });
+});
+
+describe('GET /parent', () => {
+  it('返回 admin.html（状态码 200）', async () => {
+    const app2 = await buildApp({ port: 0, webDir: testWebDir, dbPath: ':memory:' });
+    const res = await app2.inject({ method: 'GET', url: '/parent' });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toMatch(/text\/html/);
+    await app2.close();
+  });
+});
+
+describe('GET /login', () => {
+  it('返回 login.html（状态码 200）', async () => {
+    const app2 = await buildApp({ port: 0, webDir: testWebDir, dbPath: ':memory:' });
+    const res = await app2.inject({ method: 'GET', url: '/login' });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toMatch(/text\/html/);
+    await app2.close();
   });
 });

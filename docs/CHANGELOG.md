@@ -8,9 +8,11 @@
 
 ### Changed
 - **Web 通用代码重构**：提取 app.js 和 admin.js 中重复的通用代码（`showTransitionMask`、`hideTransitionMask`、`escapeHtml`、Service Worker 注册、页面刷新检测）到共享模块 `common.js`，消除约 100 行重复代码。更新 HTML 加载顺序在依赖脚本前引入 common.js。适配 4 个测试文件的 VM 上下文和提取源路径。全量 657 测试通过
+- **路由优化**：孩子端路径从 `/{admin.html}` 改为语义化路径 `/child`、`/parent`、`/login`。官网落地页导航栏、家庭管理面板、超管面板新增图标式角色入口按钮。Android 端同步更新 URL 拼接逻辑。全量 660 测试通过
 
 ### Fixed
-- **孩子端离线/在线同步系统 11 个问题修复（基于代码审查报告 `docs/offline-sync-audit.md`）**：
+
+  - **孩子端离线/在线同步系统 11 个问题修复（基于代码审查报告 `docs/offline-sync-audit.md`）**：
   - **P0（数据丢失）**：`CRDTLog.append()` 加 `await` 和 `console.error`（22 处）；离线降级函数空 catch 改 `console.error` + `return false`（18 处）
   - **P1（同步失败）**：`pollServer` 空 catch 加 `console.error`；`_doReconnect` 中 CRDT 同步失败后抛异常阻止切 `online`；`_refreshFromServer` 静默失败加 `console.warn`
   - **P2（体验降级）**：`wakeUp` 添加 CM 模式等待重试机制；`init` 离线恢复用 `API.getData()` 替换 `location.reload()`

@@ -24,7 +24,7 @@ button:hover{background:#45a049}
 <div class="error" id="error">访问码无效，请联系管理员</div>
 </div>
 <script>
-async function login(){var c=document.getElementById('accessCode').value.trim();if(!c)return;var r=await fetch('/api/auth/exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({access_code:c})});if(r.ok){var d=await r.json();localStorage.setItem('papacheck_token',d.token);localStorage.setItem('papacheck_role',d.role);localStorage.setItem('papacheck_nickname',d.nickname);var p=new URLSearchParams(window.location.search);window.location.href=p.get('redirect')||'/'}else document.getElementById('error').style.display='block'}
+async function login(){var c=document.getElementById('accessCode').value.trim();if(!c)return;var r=await fetch('/api/auth/exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({access_code:c})});if(r.ok){var d=await r.json();localStorage.setItem('papacheck_token',d.token);localStorage.setItem('papacheck_role',d.role);localStorage.setItem('papacheck_nickname',d.nickname);var p=new URLSearchParams(window.location.search);window.location.href=p.get('redirect')||'/child'}else document.getElementById('error').style.display='block'}
 document.getElementById('accessCode').addEventListener('keydown',function(e){if(e.key==='Enter')login()})
 </script>
 </body>
