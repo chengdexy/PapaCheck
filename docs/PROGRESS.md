@@ -1,15 +1,16 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-17（修复家长访问码登录无限循环 Bug）
+> 最后更新：2026-06-17（Phase 5d 运维增强完成）
 
 ## 当前版本
 
-**v1.4.0-beta**（数据库迁移清理，644 测试）
+**v1.4.1-beta**（运维增强，657 测试）
 
 ## 部署状态
 
 - [x] **Phase 5b 服务器迁移完成** — 已移除 Docker，改用 systemd + Nginx + PostgreSQL 直接部署
 - [x] **Phase 5c 完成** — JWT 多租户认证系统，官网管理面板，超级管理员
+- [x] **Phase 5d 完成** — PostgreSQL 自动备份 + 健康监控 + 邮件告警
 
 ---
 
@@ -59,12 +60,12 @@
 - [x] **自定义科目**：科目从硬编码改为 settings 可配置，设置页可添加/删除/恢复/重置
 - [x] **PapaCheck.Site 官网子项目**：从 `docs/` 搬出官网到独立子项目，管理面板拆为独立页面
 - [x] **认证体系重构（Phase 5f）**：分离账号与访问码，`users` 表合并 `tenants` 表，新增 `access_codes` 表。角色简化为 `admin`/`user`（账号）和 `parent`/`child`（访问码）。统一登录入口，超级管理员首次登录强制修改凭证。639 测试
+- [x] **Phase 5d 运维增强**：PostgreSQL 自动备份（每日 03:00，保留 3 份）、健康监控（磁盘/PG/备份状态，每 5 分钟）、邮件告警（状态机去重，SMTP 配置面板）、超管面板系统健康页面。新增 13 个 TDD 测试，全量 657 测试
 
 ---
 
 ## 待开发功能
 
-- [ ] Phase 5d: 运维增强（增强 release.py + 备份日报 + 巡检）
 - [ ] Phase 5e: 客户端适配（Android 远程配置 + Web 登录状态持久化）
 - [ ] iOS 端
 - [ ] 多孩子支持（数据模型已有，UI 未实现）
@@ -88,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-17 | **Phase 5d 运维增强完成**：PostgreSQL 自动备份（每日 03:00，保留 3 份）+ 健康监控（磁盘/PG/备份状态，每 5 分钟）+ 邮件告警（状态机去重，SMTP 配置面板）+ 超管面板系统健康页面。新增 13 个 TDD 测试，全量 657 测试通过。部署脚本新增备份目录创建，systemd 新增 ENCRYPTION_KEY |
 | 2026-06-17 | **修复家长访问码登录无限循环 Bug**：`auth/middleware.ts` 对 parent/child 角色错误地用 `users.token_version` 验证 JWT（应查 `access_codes.token_version`）。当用户账号改过密码（users.token_version=4）后，家长 JWT（token_version=2）被错误拒绝 401，导致 `/app/admin.html` 无限重定向。修复为按角色区分验证：parent/child 通过 `member_id` 查 `access_codes` 表，admin/user 查 `users` 表。新增 5 个 TDD 测试，全量 644 测试通过；生产环境验证家长"爸爸"访问码 QWSWCn 登录 + /api/data 返回 200 |
 | 2026-06-17 | **代码审查修复 3 个 Issue**：`deactivateMember` 参数颠倒 + 引用已删列修复（SQLite+PG 对齐）；`regenerateMemberHash` 弃用标注并指向 `access_codes`；移除测试中残留的 `console.log` |
 | 2026-06-17 | **修复 SQLite 适配器 + 速率限制 429**：SQLite `users` 表结构对齐 PG；修复 `errorResponseBuilder` 缺少 `statusCode` 导致限流返回 500；修复 4 个测试 mock DB 缺少 `updateAccessCodeLastLogin`。全量 639 测试通过 |

@@ -1,4 +1,4 @@
-import type { IDatabase, FullDataSnapshot, ModifiedEntry, NotificationItem, AccessCodeRecord, CreateAccessCodeInput, TenantListItem } from './types.js';
+import type { IDatabase, FullDataSnapshot, ModifiedEntry, NotificationItem, AccessCodeRecord, CreateAccessCodeInput, TenantListItem, BackupRecord, HealthRecord, AlertState, OpsConfig } from './types.js';
 import type { CRDTOperation } from '../crdt/types.js';
 
 // ==================== DatabaseAdapter 抽象基类 ====================
@@ -55,6 +55,21 @@ export abstract class DatabaseAdapter implements IDatabase {
     if (data.averageRatio !== undefined || data.efficiencyRatio !== undefined) return 'efficiency_history';
     return null;
   }
+
+  // ==================== Ops Methods (default stubs) ====================
+  async insertBackupRecord(_record: BackupRecord): Promise<void> { throw new Error('Not implemented'); }
+  async listBackupRecords(_limit: number): Promise<BackupRecord[]> { throw new Error('Not implemented'); }
+  async getBackupRecord(_id: string): Promise<BackupRecord | null> { throw new Error('Not implemented'); }
+  async deleteBackupRecord(_id: string): Promise<void> { throw new Error('Not implemented'); }
+  async deleteBackupRecordsOlderThan(_count: number): Promise<BackupRecord[]> { throw new Error('Not implemented'); }
+  async getLatestBackupRecord(): Promise<BackupRecord | null> { throw new Error('Not implemented'); }
+  async insertHealthRecord(_record: HealthRecord): Promise<void> { throw new Error('Not implemented'); }
+  async listHealthRecords(_limit: number): Promise<HealthRecord[]> { throw new Error('Not implemented'); }
+  async pruneHealthRecords(_maxRows: number): Promise<void> { throw new Error('Not implemented'); }
+  async getAlertState(_key: string): Promise<AlertState | null> { throw new Error('Not implemented'); }
+  async upsertAlertState(_state: AlertState): Promise<void> { throw new Error('Not implemented'); }
+  async getOpsConfig(): Promise<OpsConfig | null> { throw new Error('Not implemented'); }
+  async saveOpsConfig(_config: OpsConfig): Promise<void> { throw new Error('Not implemented'); }
 
   // ==================== Abstract Methods ====================
 

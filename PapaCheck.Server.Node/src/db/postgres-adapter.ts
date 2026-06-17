@@ -6,7 +6,7 @@ import { Pool } from 'pg';
 import type { Pool as PoolType, QueryResult } from 'pg';
 import bcrypt from 'bcryptjs';
 import { DatabaseAdapter } from './adapter.js';
-import type { FullDataSnapshot, PointsHistoryEntry, ModifiedEntry, NotificationItem, TenantListItem, AccessCodeRecord, CreateAccessCodeInput, AdminUser } from './types.js';
+import type { FullDataSnapshot, PointsHistoryEntry, ModifiedEntry, NotificationItem, TenantListItem, AccessCodeRecord, CreateAccessCodeInput, AdminUser, BackupRecord, HealthRecord, AlertState, OpsConfig } from './types.js';
 import type { CRDTOperation } from '../crdt/types.js';
 
 /** date_key 表：以日期为主键，存储 JSON 数据 */
@@ -1173,57 +1173,57 @@ export class PostgresAdapter extends DatabaseAdapter {
         const recordKey = data.date || data.dateKey || uuid || '';
         if (!recordKey) continue;
 
-            const existing = await this._getDateDataRaw(table, recordKey, tenantId);
+        const existing = await this._getDateDataRaw(table, recordKey, tenantId);
         let existingList: any[] = Array.isArray(existing) ? [...existing] : [];
         let existingDict = !Array.isArray(existing) ? (existing ?? {}) : null;
 
-        if (Array.isArray(existing)) {                              
+        if (Array.isArray(existing)) {
           const { index: idx, item: existingItem } = this._findByUuid(existingList, uuid);
           let foundIdx = idx;
           let foundItem = existingItem;
 
-                if (!foundItem && data.id) {
-                  const alt = this._findByUuid(existingList, data.id);
-                  foundIdx = alt.index;
-                foundItem = alt.item;
-                
-            } 
-            if (!foundItem && data.taskId) {
-            const alt = this._findByUuid(existingList, data.taskId);
-              foundIdx = alt.index;
-              foundItem = alt.item;
-            }
+          if (!foundItem && data.id) {
+            const alt = this._findByUuid(existingList, data.id);
+            foundIdx = alt.index;
+            foundItem = alt.item;
 
-            if (foundItem) {
-              const oldLast = foundItem.lastModified ?? '0';
-              if (changeType === 'delete') {
+          }
+          if (!foundItem && data.taskId) {
+            const alt = this._findByUuid(existingList, data.taskId);
+            foundIdx = alt.index;
+            foundItem = alt.item;
+          }
+
+          if (foundItem) {
+            const oldLast = foundItem.lastModified ?? '0';
+            if (changeType === 'delete') {
               existingList[foundIdx].isDeleted = true;
               existingList[foundIdx].lastModified = newLastModified;
             } else if (newLastModified >= oldLast) {
-                existingList[foundIdx] = data;
+              existingList[foundIdx] = data;
             }
-            } else {
-              existingList.push(data);
+          } else {
+            existingList.push(data);
           }
 
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
           await this._setDateData(table, recordKey, existingList, tenantId);
           await this.recordModification(table, recordKey, timestamp, tenantId);
-        } else if (existingDict !== null) {                              
+        } else if (existingDict !== null) {
           const oldLast = existingDict.lastModified ?? '0';
           if (changeType === 'delete') {
             data.isDeleted = true;
@@ -1232,26 +1232,26 @@ export class PostgresAdapter extends DatabaseAdapter {
             await this._setDateData(table, recordKey, data, tenantId);
           }
           await this.recordModification(table, recordKey, timestamp, tenantId);
-        }                              
-     } else if (SINGLE_ROW_TABLES.has(table)) {
-      const existing = await this._getJson(table, tenantId, 1);
-      const existingList = Array.isArray(existing) ? [...existing] : null;
-      const existingDict = !Array.isArray(existing) ? (existing ?? {}) : null;
-  
+        }
+      } else if (SINGLE_ROW_TABLES.has(table)) {
+        const existing = await this._getJson(table, tenantId, 1);
+        const existingList = Array.isArray(existing) ? [...existing] : null;
+        const existingDict = !Array.isArray(existing) ? (existing ?? {}) : null;
+
         if (existingList) {
           const { index: idx, item: existingItem } = this._findByUuid(existingList, uuid);
           let foundIdx = idx;
           let foundItem = existingItem;
-  
+
           if (!foundItem && data.id) {
-          const alt = this._findByUuid(existingList, data.id);
-          foundIdx = alt.index;
-           foundItem = alt.item;
-         }
-         if (!foundItem && data.taskId) {
-          const alt = this._findByUuid(existingList, data.taskId);
-        foundIdx = alt.index;
-        foundItem = alt.item;
+            const alt = this._findByUuid(existingList, data.id);
+            foundIdx = alt.index;
+            foundItem = alt.item;
+          }
+          if (!foundItem && data.taskId) {
+            const alt = this._findByUuid(existingList, data.taskId);
+            foundIdx = alt.index;
+            foundItem = alt.item;
           }
 
           if (foundItem) {
@@ -1259,8 +1259,8 @@ export class PostgresAdapter extends DatabaseAdapter {
             if (changeType === 'delete') {
               existingList[foundIdx].isDeleted = true;
               existingList[foundIdx].lastModified = newLastModified;
-          } else if (newLastModified >= oldLast) {
-            existingList[foundIdx] = data;
+            } else if (newLastModified >= oldLast) {
+              existingList[foundIdx] = data;
             }
           } else {
             existingList.push(data);
@@ -1272,16 +1272,16 @@ export class PostgresAdapter extends DatabaseAdapter {
           await this.recordModification(table, '1', timestamp, tenantId);
         }
       }
-}
+    }
 
     return { ok: true };
   }
 
   // ==================== Sync ====================
-  
+
   async recordModification(tableName: string, recordKey: string, timestamp: string, tenantId?: string): Promise<void> {
-if (tenantId) {
-await this.pool.query(
+    if (tenantId) {
+      await this.pool.query(
         'INSERT INTO last_modified (tenant_id, table_name, record_key, last_modified) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, table_name, record_key) DO UPDATE SET last_modified = $4',
         [tenantId, tableName, recordKey, timestamp]
       );
@@ -1289,7 +1289,7 @@ await this.pool.query(
       await this.pool.query(
         'INSERT INTO last_modified (table_name, record_key, last_modified) VALUES ($1, $2, $3) ON CONFLICT (table_name, record_key) DO UPDATE SET last_modified = $3',
         [tableName, recordKey, timestamp]
-  );
+      );
     }
   }
 
@@ -1299,12 +1299,12 @@ await this.pool.query(
     if (tenantId) {
       await this.pool.query("DELETE FROM homeworks WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
       await this.pool.query("DELETE FROM daily_settlement WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
-    await this.pool.query("DELETE FROM efficiency_history WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
-    await this.pool.query("DELETE FROM free_time_tasks WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
-    await this.pool.query("DELETE FROM bounty_submissions WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
-    await this.pool.query("DELETE FROM bounty_completions WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
+      await this.pool.query("DELETE FROM efficiency_history WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
+      await this.pool.query("DELETE FROM free_time_tasks WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
+      await this.pool.query("DELETE FROM bounty_submissions WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
+      await this.pool.query("DELETE FROM bounty_completions WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
     } else {
-    await this.pool.query("DELETE FROM homeworks WHERE date_key = $1", [dateKey]);
+      await this.pool.query("DELETE FROM homeworks WHERE date_key = $1", [dateKey]);
       await this.pool.query("DELETE FROM daily_settlement WHERE date_key = $1", [dateKey]);
       await this.pool.query("DELETE FROM efficiency_history WHERE date_key = $1", [dateKey]);
       await this.pool.query("DELETE FROM free_time_tasks WHERE date_key = $1", [dateKey]);
@@ -1316,11 +1316,11 @@ await this.pool.query(
     const buffs = (await this._getJson('active_buffs', tenantId)) ?? [];
     const beforeCount = buffs.length;
     const parts = dateKey.split('-');
-    if (parts.length !== 3) return;                          
+    if (parts.length !== 3) return;
     const isoPrefix = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
     const filteredBuffs = buffs.filter((b: any) =>
-b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
-  );
+      b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
+    );
     if (filteredBuffs.length !== beforeCount) {
       await this._setJson('active_buffs', filteredBuffs, tenantId);
     }
@@ -1330,14 +1330,14 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
     } else {
       await this.pool.query("DELETE FROM meta WHERE tenant_id IS NULL AND key = 'last_shop_reset'");
     }
-  }                          
+  }
 
   // ==================== CRDT Operations ====================
 
   async saveCRDTOperation(op: CRDTOperation, tenantId?: string): Promise<void> {
-    if (tenantId) {    
-    await this.pool.query(
-      `INSERT INTO crdt_operations (tenant_id, id, type, table_name, resource_id, field, value, timestamp, node_id)
+    if (tenantId) {
+      await this.pool.query(
+        `INSERT INTO crdt_operations (tenant_id, id, type, table_name, resource_id, field, value, timestamp, node_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          ON CONFLICT (tenant_id, id) DO UPDATE SET
            type = $3, table_name = $4, resource_id = $5, field = $6,
@@ -1722,6 +1722,100 @@ b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
 
   async deleteAccessCode(id: string, userId: string): Promise<void> {
     await this.pool.query('DELETE FROM access_codes WHERE id = $1 AND user_id = $2', [id, userId]);
+  }
+
+  // ==================== Ops Methods ====================
+
+  async insertBackupRecord(record: BackupRecord): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO backup_records (id, filename, size_bytes, status, error_message, checksum, created_at, triggered_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [record.id, record.filename, record.size_bytes, record.status, record.error_message, record.checksum, record.created_at, record.triggered_by]
+    );
+  }
+
+  async listBackupRecords(limit: number): Promise<BackupRecord[]> {
+    const result = await this.pool.query('SELECT * FROM backup_records ORDER BY created_at DESC LIMIT $1', [limit]);
+    return result.rows;
+  }
+
+  async getBackupRecord(id: string): Promise<BackupRecord | null> {
+    const result = await this.pool.query('SELECT * FROM backup_records WHERE id = $1', [id]);
+    return result.rows[0] ?? null;
+  }
+
+  async deleteBackupRecord(id: string): Promise<void> {
+    await this.pool.query('DELETE FROM backup_records WHERE id = $1', [id]);
+  }
+
+  async deleteBackupRecordsOlderThan(count: number): Promise<BackupRecord[]> {
+    const all = await this.pool.query('SELECT * FROM backup_records WHERE status = $1 ORDER BY created_at DESC', ['success']);
+    if (all.rows.length <= count) return [];
+    const toDelete = all.rows.slice(count);
+    for (const r of toDelete) {
+      await this.pool.query('DELETE FROM backup_records WHERE id = $1', [r.id]);
+    }
+    return toDelete;
+  }
+
+  async getLatestBackupRecord(): Promise<BackupRecord | null> {
+    const result = await this.pool.query('SELECT * FROM backup_records ORDER BY created_at DESC LIMIT 1');
+    return result.rows[0] ?? null;
+  }
+
+  async insertHealthRecord(record: HealthRecord): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO health_records (id, created_at, event_type, alert_key, severity, snapshot_json, message) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [record.id, record.created_at, record.event_type, record.alert_key, record.severity, record.snapshot_json, record.message]
+    );
+  }
+
+  async listHealthRecords(limit: number): Promise<HealthRecord[]> {
+    const result = await this.pool.query('SELECT * FROM health_records ORDER BY created_at DESC LIMIT $1', [limit]);
+    return result.rows;
+  }
+
+  async pruneHealthRecords(maxRows: number): Promise<void> {
+    await this.pool.query(
+      `DELETE FROM health_records WHERE id IN (SELECT id FROM health_records ORDER BY created_at ASC LIMIT GREATEST(0, (SELECT COUNT(*) FROM health_records) - $1))`,
+      [maxRows]
+    );
+  }
+
+  async getAlertState(key: string): Promise<AlertState | null> {
+    const result = await this.pool.query('SELECT * FROM alert_state WHERE alert_key = $1', [key]);
+    return result.rows[0] ?? null;
+  }
+
+  async upsertAlertState(state: AlertState): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO alert_state (alert_key, status, last_notified_at, first_triggered_at, severity, message) VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (alert_key) DO UPDATE SET status = $2, last_notified_at = $3, first_triggered_at = $4, severity = $5, message = $6`,
+      [state.alert_key, state.status, state.last_notified_at, state.first_triggered_at, state.severity, state.message]
+    );
+  }
+
+  async getOpsConfig(): Promise<OpsConfig | null> {
+    const result = await this.pool.query("SELECT data FROM settings WHERE tenant_id = (SELECT id FROM tenants ORDER BY created_at LIMIT 1)");
+    if (!result.rows[0]) return null;
+    const data = typeof result.rows[0].data === 'string' ? JSON.parse(result.rows[0].data) : result.rows[0].data;
+    return data?.ops_config ?? null;
+  }
+
+  async saveOpsConfig(config: OpsConfig): Promise<void> {
+    const tenantResult = await this.pool.query('SELECT id FROM tenants ORDER BY created_at LIMIT 1');
+    const tenantId = tenantResult.rows[0]?.id;
+    if (!tenantId) return;
+    const settingsResult = await this.pool.query('SELECT data FROM settings WHERE tenant_id = $1', [tenantId]);
+    let data: any = {};
+    if (settingsResult.rows[0]) {
+      data = typeof settingsResult.rows[0].data === 'string' ? JSON.parse(settingsResult.rows[0].data) : settingsResult.rows[0].data;
+    }
+    data.ops_config = config;
+    await this.pool.query(
+      `INSERT INTO settings (tenant_id, id, data) VALUES ($1, 1, $2)
+       ON CONFLICT (tenant_id, id) DO UPDATE SET data = $2`,
+      [tenantId, JSON.stringify(data)]
+    );
   }
 
   // ==================== Connection ====================

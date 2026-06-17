@@ -109,8 +109,8 @@ export interface AdminUser {
   id: string;
   tenant_id: string;
   email: string;
-password_hash: string;
-token_version: number;
+  password_hash: string;
+  token_version: number;
 }
 
 export interface CreateUserInput {
@@ -142,23 +142,108 @@ export interface CreateAccessCodeInput {
   nickname: string;
 }
 
+// ==================== Ops Types ====================
+
+export interface BackupRecord {
+  id: string;
+  filename: string;
+  size_bytes: number | null;
+  status: 'success' | 'failed';
+  error_message: string | null;
+  checksum: string | null;
+  created_at: string;
+  triggered_by: string;
+}
+
+export interface HealthSnapshot {
+  timestamp: number;
+  disk: { usedPercent: number; totalBytes: number; freeBytes: number };
+  memory: { usedPercent: number; totalBytes: number; freeBytes: number };
+  swap: { usedPercent: number; totalBytes: number; freeBytes: number };
+  postgres: { alive: boolean; latencyMs: number };
+  backup: {
+    lastSuccessAt: number | null;
+    lastStatus: 'success' | 'failed' | null;
+    hoursSinceLastSuccess: number | null;
+  };
+  alerts: AlertItem[];
+}
+
+export interface AlertItem {
+  alertKey: string;
+  severity: 'critical' | 'warning';
+  message: string;
+  triggeredAt: number;
+}
+
+export interface AlertState {
+  alert_key: string;
+  status: 'normal' | 'alerting';
+  last_notified_at: string | null;
+  first_triggered_at: string | null;
+  severity: 'critical' | 'warning';
+  message: string;
+}
+
+export interface HealthRecord {
+  id: string;
+  created_at: string;
+  event_type: 'alert_triggered' | 'alert_recovered';
+  alert_key: string;
+  severity: 'critical' | 'warning';
+  snapshot_json: string;
+  message: string;
+}
+
+export interface OpsConfig {
+  backup: {
+    enabled: boolean;
+    schedule: string;
+    retentionCount: number;
+    backupDir: string;
+  };
+  monitor: {
+    enabled: boolean;
+    intervalSeconds: number;
+    thresholds: {
+      diskCriticalPercent: number;
+      backupStaleHours: number;
+    };
+  };
+  alert: {
+    suppressWindowMinutes: number;
+    smtp: SmtpConfig | null;
+  };
+}
+
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  password: string;
+  from: string;
+  to: string;
+  enabled: boolean;
+}
+
 // ==================== IDatabase 接口 ====================
 
 export interface IDatabase {
-close(): Promise<void>;
-getFullData(tenantId?: string): Promise<FullDataSnapshot>;
-importFullData(data: any, tenantId?: string): Promise<void>;
-addNotification(text: string, createdAt?: number, tenantId?: string): Promise<string>;
-getPendingNotifications(tenantId?: string): Promise<NotificationItem[]>;
-consumeNotifications(ids: string[], tenantId?: string): Promise<void>;
-getPointsBalance(tenantId?: string): Promise<number>;
-updatePoints(action: 'earn' | 'spend', amount: number, detail: string, tenantId?: string): Promise<number>;
-patchPoints(delta: { earn?: number; spend?: number; detail?: string }, tenantId?: string): Promise<number>;
-getHomeworks(dateKey: string, tenantId?: string): Promise<any[]>;
-saveHomeworks(dateKey: string, items: any[], tenantId?: string): Promise<void>;
-moveHomework(fromDate: string, toDate: string, hwId: string, tenantId?: string): Promise<any | null>;
-getHomeworkById(id: string, tenantId?: string): Promise<any | null>;
-putHomework(id: string, data: any, tenantId?: string): Promise<void>;
+  close(): Promise<void>;
+  getFullData(tenantId?: string): Promise<FullDataSnapshot>;
+  importFullData(data: any, tenantId?: string): Promise<void>;
+  addNotification(text: string, createdAt?: number, tenantId?: string): Promise<string>;
+  getPendingNotifications(tenantId?: string): Promise<NotificationItem[]>;
+  consumeNotifications(ids: string[], tenantId?: string): Promise<void>;
+  getPointsBalance(tenantId?: string): Promise<number>;
+  updatePoints(action: 'earn' | 'spend', amount: number, detail: string, tenantId?: string): Promise<number>;
+  patchPoints(delta: { earn?: number; spend?: number; detail?: string }, tenantId?: string): Promise<number>;
+  getHomeworks(dateKey: string, tenantId?: string): Promise<any[]>;
+  saveHomeworks(dateKey: string, items: any[], tenantId?: string): Promise<void>;
+  moveHomework(fromDate: string, toDate: string, hwId: string, tenantId?: string): Promise<any | null>;
+  getHomeworkById(id: string, tenantId?: string): Promise<any | null>;
+  putHomework(id: string, data: any, tenantId?: string): Promise<void>;
   patchHomework(id: string, fields: any, tenantId?: string): Promise<void>;
   deleteHomework(id: string, tenantId?: string): Promise<void>;
   getSettlement(dateKey: string, tenantId?: string): Promise<any>;
@@ -231,4 +316,19 @@ putHomework(id: string, data: any, tenantId?: string): Promise<void>;
   getAccessCodeById(id: string): Promise<AccessCodeRecord | null>;
   regenerateAccessCode(id: string, userId: string): Promise<string>;
   deleteAccessCode(id: string, userId: string): Promise<void>;
+
+  // ==================== Ops Methods ====================
+  insertBackupRecord(record: BackupRecord): Promise<void>;
+  listBackupRecords(limit: number): Promise<BackupRecord[]>;
+  getBackupRecord(id: string): Promise<BackupRecord | null>;
+  deleteBackupRecord(id: string): Promise<void>;
+  deleteBackupRecordsOlderThan(count: number): Promise<BackupRecord[]>;
+  getLatestBackupRecord(): Promise<BackupRecord | null>;
+  insertHealthRecord(record: HealthRecord): Promise<void>;
+  listHealthRecords(limit: number): Promise<HealthRecord[]>;
+  pruneHealthRecords(maxRows: number): Promise<void>;
+  getAlertState(key: string): Promise<AlertState | null>;
+  upsertAlertState(state: AlertState): Promise<void>;
+  getOpsConfig(): Promise<OpsConfig | null>;
+  saveOpsConfig(config: OpsConfig): Promise<void>;
 }

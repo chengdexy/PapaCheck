@@ -211,6 +211,16 @@ def cloud_publish(server_ip, server_user):
         print('✗')
         print('  云端构建超时（npm ci 或 systemctl 耗时过长）')
         return False
+
+    # 检查备份目录
+    try:
+        _run_with_timeout(
+            ['ssh', '-o', 'StrictHostKeyChecking=accept-new',
+             f'{server_user}@{server_ip}',
+             'test -d /var/backups/papacheck || echo "WARNING: 备份目录 /var/backups/papacheck 不存在"'],
+            10)
+    except Exception:
+        pass  # 非关键检查，失败不中止
     print('✓')
 
     print()

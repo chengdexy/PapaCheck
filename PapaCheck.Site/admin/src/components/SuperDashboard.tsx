@@ -1,5 +1,6 @@
 import { useAuth } from '../hooks/useAuth';
 import TenantTable from './TenantTable';
+import SystemHealth from './SystemHealth';
 
 export default function SuperDashboard() {
   const { logout } = useAuth();
@@ -14,6 +15,7 @@ export default function SuperDashboard() {
         <h3 className="text-sm font-medium text-zinc-500 mb-4">所有家庭</h3>
         <TenantTable />
       </section>
+      <SystemHealth />
     </div>
   );
 }

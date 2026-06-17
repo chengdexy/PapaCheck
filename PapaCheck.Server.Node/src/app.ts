@@ -18,6 +18,8 @@ import { authRoutes } from './auth/routes.js';
 import { adminRoutes } from './admin/routes.js';
 import { superAdminRoutes } from './auth/super-admin-routes.js';
 import { ensureSuperAdmin } from './auth/super-admin.js';
+import { OpsScheduler } from './ops/ops-scheduler.js';
+import { opsRoutes } from './routes/ops-routes.js';
 import rateLimit from '@fastify/rate-limit';
 
 export interface AppOptions {
@@ -223,6 +225,17 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     await authRoutes(app, db);
     await adminRoutes(app, db);
     await superAdminRoutes(app, db);
+
+    // Phase 5d: Ops scheduler + routes
+    const scheduler = new OpsScheduler();
+    scheduler.start(db);
+    app.decorate('opsScheduler', scheduler);
+    await opsRoutes(app, db, scheduler);
+
+    // Graceful shutdown for scheduler
+    app.addHook('onClose', async () => {
+      scheduler.stop();
+    });
 
     // Try to create super admin on startup
     try {

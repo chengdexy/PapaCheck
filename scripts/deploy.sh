@@ -32,5 +32,8 @@ ssh "$SERVER" "
   echo '✅ 部署完成'
 "
 
-echo "=== 5. 清理 ==="
+echo "=== 5. 创建备份目录 ==="
+ssh "$SERVER" "sudo mkdir -p /var/backups/papacheck && sudo chown -R papacheck:papacheck /var/backups/papacheck && sudo chmod 700 /var/backups/papacheck"
+
+echo "=== 6. 清理 ==="
 rm /tmp/papacheck.tar.gz

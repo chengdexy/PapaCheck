@@ -15,6 +15,7 @@ StandardOutput=journal
 StandardError=journal
 Environment=NODE_ENV=production
 Environment=DATABASE_URL=postgresql://papacheck:${PG_PASSWORD}@localhost:5432/papacheck
+Environment=ENCRYPTION_KEY=${ENCRYPTION_KEY}
 LimitNOFILE=65536
 
 [Install]

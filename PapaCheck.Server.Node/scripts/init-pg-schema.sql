@@ -53,6 +53,38 @@ CREATE TABLE IF NOT EXISTS points (
   PRIMARY KEY (tenant_id, id)
 );
 
+-- ==================== Ops Tables ====================
+
+CREATE TABLE IF NOT EXISTS backup_records (
+  id UUID PRIMARY KEY,
+  filename TEXT NOT NULL,
+  size_bytes BIGINT,
+  status TEXT NOT NULL CHECK (status IN ('success', 'failed')),
+  error_message TEXT,
+  checksum TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  triggered_by TEXT NOT NULL DEFAULT 'scheduler'
+);
+
+CREATE TABLE IF NOT EXISTS health_records (
+  id UUID PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  event_type TEXT NOT NULL CHECK (event_type IN ('alert_triggered', 'alert_recovered')),
+  alert_key TEXT NOT NULL,
+  severity TEXT NOT NULL CHECK (severity IN ('critical', 'warning')),
+  snapshot_json TEXT NOT NULL DEFAULT '{}',
+  message TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS alert_state (
+  alert_key TEXT PRIMARY KEY,
+  status TEXT NOT NULL DEFAULT 'normal' CHECK (status IN ('normal', 'alerting')),
+  last_notified_at TIMESTAMPTZ,
+  first_triggered_at TIMESTAMPTZ,
+  severity TEXT NOT NULL DEFAULT 'critical' CHECK (severity IN ('critical', 'warning')),
+  message TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS points_history (
   tenant_id UUID NOT NULL,
   id SERIAL,

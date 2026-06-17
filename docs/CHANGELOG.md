@@ -6,6 +6,16 @@
 
 ## [Unreleased]
 
+### Added
+- **Phase 5d 运维增强**：PostgreSQL 自动备份（每日 03:00，保留 3 份）+ 健康监控（磁盘/PG/备份状态，每 5 分钟）+ 邮件告警（状态机去重 30 分钟抑制窗口，SMTP 配置）。新增 13 个 TDD 测试，全量 657 测试通过
+- **超管面板系统健康页面**：磁盘/内存/Swap 使用率卡片、PostgreSQL 状态、备份管理（列表/下载/手动触发）、告警历史、运维配置编辑 Modal（阈值/SMTP）
+- **SMTP 密码 AES-256-GCM 加密**：通过 `ENCRYPTION_KEY` 环境变量加密存储，面板返回时自动掩码为 `***`
+- **7 个运维 API 端点**：`/api/ops/health`、`/api/ops/backups`、`/api/ops/backups/:id/download`、`/api/ops/backups/trigger`、`/api/ops/config`（GET/PUT）、`/api/ops/config/smtp/test`
+
+### Changed
+- **部署脚本更新**：`deploy.sh` 新增备份目录创建步骤，`release.py` 新增备份目录存在性检查
+- **systemd service**：新增 `ENCRYPTION_KEY` 环境变量
+
 ### Fixed
 - **修复家长/孩子访问码登录无限循环 Bug**：`auth/middleware.ts` 对所有角色统一用 `users.token_version` 验证 JWT，但 parent/child 的 JWT `token_version` 来自 `access_codes` 表。当用户账号改过密码（`users.token_version` 递增）后，parent/child 的 JWT `token_version < users.token_version` 被错误拒绝（401），导致 `/app/admin.html` 无限重定向到登录页。修复为按角色区分验证：parent/child 查 `access_codes.token_version`（通过 `member_id`），admin/user 查 `users.token_version`。新增 5 个 TDD 测试
 - **删除废弃的 `regenerateMemberHash` 和 `deactivateMember` 方法**：两个方法已无调用方，参数名沿用旧模型语义（`userId` 实为 access_code_id、`tenantId` 实为 user_id），SQL 绑定易误解。直接从 PG 和 SQLite 适配器中删除

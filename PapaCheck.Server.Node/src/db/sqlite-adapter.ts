@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
 import { DatabaseAdapter } from './adapter.js';
-import type { FullDataSnapshot, PointsHistoryEntry, ModifiedEntry, NotificationItem, AccessCodeRecord, CreateAccessCodeInput } from './types.js';
+import type { FullDataSnapshot, PointsHistoryEntry, ModifiedEntry, NotificationItem, AccessCodeRecord, CreateAccessCodeInput, BackupRecord, HealthRecord, AlertState, OpsConfig } from './types.js';
 import type { CRDTOperation } from '../crdt/types.js';
 
 /** date_key 表：以日期为主键，存储 JSON 数据 */
@@ -196,6 +196,36 @@ export class SqliteAdapter extends DatabaseAdapter {
         last_login TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY (user_id) REFERENCES users(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS backup_records (
+        id TEXT PRIMARY KEY,
+        filename TEXT NOT NULL,
+        size_bytes INTEGER,
+        status TEXT NOT NULL CHECK (status IN ('success', 'failed')),
+        error_message TEXT,
+        checksum TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        triggered_by TEXT NOT NULL DEFAULT 'scheduler'
+      );
+
+      CREATE TABLE IF NOT EXISTS health_records (
+        id TEXT PRIMARY KEY,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        event_type TEXT NOT NULL CHECK (event_type IN ('alert_triggered', 'alert_recovered')),
+        alert_key TEXT NOT NULL,
+        severity TEXT NOT NULL CHECK (severity IN ('critical', 'warning')),
+        snapshot_json TEXT NOT NULL DEFAULT '{}',
+        message TEXT NOT NULL DEFAULT ''
+      );
+
+      CREATE TABLE IF NOT EXISTS alert_state (
+        alert_key TEXT PRIMARY KEY,
+        status TEXT NOT NULL DEFAULT 'normal' CHECK (status IN ('normal', 'alerting')),
+        last_notified_at TEXT,
+        first_triggered_at TEXT,
+        severity TEXT NOT NULL DEFAULT 'critical' CHECK (severity IN ('critical', 'warning')),
+        message TEXT NOT NULL DEFAULT ''
       );
     `);
 
@@ -1488,6 +1518,79 @@ export class SqliteAdapter extends DatabaseAdapter {
 
   async setTenantActive(_tenantId: string, _isActive: boolean): Promise<void> {
     // SQLite 模式无操作
+  }
+
+  // ==================== Ops Methods ====================
+
+  async insertBackupRecord(record: BackupRecord): Promise<void> {
+    this.db.prepare(`INSERT INTO backup_records (id, filename, size_bytes, status, error_message, checksum, created_at, triggered_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      record.id, record.filename, record.size_bytes, record.status, record.error_message, record.checksum, record.created_at, record.triggered_by
+    );
+  }
+
+  async listBackupRecords(limit: number): Promise<BackupRecord[]> {
+    return this.db.prepare(`SELECT * FROM backup_records ORDER BY created_at DESC LIMIT ?`).all(limit) as BackupRecord[];
+  }
+
+  async getBackupRecord(id: string): Promise<BackupRecord | null> {
+    return (this.db.prepare(`SELECT * FROM backup_records WHERE id = ?`).get(id) as BackupRecord | null) ?? null;
+  }
+
+  async deleteBackupRecord(id: string): Promise<void> {
+    this.db.prepare(`DELETE FROM backup_records WHERE id = ?`).run(id);
+  }
+
+  async deleteBackupRecordsOlderThan(count: number): Promise<BackupRecord[]> {
+    const all = this.db.prepare(`SELECT * FROM backup_records WHERE status = 'success' ORDER BY created_at DESC`).all() as BackupRecord[];
+    if (all.length <= count) return [];
+    const toDelete = all.slice(count);
+    for (const r of toDelete) {
+      this.db.prepare(`DELETE FROM backup_records WHERE id = ?`).run(r.id);
+    }
+    return toDelete;
+  }
+
+  async getLatestBackupRecord(): Promise<BackupRecord | null> {
+    return (this.db.prepare(`SELECT * FROM backup_records ORDER BY created_at DESC LIMIT 1`).get() as BackupRecord | null) ?? null;
+  }
+
+  async insertHealthRecord(record: HealthRecord): Promise<void> {
+    this.db.prepare(`INSERT INTO health_records (id, created_at, event_type, alert_key, severity, snapshot_json, message) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+      record.id, record.created_at, record.event_type, record.alert_key, record.severity, record.snapshot_json, record.message
+    );
+  }
+
+  async listHealthRecords(limit: number): Promise<HealthRecord[]> {
+    return this.db.prepare(`SELECT * FROM health_records ORDER BY created_at DESC LIMIT ?`).all(limit) as HealthRecord[];
+  }
+
+  async pruneHealthRecords(maxRows: number): Promise<void> {
+    const count = (this.db.prepare(`SELECT COUNT(*) as c FROM health_records`).get() as { c: number }).c;
+    if (count > maxRows) {
+      const toDelete = count - maxRows;
+      this.db.prepare(`DELETE FROM health_records WHERE id IN (SELECT id FROM health_records ORDER BY created_at ASC LIMIT ?)`).run(toDelete);
+    }
+  }
+
+  async getAlertState(key: string): Promise<AlertState | null> {
+    return (this.db.prepare(`SELECT * FROM alert_state WHERE alert_key = ?`).get(key) as AlertState | null) ?? null;
+  }
+
+  async upsertAlertState(state: AlertState): Promise<void> {
+    this.db.prepare(`INSERT OR REPLACE INTO alert_state (alert_key, status, last_notified_at, first_triggered_at, severity, message) VALUES (?, ?, ?, ?, ?, ?)`).run(
+      state.alert_key, state.status, state.last_notified_at, state.first_triggered_at, state.severity, state.message
+    );
+  }
+
+  async getOpsConfig(): Promise<OpsConfig | null> {
+    const settings = await this.getSettings();
+    return settings?.ops_config ?? null;
+  }
+
+  async saveOpsConfig(config: OpsConfig): Promise<void> {
+    const settings = await this.getSettings();
+    settings.ops_config = config;
+    await this.saveSettings(settings);
   }
 
   // ==================== Connection ====================
