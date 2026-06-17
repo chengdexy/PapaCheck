@@ -2,6 +2,9 @@ import { totalmem, freemem, hostname } from 'node:os';
 import { statfs, readFile } from 'node:fs/promises';
 import type { IDatabase, HealthSnapshot, AlertItem, OpsConfig } from '../db/types.js';
 
+/** All possible alert keys that evaluateAlerts can generate */
+export const ALL_ALERT_KEYS = ['disk_high', 'postgres_down', 'backup_stale', 'backup_failed'] as const;
+
 /** Parse /proc/meminfo to get Swap info */
 async function getSwapInfo(): Promise<{ totalBytes: number; freeBytes: number; usedPercent: number }> {
     try {

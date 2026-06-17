@@ -121,12 +121,12 @@ export async function listBackups(db: IDatabase, limit: number = 20): Promise<Ba
 }
 
 /** Get backup file path with path traversal protection */
-export function getBackupFilePath(filename: string): string | null {
+export function getBackupFilePath(filename: string, backupDir?: string): string | null {
   if (!FILENAME_REGEX.test(filename)) return null;
-  const backupDir = BACKUP_DIR_DEFAULT;
-  const fullPath = resolve(join(backupDir, filename));
-  // Ensure resolved path is still within backupDir
-  if (!fullPath.startsWith(resolve(backupDir))) return null;
+  const dir = backupDir ?? BACKUP_DIR_DEFAULT;
+  const fullPath = resolve(join(dir, filename));
+  // Ensure resolved path is still within dir
+  if (!fullPath.startsWith(resolve(dir))) return null;
   if (!existsSync(fullPath)) return null;
   return fullPath;
 }
@@ -134,10 +134,10 @@ export function getBackupFilePath(filename: string): string | null {
 /** Prune old backups, keeping only the most recent `retentionCount` successful ones */
 export async function pruneOldBackups(db: IDatabase, retentionCount: number): Promise<number> {
   const deleted = await db.deleteBackupRecordsOlderThan(retentionCount);
+  const opsConfig: OpsConfig | null = await db.getOpsConfig();
+  const backupDir = opsConfig?.backup?.backupDir ?? BACKUP_DIR_DEFAULT;
   let removedCount = 0;
   for (const record of deleted) {
-    const opsConfig: OpsConfig | null = await db.getOpsConfig();
-    const backupDir = opsConfig?.backup?.backupDir ?? BACKUP_DIR_DEFAULT;
     const filePath = join(backupDir, record.filename);
     try {
       await unlink(filePath);

@@ -1,6 +1,7 @@
 import { randomUUID, createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import nodemailer from 'nodemailer';
 import type { IDatabase, HealthSnapshot, AlertItem, AlertState, SmtpConfig, OpsConfig } from '../db/types.js';
+import { ALL_ALERT_KEYS } from './monitor.js';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -55,11 +56,12 @@ export async function sendAlertEmail(
     const now = new Date().toISOString();
     const severity = snapshot.alerts.find(a => a.alertKey === alertKey)?.severity ?? 'unknown';
 
-    await transport.sendMail({
-        from: smtp.from,
-        to: smtp.to,
-        subject: `[PapaCheck] 告警: ${alertKey}`,
-        html: `
+    try {
+        await transport.sendMail({
+            from: smtp.from,
+            to: smtp.to,
+            subject: `[PapaCheck] 告警: ${alertKey}`,
+            html: `
       <h2>PapaCheck 运维告警</h2>
       <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse">
         <tr><td>告警项</td><td>${alertKey}</td></tr>
@@ -73,7 +75,10 @@ export async function sendAlertEmail(
       </table>
       <p><a href="https://papacheck.chengdexy.cn/admin/">查看管理面板</a></p>
     `,
-    });
+        });
+    } finally {
+        transport.close();
+    }
 }
 
 /** Process alerts: evaluate state machine and trigger emails */
@@ -139,9 +144,8 @@ export async function processAlerts(
 
     // Check for recovered alerts
     const currentAlertKeys = new Set(snapshot.alerts.map(a => a.alertKey));
-    const allStateKeys = ['disk_high', 'postgres_down', 'backup_stale', 'backup_failed'];
 
-    for (const key of allStateKeys) {
+    for (const key of ALL_ALERT_KEYS) {
         if (currentAlertKeys.has(key)) continue;
         const existingState = await db.getAlertState(key);
         if (existingState && existingState.status === 'alerting') {
@@ -210,10 +214,14 @@ export async function sendDailyReport(
   `;
 
   const transport = createTransport(smtp);
-  await transport.sendMail({
-    from: smtp.from,
-    to: smtp.to,
-    subject: `[PapaCheck] 每日运维报告 ${new Date().toLocaleDateString('zh-CN')}`,
-    html,
-  });
+  try {
+      await transport.sendMail({
+          from: smtp.from,
+          to: smtp.to,
+          subject: `[PapaCheck] 每日运维报告 ${new Date().toLocaleDateString('zh-CN')}`,
+          html,
+      });
+  } finally {
+      transport.close();
+  }
 }

@@ -3,8 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { mockCreateTransport, mockSendMail } = vi.hoisted(() => {
     const sendMail = vi.fn(async () => ({}));
     const verify = vi.fn(async () => true);
+    const close = vi.fn();
     return {
-        mockCreateTransport: vi.fn(() => ({ sendMail, verify })),
+        mockCreateTransport: vi.fn(() => ({ sendMail, verify, close })),
         mockSendMail: sendMail,
     };
 });

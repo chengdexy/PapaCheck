@@ -68,7 +68,9 @@ export async function opsRoutes(app: FastifyInstance, db: IDatabase, scheduler: 
             return reply.status(404).send({ error: '备份记录不存在', code: 'NOT_FOUND' });
         }
 
-        const filePath = getBackupFilePath(record.filename);
+        const opsConfig = await db.getOpsConfig();
+        const backupDir = opsConfig?.backup?.backupDir;
+        const filePath = getBackupFilePath(record.filename, backupDir);
         if (!filePath) {
             return reply.status(400).send({ error: '备份文件不存在或文件名无效', code: 'VALIDATION_ERROR' });
         }
