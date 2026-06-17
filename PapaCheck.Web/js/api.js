@@ -580,7 +580,7 @@ const API = {
             return true;
           } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
         }
-        return false;
+        return true;
       },
       { allowFallback: true }
     );
@@ -608,7 +608,7 @@ const API = {
             return true;
           } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
         }
-        return false;
+        return true;
       },
       { allowFallback: true }
     );
