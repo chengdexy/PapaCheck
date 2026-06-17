@@ -272,12 +272,13 @@ function updateBigScreen() {
         _calculatingSettlement: typeof _calculatingSettlement !== 'undefined' ? _calculatingSettlement : 'N/A'
       });
       // 防御重算：如果 window._settlement 有数据但条件未通过，强制显示结算页
-      if (window._settlement && window._settlement.dailyBase !== undefined) {
+      // 注意：已查看过评级的结算不再强制显示，否则孩子点击"回到首页"后会被拉回结算页
+      if (window._settlement && window._settlement.dailyBase !== undefined && !settlement?.viewedAt) {
         console.warn('[Settlement] 防御触发: window._settlement 存在但未显示, 强制显示');
         updateSettlementPage();
         return;
       }
-      if (!_calculatingSettlement) {
+      if (!_calculatingSettlement && !settlement?.viewedAt) {
         console.warn('[Settlement] 防御触发: 触发重新计算');
         calculateSettlement();
         return;

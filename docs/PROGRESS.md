@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-17（Phase 5d 运维增强完成）
+> 最后更新：2026-06-17（修复孩子端评级后"回到首页"按钮无效）
 
 ## 当前版本
 
@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-17 | **修复孩子端评级后"回到首页"按钮无效**：`updateBigScreen()` 防御块在 `forceMainPage = true` 时仍强制显示结算页，导致孩子点击"回到首页"后立即被拉回评级页。修复为已查看过评级的结算（`viewedAt` 已设置）不再强制显示。全量 657 测试通过 |
 | 2026-06-17 | **代码审查修复 4 个 Issue + pruneOldBackups/runBackup 路径遍历防护**：`getBackupFilePath` 从硬编码改为读取配置（修复非默认备份目录下载失败）；`allStateKeys` 硬编码改为 `ALL_ALERT_KEYS` 共享常量；SMTP transport 添加 `close()` 修复连接泄漏；`pruneOldBackups` 循环内 `getOpsConfig()` 提升到循环外 + 文件删除改用 `getBackupFilePath()` 校验路径；`runBackup` 抽取 `resolveBackupPath()` 统一路径防护；全量 657 测试通过 |
 | 2026-06-17 | **Phase 5d 运维增强完成**：PostgreSQL 自动备份（每日 03:00，保留 3 份）+ 健康监控（磁盘/PG/备份状态，每 5 分钟）+ 邮件告警（状态机去重，SMTP 配置面板）+ 超管面板系统健康页面。新增 13 个 TDD 测试，全量 657 测试通过。部署脚本新增备份目录创建，systemd 新增 ENCRYPTION_KEY |
 | 2026-06-17 | **修复家长访问码登录无限循环 Bug**：`auth/middleware.ts` 对 parent/child 角色错误地用 `users.token_version` 验证 JWT（应查 `access_codes.token_version`）。当用户账号改过密码（users.token_version=4）后，家长 JWT（token_version=2）被错误拒绝 401，导致 `/app/admin.html` 无限重定向。修复为按角色区分验证：parent/child 通过 `member_id` 查 `access_codes` 表，admin/user 查 `users` 表。新增 5 个 TDD 测试，全量 644 测试通过；生产环境验证家长"爸爸"访问码 QWSWCn 登录 + /api/data 返回 200 |
