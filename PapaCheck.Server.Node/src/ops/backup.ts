@@ -138,7 +138,8 @@ export async function pruneOldBackups(db: IDatabase, retentionCount: number): Pr
   const backupDir = opsConfig?.backup?.backupDir ?? BACKUP_DIR_DEFAULT;
   let removedCount = 0;
   for (const record of deleted) {
-    const filePath = join(backupDir, record.filename);
+    const filePath = getBackupFilePath(record.filename, backupDir);
+    if (!filePath) continue;
     try {
       await unlink(filePath);
       removedCount++;

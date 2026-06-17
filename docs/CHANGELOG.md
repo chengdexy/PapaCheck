@@ -26,6 +26,7 @@
 - **修复测试 mock DB 缺少 `updateAccessCodeLastLogin` 方法**：4 个测试文件的 mockDb 未实现新接口，调用时抛 TypeError，exchange 端点返回 500
 - **修复 release.py site_publish 第 2 步卡死**：`site_publish` 的 SSH `mkdir` 和 `scp -r dist/*` 缺少超时保护，且 `dist/*` glob 在 Windows PowerShell 下不展开导致永久卡住；改为 tar 打包+SSH 管道解压替代 SCP glob，所有命令加超时和 `UserKnownHostsFile=NUL`
 - **代码审查修复 4 个 Issue**：备份下载 `getBackupFilePath` 硬编码路径改为从配置读取（修复非默认备份目录下载失败）；告警恢复检测 `allStateKeys` 硬编码改为共享常量 `ALL_ALERT_KEYS`（消除新增告警类型时 drift 风险）；`sendAlertEmail`/`sendDailyReport` 添加 `transport.close()`（修复 SMTP 连接泄漏）；`pruneOldBackups` 将 `getOpsConfig()` 提升到循环外（消除 N 次冗余查询）
+- **pruneOldBackups 路径遍历防护**：改用 `getBackupFilePath()` 替代裸 `join()`，增加文件名格式校验和路径遍历防护
 
 ### Added
 - **访问码最后登录时间**：`access_codes` 表新增 `last_login` 列，`POST /api/auth/exchange` 时自动记录；管理面板成员列表"最后登录"列显示实际时间，不再始终显示"从未"

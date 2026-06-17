@@ -200,7 +200,7 @@ describe('backup module', () => {
     const db = createMockDb();
     for (let i = 0; i < 4; i++) {
       await db.insertBackupRecord({
-        id: crypto.randomUUID(), filename: `papacheck-20260101-0000${i}.sql.gz`, size_bytes: 100,
+        id: crypto.randomUUID(), filename: `papacheck-20260101-00000${i}.sql.gz`, size_bytes: 100,
         status: 'success', error_message: null, checksum: null,
         created_at: `2026-01-01T00:00:0${i}Z`, triggered_by: 'scheduler',
       });
