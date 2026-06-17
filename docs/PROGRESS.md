@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-17（release.py site_publish 超时保护 + SCP glob 修复）
+> 最后更新：2026-06-17（修复家长访问码登录无限循环 Bug）
 
 ## 当前版本
 
-**v1.4.0-beta**（数据库迁移清理，639 测试）
+**v1.4.0-beta**（数据库迁移清理，644 测试）
 
 ## 部署状态
 
@@ -88,7 +88,7 @@
 
 | 日期 | 变更 |
 |------|------|
-| 2026-06-17 | **删除废弃的 `regenerateMemberHash`/`deactivateMember`**：两方法已无调用方，参数名易误解，从 PG 和 SQLite 适配器中删除 |
+| 2026-06-17 | **修复家长访问码登录无限循环 Bug**：`auth/middleware.ts` 对 parent/child 角色错误地用 `users.token_version` 验证 JWT（应查 `access_codes.token_version`）。当用户账号改过密码（users.token_version=4）后，家长 JWT（token_version=2）被错误拒绝 401，导致 `/app/admin.html` 无限重定向。修复为按角色区分验证：parent/child 通过 `member_id` 查 `access_codes` 表，admin/user 查 `users` 表。新增 5 个 TDD 测试，全量 644 测试通过；生产环境验证家长"爸爸"访问码 QWSWCn 登录 + /api/data 返回 200 |
 | 2026-06-17 | **代码审查修复 3 个 Issue**：`deactivateMember` 参数颠倒 + 引用已删列修复（SQLite+PG 对齐）；`regenerateMemberHash` 弃用标注并指向 `access_codes`；移除测试中残留的 `console.log` |
 | 2026-06-17 | **修复 SQLite 适配器 + 速率限制 429**：SQLite `users` 表结构对齐 PG；修复 `errorResponseBuilder` 缺少 `statusCode` 导致限流返回 500；修复 4 个测试 mock DB 缺少 `updateAccessCodeLastLogin`。全量 639 测试通过 |
 | 2026-06-17 | **修复 release.py site_publish 卡死**：`site_publish` 第 2 步缺少超时保护且 `scp -r dist/*` glob 在 Windows PowerShell 下不展开导致永久卡住；改为 tar 打包+SSH 管道解压，加超时和 `UserKnownHostsFile=NUL`；全量测试通过 |

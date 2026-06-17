@@ -110,6 +110,7 @@ describe('Auth Refactor — 认证体系重构测试', () => {
         type: 'parent',
         code_hash: bcrypt.hashSync('ABC123', 10),
         nickname: '妈妈',
+        token_version: 1,
         created_at: '2024-01-01T00:00:00.000Z',
       },
     ];
@@ -538,9 +539,11 @@ describe('Auth Refactor — 认证体系重构测试', () => {
     // Scenario: parent 子账号不能管理成员
     it('parent 角色（通过访问码登录）不能管理成员', async () => {
       // 构造一个 parent 角色的 JWT（模拟通过访问码登录获得的 token）
+      // 真实 /api/auth/exchange 签发的 token 一定包含 member_id（access_code id）
       const parentToken = signToken({
-        sub: 'parent-user-001',
+        sub: 'user-001',
         tenant_id: 'tenant-001',
+        member_id: 'code-001',
         role: 'parent',
         token_version: 1,
       });

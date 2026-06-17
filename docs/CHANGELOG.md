@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Fixed
+- **修复家长/孩子访问码登录无限循环 Bug**：`auth/middleware.ts` 对所有角色统一用 `users.token_version` 验证 JWT，但 parent/child 的 JWT `token_version` 来自 `access_codes` 表。当用户账号改过密码（`users.token_version` 递增）后，parent/child 的 JWT `token_version < users.token_version` 被错误拒绝（401），导致 `/app/admin.html` 无限重定向到登录页。修复为按角色区分验证：parent/child 查 `access_codes.token_version`（通过 `member_id`），admin/user 查 `users.token_version`。新增 5 个 TDD 测试
 - **删除废弃的 `regenerateMemberHash` 和 `deactivateMember` 方法**：两个方法已无调用方，参数名沿用旧模型语义（`userId` 实为 access_code_id、`tenantId` 实为 user_id），SQL 绑定易误解。直接从 PG 和 SQLite 适配器中删除
 - **修复 `deactivateMember` 和 `regenerateMemberHash` 引用已删除的列**：两个方法引用了 `users.tenant_id`/`access_hash`（已删除），PG 和 SQLite 中均会报 column-not-found 错误。且 `deactivateMember` 参数顺序颠倒、SQLite 版误改为 `DELETE FROM access_codes`。已统一修复为正确的 `UPDATE users` 或指向 `access_codes` 表，标注废弃
 - **移除测试文件中的调试 `console.log`**

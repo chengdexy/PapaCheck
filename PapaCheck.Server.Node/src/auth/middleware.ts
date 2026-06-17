@@ -47,8 +47,22 @@ export async function authMiddleware(app: FastifyInstance, opts: { db: IDatabase
     }
 
     // 检查 token_version 是否匹配（token 是否被吊销）
+    // 注意：parent/child 的 JWT token_version 来自 access_codes 表，
+    // admin/user 的来自 users 表，必须按角色分别查询，避免跨表比较。
     try {
-      const currentTokenVersion = await db.queryUserTokenVersion(payload.sub);
+      let currentTokenVersion: number;
+      if (payload.role === 'parent' || payload.role === 'child') {
+        // parent/child：通过 member_id（access_code id）查询 access_codes 表的 token_version
+        const memberId = payload.member_id ?? payload.sub;
+        const accessCode = await db.getAccessCodeById(memberId);
+        if (!accessCode) {
+          return reply.status(401).send({ error: '访问码不存在或已删除', code: 'SESSION_EXPIRED' });
+        }
+        currentTokenVersion = accessCode.token_version;
+      } else {
+        // admin/user：查询 users 表的 token_version
+        currentTokenVersion = await db.queryUserTokenVersion(payload.sub);
+      }
       if (payload.token_version < currentTokenVersion) {
         return reply.status(401).send({ error: '认证已过期，请重新登录', code: 'SESSION_EXPIRED' });
       }

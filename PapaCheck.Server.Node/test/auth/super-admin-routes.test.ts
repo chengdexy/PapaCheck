@@ -188,7 +188,15 @@ describe('Super Admin Routes', () => {
     createAccessCode: async () => 'code-id',
     getAccessCodesByUser: async () => [],
     findAccessCodeByCode: async () => null,
-    getAccessCodeById: async () => null,
+    getAccessCodeById: async (id: string) => ({
+      id,
+      user_id: 'parent-001',
+      type: 'parent' as const,
+      code_hash: 'hash',
+      nickname: 'test-parent',
+      token_version: 1,
+      created_at: '2024-01-01T00:00:00.000Z',
+    }),
     regenerateAccessCode: async () => 'new-code',
     deleteAccessCode: async () => {},
     getAllTenants: async () => storedTenants,
@@ -252,6 +260,7 @@ describe('Super Admin Routes', () => {
     const parentToken = signToken({
       sub: 'parent-001',
       tenant_id: 'tenant-001',
+      member_id: 'parent-member-001',
       role: 'parent',
       token_version: 1,
     });
@@ -356,6 +365,7 @@ describe('Super Admin Routes', () => {
     const childToken = signToken({
       sub: 'child-001',
       tenant_id: 'tenant-001',
+      member_id: 'child-member-001',
       role: 'child',
       token_version: 1,
     });
@@ -415,6 +425,7 @@ describe('Super Admin Routes', () => {
     const parentToken = signToken({
       sub: 'parent-001',
       tenant_id: 'tenant-001',
+      member_id: 'parent-member-001',
       role: 'parent',
       token_version: 1,
     });
