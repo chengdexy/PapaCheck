@@ -1,11 +1,14 @@
-var CACHE_NAME = 'papacheck-v3';
+var CACHE_NAME = 'papacheck-v4';
 
 var CORE_RESOURCES = [
   '/',
+  '/child',
+  '/parent',
   '/index.html',
   '/admin/',
   '/css/style.css',
   '/css/admin.css',
+  '/js/common.js',
   '/js/api.js',
   '/js/connection.js',
   '/js/app.js',

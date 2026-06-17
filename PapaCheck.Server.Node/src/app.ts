@@ -339,8 +339,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       const files = [
         'index.html', 'admin.html', 'sw.js', 'favicon.png',
         'css/style.css', 'css/admin.css',
-        'js/api.js', 'js/connection.js', 'js/app.js', 'js/big-screen.js',
-        'js/admin.js', 'js/await await await await db.js', 'js/change-log.js', 'js/crdt-sync.js', 'js/sync.js',
+        'js/api.js', 'js/connection.js', 'js/common.js', 'js/app.js', 'js/big-screen.js',
+        'js/admin.js', 'js/db.js', 'js/change-log.js', 'js/crdt-sync.js', 'js/sync.js',
       ];
       const hash = createHash('sha1');
       for (const f of files) {
