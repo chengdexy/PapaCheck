@@ -9,6 +9,7 @@
 | **Server (Python)** | Python 3 | `http.server`（标准库）、SQLite、`edge-tts` |
 | **Server (Node.js)** | Node.js 22+ | Fastify 5.x、better-sqlite3、TypeScript 5.x |
 | **Web 前端** | 原生 HTML/CSS/JS | `localforage`（本地存储）、Service Worker |
+| **Site（落地页+管理面板）** | Vite 5, React 18, TypeScript 5, Tailwind CSS 3 | Lucide Icons、Tailwind preset、React Router（可选） |
 | **Windows 桌面端** | Python + tkinter | PyInstaller、`pystray`、Pillow、`keyring` |
 | **Email 模块** | Python | IMAP4_SSL、LLM API（邮件内容解析） |
 | **Android 端** | Dart/Flutter | `webview_flutter`、`path_provider` |
@@ -83,6 +84,15 @@ PapaCheck/
 │   ├── css/                   # 样式
 │   ├── js/                    # 逻辑（app/admin/api/db/sync/connection）
 │   └── sw.js                  # Service Worker
+│
+├── PapaCheck.Site/            # [v1.4 整合] 落地页 + 管理面板（Vite 5 MPA）
+│   ├── index.html             # 落地页入口
+│   ├── admin/index.html       # 管理面板入口（Vite 第二入口）
+│   ├── public/imgs/mascot/    # 5 张吉祥物 PNG（wave/point/ok/thumbs/bye）
+│   ├── src/
+│   │   ├── landing/           # 落地页 React 应用（TopNav/Hero/Story/Features/Platforms/CtaFinal/Footer）
+│   │   └── admin/             # 管理面板 React 应用（AuthView/Dashboard/MemberTable/TenantTable/SystemHealth 等）
+│   └── vite.config.ts         # MPA 配置 + adminBaseRewrite/copyAdminAssets 自定义插件
 │
 ├── PapaCheck.Windows/         # Windows 桌面端
 │   ├── app_gui.py             # tkinter GUI（系统托盘、配置管理）

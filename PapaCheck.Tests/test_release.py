@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import io
 import tempfile
 import subprocess
 import argparse
@@ -641,3 +642,248 @@ class TestBetterSqlite3Rebuild:
             release.main()
             mock_check.assert_called_once()
             mock_rebuild.assert_not_called()
+
+
+class TestSitePublish:
+
+    # Feature: PapaCheck.Site 部署（Vite 合并构建）
+    #   Scenario: 在 PapaCheck.Site 根目录执行 npm run build
+    #     Given Vite 工程 PapaCheck.Site/（landing + admin 单工程）
+    #     When 调用 site_publish
+    #     Then 在 PapaCheck.Site/（不是 PapaCheck.Site/admin/）执行 npm run build
+    def test_site_publish_builds_at_site_root(self):
+        with tempfile.TemporaryDirectory() as project_root:
+            site_dir = os.path.join(project_root, 'PapaCheck.Site')
+            dist_dir = os.path.join(site_dir, 'dist')
+            os.makedirs(os.path.join(dist_dir, 'assets'))
+            os.makedirs(os.path.join(dist_dir, 'admin', 'assets'))
+            with open(os.path.join(dist_dir, 'index.html'), 'w') as f:
+                f.write('landing')
+            with open(os.path.join(dist_dir, 'assets', 'main-a.js'), 'w') as f:
+                f.write('main')
+            with open(os.path.join(dist_dir, 'admin', 'index.html'), 'w') as f:
+                f.write('admin')
+            with open(os.path.join(dist_dir, 'admin', 'assets', 'admin-a.js'), 'w') as f:
+                f.write('admin js')
+
+            with patch('release.subprocess.run') as mock_run, \
+                 patch('release._run_with_timeout') as mock_remote, \
+                 patch('release.shutil.rmtree') as mock_rm:
+                mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+                mock_remote.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+                release.site_publish('1.2.3.4', 'root',
+                                     project_root=project_root,
+                                     ssh_executor=lambda *a, **kw: subprocess.CompletedProcess(args=[], returncode=0),
+                                     cleanup_dist=False)
+
+                build_calls = [c for c in mock_run.call_args_list
+                               if c.kwargs.get('shell') and 'npm run build' in str(c.kwargs.get('args', c.args[0] if c.args else ''))]
+                assert build_calls, '应有 npm run build 调用'
+                assert build_calls[0].kwargs['cwd'] == site_dir, \
+                    f'npm run build 应在 {site_dir} 执行，实际 {build_calls[0].kwargs.get("cwd")}'
+
+    # Feature: PapaCheck.Site 部署（Vite 合并构建）
+    #   Scenario: landing 上传到 /opt/papacheck/PapaCheck.Site/，仅含主入口
+    #     Given Vite 构建产物 dist/{index.html, favicon.png, imgs/, assets/main-*, assets/refresh-*}
+    #     When 调用 site_publish
+    #     Then landing tar 包应上传到 /opt/papacheck/PapaCheck.Site/，包含 index.html + imgs/ + main-* + refresh-*，**不**包含 admin-*
+    def test_site_publish_landing_uploads_index_assets_imgs_skip_admin_chunks(self):
+        with tempfile.TemporaryDirectory() as project_root:
+            site_dir = os.path.join(project_root, 'PapaCheck.Site')
+            dist_dir = os.path.join(site_dir, 'dist')
+            os.makedirs(os.path.join(dist_dir, 'imgs'))
+            os.makedirs(os.path.join(dist_dir, 'assets'))
+            os.makedirs(os.path.join(dist_dir, 'admin', 'assets'))
+
+            # landing 用到的文件
+            with open(os.path.join(dist_dir, 'index.html'), 'w') as f:
+                f.write('<html>landing</html>')
+            with open(os.path.join(dist_dir, 'favicon.png'), 'wb') as f:
+                f.write(b'fav')
+            with open(os.path.join(dist_dir, 'imgs', 'logo.png'), 'wb') as f:
+                f.write(b'logo')
+            with open(os.path.join(dist_dir, 'assets', 'main-abc.js'), 'w') as f:
+                f.write('main js')
+            with open(os.path.join(dist_dir, 'assets', 'main-abc.css'), 'w') as f:
+                f.write('main css')
+            with open(os.path.join(dist_dir, 'assets', 'refresh-xyz.js'), 'w') as f:
+                f.write('refresh js')
+            # admin 专用 chunks（landing 目录中应排除）
+            with open(os.path.join(dist_dir, 'assets', 'admin-def.js'), 'w') as f:
+                f.write('admin js in landing')
+            with open(os.path.join(dist_dir, 'assets', 'admin-def.css'), 'w') as f:
+                f.write('admin css in landing')
+            # admin 整目录
+            with open(os.path.join(dist_dir, 'admin', 'index.html'), 'w') as f:
+                f.write('<html>admin</html>')
+            with open(os.path.join(dist_dir, 'admin', 'assets', 'admin-uvw.js'), 'w') as f:
+                f.write('admin js')
+
+            captured_tars = []
+            captured_cmds = []
+            def fake_ssh(*args, **kwargs):
+                if 'input' in kwargs and kwargs['input']:
+                    captured_tars.append((args[0][-1], kwargs['input']))
+                return subprocess.CompletedProcess(args=[], returncode=0)
+
+            with patch('release.subprocess.run') as mock_run, \
+                 patch('release._run_with_timeout', side_effect=fake_ssh), \
+                 patch('release.shutil.rmtree'):
+                mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+                release.site_publish('1.2.3.4', 'root',
+                                     project_root=project_root,
+                                     cleanup_dist=False)
+
+            # 通过 SSH 命令的 -C 路径区分 landing / admin tar
+            import tarfile as _tf
+            landing_tar = None
+            admin_tar = None
+            for cmd, blob in captured_tars:
+                if 'PapaCheck.Site/admin/' in cmd and 'tar xzf' in cmd:
+                    admin_tar = blob
+                elif 'PapaCheck.Site/' in cmd and 'tar xzf' in cmd and '/admin/' not in cmd:
+                    landing_tar = blob
+
+            assert landing_tar is not None, '应有一个 landing tar 包'
+            with _tf.open(fileobj=io.BytesIO(landing_tar), mode='r:gz') as t:
+                landing_names = t.getnames()
+            # landing 应包含
+            assert 'index.html' in landing_names
+            assert 'favicon.png' in landing_names
+            assert 'imgs/logo.png' in landing_names
+            assert 'assets/main-abc.js' in landing_names
+            assert 'assets/main-abc.css' in landing_names
+            assert 'assets/refresh-xyz.js' in landing_names
+            # landing **不**应包含 admin-* 文件
+            assert 'assets/admin-def.js' not in landing_names
+            assert 'assets/admin-def.css' not in landing_names
+            # landing **不**应包含 admin/ 子目录
+            assert not any(n.startswith('admin/') for n in landing_names)
+
+    # Feature: PapaCheck.Site 部署（Vite 合并构建）
+    #   Scenario: admin 整目录上传到 /opt/papacheck/PapaCheck.Site/admin/
+    #     Given Vite 构建产物 dist/admin/（index.html + assets/）
+    #     When 调用 site_publish
+    #     Then admin tar 包应上传到 /opt/papacheck/PapaCheck.Site/admin/，含 index.html + assets/*
+    def test_site_publish_admin_uploads_to_site_admin_dir(self):
+        with tempfile.TemporaryDirectory() as project_root:
+            site_dir = os.path.join(project_root, 'PapaCheck.Site')
+            dist_dir = os.path.join(site_dir, 'dist')
+            os.makedirs(os.path.join(dist_dir, 'imgs'))
+            os.makedirs(os.path.join(dist_dir, 'assets'))
+            os.makedirs(os.path.join(dist_dir, 'admin', 'assets'))
+
+            with open(os.path.join(dist_dir, 'index.html'), 'w') as f:
+                f.write('<html>landing</html>')
+            with open(os.path.join(dist_dir, 'assets', 'main-a.js'), 'w') as f:
+                f.write('main')
+            with open(os.path.join(dist_dir, 'admin', 'index.html'), 'w') as f:
+                f.write('<html>admin</html>')
+            with open(os.path.join(dist_dir, 'admin', 'assets', 'admin-b.js'), 'w') as f:
+                f.write('admin js')
+            with open(os.path.join(dist_dir, 'admin', 'assets', 'admin-b.css'), 'w') as f:
+                f.write('admin css')
+
+            ssh_calls = []
+            def fake_ssh(*args, **kwargs):
+                if 'input' in kwargs and kwargs['input']:
+                    ssh_calls.append((args, kwargs['input']))
+                return subprocess.CompletedProcess(args=[], returncode=0)
+
+            with patch('release.subprocess.run') as mock_run, \
+                 patch('release._run_with_timeout', side_effect=fake_ssh), \
+                 patch('release.shutil.rmtree'):
+                mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+                release.site_publish('1.2.3.4', 'root',
+                                     project_root=project_root,
+                                     cleanup_dist=False)
+
+            # 应有 tar 解压到 /opt/papacheck/PapaCheck.Site/admin/
+            admin_targets = [args[0][-1] for args, _ in ssh_calls
+                             if 'tar xzf' in args[0][-1] and 'PapaCheck.Site/admin' in args[0][-1]]
+            assert admin_targets, '应有 tar 解压到 PapaCheck.Site/admin/'
+            assert any('-C /opt/papacheck/PapaCheck.Site/admin/' in t for t in admin_targets), \
+                f'admin 应解压到 /opt/papacheck/PapaCheck.Site/admin/，实际: {admin_targets}'
+
+            # admin tar 内容
+            import tarfile as _tf
+            admin_tar_blob = None
+            for args, blob in ssh_calls:
+                cmd = args[0][-1]
+                if 'tar xzf' in cmd and 'PapaCheck.Site/admin' in cmd:
+                    admin_tar_blob = blob
+                    break
+            assert admin_tar_blob is not None
+            buf = io.BytesIO(admin_tar_blob)
+            with _tf.open(fileobj=buf, mode='r:gz') as t:
+                names = t.getnames()
+            assert 'index.html' in names
+            assert 'assets/admin-b.js' in names
+            assert 'assets/admin-b.css' in names
+
+    # Feature: PapaCheck.Site 部署（Vite 合并构建）
+    #   Scenario: 部署前在远端创建目标目录
+    #     Given 远端服务器 IP 和用户
+    #     When 调用 site_publish
+    #     Then 通过 SSH 在远端执行 mkdir -p /opt/papacheck/PapaCheck.Site/... 和 /opt/papacheck/PapaCheck.Site/admin
+    def test_site_publish_creates_remote_dirs(self):
+        with tempfile.TemporaryDirectory() as project_root:
+            site_dir = os.path.join(project_root, 'PapaCheck.Site')
+            dist_dir = os.path.join(site_dir, 'dist')
+            os.makedirs(os.path.join(dist_dir, 'assets'))
+            os.makedirs(os.path.join(dist_dir, 'admin', 'assets'))
+
+            with open(os.path.join(dist_dir, 'index.html'), 'w') as f:
+                f.write('landing')
+            with open(os.path.join(dist_dir, 'assets', 'main-a.js'), 'w') as f:
+                f.write('main')
+            with open(os.path.join(dist_dir, 'admin', 'index.html'), 'w') as f:
+                f.write('admin')
+            with open(os.path.join(dist_dir, 'admin', 'assets', 'admin-a.js'), 'w') as f:
+                f.write('admin js')
+
+            ssh_calls = []
+            def fake_ssh(*args, **kwargs):
+                ssh_calls.append(args[0][-1])
+                return subprocess.CompletedProcess(args=[], returncode=0)
+
+            with patch('release.subprocess.run') as mock_run, \
+                 patch('release._run_with_timeout', side_effect=fake_ssh), \
+                 patch('release.shutil.rmtree'):
+                mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+                release.site_publish('1.2.3.4', 'root',
+                                     project_root=project_root,
+                                     cleanup_dist=False)
+
+            mkdir_cmds = [c for c in ssh_calls if 'mkdir' in c]
+            # 应创建 landing 目标目录
+            assert any('/opt/papacheck/PapaCheck.Site' in c and 'mkdir' in c for c in mkdir_cmds), \
+                f'应创建 PapaCheck.Site 目标目录，实际 mkdir 命令: {mkdir_cmds}'
+
+    # Feature: PapaCheck.Site 部署（Vite 合并构建）
+    #   Scenario: 构建失败时立即返回 False，不继续部署
+    #     Given PapaCheck.Site/ 目录下 npm run build 失败
+    #     When 调用 site_publish
+    #     Then 返回 False 且**不**执行任何 SSH 上传
+    def test_site_publish_returns_false_when_build_fails(self):
+        with tempfile.TemporaryDirectory() as project_root:
+            site_dir = os.path.join(project_root, 'PapaCheck.Site')
+            os.makedirs(site_dir)
+
+            ssh_called = []
+            def fake_ssh(*args, **kwargs):
+                ssh_called.append(True)
+                return subprocess.CompletedProcess(args=[], returncode=0)
+
+            with patch('release.subprocess.run') as mock_run, \
+                 patch('release._run_with_timeout', side_effect=fake_ssh), \
+                 patch('release.shutil.rmtree'):
+                mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=1)
+                result = release.site_publish('1.2.3.4', 'root',
+                                              project_root=project_root,
+                                              ssh_executor=fake_ssh,
+                                              cleanup_dist=False)
+
+            assert result is False
+            assert ssh_called == [], f'构建失败时不应执行 SSH，实际: {ssh_called}'

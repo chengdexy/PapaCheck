@@ -385,6 +385,27 @@
 - CORS 头新增 PUT、PATCH、DELETE、HEAD 方法支持
 - 23 个新测试覆盖所有新增路由
 
+## [Unreleased - PapaCheck.Site 整合]
+
+### Added
+- **PapaCheck.Site 整合**：将落地页（landing）和管理面板（admin）合并到统一项目 `PapaCheck.Site`，使用 Vite 5 + React 18 + TypeScript 5 + Tailwind CSS 3 同一技术栈
+- **Vite 多页面（MPA）配置**：通过 `PapaCheck.Site/vite.config.ts` 的自定义插件 `adminBaseRewrite` + `copyAdminAssets`，实现落地页 `index.html` 和管理面板 `admin/index.html` 的统一构建
+- **落地页五大区块**：导航栏（TopNav）、Hero、Story 时间线、Features 功能区、Platforms 多端区、CTA 收尾、Footer
+- **吉祥物五态插画**：`mascot-wave`（Hero 招呼）、`mascot-point`（Story 17:30 指向作业）、`mascot-ok`（Story 19:00 评优）、`mascot-thumbs`（Story 20:00 收尾点赞）、`mascot-bye`（CTA 收尾挥手）
+- **吉祥物悬浮动画**：`mascot-float`（Hero 区，4s）和 `mascot-float-slow`（Story 区，6s）
+- **`site_publish` 部署脚本**：新增 `release.site_publish()` 函数，适配 Vite 合并构建后的 `dist/` 目录结构（landing 与 admin 同包），自动过滤 `admin-` 前缀的 admin 端资源
+- **`site_publish` TDD 测试**：在 `PapaCheck.Tests/test_release.py` 新增 `TestSitePublish` 测试类，覆盖构建流程、资源过滤、远程目录创建等场景（5 个新测试）
+- **辅助函数 `_tar_dir_to_bytes`**：用于将本地目录打包为 gzip tar 字节流，支持目录递归 + 排除规则
+
+### Changed
+- **`release.py` 重构**：调整 `site_publish` 实现，移除对旧 `landing/` + `admin/` 分离项目结构的依赖
+- **PapaCheck.Site 项目结构清理**：删除老 `admin.html` / `css/style.css` / `js/main.js` / `imgs/check_icon_512.jpg` / `imgs/favicon.png` 等静态资源残留
+- **Story 区吉祥物展示优化**：去除时间线节点的边框和渐变背景容器，让吉祥物以裸插画形式自然悬浮
+
+### Removed
+- **PapaCheck.Site 静态资源**：删除原 HTML/CSS/JS 实现的旧落地页和管理面板
+- **PapaCheck.Site/admin 子项目**：删除原独立的 Vite + React 管理面板项目（已整合到根 `src/admin/`）
+
 ## [1.2.0] - 2026-06-06
 
 ### Added

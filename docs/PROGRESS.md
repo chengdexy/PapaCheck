@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-17（路由优化 + 图标入口）
+> 最后更新：2026-06-18（PapaCheck.Site 整合）
 
 ## 当前版本
 
-**v1.4.1-beta**（路由优化，660 测试）
+**v1.4.2-beta**（PapaCheck.Site 整合落地页 + 管理面板，665 测试）
 
 ## 部署状态
 
@@ -89,7 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
-| 2026-06-17 | **路由优化 + 图标入口**：孩子端路径改为 `/child`，家长端改为 `/parent`，登录页统一为 `/login`。官网落地页导航栏、家庭管理面板、超管面板新增角色图标入口。Android 端 URL 拼接同步更新。TDD 驱动，全量 660 测试通过 |
+| 2026-06-18 | **PapaCheck.Site 整合落地页 + 管理面板**：将 landing 和 admin 合并到统一 Vite 5 + React 18 + TypeScript 5 + Tailwind CSS 3 项目；MPA 配置 + 自定义插件处理 admin 资源路径和复制；新增 5 个吉祥物插画（wave/point/ok/thumbs/bye）+ 悬浮动画；Story 区吉祥物以裸插画形式自然展示（去除边框背景）；`release.py site_publish` 重构适配合并构建；新增 5 个 TDD 测试覆盖构建流程、资源过滤、远程目录创建；全量 665 测试通过 |
 | 2026-06-17 | **Web 通用代码重构**：提取 app.js 和 admin.js 重复代码（showTransitionMask、hideTransitionMask、escapeHtml、SW注册、更新检测）到共享模块 common.js，消除约 100 行重复代码。更新 HTML 加载顺序，适配 4 个测试文件。全量 657 测试通过 |
 | 2026-06-17 | **离线/在线同步系统 11 个问题修复（P0-P3）**：CRDTLog.append 加 await + console.error（22 处）；离线降级函数空 catch 改 console.error + return false（18 处）；pollServer 空 catch 加日志；_doReconnect 同步失败后阻止切 online；_refreshFromServer 加 warn；wakeUp 加重试机制；init 用 API.getData 替代 location.reload；nodeId 改为 session 级持久 ID。全量 657 测试通过 |
 | 2026-06-17 | **修复孩子端评级后"回到首页"按钮无效**：`updateBigScreen()` 防御块在 `forceMainPage = true` 时仍强制显示结算页，导致孩子点击"回到首页"后立即被拉回评级页。修复为已查看过评级的结算（`viewedAt` 已设置）不再强制显示。全量 657 测试通过 |

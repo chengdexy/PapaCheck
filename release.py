@@ -228,98 +228,96 @@ def cloud_publish(server_ip, server_user):
     return True
 
 
-def site_publish(server_ip, server_user):
-    """构建并部署 PapaCheck.Site 到云端。"""
-    section('PapaCheck.Site 部署')
-    site_admin_dir = os.path.join(ROOT, 'PapaCheck.Site', 'admin')
-    site_landing_dir = os.path.join(ROOT, 'PapaCheck.Site')
+def _tar_dir_to_bytes(src_dir, exclude_names=None, exclude_predicate=None):
+    """把 src_dir 下的内容打成 tar.gz 字节流返回。
 
-    # 1. 构建 React 管理面板
-    print(f'  ▶ [1/4] 构建管理面板 ... ', end='', flush=True)
+    exclude_names: 不打包的顶级目录/文件名集合
+    exclude_predicate: 接受相对路径名（含子目录，如 'assets/admin-x.js'）返回 True 则跳过
+    """
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode='w:gz') as tar:
+        for name in os.listdir(src_dir):
+            if exclude_names and name in exclude_names:
+                continue
+            fpath = os.path.join(src_dir, name)
+            arcname = name
+            if exclude_predicate and exclude_predicate(arcname):
+                continue
+            if os.path.isdir(fpath):
+                # 递归走子目录，对每个文件单独判断 exclude_predicate
+                for root_dir, _dirs, files in os.walk(fpath):
+                    for fname in files:
+                        full = os.path.join(root_dir, fname)
+                        rel = os.path.relpath(full, src_dir).replace(os.sep, '/')
+                        if exclude_predicate and exclude_predicate(rel):
+                            continue
+                        tar.add(full, arcname=rel)
+            else:
+                tar.add(fpath, arcname=arcname)
+    return buf.getvalue()
+
+
+def site_publish(server_ip, server_user, project_root=None,
+                 ssh_executor=None, cleanup_dist=True):
+    """构建并部署 PapaCheck.Site（Vite 单工程 landing + admin）到云端。
+
+    Args:
+        server_ip: 云端服务器 IP
+        server_user: SSH 用户
+        project_root: 项目根目录（测试用，默认 ROOT）
+        ssh_executor: 自定义 SSH 执行器（测试用，默认 _run_with_timeout）
+        cleanup_dist: 是否清理本地 dist/（测试用）
+    """
+    section('PapaCheck.Site 部署')
+    root = project_root or ROOT
+    site_dir = os.path.join(root, 'PapaCheck.Site')
+    dist_dir = os.path.join(site_dir, 'dist')
+    ssh = ssh_executor or _run_with_timeout
+
+    remote_site = '/opt/papacheck/PapaCheck.Site'
+    remote_admin = '/opt/papacheck/PapaCheck.Site/admin'
+
+    # 1. 在 PapaCheck.Site 根目录执行一次构建
+    print(f'  ▶ [1/4] 构建 Vite 工程 ... ', end='', flush=True)
     result = subprocess.run(
-        'npm run build', cwd=site_admin_dir, shell=True,
+        'npm run build', cwd=site_dir, shell=True,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if result.returncode != 0:
         print('✗')
-        print('  React 构建失败')
+        print('  Vite 构建失败')
         return False
     print('✓')
 
-    # 2. 上传管理面板到 webDir/admin/
-    print(f'  ▶ [2/4] 上传管理面板 ... ', end='', flush=True)
-    dist_dir = os.path.join(site_admin_dir, 'dist')
+    # 2. 上传 landing 到 /opt/papacheck/PapaCheck.Site/
+    print(f'  ▶ [2/4] 上传落地页 ... ', end='', flush=True)
     try:
-        result = _run_with_timeout([
+        result = ssh([
             'ssh', '-o', 'StrictHostKeyChecking=accept-new',
             '-o', 'UserKnownHostsFile=NUL',
             f'{server_user}@{server_ip}',
-            'mkdir -p /opt/papacheck/PapaCheck.Web/admin'
+            f'mkdir -p {remote_site}',
         ], SSH_TIMEOUT)
         if result.returncode != 0:
             print('✗')
             return False
     except subprocess.TimeoutExpired:
         print('✗')
-        print('  SSH 创建目录超时')
+        print('  SSH 创建 landing 目录超时')
         return False
 
-    # 用 tar 打包后通过 SSH 管道解压，避免 Windows 下 SCP glob 不展开的问题
     try:
-        buf = io.BytesIO()
-        with tarfile.open(fileobj=buf, mode='w:gz') as tar:
-            for fname in os.listdir(dist_dir):
-                fpath = os.path.join(dist_dir, fname)
-                tar.add(fpath, arcname=fname)
-        buf.seek(0)
-        result = _run_with_timeout(
-            ['ssh', '-o', 'StrictHostKeyChecking=accept-new',
-             '-o', 'UserKnownHostsFile=NUL',
-             f'{server_user}@{server_ip}',
-             'tar xzf - -C /opt/papacheck/PapaCheck.Web/admin/'],
-            SCP_TIMEOUT, input=buf.getvalue())
-        if result.returncode != 0:
-            print('✗')
-            print('  管理面板上传失败')
-            return False
-    except subprocess.TimeoutExpired:
-        print('✗')
-        print('  上传管理面板超时')
-        return False
-    print('✓')
-
-    # 3. 上传官网落地页到 Site 目录
-    # 打包 index.html、css/、js/、imgs/，用 tar SSH 管道解压
-    print(f'  ▶ [3/4] 上传落地页 ... ', end='', flush=True)
-    try:
-        result = _run_with_timeout([
+        # landing tar: 跳过 admin/ 子目录和 assets/admin-* 专属 chunk
+        landing_tar = _tar_dir_to_bytes(
+            dist_dir,
+            exclude_names={'admin'},
+            exclude_predicate=lambda n: n.startswith('assets/admin-'),
+        )
+        result = ssh([
             'ssh', '-o', 'StrictHostKeyChecking=accept-new',
             '-o', 'UserKnownHostsFile=NUL',
             f'{server_user}@{server_ip}',
-            'mkdir -p /opt/papacheck/PapaCheck.Site/css /opt/papacheck/PapaCheck.Site/js /opt/papacheck/PapaCheck.Site/imgs'
-        ], SSH_TIMEOUT)
-        if result.returncode != 0:
-            print('✗')
-            return False
-    except subprocess.TimeoutExpired:
-        print('✗')
-        print('  SSH 创建目录超时')
-        return False
-
-    try:
-        buf = io.BytesIO()
-        with tarfile.open(fileobj=buf, mode='w:gz') as tar:
-            # 只添加落地页文件，排除 admin/ 子目录
-            for name in ['index.html', 'css', 'js', 'imgs']:
-                fpath = os.path.join(site_landing_dir, name)
-                if os.path.exists(fpath):
-                    tar.add(fpath, arcname=name)
-        buf.seek(0)
-        result = _run_with_timeout(
-            ['ssh', '-o', 'StrictHostKeyChecking=accept-new',
-             '-o', 'UserKnownHostsFile=NUL',
-             f'{server_user}@{server_ip}',
-             'tar xzf - -C /opt/papacheck/PapaCheck.Site/'],
-            SCP_TIMEOUT, input=buf.getvalue())
+            f'tar xzf - -C {remote_site}/',
+        ], SCP_TIMEOUT, input=landing_tar)
         if result.returncode != 0:
             print('✗')
             print('  落地页上传失败')
@@ -330,9 +328,46 @@ def site_publish(server_ip, server_user):
         return False
     print('✓')
 
+    # 3. 上传 admin 到 /opt/papacheck/PapaCheck.Site/admin/
+    print(f'  ▶ [3/4] 上传管理面板 ... ', end='', flush=True)
+    admin_dist = os.path.join(dist_dir, 'admin')
+    try:
+        result = ssh([
+            'ssh', '-o', 'StrictHostKeyChecking=accept-new',
+            '-o', 'UserKnownHostsFile=NUL',
+            f'{server_user}@{server_ip}',
+            f'mkdir -p {remote_admin}',
+        ], SSH_TIMEOUT)
+        if result.returncode != 0:
+            print('✗')
+            return False
+    except subprocess.TimeoutExpired:
+        print('✗')
+        print('  SSH 创建 admin 目录超时')
+        return False
+
+    try:
+        admin_tar = _tar_dir_to_bytes(admin_dist)
+        result = ssh([
+            'ssh', '-o', 'StrictHostKeyChecking=accept-new',
+            '-o', 'UserKnownHostsFile=NUL',
+            f'{server_user}@{server_ip}',
+            f'tar xzf - -C {remote_admin}/',
+        ], SCP_TIMEOUT, input=admin_tar)
+        if result.returncode != 0:
+            print('✗')
+            print('  管理面板上传失败')
+            return False
+    except subprocess.TimeoutExpired:
+        print('✗')
+        print('  上传管理面板超时')
+        return False
+    print('✓')
+
     # 4. 清理本地构建产物
     print(f'  ▶ [4/4] 清理构建产物 ... ', end='', flush=True)
-    shutil.rmtree(dist_dir)
+    if cleanup_dist and os.path.isdir(dist_dir):
+        shutil.rmtree(dist_dir)
     print('✓')
     done('PapaCheck.Site 部署完成')
     return True

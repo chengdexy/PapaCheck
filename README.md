@@ -2,7 +2,7 @@
 
 ![PapaCheck Banner](./docs/imgs/_banner.jpg)
 
-> **v1.4.1-beta** — 路由优化，孩子端/家长端语义化路径（660 测试）
+> **v1.4.1-beta** — 路由优化，孩子端/家长端语义化路径（665 测试）
 
 PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和跟踪孩子的作业完成情况。支持通过转发微信群中老师布置的作业到邮件，AI 自动解析并添加到清单；孩子可以自主开始/暂停/完成作业并获得积分；家长远程评级并管理积分商店。
 
@@ -22,6 +22,8 @@ PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和�
 - **🔌 离线可用**：断网时核心功能正常，联网后自动同步
 - **💾 自动备份**：每日凌晨 PostgreSQL 自动备份，超管面板可下载
 - **📊 健康监控**：磁盘/PG/备份状态实时监控，异常邮件告警
+- **🎨 品牌落地页**：`PapaCheck.Site` 提供产品介绍 + 下载 + 注册入口，含五态吉祥物插画（wave/point/ok/thumbs/bye）
+- **🛠 统一管理面板**：`PapaCheck.Site/admin` 提供家庭成员/作业/积分商店的远程管理（与落地页同一 Vite + React + TS + Tailwind 技术栈）
 
 ## 🚀 快速开始
 
@@ -30,7 +32,7 @@ PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和�
 项目已部署到阿里云 ECS，访问 [https://papacheck.chengdexy.cn/app/](https://papacheck.chengdexy.cn/app/)：
 
 - **孩子端**：`https://papacheck.chengdexy.cn/app/`
-- **管理端**：`https://papacheck.chengdexy.cn/app/admin.html`
+- **管理端**：`https://papacheck.chengdexy.cn/app/admin/`
 
 > 服务器配置：2核2G / 3M带宽 / Ubuntu 24.04 / systemd + Nginx + PostgreSQL
 
@@ -93,10 +95,11 @@ PapaCheck/
 | ----------------- | ------------------------------------------------------- |
 | **Server**        | Node.js, Fastify, better-sqlite3 / pg (PostgreSQL), edge-tts (`tts_bridge.py`) |
 | **Web 前端**      | 原生 HTML/CSS/JS, SVG 图表, Service Worker              |
+| **Site（落地页+管理面板）** | Vite 5, React 18, TypeScript 5, Tailwind CSS 3, Lucide Icons |
 | **Windows 桌面端** | Python, tkinter, 内嵌 Node.js 子进程（pkg SEA 单 EXE） |
 | **邮件同步**      | Node.js IMAP 模块（内置于服务端）                       |
 | **Android 端**    | Flutter, `webview_flutter`                              |
-| **测试**          | Vitest（前端/服务端 644 测试）、pytest（Python 53 测试） |
+| **测试**          | Vitest（前端/服务端 644 测试）、pytest（Python 58 测试） |
 | **构建发布**      | release.py（一站式：EXE + APK + ZIP）                    |
 
 ## 🔧 开发
