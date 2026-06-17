@@ -43,7 +43,8 @@ export async function runBackup(db: IDatabase, triggeredBy: string = 'scheduler'
   const backupDir = opsConfig?.backup?.backupDir ?? BACKUP_DIR_DEFAULT;
   const retentionCount = opsConfig?.backup?.retentionCount ?? 3;
   const filename = generateFilename();
-  const filePath = join(backupDir, filename);
+  const filePath = resolveBackupPath(filename, backupDir);
+  if (!filePath) throw new Error('Failed to generate valid backup file path');
   const recordId = randomUUID();
   const now = new Date().toISOString();
 
@@ -120,13 +121,19 @@ export async function listBackups(db: IDatabase, limit: number = 20): Promise<Ba
   return db.listBackupRecords(limit);
 }
 
-/** Get backup file path with path traversal protection */
-export function getBackupFilePath(filename: string, backupDir?: string): string | null {
+/** Validate filename format + resolve path with traversal protection (no existence check) */
+function resolveBackupPath(filename: string, backupDir?: string): string | null {
   if (!FILENAME_REGEX.test(filename)) return null;
   const dir = backupDir ?? BACKUP_DIR_DEFAULT;
   const fullPath = resolve(join(dir, filename));
-  // Ensure resolved path is still within dir
   if (!fullPath.startsWith(resolve(dir))) return null;
+  return fullPath;
+}
+
+/** Get backup file path with path traversal protection + existence check */
+export function getBackupFilePath(filename: string, backupDir?: string): string | null {
+  const fullPath = resolveBackupPath(filename, backupDir);
+  if (!fullPath) return null;
   if (!existsSync(fullPath)) return null;
   return fullPath;
 }
