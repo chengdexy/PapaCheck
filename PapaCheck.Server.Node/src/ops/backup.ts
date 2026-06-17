@@ -54,8 +54,10 @@ export async function runBackup(db: IDatabase, triggeredBy: string = 'scheduler'
     // Run pg_dump
     const dbUrl = new URL(getConnectionString());
     const dbName = dbUrl.pathname.replace(/^\//, '') || 'papacheck';
+    const dbHost = dbUrl.hostname || 'localhost';
+    const dbUser = dbUrl.username || 'papacheck';
     await new Promise<void>((resolvePromise, rejectPromise) => {
-      execFile('pg_dump', ['-Fc', '-f', filePath, dbName], {
+      execFile('pg_dump', ['-Fc', '-h', dbHost, '-U', dbUser, '-f', filePath, dbName], {
         env: { ...process.env, PGPASSWORD: dbUrl.password || '' },
         timeout: 120_000, // 2 minute timeout
       }, (error) => {

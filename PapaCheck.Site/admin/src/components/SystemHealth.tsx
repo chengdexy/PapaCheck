@@ -268,10 +268,11 @@ function ConfigModal({ onClose }: { onClose: () => void }) {
                     />
                 </div>
                 <div>
-                    <label className="block text-xs text-zinc-500 mb-1">密码/授权码</label>
+                    <label className="block text-xs text-zinc-500 mb-1">授权码</label>
                     <input
-                        type="password"
+                        type="text"
                         className="w-full px-2 py-1.5 border-b border-zinc-300 focus:border-orange-500 outline-none text-sm"
+                        autoComplete="off"
                         placeholder={config?.alert?.smtp?.password === '***' ? '已加密，留空不变' : ''}
                         onChange={e => set('alert.smtp.password', e.target.value || '***')}
                     />

@@ -3,7 +3,7 @@ import type { ScheduledTask } from 'node-cron';
 import type { IDatabase, OpsConfig, SmtpConfig } from '../db/types.js';
 import { runBackup } from './backup.js';
 import { collectHealth } from './monitor.js';
-import { processAlerts } from './alert.js';
+import { processAlerts, sendDailyReport } from './alert.js';
 
 export class OpsScheduler {
     private backupJob: ScheduledTask | null = null;
@@ -37,11 +37,21 @@ export class OpsScheduler {
         if (!enabled) return;
 
         this.backupJob = cron.schedule(schedule, async () => {
+            let record: any;
             try {
-                const record = await runBackup(db, 'scheduler');
+                record = await runBackup(db, 'scheduler');
                 console.log(`[ops] 备份 ${record.status}: ${record.filename}`);
             } catch (err) {
                 console.error('[ops] 定时备份失败:', err);
+                record = { status: 'failed', filename: 'unknown', size_bytes: null, error_message: String(err), created_at: new Date().toISOString() };
+            }
+            // Send daily report with backup result + health snapshot
+            try {
+                const snapshot = await collectHealth(db);
+                await sendDailyReport(db, record, snapshot);
+                console.log('[ops] 日报邮件已发送');
+            } catch (err) {
+                console.error('[ops] 发送日报邮件失败:', err);
             }
         });
     }

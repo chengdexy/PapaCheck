@@ -170,3 +170,50 @@ export async function processAlerts(
 
     return events;
 }
+
+/** Send a daily report email after scheduled backup */
+export async function sendDailyReport(
+  db: IDatabase,
+  backupRecord: { status: string; filename: string; size_bytes: number | null; error_message: string | null; created_at: string },
+  snapshot: HealthSnapshot
+): Promise<void> {
+  const config: OpsConfig | null = await db.getOpsConfig();
+  const smtp = config?.alert?.smtp;
+  if (!smtp || !smtp.enabled) return;
+
+  const now = new Date().toLocaleString('zh-CN', { hour12: false });
+  const backupStatus = backupRecord.status === 'success' ? '✅ 成功' : '❌ 失败';
+  const backupSize = backupRecord.size_bytes
+    ? backupRecord.size_bytes >= 1e6 ? `${(backupRecord.size_bytes / 1e6).toFixed(1)} MB` : `${(backupRecord.size_bytes / 1e3).toFixed(1)} KB`
+    : '未知';
+  const diskColor = snapshot.disk.usedPercent > 90 ? 'red' : snapshot.disk.usedPercent > 70 ? 'orange' : 'green';
+  const pgStatus = snapshot.postgres.alive ? '✅ 正常' : '❌ 异常';
+
+  const html = `
+    <h2>PapaCheck 每日运维报告</h2>
+    <hr>
+    <h3>📦 自动备份</h3>
+    <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse">
+      <tr><td>状态</td><td>${backupStatus}</td></tr>
+      <tr><td>文件名</td><td>${backupRecord.filename}</td></tr>
+      <tr><td>大小</td><td>${backupSize}</td></tr>
+      ${backupRecord.error_message ? `<tr><td>错误信息</td><td>${backupRecord.error_message}</td></tr>` : ''}
+      <tr><td>时间</td><td>${now}</td></tr>
+    </table>
+    <h3>💻 系统健康</h3>
+    <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse">
+      <tr><td>磁盘使用率</td><td><span style="color:${diskColor}">${snapshot.disk.usedPercent}%</span></td></tr>
+      <tr><td>内存使用率</td><td>${snapshot.memory.usedPercent}%</td></tr>
+      <tr><td>PostgreSQL</td><td>${pgStatus} (${snapshot.postgres.latencyMs}ms)</td></tr>
+    </table>
+    <p><a href="https://papacheck.chengdexy.cn/admin/">查看管理面板</a></p>
+  `;
+
+  const transport = createTransport(smtp);
+  await transport.sendMail({
+    from: smtp.from,
+    to: smtp.to,
+    subject: `[PapaCheck] 每日运维报告 ${new Date().toLocaleDateString('zh-CN')}`,
+    html,
+  });
+}

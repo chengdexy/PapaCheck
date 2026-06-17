@@ -1795,7 +1795,10 @@ export class PostgresAdapter extends DatabaseAdapter {
   }
 
   async getOpsConfig(): Promise<OpsConfig | null> {
-    const result = await this.pool.query("SELECT data FROM settings WHERE tenant_id = (SELECT id FROM tenants ORDER BY created_at LIMIT 1)");
+    const tenantResult = await this.pool.query('SELECT id FROM tenants ORDER BY created_at LIMIT 1');
+    const tenantId = tenantResult.rows[0]?.id;
+    if (!tenantId) return null;
+    const result = await this.pool.query('SELECT data FROM settings WHERE tenant_id = $1', [tenantId]);
     if (!result.rows[0]) return null;
     const data = typeof result.rows[0].data === 'string' ? JSON.parse(result.rows[0].data) : result.rows[0].data;
     return data?.ops_config ?? null;

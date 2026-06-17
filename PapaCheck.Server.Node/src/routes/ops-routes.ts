@@ -99,10 +99,11 @@ export async function opsRoutes(app: FastifyInstance, db: IDatabase, scheduler: 
         const payload = requireAdmin(request, reply);
         if (!payload) return;
 
-        const config = await db.getOpsConfig();
-        if (!config) {
-            return reply.status(404).send({ error: '未找到运维配置', code: 'NOT_FOUND' });
-        }
+        const config = await db.getOpsConfig() || {
+            backup: { enabled: true, schedule: '0 3 * * *', retentionCount: 3, backupDir: '/var/backups/papacheck/' },
+            monitor: { enabled: true, intervalSeconds: 300, thresholds: { diskCriticalPercent: 90, backupStaleHours: 25 } },
+            alert: { suppressWindowMinutes: 30, smtp: { host: '', port: 587, secure: false, user: '', password: '***', from: '', to: '', enabled: false } },
+        };
 
         if (config.alert?.smtp?.password) {
             config.alert.smtp.password = '***';
