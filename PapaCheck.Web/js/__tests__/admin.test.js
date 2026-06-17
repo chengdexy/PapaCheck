@@ -82,19 +82,19 @@ function simulateEscapeHtml(str) {
 }
 
 /**
- * 使用 vm 从 admin.js 提取实际的 escapeHtml 函数
+ * 使用 vm 从 common.js 提取实际的 escapeHtml 函数
  */
 function loadEscapeHtmlFromSource() {
-  const adminCode = fs.readFileSync(
-    path.join(__dirname, '..', 'admin.js'),
+  const code = fs.readFileSync(
+    path.join(__dirname, '..', 'common.js'),
     'utf8'
   );
 
   // 提取 escapeHtml 函数
-  const match = adminCode.match(
+  const match = code.match(
     /function escapeHtml\([\s\S]*?\n\}/
   );
-  if (!match) throw new Error('无法从 admin.js 提取 escapeHtml');
+  if (!match) throw new Error('无法从 common.js 提取 escapeHtml');
 
   const vm = require('vm');
   const ctx = vm.createContext({

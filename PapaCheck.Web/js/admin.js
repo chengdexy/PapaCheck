@@ -3,57 +3,6 @@
  * 负责作业管理、商店管理、兑换管理、评级、统计、设置
  */
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function () {
-    navigator.serviceWorker.register('/sw.js').then(function (reg) {
-      console.log('SW registered:', reg.scope);
-    }).catch(function (err) {
-      console.log('SW registration failed:', err);
-    });
-
-    // 监听 SW 发来的强制刷新消息
-    navigator.serviceWorker.addEventListener('message', function (event) {
-      if (event.data && event.data.type === 'FORCE_REFRESH') {
-        sessionStorage.setItem('sw_updated', 'true');
-        showTransitionMask('检测到新版本，正在刷新页面...');
-        window.location.reload();
-      }
-    });
-  });
-}
-
-// 页面加载时检测是否为刷新后
-if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('sw_updated') === 'true') {
-  sessionStorage.removeItem('sw_updated');
-  setTimeout(function () {
-    showToast('已更新到最新版本');
-  }, 500);
-}
-
-// ========== Transition Mask ==========
-function showTransitionMask(text) {
-  var mask = document.getElementById('transitionMask');
-  if (!mask) return;
-  if (mask.style.display === 'flex') return;
-  document.getElementById('transitionText').textContent = text;
-  mask.style.display = 'flex';
-  clearTimeout(mask._timeout);
-  mask._timeout = setTimeout(function () { mask.style.display = 'none'; }, 5000);
-}
-function hideTransitionMask() {
-  var mask = document.getElementById('transitionMask');
-  if (!mask) return;
-  clearTimeout(mask._timeout);
-  mask.style.display = 'none';
-}
-
-function escapeHtml(str) {
-  if (!str) return '';
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
 let adminDate = new Date();
 let adminHomeworks = [];
 let adminShopItems = [];

@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### Changed
+- **Web 通用代码重构**：提取 app.js 和 admin.js 中重复的通用代码（`showTransitionMask`、`hideTransitionMask`、`escapeHtml`、Service Worker 注册、页面刷新检测）到共享模块 `common.js`，消除约 100 行重复代码。更新 HTML 加载顺序在依赖脚本前引入 common.js。适配 4 个测试文件的 VM 上下文和提取源路径。全量 657 测试通过
+
 ### Fixed
 - **孩子端离线/在线同步系统 11 个问题修复（基于代码审查报告 `docs/offline-sync-audit.md`）**：
   - **P0（数据丢失）**：`CRDTLog.append()` 加 `await` 和 `console.error`（22 处）；离线降级函数空 catch 改 `console.error` + `return false`（18 处）

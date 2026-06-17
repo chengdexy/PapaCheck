@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-17（离线/在线同步系统代码审查修复）
+> 最后更新：2026-06-17（Web 通用代码重构）
 
 ## 当前版本
 
@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-17 | **Web 通用代码重构**：提取 app.js 和 admin.js 重复代码（showTransitionMask、hideTransitionMask、escapeHtml、SW注册、更新检测）到共享模块 common.js，消除约 100 行重复代码。更新 HTML 加载顺序，适配 4 个测试文件。全量 657 测试通过 |
 | 2026-06-17 | **离线/在线同步系统 11 个问题修复（P0-P3）**：CRDTLog.append 加 await + console.error（22 处）；离线降级函数空 catch 改 console.error + return false（18 处）；pollServer 空 catch 加日志；_doReconnect 同步失败后阻止切 online；_refreshFromServer 加 warn；wakeUp 加重试机制；init 用 API.getData 替代 location.reload；nodeId 改为 session 级持久 ID。全量 657 测试通过 |
 | 2026-06-17 | **修复孩子端评级后"回到首页"按钮无效**：`updateBigScreen()` 防御块在 `forceMainPage = true` 时仍强制显示结算页，导致孩子点击"回到首页"后立即被拉回评级页。修复为已查看过评级的结算（`viewedAt` 已设置）不再强制显示。全量 657 测试通过 |
 | 2026-06-17 | **代码审查修复 4 个 Issue + pruneOldBackups/runBackup 路径遍历防护**：`getBackupFilePath` 从硬编码改为读取配置（修复非默认备份目录下载失败）；`allStateKeys` 硬编码改为 `ALL_ALERT_KEYS` 共享常量；SMTP transport 添加 `close()` 修复连接泄漏；`pruneOldBackups` 循环内 `getOpsConfig()` 提升到循环外 + 文件删除改用 `getBackupFilePath()` 校验路径；`runBackup` 抽取 `resolveBackupPath()` 统一路径防护；全量 657 测试通过 |

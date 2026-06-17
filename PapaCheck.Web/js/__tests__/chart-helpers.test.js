@@ -87,6 +87,8 @@ beforeAll(() => {
     JSON, Error, Object, Array, Math, Date, Map, Set, Promise,
     String, Number, Boolean, RegExp, parseInt, parseFloat,
     isNaN, isFinite, Symbol, WeakMap, WeakSet,
+    showTransitionMask: () => {},
+    hideTransitionMask: () => {},
   });
 
   vm.runInContext(adminCode, context, { timeout: 5000 });

@@ -143,6 +143,8 @@ function loadAdminInVM(mocks) {
         Symbol,
         WeakMap,
         WeakSet,
+        showTransitionMask: () => {},
+        hideTransitionMask: () => {},
     });
 
     vm.runInContext(adminCode, context, { timeout: 5000 });
