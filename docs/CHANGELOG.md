@@ -6,6 +6,15 @@
 
 ## [Unreleased]
 
+### Fixed
+- **孩子端离线/在线同步系统 11 个问题修复（基于代码审查报告 `docs/offline-sync-audit.md`）**：
+  - **P0（数据丢失）**：`CRDTLog.append()` 加 `await` 和 `console.error`（22 处）；离线降级函数空 catch 改 `console.error` + `return false`（18 处）
+  - **P1（同步失败）**：`pollServer` 空 catch 加 `console.error`；`_doReconnect` 中 CRDT 同步失败后抛异常阻止切 `online`；`_refreshFromServer` 静默失败加 `console.warn`
+  - **P2（体验降级）**：`wakeUp` 添加 CM 模式等待重试机制；`init` 离线恢复用 `API.getData()` 替换 `location.reload()`
+  - **P3（架构隐患）**：CRDTLog `nodeId` 改为 session 级别持久 ID，避免每次操作随机生成
+  - **审查自修复**：`_doReconnect` 增加 `crdtAttempted` 标记区分"跳过 CRDT"与"CRDT 失败"（SyncEngine 不可用时不再错误阻止上线）；`wakeUp` 重试前清理旧 interval 防止泄漏
+  - 全量 **657 测试**通过
+
 ### Added
 - **Phase 5d 运维增强**：PostgreSQL 自动备份（每日 03:00，保留 3 份）+ 健康监控（磁盘/PG/备份状态，每 5 分钟）+ 邮件告警（状态机去重 30 分钟抑制窗口，SMTP 配置）。新增 13 个 TDD 测试，全量 657 测试通过
 - **超管面板系统健康页面**：磁盘/内存/Swap 使用率卡片、PostgreSQL 状态、备份管理（列表/下载/手动触发）、告警历史、运维配置编辑 Modal（阈值/SMTP）

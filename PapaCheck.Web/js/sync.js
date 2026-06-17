@@ -308,7 +308,7 @@ var SyncEngine = (function() {
         await CRDTLog.cleanup();
       }
     } catch (e) {
-      // best-effort
+      console.warn('[SyncEngine] _refreshFromServer 全量刷新失败，下次轮询将重试:', e);
     }
   }
 

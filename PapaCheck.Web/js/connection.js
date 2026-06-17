@@ -55,14 +55,16 @@ var ConnectionManager = (function () {
     showReconnectMask('\u6b63\u5728\u540c\u6b65\u6570\u636e\u2026');
     updateConnStatus();
     try {
+      var crdtOk = false;
+      var crdtAttempted = false;
       var syncPromise = (async function () {
         // 首先尝试 CRDT 同步
-        var crdtOk = false;
         if (typeof SyncEngine !== 'undefined' && SyncEngine.crdtFullSync) {
+          crdtAttempted = true;
           try {
             crdtOk = await SyncEngine.crdtFullSync();
           } catch (crdtErr) {
-            // CRDT 同步失败，后续依赖本地缓存数据
+            console.error('[ConnectionManager] CRDT 同步失败:', crdtErr);
           }
         }
         // 从 IndexedDB 读取最新数据（CRDT 成功时已更新，失败时保留本地状态）
@@ -72,12 +74,22 @@ var ConnectionManager = (function () {
           cachedData = await DB.getFullData();
         }
       })();
-      await Promise.race([
+      var raceResult = await Promise.race([
         syncPromise,
         new Promise(function (resolve) {
           setTimeout(function () { resolve('timeout'); }, _getReconnectTimeout());
         })
       ]);
+      if (raceResult === 'timeout') {
+        console.warn('[ConnectionManager] 同步超时，部分操作可能未完全同步');
+        // 超时后不立即切 online：若 crdtPush 成功但 crdtPull 未完成，
+        // 下次重连会重新推送（服务端需支持操作幂等）
+      }
+      // CRDT 同步失败（非超时）时保持 offline，等待下次 ping 重试
+      // 注意：仅当 CRDT 真正尝试且失败时才阻止切 online；SyncEngine 不可用时跳过
+      if (crdtAttempted && !crdtOk && raceResult !== 'timeout') {
+        throw new Error('CRDT 同步失败，保持离线模式');
+      }
       _mode = 'online';
       _wasOnline = true;
     } catch (syncErr) {

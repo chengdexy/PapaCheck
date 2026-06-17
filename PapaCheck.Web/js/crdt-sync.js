@@ -6,6 +6,8 @@
 var CRDTLog = (function () {
   var _storeName = 'papacheck_crdt_log';
   var _store = null;
+  // 持久化 nodeId，同一客户端 session 内保持一致，避免每次操作随机生成
+  var _nodeId = 'web-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 5);
 
   // 初始化 localforage store
   async function _getStore() {
@@ -33,7 +35,7 @@ var CRDTLog = (function () {
         field: op.field || null,
         value: op.value,
         timestamp: op.timestamp || new Date().toISOString(),
-        nodeId: op.nodeId || 'web-' + Math.random().toString(36).substr(2, 5),
+        nodeId: op.nodeId || _nodeId,
         synced: false,
       };
       await store.setItem(id, entry);

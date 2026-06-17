@@ -1145,6 +1145,7 @@ function startPoll(intervalMs) {
         updateBigScreen();
       }
     } catch (e) {
+      console.error('[PollServer] 轮询异常:', e);
     } finally {
       if (pollInterval !== null) pollInterval = setTimeout(pollServer, intervalMs);
     }
@@ -1179,8 +1180,32 @@ function wakeUp() {
   document.getElementById('screenSaver').classList.remove('active');
   startScreenSaverTimer();
   stopPoll();
-  pollServer();
-  startPoll(5000);
+  // 如果 CM 尚未切回 online，短延迟重试，避免 pollServer 入口被直接跳过
+  var mode = ConnectionManager.getMode();
+  if (mode === 'offline' || mode === 'reconnecting') {
+    var retryCount = 0;
+    var maxRetries = 5; // 最多重试 5 次（间隔 1s，共 5s）
+    // 先清理可能存在的旧重试 timer，防止重复唤醒导致 interval 泄漏
+    if (window._wakeUpRetry) clearInterval(window._wakeUpRetry);
+    var retryId = setInterval(function () {
+      retryCount++;
+      var m = ConnectionManager.getMode();
+      if (m === 'online') {
+        clearInterval(retryId);
+        window._wakeUpRetry = null;
+        pollServer();
+        startPoll(5000);
+      } else if (retryCount >= maxRetries) {
+        clearInterval(retryId);
+        window._wakeUpRetry = null;
+        startPoll(5000);
+      }
+    }, 1000);
+    window._wakeUpRetry = retryId;
+  } else {
+    pollServer();
+    startPoll(5000);
+  }
   Voice.speak('屏幕已唤醒');
 }
 
@@ -1217,10 +1242,21 @@ async function init() {
           isServerMode = false;
           cachedData = { homeworks: {}, freeTimeTasks: {}, dailySettlement: {}, points: { balance: 0 }, shopItems: [], rewardBox: [], activeBuffs: [], bountyTasks: [], bountySubmissions: {}, bountyCompletions: {}, settings: {} };
           if (window._recoveryInterval) clearInterval(window._recoveryInterval);
-          window._recoveryInterval = setInterval(function () {
+          window._recoveryInterval = setInterval(async function () {
             if (ConnectionManager.getMode() === 'online') {
               clearInterval(window._recoveryInterval);
-              location.reload();
+              // 不再整页刷新：通过 API 获取最新数据并更新 UI，保留用户操作状态
+              try {
+                cachedData = await API.getData();
+                isServerMode = true;
+                try { await DB.cacheFullData(JSON.parse(JSON.stringify(cachedData))); } catch (e) { }
+                updateBigScreen();
+                startPoll(5000);
+                showToast('已连接服务器，数据已恢复');
+              } catch (recoveryErr) {
+                console.error('[Init] 恢复数据失败:', recoveryErr);
+                showToast('数据恢复失败，请刷新页面');
+              }
             }
           }, 2000);
         }

@@ -535,7 +535,7 @@ const API = {
 
   async putHomework(id, data) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'update', table: 'homeworks', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'homeworks', resourceId: id, field: null, value: data }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -551,8 +551,8 @@ const API = {
           if (idx !== -1) { list[idx] = data; }
           else { list.push(data); }
           await DB.saveHomeworks(dk, list);
-        } catch (e) { /* 非致命 */ }
-        return true;
+          return true;
+        } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
       },
       { allowFallback: true }
     );
@@ -560,7 +560,7 @@ const API = {
 
   async patchHomework(id, fields, dateKey) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'update', table: 'homeworks', resourceId: id, field: null, value: fields }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'homeworks', resourceId: id, field: null, value: fields }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -577,9 +577,10 @@ const API = {
               Object.assign(list[idx], fields);
               await DB.saveHomeworks(dateKey, list);
             }
-          } catch (e) { /* 非致命 */ }
+            return true;
+          } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
         }
-        return true;
+        return false;
       },
       { allowFallback: true }
     );
@@ -587,7 +588,7 @@ const API = {
 
   async deleteHomework(id, dateKey) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'delete', table: 'homeworks', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'delete', table: 'homeworks', resourceId: id, field: null, value: null }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -604,9 +605,10 @@ const API = {
               list.splice(idx, 1);
               await DB.saveHomeworks(dateKey, list);
             }
-          } catch (e) { /* 非致命 */ }
+            return true;
+          } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
         }
-        return true;
+        return false;
       },
       { allowFallback: true }
     );
@@ -627,7 +629,7 @@ const API = {
 
   async putSettlement(dateKey, data) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'update', table: 'daily_settlement', resourceId: dateKey, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'daily_settlement', resourceId: dateKey, field: null, value: data }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -636,8 +638,7 @@ const API = {
       },
       async () => {
         // 离线降级：在本地 DB 中创建/更新
-        try { await DB.saveSettlement(dateKey, data); } catch (e) { /* 非致命 */ }
-        return true;
+        try { await DB.saveSettlement(dateKey, data); return true; } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
       },
       { allowFallback: true }
     );
@@ -645,7 +646,7 @@ const API = {
 
   async patchSettlement(dateKey, fields) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'update', table: 'daily_settlement', resourceId: dateKey, field: null, value: fields }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'daily_settlement', resourceId: dateKey, field: null, value: fields }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-only',
       async () => {
@@ -661,7 +662,7 @@ const API = {
 
   async patchPoints(delta) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'update', table: 'points', resourceId: 'points', field: null, value: delta }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'points', resourceId: 'points', field: null, value: delta }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-only',
       async () => {
@@ -677,7 +678,7 @@ const API = {
 
   async putShopItem(id, data) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'update', table: 'shop_items', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'shop_items', resourceId: id, field: null, value: data }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -692,8 +693,8 @@ const API = {
           if (idx !== -1) items[idx] = data;
           else items.push(data);
           await DB.saveShopItems(items);
-        } catch (e) { /* 非致命 */ }
-        return true;
+          return true;
+        } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
       },
       { allowFallback: true }
     );
@@ -701,7 +702,7 @@ const API = {
 
   async deleteShopItem(id) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'delete', table: 'shop_items', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'delete', table: 'shop_items', resourceId: id, field: null, value: null }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -717,8 +718,8 @@ const API = {
             items.splice(idx, 1);
             await DB.saveShopItems(items);
           }
-        } catch (e) { /* 非致命 */ }
-        return true;
+          return true;
+        } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
       },
       { allowFallback: true }
     );
@@ -739,7 +740,7 @@ const API = {
 
   async putRedemption(id, data) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'update', table: 'redemptions', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'redemptions', resourceId: id, field: null, value: data }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -754,8 +755,8 @@ const API = {
           if (idx !== -1) items[idx] = data;
           else items.push(data);
           await DB.saveRedemptions(items);
-        } catch (e) { /* 非致命 */ }
-        return true;
+          return true;
+        } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
       },
       { allowFallback: true }
     );
@@ -765,7 +766,7 @@ const API = {
 
   async putRewardBoxItem(id, data) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'update', table: 'reward_box', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'reward_box', resourceId: id, field: null, value: data }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -780,8 +781,8 @@ const API = {
           if (idx !== -1) items[idx] = data;
           else items.push(data);
           await DB.saveRewardBox(items);
-        } catch (e) { /* 非致命 */ }
-        return true;
+          return true;
+        } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
       },
       { allowFallback: true }
     );
@@ -789,7 +790,7 @@ const API = {
 
   async deleteRewardBoxItem(id) {
     // 添加 CRDT 删除操作日志
-    try { var op = { type: 'delete', table: 'reward_box', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'delete', table: 'reward_box', resourceId: id, field: null, value: null }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -805,8 +806,8 @@ const API = {
             items.splice(idx, 1);
             await DB.saveRewardBox(items);
           }
-        } catch (e) { /* 非致命 */ }
-        return true;
+          return true;
+        } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
       },
       { allowFallback: true }
     );
@@ -816,7 +817,7 @@ const API = {
 
   async putSettings(data) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'update', table: 'settings', resourceId: 'settings', field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'settings', resourceId: 'settings', field: null, value: data }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -825,8 +826,7 @@ const API = {
       },
       async () => {
         // 离线降级：在本地 DB 中创建/更新
-        try { await DB.saveSettings(data); } catch (e) { /* 非致命 */ }
-        return true;
+        try { await DB.saveSettings(data); return true; } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
       },
       { allowFallback: true }
     );
@@ -834,7 +834,7 @@ const API = {
 
   async patchSettings(fields) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'update', table: 'settings', resourceId: 'settings', field: null, value: fields }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'settings', resourceId: 'settings', field: null, value: fields }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-only',
       async () => {
@@ -850,7 +850,7 @@ const API = {
 
   async putBuff(id, data) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'update', table: 'active_buffs', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'active_buffs', resourceId: id, field: null, value: data }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -865,8 +865,8 @@ const API = {
           if (idx !== -1) items[idx] = data;
           else items.push(data);
           await DB.saveActiveBuffs(items);
-        } catch (e) { /* 非致命 */ }
-        return true;
+          return true;
+        } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
       },
       { allowFallback: true }
     );
@@ -874,7 +874,7 @@ const API = {
 
   async deleteBuff(id) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'delete', table: 'active_buffs', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'delete', table: 'active_buffs', resourceId: id, field: null, value: null }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -890,8 +890,8 @@ const API = {
             buffs.splice(idx, 1);
             await DB.saveActiveBuffs(buffs);
           }
-        } catch (e) { /* 非致命 */ }
-        return true;
+          return true;
+        } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
       },
       { allowFallback: true }
     );
@@ -901,7 +901,7 @@ const API = {
 
   async putEfficiency(dateKey, data) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'update', table: 'efficiency_history', resourceId: dateKey, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'efficiency_history', resourceId: dateKey, field: null, value: data }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -910,8 +910,7 @@ const API = {
       },
       async () => {
         // 离线降级：在本地 DB 中创建/更新
-        try { await DB.saveEfficiency(dateKey, data); } catch (e) { /* 非致命 */ }
-        return true;
+        try { await DB.saveEfficiency(dateKey, data); return true; } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
       },
       { allowFallback: true }
     );
@@ -921,7 +920,7 @@ const API = {
 
   async putFreeTimeTask(id, data) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'update', table: 'free_time_tasks', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'free_time_tasks', resourceId: id, field: null, value: data }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -937,8 +936,8 @@ const API = {
           if (idx !== -1) list[idx] = data;
           else list.push(data);
           await DB.saveFreeTime(dk, list);
-        } catch (e) { /* 非致命 */ }
-        return true;
+          return true;
+        } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
       },
       { allowFallback: true }
     );
@@ -948,7 +947,7 @@ const API = {
 
   async putBountyTask(id, data) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'update', table: 'bounty_tasks', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'bounty_tasks', resourceId: id, field: null, value: data }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -963,8 +962,8 @@ const API = {
           if (idx !== -1) items[idx] = data;
           else items.push(data);
           await DB.saveBountyTasks(items);
-        } catch (e) { /* 非致命 */ }
-        return true;
+          return true;
+        } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
       },
       { allowFallback: true }
     );
@@ -972,7 +971,7 @@ const API = {
 
   async deleteBountyTask(id) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'delete', table: 'bounty_tasks', resourceId: id, field: null, value: null }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'delete', table: 'bounty_tasks', resourceId: id, field: null, value: null }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -988,8 +987,8 @@ const API = {
             tasks.splice(idx, 1);
             await DB.saveBountyTasks(tasks);
           }
-        } catch (e) { /* 非致命 */ }
-        return true;
+          return true;
+        } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
       },
       { allowFallback: true }
     );
@@ -1010,7 +1009,7 @@ const API = {
 
   async putBountySubmission(id, data) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'update', table: 'bounty_submissions', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'bounty_submissions', resourceId: id, field: null, value: data }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -1026,8 +1025,8 @@ const API = {
           if (idx !== -1) list[idx] = data;
           else list.push(data);
           await DB.saveBountySubmissions(dk, list);
-        } catch (e) { /* 非致命 */ }
-        return true;
+          return true;
+        } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
       },
       { allowFallback: true }
     );
@@ -1037,7 +1036,7 @@ const API = {
 
   async putBountyCompletion(id, data) {
     // 添加 CRDT 操作日志
-    try { var op = { type: 'update', table: 'bounty_completions', resourceId: id, field: null, value: data }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'bounty_completions', resourceId: id, field: null, value: data }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
@@ -1046,8 +1045,7 @@ const API = {
       },
       async () => {
         // 离线降级：在本地 DB 中创建/更新
-        try { await DB.saveBountyCompletions(id, data); } catch (e) { /* 非致命 */ }
-        return true;
+        try { await DB.saveBountyCompletions(id, data); return true; } catch (e) { console.error('[API] 离线写入失败:', e); return false; }
       },
       { allowFallback: true }
     );
@@ -1079,7 +1077,7 @@ const API = {
   // ---- 通知 (notifications) ----
 
   async announce(text) {
-    try { var op = { type: 'update', table: 'notifications', resourceId: crypto.randomUUID(), field: null, value: { text, createdAt: Date.now() } }; CRDTLog.append(op); } catch (e) { /* 非致命 */ }
+    try { var op = { type: 'update', table: 'notifications', resourceId: crypto.randomUUID(), field: null, value: { text, createdAt: Date.now() } }; await CRDTLog.append(op); } catch (e) { console.error('[API] CRDTLog.append 失败:', e); }
     return await this._requestWithStrategy(
       'online-first',
       async () => {
