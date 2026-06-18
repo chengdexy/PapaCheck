@@ -1,3 +1,5 @@
+import Mascot from '../Mascot';
+
 const steps = [
   {
     time: '17:30',
@@ -45,6 +47,7 @@ export default function Story() {
           <div className="space-y-12 md:space-y-16">
             {steps.map((step, i) => {
               const isLeft = i % 2 === 0;
+              const mascotName = step.mascot.split('/').pop()!.replace('mascot-', '').replace('.png', '') as 'point' | 'ok' | 'thumbs';
               return (
                 <div
                   key={i}
@@ -66,9 +69,10 @@ export default function Story() {
                   </div>
 
                   <div className={`hidden md:flex ${isLeft ? 'md:justify-start md:pl-12' : 'md:justify-end md:pr-12'} md:[direction:ltr]`}>
-                    <img
-                      src={step.mascot}
+                    <Mascot
+                      name={mascotName}
                       alt={step.mascotAlt}
+                      size={192}
                       className="relative z-10 w-48 h-48 object-contain drop-shadow-[0_10px_20px_rgba(249,115,22,0.15)] mascot-float-slow"
                     />
                   </div>

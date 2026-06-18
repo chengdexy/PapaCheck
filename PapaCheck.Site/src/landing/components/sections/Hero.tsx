@@ -1,4 +1,5 @@
 import { Download, MonitorPlay, Smartphone, Tablet, Globe, WifiOff, ShieldCheck } from 'lucide-react';
+import Mascot from '../Mascot';
 
 export default function Hero() {
   return (
@@ -65,9 +66,11 @@ export default function Hero() {
           <div className="relative z-10 order-first lg:order-last flex items-center justify-center">
             <div className="relative w-full max-w-[480px] aspect-square">
               <div className="mascot-halo" />
-              <img
-                src="/imgs/mascot/mascot-wave.png"
+              <Mascot
+                name="wave"
                 alt="PapaCheck 吉祥物"
+                size={480}
+                priority
                 className="mascot-float relative z-10 w-full h-full object-contain drop-shadow-[0_20px_30px_rgba(249,115,22,0.25)]"
               />
               <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-gradient-to-br from-yellow-300 to-orange-400 opacity-40 blur-xl" />

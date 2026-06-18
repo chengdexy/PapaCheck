@@ -6,11 +6,15 @@
 
 ## [Unreleased]
 
+### Added
+- **吉祥物图片多尺寸 + WebP 支持**：落地页 5 个吉祥物姿态（wave/bye/thumbs/ok/point）改用 `<picture>` + WebP 优先 + PNG 兜底；自动按 DPR 选 1x / 2x 资源；新增复用组件 `PapaCheck.Site/src/landing/components/Mascot.tsx`；Hero 的 wave 加 `fetchpriority="high"` + `index.html` 的 `<link rel="preload">` 抢 LCP；Story 三张加 `loading="lazy"`。新增资源生成脚本 `scripts/optimize_mascots.py`（可复跑）。资源体积 **10.49 MB → 633.9 KB（-94.1%）**
+
 ### Changed
 - **Web 通用代码重构**：提取 app.js 和 admin.js 中重复的通用代码（`showTransitionMask`、`hideTransitionMask`、`escapeHtml`、Service Worker 注册、页面刷新检测）到共享模块 `common.js`，消除约 100 行重复代码。更新 HTML 加载顺序在依赖脚本前引入 common.js。适配 4 个测试文件的 VM 上下文和提取源路径。全量 657 测试通过
 - **路由优化**：孩子端路径从 `/{admin.html}` 改为语义化路径 `/child`、`/parent`、`/login`。官网落地页导航栏、家庭管理面板、超管面板新增图标式角色入口按钮。Android 端同步更新 URL 拼接逻辑。全量 660 测试通过
 
 ### Fixed
+- **落地页吉祥物方向错误**：`mascot-ok.png`（OK 手势）和 `mascot-point.png`（指向右侧）的角色朝向与设计意图相反，水平翻转纠正
 
   - **孩子端离线/在线同步系统 11 个问题修复（基于代码审查报告 `docs/offline-sync-audit.md`）**：
   - **P0（数据丢失）**：`CRDTLog.append()` 加 `await` 和 `console.error`（22 处）；离线降级函数空 catch 改 `console.error` + `return false`（18 处）

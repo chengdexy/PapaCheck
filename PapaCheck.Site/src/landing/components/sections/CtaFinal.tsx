@@ -1,4 +1,5 @@
 import { Download, MonitorPlay, Heart, Check } from 'lucide-react';
+import Mascot from '../Mascot';
 
 export default function CtaFinal() {
   return (
@@ -57,9 +58,10 @@ export default function CtaFinal() {
             <div className="relative flex items-center justify-center">
               <div className="relative w-full max-w-[320px] aspect-square">
                 <div className="mascot-halo" />
-                <img
-                  src="/imgs/mascot/mascot-bye.png"
+                <Mascot
+                  name="bye"
                   alt="PapaCheck 吉祥物挥手告别"
+                  size={320}
                   className="mascot-float relative z-10 w-full h-full object-contain drop-shadow-[0_20px_30px_rgba(249,115,22,0.25)]"
                 />
                 <div className="absolute top-4 -right-2 w-12 h-12 rounded-full bg-pink-200/50 blur-lg" />

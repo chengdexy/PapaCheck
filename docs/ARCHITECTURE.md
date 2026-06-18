@@ -1,6 +1,6 @@
 # PapaCheck 技术架构文档
 
-> 最后更新：2026-06-10 | 版本：1.2.21
+> 最后更新：2026-06-18 | 版本：1.2.21
 
 ## 一、技术栈
 
@@ -166,6 +166,7 @@ PapaCheck/
 | TTS | edge-tts（微软） | 免费高质量中文语音 |
 | AI 解析 | LLM API（如 DeepSeek 等） | 任意支持中文的 LLM 均可，默认使用 DeepSeek |
 | 凭据存储 | Windows Credential Manager | 系统级安全存储 |
+| 落地页图片资源 | `<picture>` + WebP 1x/2x + PNG 兜底 | 资源体积 -94%，LCP 图 preload + fetchpriority=high 抢首屏；详见 `scripts/optimize_mascots.py` |
 
 ---
 

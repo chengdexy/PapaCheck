@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-18（PapaCheck.Site 整合）
+> 最后更新：2026-06-18（吉祥物资源优化）
 
 ## 当前版本
 
@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-18 | 落地页吉祥物资源优化：5 张 2048² PNG（10.49 MB）→ 1x/2x WebP + 1x PNG 兜底（633.9 KB，**缩减 94.1%**）；新增 `Mascot` 复用组件（`<picture>` + srcset）；Hero 的 wave 加 `fetchpriority="high"` + `index.html` preload；Story 3 张加 `loading="lazy"`；脚本 `scripts/optimize_mascots.py` 可复跑；顺手翻转 ok / point 纠正方向 |
 | 2026-06-18 | **PapaCheck.Site 整合落地页 + 管理面板**：将 landing 和 admin 合并到统一 Vite 5 + React 18 + TypeScript 5 + Tailwind CSS 3 项目；MPA 配置 + 自定义插件处理 admin 资源路径和复制；新增 5 个吉祥物插画（wave/point/ok/thumbs/bye）+ 悬浮动画；Story 区吉祥物以裸插画形式自然展示（去除边框背景）；`release.py site_publish` 重构适配合并构建；新增 5 个 TDD 测试覆盖构建流程、资源过滤、远程目录创建；全量 665 测试通过 |
 | 2026-06-17 | **Web 通用代码重构**：提取 app.js 和 admin.js 重复代码（showTransitionMask、hideTransitionMask、escapeHtml、SW注册、更新检测）到共享模块 common.js，消除约 100 行重复代码。更新 HTML 加载顺序，适配 4 个测试文件。全量 657 测试通过 |
 | 2026-06-17 | **离线/在线同步系统 11 个问题修复（P0-P3）**：CRDTLog.append 加 await + console.error（22 处）；离线降级函数空 catch 改 console.error + return false（18 处）；pollServer 空 catch 加日志；_doReconnect 同步失败后阻止切 online；_refreshFromServer 加 warn；wakeUp 加重试机制；init 用 API.getData 替代 location.reload；nodeId 改为 session 级持久 ID。全量 657 测试通过 |
