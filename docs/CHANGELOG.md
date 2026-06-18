@@ -6,6 +6,24 @@
 
 ## [Unreleased]
 
+### Added
+- **Phase 5e 完成 — Android 云端适配**：默认连接地址改为 `papacheck.chengdexy.cn:443`（原 `192.168.1.x:8080`）— `setup_page.dart`
+- **全量测试整合为 810 全绿**：Vitest 704 pass + 11 PG 集成 skip + Python 65 + Flutter 30；11 个 Site 管理面板测试通过 `@vitest-environment jsdom` 文件级注释并入主测试套件
+- **PapaCheck.Site 管理面板测试**：11 个文件 38 个测试加入 IDE 测试浏览器（之前因 jsdom 环境缺失全数跳过）
+
+### Changed
+- **测试配置重构**：全局 `vitest.config.js` 精简为 node 默认环境 + `include` 所有测试；Site 测试用文件级 `@vitest-environment jsdom` 注释隔离；删除 `PapaCheck.Site/vitest.config.ts` 残骸
+- **版本号**：v1.4.1-beta → v1.5.0-beta
+
+### Fixed
+- **PostgresAdapter 测试构造函数修复**：`new PostgresAdapter()` → `PostgresAdapter.create()`（构造函数已私有化）
+- **偶发测试失败修复**：`connection_offline_threshold.test.js` 用轮询（50ms×16）替代固定延迟 350ms 等待 JSDOM VM 定时器
+- **nginx-prod.conf 残留清理**：被 `nginx.conf` 完全替代的旧配置
+- **Footer 大屏留白修复**：`py-16` 从 `hero-container` div 搬到 `<footer>` 元素，避开 CSS `.hero-container { padding: 0 1.5rem }` 覆盖
+
+### Removed
+- **清理约 8000 行死代码**：`PapaCheck.Server/`（Python 旧后端）、`PapaCheck.Email/`、`Dockerfile` + `docker-compose.yml` + `.dockerignore`、`nginx-prod.conf`、`scripts/deploy.sh`、6 个临时 certbot 调试脚本、`docs/review.html`、`scripts/add_nginx_cache_headers.py`、`scripts/optimize_mascots.py`、4 个已废弃的 Python 测试文件、`conftest.py`
+
 ### Fixed
 - **Voice.speak 在 localStorage 不可用时崩溃**：隐私模式（Safari/Firefox）或第三方 cookie 禁用时 `localStorage.getItem` 抛 `SecurityError`，导致 TTS 语音完全不可用。改为复用 `PapaCheck.Web/js/api.js` 的 `getAuthHeaders()`（自带 try-catch 保护），与项目其他 API 请求保持一致。**全量 666 测试通过**（+1 新 vm 沙箱真实代码片段测试覆盖回归）
 
