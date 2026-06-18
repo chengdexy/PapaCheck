@@ -13,7 +13,7 @@
 
 ### Changed
 - **测试配置重构**：全局 `vitest.config.js` 精简为 node 默认环境 + `include` 所有测试；Site 测试用文件级 `@vitest-environment jsdom` 注释隔离；删除 `PapaCheck.Site/vitest.config.ts` 残骸
-- **版本号**：v1.4.1-beta → v1.5.0-beta
+- **版本号**：v1.4.1-beta → v1.3.8-beta
 
 ### Fixed
 - **PostgresAdapter 测试构造函数修复**：`new PostgresAdapter()` → `PostgresAdapter.create()`（构造函数已私有化）
