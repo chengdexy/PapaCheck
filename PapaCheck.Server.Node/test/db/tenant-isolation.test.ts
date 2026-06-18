@@ -7,7 +7,7 @@ describe.runIf(runPg)('Tenant Isolation', () => {
 
   beforeAll(async () => {
     const { PostgresAdapter } = await import('../../src/db/postgres-adapter.js');
-    adapter = new PostgresAdapter(process.env['DATABASE_URL']!);
+    adapter = await PostgresAdapter.create(process.env['DATABASE_URL']!);
   });
 
   afterAll(async () => {
