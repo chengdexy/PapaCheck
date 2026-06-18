@@ -66,7 +66,7 @@
 
 ## 待开发功能
 
-- [ ] Phase 5e: 客户端适配（Android 远程配置 + Web 登录状态持久化）
+- [x] Phase 5e: 客户端适配（Android 远程配置 + Web 登录状态持久化）— Android 首屏默认连接云服务器 `papacheck.chengdexy.cn:443`；Web child/admin 端 localStorage token 刷新恢复
 - [ ] iOS 端
 - [ ] 多孩子支持（数据模型已有，UI 未实现）
 - [ ] 更丰富的数据分析与报告
@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-18 | **Phase 5e 完成**：Android 端默认连接云服务器 `papacheck.chengdexy.cn:443`；Web 登录状态持久化已就绪（token localStorage 刷新恢复）；全量测试整合为 810 全绿（704+11 vitest + 65 Python + 30 Flutter）；清理约 8000 行死代码（PapaCheck.Server/、Docker、临时脚本等） |
 | 2026-06-18 | **Let's Encrypt 证书续期路径修复**：HTTP server `return 301` 从 server 级移入 `location /`，避免拦截 `/.well-known/acme-challenge/`（nginx 不会为 server 级 return 匹配 location）；certbot authenticator 从 standalone 改为 webroot（避免与 nginx 80 端口冲突）→ certbot renew --dry-run 通过 | 
 | 2026-06-18 | **Voice.speak 隐私模式异常修复**：Safari/Firefox 隐私模式或第三方 cookie 禁用时 `localStorage.getItem` 抛 `SecurityError` 导致 TTS 完全不可用，改为复用 `api.js` 的 `getAuthHeaders()`（自带 try-catch），新增 1 个 vm 沙箱真实代码片段测试，全量 666 测试通过 |
 | 2026-06-18 | **/api/speak 鉴权改造**：将 TTS 语音合成端点从 `PUBLIC_PATHS` 白名单移除，改为需 JWT 鉴权；`PapaCheck.Web/js/app.js` Voice.speak fetch 增加 `Authorization: Bearer <token>` 头；新增 6 个 TDD 测试（3 个 speak-auth、1 个 compiled-middleware、2 个 app.test.js），全量 665 测试通过。消除匿名滥用 TTS 上游、磁盘缓存无界增长、Python 服务端 CORS `*` 等 7 项隐患 |

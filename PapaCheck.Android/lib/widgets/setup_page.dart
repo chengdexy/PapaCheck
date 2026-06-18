@@ -59,8 +59,8 @@ class _SetupPageState extends State<SetupPage> {
         text: (uri?.port ?? 8081).toString(),
       );
     } else {
-      _ipController = TextEditingController(text: '192.168.1.');
-      _portController = TextEditingController(text: '8080');
+      _ipController = TextEditingController(text: 'papacheck.chengdexy.cn');
+      _portController = TextEditingController(text: '443');
     }
   }
 
@@ -359,7 +359,7 @@ class _SetupPageState extends State<SetupPage> {
             style: const TextStyle(
                 fontSize: 15, fontWeight: FontWeight.w500),
             decoration: _inputDecoration(
-                '192.168.1.xxx \u6216\u57df\u540d'),
+                'papacheck.chengdexy.cn'),
           ),
         ),
         Padding(
@@ -377,7 +377,7 @@ class _SetupPageState extends State<SetupPage> {
             keyboardType: TextInputType.number,
             style: const TextStyle(
                 fontSize: 15, fontWeight: FontWeight.w500),
-            decoration: _inputDecoration('8080'),
+            decoration: _inputDecoration('443'),
           ),
         ),
       ],
