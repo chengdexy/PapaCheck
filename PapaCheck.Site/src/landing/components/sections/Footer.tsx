@@ -2,9 +2,9 @@ import { ExternalLink } from 'lucide-react';
 
 export default function Footer() {
   return (
-    <footer className="border-t border-ink-200/60 bg-white py-16 md:py-20 lg:py-24">
+    <footer className="border-t border-ink-200/60 bg-white py-10">
       <div className="hero-container">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <img src="/imgs/favicon.png" alt="PapaCheck" className="w-8 h-8 rounded-lg" />
             <div>
