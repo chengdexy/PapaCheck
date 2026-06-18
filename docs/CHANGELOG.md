@@ -7,7 +7,7 @@
 ## [Unreleased]
 
 ### Added
-- **吉祥物图片多尺寸 + WebP 支持**：落地页 5 个吉祥物姿态（wave/bye/thumbs/ok/point）改用 `<picture>` + WebP 优先 + PNG 兜底；自动按 DPR 选 1x / 2x 资源；新增复用组件 `PapaCheck.Site/src/landing/components/Mascot.tsx`；Hero 的 wave 加 `fetchpriority="high"` + `index.html` 的 `<link rel="preload">` 抢 LCP；Story 三张加 `loading="lazy"`。新增资源生成脚本 `scripts/optimize_mascots.py`（可复跑）。资源体积 **10.49 MB → 633.9 KB（-94.1%）**
+- **/api/speak 鉴权改造（安全加固）**：将 TTS 语音合成端点从 `PUBLIC_PATHS` 白名单移除，改为需 JWT 鉴权；`PapaCheck.Web/js/app.js` 的 `Voice.speak` fetch 增加 `Authorization: Bearer <token>` 头（已登录时携带，未登录时降级处理）；新增 6 个 TDD 测试覆盖服务端 401/有效 token 200、中间件拦载、编译产物一致、前端携带 auth 头等场景，全量 **665 测试**通过。消除匿名滥用 TTS 上游、磁盘缓存无界增长、Python 服务端 CORS `*` 等 7 项隐患
 
 ### Changed
 - **Web 通用代码重构**：提取 app.js 和 admin.js 中重复的通用代码（`showTransitionMask`、`hideTransitionMask`、`escapeHtml`、Service Worker 注册、页面刷新检测）到共享模块 `common.js`，消除约 100 行重复代码。更新 HTML 加载顺序在依赖脚本前引入 common.js。适配 4 个测试文件的 VM 上下文和提取源路径。全量 657 测试通过
@@ -16,6 +16,7 @@
 ### Fixed
 - **落地页吉祥物方向错误**：`mascot-ok.png`（OK 手势）和 `mascot-point.png`（指向右侧）的角色朝向与设计意图相反，水平翻转纠正
 - **preload `imagesrcset` 兼容性**：`index.html` 的 `<link rel="preload" as="image">` 上的 `imagesrcset` 仅在 Chrome 121+ / Firefox 128+ / Safari 17.4+（2024 年起）才生效，对老浏览器是无效配置；移除该属性，统一回退到 `href`（1x 兜底），由组件内 `srcset` 负责 2x 选择
+- **落地页 footer 大屏留白不足**：`Footer.tsx` 垂直内边距 `py-10`（40px）相比其他 section 的 `py-20 md:py-28`（80/112px）缩水一半，在 1920px+ 大屏下显得被"压扁"在页面底部；改为 `py-16 md:py-20 lg:py-24`（64/80/96px），并把主行 `gap-4` → `gap-6` 提升节奏感
 
   - **孩子端离线/在线同步系统 11 个问题修复（基于代码审查报告 `docs/offline-sync-audit.md`）**：
   - **P0（数据丢失）**：`CRDTLog.append()` 加 `await` 和 `console.error`（22 处）；离线降级函数空 catch 改 `console.error` + `return false`（18 处）

@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-18（吉祥物资源优化）
+> 最后更新：2026-06-18（/api/speak 鉴权改造）
 
 ## 当前版本
 
@@ -89,6 +89,8 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-18 | **/api/speak 鉴权改造**：将 TTS 语音合成端点从 `PUBLIC_PATHS` 白名单移除，改为需 JWT 鉴权；`PapaCheck.Web/js/app.js` Voice.speak fetch 增加 `Authorization: Bearer <token>` 头；新增 6 个 TDD 测试（3 个 speak-auth、1 个 compiled-middleware、2 个 app.test.js），全量 665 测试通过。消除匿名滥用 TTS 上游、磁盘缓存无界增长、Python 服务端 CORS `*` 等 7 项隐患 |
+| 2026-06-18 | 修复：落地页 footer 大屏留白不足（`py-10` → `py-16 md:py-20 lg:py-24`，主行 `gap-4` → `gap-6`） |
 | 2026-06-18 | 修复：preload `imagesrcset` 兼容性（仅 Chrome 121+/FF 128+/Safari 17.4+ 支持，老浏览器无效），移除该属性，统一回退到 `href`（1x 兜底） |
 | 2026-06-18 | 落地页吉祥物资源优化：5 张 2048² PNG（10.49 MB）→ 1x/2x WebP + 1x PNG 兜底（633.9 KB，**缩减 94.1%**）；新增 `Mascot` 复用组件（`<picture>` + srcset）；Hero 的 wave 加 `fetchpriority="high"` + `index.html` preload；Story 3 张加 `loading="lazy"`；脚本 `scripts/optimize_mascots.py` 可复跑；顺手翻转 ok / point 纠正方向 |
 | 2026-06-18 | **PapaCheck.Site 整合落地页 + 管理面板**：将 landing 和 admin 合并到统一 Vite 5 + React 18 + TypeScript 5 + Tailwind CSS 3 项目；MPA 配置 + 自定义插件处理 admin 资源路径和复制；新增 5 个吉祥物插画（wave/point/ok/thumbs/bye）+ 悬浮动画；Story 区吉祥物以裸插画形式自然展示（去除边框背景）；`release.py site_publish` 重构适配合并构建；新增 5 个 TDD 测试覆盖构建流程、资源过滤、远程目录创建；全量 665 测试通过 |
