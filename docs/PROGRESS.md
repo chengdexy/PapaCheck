@@ -90,6 +90,7 @@
 | 日期 | 变更 |
 |------|------|
 | 2026-06-18 | **/api/speak 鉴权改造**：将 TTS 语音合成端点从 `PUBLIC_PATHS` 白名单移除，改为需 JWT 鉴权；`PapaCheck.Web/js/app.js` Voice.speak fetch 增加 `Authorization: Bearer <token>` 头；新增 6 个 TDD 测试（3 个 speak-auth、1 个 compiled-middleware、2 个 app.test.js），全量 665 测试通过。消除匿名滥用 TTS 上游、磁盘缓存无界增长、Python 服务端 CORS `*` 等 7 项隐患 |
+| 2026-06-18 | 修复：nginx `location /` 缺 `Cache-Control` 导致 `index.html` 走浏览器启发式缓存，deploy 后用户必须硬刷新才能看到新内容；改为 `no-cache, must-revalidate`，`/assets/*` 缓存由 7d 延长为 1y（Vite content-hash 安全） |
 | 2026-06-18 | 修复：落地页 footer 大屏留白不足（`py-10` → `py-16 md:py-20 lg:py-24`，主行 `gap-4` → `gap-6`） |
 | 2026-06-18 | 修复：preload `imagesrcset` 兼容性（仅 Chrome 121+/FF 128+/Safari 17.4+ 支持，老浏览器无效），移除该属性，统一回退到 `href`（1x 兜底） |
 | 2026-06-18 | 落地页吉祥物资源优化：5 张 2048² PNG（10.49 MB）→ 1x/2x WebP + 1x PNG 兜底（633.9 KB，**缩减 94.1%**）；新增 `Mascot` 复用组件（`<picture>` + srcset）；Hero 的 wave 加 `fetchpriority="high"` + `index.html` preload；Story 3 张加 `loading="lazy"`；脚本 `scripts/optimize_mascots.py` 可复跑；顺手翻转 ok / point 纠正方向 |

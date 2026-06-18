@@ -17,6 +17,7 @@
 - **落地页吉祥物方向错误**：`mascot-ok.png`（OK 手势）和 `mascot-point.png`（指向右侧）的角色朝向与设计意图相反，水平翻转纠正
 - **preload `imagesrcset` 兼容性**：`index.html` 的 `<link rel="preload" as="image">` 上的 `imagesrcset` 仅在 Chrome 121+ / Firefox 128+ / Safari 17.4+（2024 年起）才生效，对老浏览器是无效配置；移除该属性，统一回退到 `href`（1x 兜底），由组件内 `srcset` 负责 2x 选择
 - **落地页 footer 大屏留白不足**：`Footer.tsx` 垂直内边距 `py-10`（40px）相比其他 section 的 `py-20 md:py-28`（80/112px）缩水一半，在 1920px+ 大屏下显得被"压扁"在页面底部；改为 `py-16 md:py-20 lg:py-24`（64/80/96px），并把主行 `gap-4` → `gap-6` 提升节奏感
+- **nginx `index.html` cache header 缺失**：`location /` 之前无 `Cache-Control`，依赖浏览器启发式缓存，导致 `release.py --site` 部署新代码后用户必须硬刷新（Ctrl+Shift+R）才能看到新内容；改为 `no-cache, must-revalidate` 强制每次 revalidate（开销几乎为 0），配合现有 ETag 机制，deploy 后下次访问即生效；同时将 `/assets/*` 的 cache 由 7 天延长为 1 年（Vite 输出全部带 content-hash，URL 变了就是新文件，缓存 1 年绝对安全）
 
   - **孩子端离线/在线同步系统 11 个问题修复（基于代码审查报告 `docs/offline-sync-audit.md`）**：
   - **P0（数据丢失）**：`CRDTLog.append()` 加 `await` 和 `console.error`（22 处）；离线降级函数空 catch 改 `console.error` + `return false`（18 处）
