@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-18 | **Let's Encrypt 证书续期路径修复**：HTTP server `return 301` 从 server 级移入 `location /`，避免拦截 `/.well-known/acme-challenge/`（nginx 不会为 server 级 return 匹配 location）；certbot authenticator 从 standalone 改为 webroot（避免与 nginx 80 端口冲突）→ certbot renew --dry-run 通过 | 
 | 2026-06-18 | **Voice.speak 隐私模式异常修复**：Safari/Firefox 隐私模式或第三方 cookie 禁用时 `localStorage.getItem` 抛 `SecurityError` 导致 TTS 完全不可用，改为复用 `api.js` 的 `getAuthHeaders()`（自带 try-catch），新增 1 个 vm 沙箱真实代码片段测试，全量 666 测试通过 |
 | 2026-06-18 | **/api/speak 鉴权改造**：将 TTS 语音合成端点从 `PUBLIC_PATHS` 白名单移除，改为需 JWT 鉴权；`PapaCheck.Web/js/app.js` Voice.speak fetch 增加 `Authorization: Bearer <token>` 头；新增 6 个 TDD 测试（3 个 speak-auth、1 个 compiled-middleware、2 个 app.test.js），全量 665 测试通过。消除匿名滥用 TTS 上游、磁盘缓存无界增长、Python 服务端 CORS `*` 等 7 项隐患 |
 | 2026-06-18 | 修复：nginx `location /` 缺 `Cache-Control` 导致 `index.html` 走浏览器启发式缓存，deploy 后用户必须硬刷新才能看到新内容；改为 `no-cache, must-revalidate`，`/assets/*` 改为 `add_header "public, max-age=31536000, immutable"`（1y，Vite content-hash 安全；**不能用 `expires 1y`**，会被 nginx 自动生成 cache-control 抑制 add_header 导致双 cache-control 头）。同时把项目 `nginx.conf` 同步成 live `default`（之前 root 写成 `/usr/share/nginx/html` 是错的，应该是 `/opt/papacheck/PapaCheck.Site`；还缺少整个反向代理段 `/child /parent /login /app/ /api/ @nodejs`），新增 `scripts/add_nginx_cache_headers.py`（幂等修复脚本） |
