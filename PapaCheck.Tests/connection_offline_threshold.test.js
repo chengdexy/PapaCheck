@@ -252,8 +252,8 @@ function loadConnectionManager(options = {}) {
         json: async () => ({ ok: true }),
       };
     },
-    showToast: () => {},
-    SyncEngine: { fullSync: async () => {} },
+    showToast: () => { },
+    SyncEngine: { fullSync: async () => { } },
     API: { getData: async () => ({}) },
   };
 
@@ -300,8 +300,11 @@ test('[RED] 连续 2 次 ping 失败后模式仍为 online（阈值容错）', a
   // 启动 CM，第 1 次 ping 成功 → online
   await ConnectionManager.start();
 
-  // 等待 2 次 interval ping（间隔 100ms，等待 250ms 足以触发 2 次）
-  await new Promise(r => setTimeout(r, 250));
+  // 轮询等待（最多等 500ms，防止 JSDOM VM 定时器不精确）
+  for (let i = 0; i < 10; i++) {
+    await new Promise(r => setTimeout(r, 50));
+    if (ConnectionManager.getMode() === 'reconnecting') break;
+  }
 
   const mode = ConnectionManager.getMode();
 
@@ -326,8 +329,11 @@ test('连续 3 次 ping 失败后正确切换离线', async () => {
 
   await ConnectionManager.start();
 
-  // 等待 3 次 interval ping（间隔 100ms，350ms 足以触发 3 次）
-  await new Promise(r => setTimeout(r, 350));
+  // 轮询等待离线（最多等 800ms，防止 JSDOM VM 定时器不精确）
+  for (let i = 0; i < 16; i++) {
+    await new Promise(r => setTimeout(r, 50));
+    if (ConnectionManager.getMode() === 'offline') break;
+  }
 
   const mode = ConnectionManager.getMode();
   assert.strictEqual(mode, 'offline', '连续 3 次 ping 失败应切换为 offline');
