@@ -76,4 +76,11 @@ const viteConfig = {
   },
 };
 
-export default defineConfig(viteConfig);
+export default defineConfig({
+  ...viteConfig,
+  // @ts-ignore
+  test: {
+    environment: 'jsdom',
+    globals: true,
+  },
+});
