@@ -22,6 +22,9 @@
   },
   "homepage": "https://github.com/chengdexy/PapaCheck#readme",
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@vitest/coverage-v8": "^4.1.8",
     "imap": "^0.8.19",
     "jsdom": "^29.1.1",
