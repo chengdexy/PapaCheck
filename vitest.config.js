@@ -5,13 +5,19 @@ import { dirname } from 'path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-    test: {
-        root: __dirname,
-        globals: true,
-        include: [
-            'PapaCheck.Tests/**/*.test.js',
-            'PapaCheck.Server.Node/test/**/*.test.ts',
-            'PapaCheck.Web/js/__tests__/**/*.test.js',
-        ],
-    },
+  test: {
+    root: __dirname,
+    globals: true,
+    environment: 'jsdom',
+    include: [
+      'PapaCheck.Tests/**/*.test.js',
+      'PapaCheck.Server.Node/test/**/*.test.ts',
+      'PapaCheck.Site/src/**/*.test.tsx',
+      'PapaCheck.Web/js/__tests__/**/*.test.js',
+    ],
+    exclude: [
+      'PapaCheck.Server.Node/test/tts.test.ts',
+      'PapaCheck.Server.Node/test/ops/backup.test.ts',
+    ],
+  },
 });

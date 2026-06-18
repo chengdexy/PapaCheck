@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
+import { fileURLToPath } from 'node:url';
+import { resolve, dirname } from 'node:path';
 
-const SCHEMA_PATH = new URL('../../scripts/init-pg-schema.sql', import.meta.url);
+const SCHEMA_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../../scripts/init-pg-schema.sql');
 
 describe('Multi-tenant Schema', () => {
   const schema = readFileSync(SCHEMA_PATH, 'utf-8');

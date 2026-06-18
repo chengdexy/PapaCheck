@@ -13,7 +13,13 @@ const { mockMkdir, mockUnlink, mockStat } = vi.hoisted(() => ({
   mockCreateReadStream: vi.fn(),
 }));
 
-vi.mock('node:child_process', () => ({ execFile: mockExecFile }));
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return {
+    ...actual,
+    execFile: mockExecFile,
+  };
+});
 vi.mock('node:fs', () => {
   const { Readable } = require('stream');
   return {
@@ -27,12 +33,16 @@ vi.mock('node:fs', () => {
     existsSync: () => true,
   };
 });
-vi.mock('node:fs/promises', () => ({
-  mkdir: mockMkdir,
-  unlink: mockUnlink,
-  stat: mockStat,
-  readdir: vi.fn(),
-}));
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return {
+    ...actual,
+    mkdir: mockMkdir,
+    unlink: mockUnlink,
+    stat: mockStat,
+    readdir: vi.fn(),
+  };
+});
 
 import { runBackup, triggerBackupManually, listBackups, getBackupFilePath, pruneOldBackups } from '../../src/ops/backup.js';
 import type { IDatabase, BackupRecord } from '../../src/db/types.js';

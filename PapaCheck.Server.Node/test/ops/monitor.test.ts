@@ -9,15 +9,23 @@ const { mockStatfs } = vi.hoisted(() => ({
     mockStatfs: vi.fn(),
 }));
 
-vi.mock('node:os', () => ({
-    totalmem: () => mockTotalmem(),
-    freemem: () => mockFreemem(),
-    hostname: () => 'test-server',
-}));
-vi.mock('node:fs/promises', () => ({
-    statfs: mockStatfs,
-    readFile: vi.fn(),
-}));
+vi.mock('node:os', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('node:os')>();
+    return {
+        ...actual,
+        totalmem: () => mockTotalmem(),
+        freemem: () => mockFreemem(),
+        hostname: () => 'test-server',
+    };
+});
+vi.mock('node:fs/promises', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('node:fs/promises')>();
+    return {
+        ...actual,
+        statfs: mockStatfs,
+        readFile: vi.fn(),
+    };
+});
 
 import { collectHealth, evaluateAlerts } from '../../src/ops/monitor.js';
 import type { IDatabase } from '../../src/db/types.js';
