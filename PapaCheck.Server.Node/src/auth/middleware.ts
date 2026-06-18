@@ -5,12 +5,12 @@ import { verifyToken } from './jwt.js';
 
 // PUBLIC_PATHS: 放行的公开 API 路径
 // 新增公开路由时请同步更新此集合，避免意外拦截
+// 注：/api/speak 已于 2026-06-18 改为需鉴权，防止匿名滥用 TTS 上游
 const PUBLIC_PATHS = new Set([
   '/api/ping',
   '/api/version',
   '/api/static-version',
   '/api/download',
-  '/api/speak',
   '/api/auth/exchange',
   '/api/auth/register',
   '/api/auth/login',

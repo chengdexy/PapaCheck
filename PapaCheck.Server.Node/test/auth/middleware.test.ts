@@ -61,15 +61,15 @@ describe('Auth Middleware', () => {
     expect(res.statusCode).toBe(200);
   });
 
-  // Feature: 公开 API 路径无需认证
-  //   Scenario: /api/speak 公开路径直接放行
-  //     Given TTS 语音合成的公开路径 /api/speak
-  //     When  不携带认证信息
-  //     Then  返回 200
+  // Feature: 受保护路径需要认证
+  //   Scenario: /api/speak 改为需鉴权后无 token 被拒绝
+  //     Given /api/speak 已从 PUBLIC_PATHS 移除
+  //     When  不携带 Authorization 头访问 /api/speak
+  //     Then  返回 401
 
-  it('should allow /api/speak without auth', async () => {
+  it('should return 401 for /api/speak without auth', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/speak' });
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(401);
   });
 
   // Feature: 公开 API 路径无需认证

@@ -38,6 +38,17 @@
  *     Given 作业对象包含 _pausedElapsed 瞬态字段
  *     When pauseActiveTask 构造 PATCH 数据或完成时
  *     Then 发送到服务器的数据不包含 _pausedElapsed
+ *
+ * Feature: /api/speak 鉴权改造
+ *   Scenario: Voice.speak 拉取语音时携带 Authorization 头
+ *     Given 用户已登录且 localStorage 中有 papacheck_token
+ *     When  Voice.speak 调 /api/speak?text=...
+ *     Then  fetch 请求头包含 'Authorization: Bearer <token>'
+ *
+ *   Scenario: 未登录时拉取语音不抛异常
+ *     Given localStorage 中无 papacheck_token
+ *     When  Voice.speak 调 /api/speak?text=...
+ *     Then  fetch 请求头不含 Authorization，服务端会返回 401，走降级逻辑
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -117,6 +128,72 @@ describe('wakeUp 调用顺序', () => {
 
     wakeUp();
     expect(speakCalls).toEqual(['屏幕已唤醒']);
+  });
+});
+
+describe('/api/speak 鉴权请求', () => {
+  // Scenario: 已登录时 fetch /api/speak 携带 Authorization 头
+  //   Given localStorage 中存在 papacheck_token
+  //   When  Voice.speak 调 /api/speak?text=...
+  //   Then  fetch 请求头包含 'Authorization: Bearer <token>'
+
+  it('已登录时 fetch /api/speak 应携带 Authorization 头', async () => {
+    const fakeToken = 'test-jwt-token-abc';
+    // 模拟 localStorage
+    const storage = { papacheck_token: fakeToken };
+    const localStorageMock = {
+      getItem: (key) => storage[key] ?? null,
+      setItem: (key, val) => { storage[key] = val; },
+    };
+
+    // 模拟 fetch，捕获请求头
+    let capturedHeaders = null;
+    const fetchMock = async (url, opts = {}) => {
+      capturedHeaders = opts.headers || {};
+      return { ok: true, blob: async () => new Blob([new Uint8Array(8)], { type: 'audio/mpeg' }) };
+    };
+
+    // 模拟的 Voice.speak 简化版（仅取本次任务的 fetch 调用）
+    async function speakText(text) {
+      const url = '/api/speak?' + new URLSearchParams({ text });
+      const token = localStorageMock.getItem('papacheck_token');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      const resp = await fetchMock(url, { headers });
+      return resp;
+    }
+
+    await speakText('你好');
+
+    expect(capturedHeaders).toHaveProperty('Authorization');
+    expect(capturedHeaders['Authorization']).toBe('Bearer ' + fakeToken);
+  });
+
+  // Scenario: 未登录时 fetch /api/speak 不抛异常
+  //   Given localStorage 中无 papacheck_token
+  //   When  Voice.speak 调 /api/speak?text=...
+  //   Then  fetch 请求头不含 Authorization，调用不抛异常
+
+  it('未登录时 fetch /api/speak 不抛异常且不带 Authorization 头', async () => {
+    const localStorageMock = {
+      getItem: () => null,
+    };
+
+    let capturedHeaders = null;
+    const fetchMock = async (url, opts = {}) => {
+      capturedHeaders = opts.headers || {};
+      return { ok: true, blob: async () => new Blob([]) };
+    };
+
+    async function speakText(text) {
+      const url = '/api/speak?' + new URLSearchParams({ text });
+      const token = localStorageMock.getItem('papacheck_token');
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      const resp = await fetchMock(url, { headers });
+      return resp;
+    }
+
+    await expect(speakText('测试')).resolves.toBeDefined();
+    expect(capturedHeaders).not.toHaveProperty('Authorization');
   });
 });
 

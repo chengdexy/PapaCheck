@@ -111,7 +111,10 @@ const Voice = {
         audio = new Audio(this._cache.get(text));
       } else {
         const url = '/api/speak?' + new URLSearchParams({ text });
-        const resp = await fetch(url);
+        // /api/speak 已改为需鉴权（2026-06-18），需携带 JWT
+        const token = localStorage.getItem('papacheck_token');
+        const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+        const resp = await fetch(url, { headers });
         if (!resp.ok) throw new Error('speak fail');
         const blob = await resp.blob();
         console.log('[Voice] fetch OK:', text, 'size:', blob.size);

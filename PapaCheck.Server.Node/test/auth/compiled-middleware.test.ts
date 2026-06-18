@@ -25,14 +25,13 @@ describe('Compiled Middleware', () => {
     expect(existsSync(DIST_MIDDLEWARE)).toBe(true);
   });
 
-  // Feature: PUBLIC_PATHS 必须包含 /api/speak
-  //   Scenario: /api/speak 在公开路径白名单中
+  // Feature: PUBLIC_PATHS 不应包含 /api/speak（已改为需鉴权）
+  //   Scenario: /api/speak 不在公开路径白名单中
   //     Given dist/auth/middleware.js 已编译
   //     When  读取文件内容
-  //     Then  必须包含 '/api/speak' 在 PUBLIC_PATHS 中
-  //   Note: 缺少此项会导致孩子端语音播报返回 401
+  //     Then  PUBLIC_PATHS 中不应包含 '/api/speak'
 
-  it('should include /api/speak in PUBLIC_PATHS', () => {
+  it('should NOT include /api/speak in PUBLIC_PATHS', () => {
     if (!existsSync(DIST_MIDDLEWARE)) {
       return; // 跳过，由上一个测试负责报告
     }
@@ -40,7 +39,7 @@ describe('Compiled Middleware', () => {
     // 在 PUBLIC_PATHS 的 new Set([...]) 中查找 /api/speak
     const publicPathsMatch = content.match(/new Set\(\[([\s\S]*?)\]\)/);
     expect(publicPathsMatch).not.toBeNull();
-    expect(publicPathsMatch![1]).toContain('/api/speak');
+    expect(publicPathsMatch![1]).not.toContain('/api/speak');
   });
 
   // Feature: 源代码中的 PUBLIC_PATHS 与编译产物一致

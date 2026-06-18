@@ -731,6 +731,7 @@ describe('GET /api/static-version', () => {
 });
 
 // ==================== TTS 端点 ====================
+// 注：/api/speak 鉴权测试已迁移到 test/auth/speak-auth.test.ts
 
 describe('GET /api/speak', () => {
   it('缺少 text 参数时返回 400', async () => {
