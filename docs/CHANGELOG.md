@@ -15,6 +15,7 @@
 
 ### Fixed
 - **落地页吉祥物方向错误**：`mascot-ok.png`（OK 手势）和 `mascot-point.png`（指向右侧）的角色朝向与设计意图相反，水平翻转纠正
+- **preload `imagesrcset` 兼容性**：`index.html` 的 `<link rel="preload" as="image">` 上的 `imagesrcset` 仅在 Chrome 121+ / Firefox 128+ / Safari 17.4+（2024 年起）才生效，对老浏览器是无效配置；移除该属性，统一回退到 `href`（1x 兜底），由组件内 `srcset` 负责 2x 选择
 
   - **孩子端离线/在线同步系统 11 个问题修复（基于代码审查报告 `docs/offline-sync-audit.md`）**：
   - **P0（数据丢失）**：`CRDTLog.append()` 加 `await` 和 `console.error`（22 处）；离线降级函数空 catch 改 `console.error` + `return false`（18 处）

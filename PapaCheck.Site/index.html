@@ -6,13 +6,13 @@
   <title>PapaCheck 爸~检查！- 让孩子主动写作业</title>
   <meta name="description" content="AI 评优 + 积分商城 + 三端同步，培养孩子自驱力。" />
   <link rel="icon" type="image/png" href="/imgs/favicon.png" />
-  <!-- LCP 关键图：Hero 吉祥物 wave，提前预加载抢首屏 -->
+  <!-- LCP 关键图：Hero 吉祥物 wave，提前预加载 1x 抢首屏 -->
+  <!-- 2x 由组件内 srcset 处理；imagesrcset 在 <link rel=preload> 上支持较新（Chrome 121+/FF 128+/Safari 17.4+），此处不强依赖 -->
   <link
     rel="preload"
     as="image"
     type="image/webp"
     href="/imgs/mascot/mascot-wave.webp"
-    imagesrcset="/imgs/mascot/mascot-wave.webp 1x, /imgs/mascot/mascot-wave@2x.webp 2x"
     fetchpriority="high"
   />
 </head>
