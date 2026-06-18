@@ -49,6 +49,11 @@
  *     Given localStorage 中无 papacheck_token
  *     When  Voice.speak 调 /api/speak?text=...
  *     Then  fetch 请求头不含 Authorization，服务端会返回 401，走降级逻辑
+ *
+ *   Scenario: localStorage 抛出异常时（隐私模式/被禁用）不阻断语音功能
+ *     Given localStorage.getItem 抛 SecurityError（如 Safari 隐私模式）
+ *     When  Voice.speak 调 /api/speak?text=...
+ *     Then  fetch 仍被调用，请求头不含 Authorization，不抛异常
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -193,6 +198,64 @@ describe('/api/speak 鉴权请求', () => {
     }
 
     await expect(speakText('测试')).resolves.toBeDefined();
+    expect(capturedHeaders).not.toHaveProperty('Authorization');
+  });
+
+  // Scenario: localStorage 抛异常时（隐私模式/被禁用）不阻断语音功能
+  //   Given localStorage.getItem 抛 SecurityError
+  //   When  Voice.speak 调 /api/speak?text=...
+  //   Then  fetch 仍被调用，请求头不含 Authorization，不抛异常
+
+  it('localStorage 抛异常时仍能调用 fetch 且不带 Authorization 头', async () => {
+    // 从 app.js 读取真实的"取 token + 构造 fetch"片段并执行，
+    // 确保测试覆盖生产代码（防止有人未来又用裸 localStorage.getItem 替换回去）
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const vm = await import('node:vm');
+
+    const appJsPath = path.resolve(__dirname, '..', 'app.js');
+    const appJsSrc = fs.readFileSync(appJsPath, 'utf-8');
+    // 提取 "/api/speak" 段附近的 token 读取 + headers 构造 + fetch 调用片段
+    // 模式匹配"const url = '/api/speak..." 到 "await fetch(url" 之间
+    const snippet = appJsSrc.match(/const url = '\/api\/spea[^]*?await fetch\(url[^;]*;/);
+    if (!snippet) {
+      throw new Error('无法在 app.js 中定位 /api/speak fetch 片段，请检查源码结构');
+    }
+
+    // 构造沙箱：注入模拟 localStorage + fetch + URLSearchParams + getAuthHeaders + text 参数
+    // getAuthHeaders 来自 api.js：自带 try-catch 保护隐私模式下 localStorage 禁用场景
+    let capturedHeaders = null;
+    let fetchCalled = false;
+    const sandbox = {
+      localStorage: {
+        getItem: () => {
+          const err = new Error('SecurityError: localStorage is disabled');
+          err.name = 'SecurityError';
+          throw err;
+        },
+      },
+      URLSearchParams,
+      text: '你好',
+      getAuthHeaders: () => {
+        try {
+          const token = sandbox.localStorage.getItem('papacheck_token');
+          return token ? { 'Authorization': 'Bearer ' + token } : {};
+        } catch (e) {
+          return {};
+        }
+      },
+      fetch: async (_url, opts = {}) => {
+        fetchCalled = true;
+        capturedHeaders = opts.headers || {};
+        return { ok: true, blob: async () => new Blob([]) };
+      },
+    };
+    vm.createContext(sandbox);
+    // 将提取的片段包成 async IIFE 并执行
+    const code = `(async () => { ${snippet[0]} })()`;
+    await vm.runInContext(code, sandbox);
+
+    expect(fetchCalled).toBe(true);
     expect(capturedHeaders).not.toHaveProperty('Authorization');
   });
 });

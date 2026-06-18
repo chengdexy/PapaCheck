@@ -112,9 +112,8 @@ const Voice = {
       } else {
         const url = '/api/speak?' + new URLSearchParams({ text });
         // /api/speak 已改为需鉴权（2026-06-18），需携带 JWT
-        const token = localStorage.getItem('papacheck_token');
-        const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
-        const resp = await fetch(url, { headers });
+        // 复用 api.js 的 getAuthHeaders()：自带 try-catch 保护隐私模式下 localStorage 禁用场景
+        const resp = await fetch(url, { headers: getAuthHeaders() });
         if (!resp.ok) throw new Error('speak fail');
         const blob = await resp.blob();
         console.log('[Voice] fetch OK:', text, 'size:', blob.size);

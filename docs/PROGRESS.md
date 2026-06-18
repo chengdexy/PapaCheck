@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-18（/api/speak 鉴权改造）
+> 最后更新：2026-06-18（Voice.speak 隐私模式异常修复）
 
 ## 当前版本
 
-**v1.4.2-beta**（PapaCheck.Site 整合落地页 + 管理面板，665 测试）
+**v1.4.2-beta**（PapaCheck.Site 整合落地页 + 管理面板，666 测试）
 
 ## 部署状态
 
@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-18 | **Voice.speak 隐私模式异常修复**：Safari/Firefox 隐私模式或第三方 cookie 禁用时 `localStorage.getItem` 抛 `SecurityError` 导致 TTS 完全不可用，改为复用 `api.js` 的 `getAuthHeaders()`（自带 try-catch），新增 1 个 vm 沙箱真实代码片段测试，全量 666 测试通过 |
 | 2026-06-18 | **/api/speak 鉴权改造**：将 TTS 语音合成端点从 `PUBLIC_PATHS` 白名单移除，改为需 JWT 鉴权；`PapaCheck.Web/js/app.js` Voice.speak fetch 增加 `Authorization: Bearer <token>` 头；新增 6 个 TDD 测试（3 个 speak-auth、1 个 compiled-middleware、2 个 app.test.js），全量 665 测试通过。消除匿名滥用 TTS 上游、磁盘缓存无界增长、Python 服务端 CORS `*` 等 7 项隐患 |
 | 2026-06-18 | 修复：nginx `location /` 缺 `Cache-Control` 导致 `index.html` 走浏览器启发式缓存，deploy 后用户必须硬刷新才能看到新内容；改为 `no-cache, must-revalidate`，`/assets/*` 缓存由 7d 延长为 1y（Vite content-hash 安全） |
 | 2026-06-18 | 修复：落地页 footer 大屏留白不足（`py-10` → `py-16 md:py-20 lg:py-24`，主行 `gap-4` → `gap-6`） |

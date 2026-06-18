@@ -6,8 +6,11 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Voice.speak 在 localStorage 不可用时崩溃**：隐私模式（Safari/Firefox）或第三方 cookie 禁用时 `localStorage.getItem` 抛 `SecurityError`，导致 TTS 语音完全不可用。改为复用 `PapaCheck.Web/js/api.js` 的 `getAuthHeaders()`（自带 try-catch 保护），与项目其他 API 请求保持一致。**全量 666 测试通过**（+1 新 vm 沙箱真实代码片段测试覆盖回归）
+
 ### Added
-- **/api/speak 鉴权改造（安全加固）**：将 TTS 语音合成端点从 `PUBLIC_PATHS` 白名单移除，改为需 JWT 鉴权；`PapaCheck.Web/js/app.js` 的 `Voice.speak` fetch 增加 `Authorization: Bearer <token>` 头（已登录时携带，未登录时降级处理）；新增 6 个 TDD 测试覆盖服务端 401/有效 token 200、中间件拦载、编译产物一致、前端携带 auth 头等场景，全量 **665 测试**通过。消除匿名滥用 TTS 上游、磁盘缓存无界增长、Python 服务端 CORS `*` 等 7 项隐患
+- **/api/speak 鉴权改造（安全加固）**：将 TTS 语音合成端点从 `PUBLIC_PATHS` 白名单移除，改为需 JWT 鉴权；`PapaCheck.Web/js/app.js` 的 `Voice.speak` fetch 增加 `Authorization: Bearer <token>` 头（已登录时携带，未登录时降级处理）；新增 6 个 TDD 测试覆盖服务端 401/有效 token 200、中间件拦载、编译产物一致、前端携带 auth 头等场景。消除匿名滥用 TTS 上游、磁盘缓存无界增长、Python 服务端 CORS `*` 等 7 项隐患
 
 ### Changed
 - **Web 通用代码重构**：提取 app.js 和 admin.js 中重复的通用代码（`showTransitionMask`、`hideTransitionMask`、`escapeHtml`、Service Worker 注册、页面刷新检测）到共享模块 `common.js`，消除约 100 行重复代码。更新 HTML 加载顺序在依赖脚本前引入 common.js。适配 4 个测试文件的 VM 上下文和提取源路径。全量 657 测试通过
