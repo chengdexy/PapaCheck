@@ -128,22 +128,21 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
     const { name } = request.body as { name: string };
 
     const accessCodeId = crypto.randomUUID();
-    const childId = crypto.randomUUID();
     const { raw, hashed } = await generateAccessHash();
 
-    // 先创建孩子
-    await db.createChild(payload.sub, name, accessCodeId);
+    // 先创建孩子（createChild 内部生成自己的 id）
+    const child = await db.createChild(payload.sub, name, accessCodeId);
 
-    // 再创建关联的访问码
+    // 再创建关联的访问码，使用孩子的真实 id
     await db.createAccessCode({
       id: accessCodeId,
       tenant_id: payload.sub,
       code_hash: hashed,
       access_code: raw,
-      child_id: childId,
+      child_id: child.id,
     });
 
-    return { child_id: childId, child_name: name, access_code_id: accessCodeId, access_code: raw };
+    return { child_id: child.id, child_name: name, access_code_id: accessCodeId, access_code: raw };
   });
 
   // POST /api/admin/members/:id/regenerate — 重新生成访问码
