@@ -71,6 +71,9 @@ node_modules/
 # Node.js 构建产物
 PapaCheck.Server.Node/dist/
 
+# TypeScript 增量编译缓存
+*.tsbuildinfo
+
 # Node.js TTS 缓存
 PapaCheck.Server.Node/tts_cache/
 PapaCheck.Web/tts_cache/
