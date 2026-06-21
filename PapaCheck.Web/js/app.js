@@ -41,6 +41,7 @@ let pollInterval = null;
 let _lastBuffs = null;
 let _lastRewardBox = null;
 let _lastShopItems = null;
+let _lastPoints = null;
 let _lastBountySubmissions = null;
 let _lastBountyCompletions = null;
 window._recentNewRewardIds = new Set();
@@ -904,6 +905,17 @@ function startPoll(intervalMs) {
       }
       if (_lastShopItems === null) {
         _lastShopItems = shopItems.concat();
+      }
+
+      // 积分变化检测
+      const points = cachedData.points || {};
+      const prevPoints = _lastPoints || {};
+      if (_lastPoints !== null && JSON.stringify(points) !== JSON.stringify(prevPoints)) {
+        _lastPoints = Object.assign({}, points);
+        needsFullRender = true;
+      }
+      if (_lastPoints === null) {
+        _lastPoints = Object.assign({}, points);
       }
 
       const rb = cachedData.rewardBox || [];
