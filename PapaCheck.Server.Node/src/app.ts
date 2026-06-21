@@ -175,11 +175,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   // 创建数据库和 TTS 实例
+  const ttsCacheDir = join(_moduleDirname, '..', 'tts_cache');
   const db = await createDatabase({});
   const tts = new TTSBridge({
     pythonPath: options.ttsPython ?? 'python',
-    cacheDir: join(_moduleDirname, '..', 'tts_cache'),
+    cacheDir: ttsCacheDir,
   });
+  console.log('[App] TTS cache dir:', ttsCacheDir);
 
   // 暴露给测试使用
   app.decorate('papaCheckDB', db);

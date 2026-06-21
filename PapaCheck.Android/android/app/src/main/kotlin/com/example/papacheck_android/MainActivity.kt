@@ -5,6 +5,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import com.example.papacheck_android.queue.QueueBridge
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
 
 class MainActivity : FlutterActivity() {
     private val scope = MainScope()
@@ -22,9 +23,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        scope.cancel()
         super.onDestroy()
-        if (::queueBridge.isInitialized) {
-            // scope 会在 onDestroy 时自动清理协程
-        }
     }
 }

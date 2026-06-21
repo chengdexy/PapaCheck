@@ -35,6 +35,21 @@ class QueueBridge(private val context: Context, private val scope: CoroutineScop
                     _tenantId = call.argument<String>("tenantId")
                     result.success(true)
                 }
+                "getFailedOperations" -> {
+                    val tenantId = _tenantId ?: run {
+                        result.error("NO_AUTH", "tenantId not set", null)
+                        return@setMethodCallHandler
+                    }
+                    scope.launch {
+                        val db = AppDatabase.getInstance(context)
+                        val failed = db.dao().getFailed(tenantId)
+                        val ids = failed.map { it.id }
+                        if (ids.isNotEmpty()) {
+                            db.dao().clearFailed(tenantId)
+                        }
+                        result.success(ids)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }

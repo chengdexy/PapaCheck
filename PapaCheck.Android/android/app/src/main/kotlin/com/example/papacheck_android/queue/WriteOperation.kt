@@ -35,4 +35,10 @@ interface WriteOperationDao {
 
     @Query("SELECT COUNT(*) FROM write_operations WHERE status = 'pending' AND tenantId = :tenantId")
     suspend fun pendingCount(tenantId: String): Int
+
+    @Query("SELECT * FROM write_operations WHERE status = 'failed' AND tenantId = :tenantId ORDER BY createdAt ASC")
+    suspend fun getFailed(tenantId: String): List<WriteOperation>
+
+    @Query("DELETE FROM write_operations WHERE status = 'failed' AND tenantId = :tenantId")
+    suspend fun clearFailed(tenantId: String)
 }

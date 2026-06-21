@@ -19,6 +19,8 @@ import 'services/update_service.dart';
 import 'widgets/connect_failed_dialog.dart';
 import 'widgets/setup_page.dart';
 
+const _queueChannel = MethodChannel('com.example.papacheck_android/queue');
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -61,9 +63,6 @@ class PapaCheckBrowser extends StatelessWidget {
 class BatteryMonitor {
   static const _pollInterval = Duration(seconds: 30);
   static const _startupDelay = Duration(seconds: 3);
-
-  // MethodChannel 名称，与 Kotlin 端 QueueBridge 的 CHANNEL 常量一致
-  static const _queueChannel = MethodChannel('com.example.papacheck_android/queue');
 
   final Battery _battery = Battery();
   Timer? _pollTimer;
@@ -447,6 +446,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
             if (mounted) {
               setState(() => _isPageReady = true);
               _startBatteryMonitor();
+              _checkFailedOperations();
             }
           }
         } catch (_) {
@@ -454,10 +454,22 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
             _readyCheckTimer?.cancel();
             setState(() => _isPageReady = true);
             _startBatteryMonitor();
+            _checkFailedOperations();
           }
         }
       },
     );
+  }
+
+  Future<void> _checkFailedOperations() async {
+    try {
+      final result = await _queueChannel.invokeMethod('getFailedOperations');
+      if (result is List && result.isNotEmpty) {
+        _controller?.runJavaScript(
+          "if (typeof showToast === 'function') showToast('同步失败，部分操作未保存，请重试');"
+        );
+      }
+    } catch (_) {}
   }
 
   void _handlePageLoadError(String url) async {
