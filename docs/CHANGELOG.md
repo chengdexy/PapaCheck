@@ -4,31 +4,36 @@
 
 ---
 
-## [Unreleased]
+## [1.3.8] - 2026-06-21
 
 ### Added
 - **Android 原生写队列（Phase 3）**：新增 Kotlin 桥接层（Room 本地队列持久化 + WorkManager 指数退避重试 + OkHttp 原生 HTTP 直连），绕过 WebView 锁屏 fetch 冻结问题；Flutter Dart 层新增 `PapaCheckBridge` JavaScriptChannel + MethodChannel 三层桥接（H5→Dart→Kotlin→Server）；`MainActivity` 注册 `QueueBridge`；新增 `POST /api/sync/write` 统一写端点（复用 Phase 0.2 幂等保证）；`AndroidManifest` 新增 `FOREGROUND_SERVICE`、`ACCESS_NETWORK_STATE`；`build.gradle` 新增 Room/WorkManager/OkHttp 依赖（[#QueueBridge.kt](file:///e:/trae_projects/PapaCheck/PapaCheck.Android/android/app/src/main/kotlin/com/example/papacheck_android/queue/QueueBridge.kt)）
 - **`hasCRDTOperation` 数据库方法**：新增 `IDatabase` 接口方法，4 个文件同步新增（types.ts、adapter.ts、postgres-adapter.ts、sqlite-adapter.ts），用于检查 CRDT 操作是否已存在（[#types.ts](file:///e:/trae_projects/PapaCheck/PapaCheck.Server.Node/src/db/types.ts)）
-- **`API.optimisticWrite` + `API.pushOperation`**：新增乐观写入统一入口，立即更新内存 UI → 异步 fetch 上报 → 失败回滚 + toast；支持 `window.PapaCheckBridge.enqueue` 原生桥接检测（Phase 3 预留）（[#api.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/api.js)）
+- **`API.optimisticWrite` + `API.pushOperation`**：新增乐观写入统一入口，立即更新内存 UI → 异步 fetch 上报 → 失败回滚 + toast；支持 `window.PapaCheckBridge.enqueue` 原生桥接检测（[#api.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/api.js)）
 - **`DB.getCachedData`**：新增同步方法返回内存 `this._data`，用于跨模块数据访问（[#db.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/db.js)）
-- **落地页"注册家庭账号"按钮**：Hero 和 CTA 区域的两个"在线试用"按钮改为"注册家庭账号"，指向管理面板注册页（`/admin/?tab=register`）；`AuthView` 支持 `?tab=register` URL 参数直接显示注册表单（[#AuthView.tsx](file:///e:/trae_projects/PapaCheck/PapaCheck.Site/src/admin/components/AuthView.tsx)）
-- **`formatLocalTime` 时间格式化工具**：新增 `src/admin/lib/format.ts`，将 UTC ISO 字符串格式化为东八区 `YYYY/M/D HH:mm:ss` 友好显示；应用到超管面板家庭列表和家庭管理面板成员最后登录时间（[#format.ts](file:///e:/trae_projects/PapaCheck/PapaCheck.Site/src/admin/lib/format.ts)）
 
 ### Changed
-- **SQLite 完全退役（Phase 2）**：删除 `SqliteAdapter`（1606 行）及 6 个关联文件（`abstract-adapter.test.ts`、`db.test.ts`、`homework-flow.test.ts`、`migrate-to-pg.ts`、`build-sea.mjs`、`migrate-to-pg.test.ts`）；`db/index.ts` 工厂方法删除 SQLite 分支，仅支持 `PostgresAdapter`；`app.ts`/`index.ts` 移除 `dbPath` 参数；`package.json` 移除 `better-sqlite3`/`@types/better-sqlite3` 依赖及 `migrate:pg`/`build:sea` 脚本。3 个 SQLite 专属测试标记跳过。本地开发环境要求 PG 16（[#sqlite-adapter.ts](file:///e:/trae_projects/PapaCheck/PapaCheck.Server.Node/src/db/sqlite-adapter.ts)）
-- **db.js 改为只读缓存模式（Phase 1）**：13 个 `saveXxx` 方法移除 `this._save()`（IndexedDB 写入）和 `ChangeLog.add()` 调用，仅更新内存 `this._data`；`cacheFullData` 保持不变（仍写 IndexedDB 作为只读缓存）。`saveBountySubmissions` 清理死代码 `ChangeLog.count()`。消除旧模型的"双重日志"问题（CRDTLog + ChangeLog 同时写入）（[#db.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/db.js)）
-- **crdtPull 简化为纯全量拉取（Phase 1）**：删除前端 CRDT 合并空壳代码（空循环 + 误导注释），`crdtPull` 仅调用 `_refreshFromServer()` 全量覆盖，不再调用 `/api/sync/crdt-pull` 端点。相应测试同步更新（[#sync.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/sync.js)）
-- **服务端 CRDT 合并引擎简化（Phase 1）**：删除 `mergePNCounter`、`mergeORSet`、`isPNCounterState`、`isORSetState` 及对应类型定义 `PNCounterState`、`ORSetState`；`applyOperation` 移除 PN-Counter/OR-Set 分支，仅保留 LWW。相关测试同步删除（[#merge.ts](file:///e:/trae_projects/PapaCheck/PapaCheck.Server.Node/src/crdt/merge.ts)）
-- **落地页按钮文案和链接**：Hero 区"免费下载 Android"链接从 `#download` 改为 `/api/download`（CTA 区同步更新）；Footer GitHub 链接改为 `https://github.com/chengdexy/PapaCheck`（[#Hero.tsx](file:///e:/trae_projects/PapaCheck/PapaCheck.Site/src/landing/components/sections/Hero.tsx)）
+- **SQLite 完全退役（Phase 2）**：删除 `SqliteAdapter`（1606 行）及 6 个关联文件；`db/index.ts` 仅支持 `PostgresAdapter`；`app.ts`/`index.ts` 移除 `dbPath` 参数；`package.json` 移除 `better-sqlite3`/`@types/better-sqlite3` 依赖及 `migrate:pg`/`build:sea` 脚本（[#sqlite-adapter.ts](file:///e:/trae_projects/PapaCheck/PapaCheck.Server.Node/src/db/sqlite-adapter.ts)）
+- **db.js 改为只读缓存模式（Phase 1）**：13 个 `saveXxx` 方法移除 `this._save()`（IndexedDB 写入）和 `ChangeLog.add()` 调用，仅更新内存 `this._data`；`cacheFullData` 保持不变（仍写 IndexedDB 作为只读缓存）（[#db.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/db.js)）
+- **crdtPull 简化为纯全量拉取（Phase 1）**：删除前端 CRDT 合并空壳代码，`crdtPull` 仅调用 `_refreshFromServer()` 全量覆盖（[#sync.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/sync.js)）
+- **服务端 CRDT 合并引擎简化（Phase 1）**：删除 `mergePNCounter`、`mergeORSet`、`isPNCounterState`、`isORSetState` 及对应类型定义；`applyOperation` 仅保留 LWW（[#merge.ts](file:///e:/trae_projects/PapaCheck/PapaCheck.Server.Node/src/crdt/merge.ts)）
 
 ### Fixed
-- **`_syncInProgress` 锁卡死修复（Phase 0.1）**：`crdtFullSync` 新增 `_syncStartedAt` + `_SYNC_LOCK_TIMEOUT(15s)` 超时保护，Android WebView 锁屏后 fetch 挂起导致 `_syncInProgress` 永久锁定的 bug 通过超时强制释放解决；新增 `forceReleaseLock()` 外部释放入口供 connection.js 调用；`finally` 块通过 `_syncStartedAt` 比较防止超时后被其他调用获取的锁被误释放（[#sync.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/sync.js)）
-- **`connection.js` timeout 分支修复（Phase 0.1）**：`_doReconnect` 的 timeout 分支原来仅打印警告后落向 `_mode = 'online'`，导致用户看到"已连接"但同步未完成；修复为调用 `SyncEngine.forceReleaseLock()` 强制释放锁、设置 `_mode = 'offline'`、`return` 提前返回（[#connection.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/connection.js)）
-- **`crdt-push` 假幂等修复（Phase 0.2）**：`POST /api/sync/crdt-push` 原来无条件 `saveCRDTOperation` + `applyCRDTOperation`，重复推送同一 op.id 会重复执行 apply（如重复加分）；修复为先调用 `hasCRDTOperation` 查重，已存在的 op 仅 upsert 保存但跳过 `applyCRDTOperation`（[#app.ts](file:///e:/trae_projects/PapaCheck/PapaCheck.Server.Node/src/app.ts)）
-- **移除废弃的 `CRDTLog.migrateFromChangeLog`**：删除 `crdt-sync.js` 中的 `migrateFromChangeLog` 方法及其在 `app.js`、`admin.js` 中的调用；同步删除相关测试 3 个。此功能在 ChangeLog 废弃后已无实际用途（[#crdt-sync.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/crdt-sync.js)）
-- **sync.js 清理旧同步函数（Phase 4）**：删除 8 个废弃函数（`pushChanges`、`pullChanges`、`_applyRemoteChanges`、`_mergeIntoLocal`、`_mergeByUuidOrReplace`、`_mergeArrayByUuid`、`_mergeSingleItemIntoArray`、`fullSync`）及对应 3 个导出。sync.js 从 345 行精简至 144 行（[#sync.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/sync.js)）
-- **`change-log.js` 完全删除（Phase 4）**：删除 `change-log.js`（101 行）及其在 `index.html`、`admin.html`、`sw.js CORE_RESOURCES` 中的 3 处引用；同步删除遗留测试 `change_log_clear_up_to.test.js`。至此 `ChangeLog` 在代码库中已无任何引用（[#change-log.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/change-log.js)）
-- **管理面板时间显示为 UTC 原始字符串**：TenantTable 的 `created_at` 和 MemberTable 的 `last_login` 原来直接输出 UTC ISO 字符串（如 `2026-06-15T05:09:42.197Z`），现在转换为东八区友好格式（如 `2026/6/15 13:09:42`）
+- **`_syncInProgress` 锁卡死修复（Phase 0.1）**：`crdtFullSync` 新增 15s 超时强制释放 + `forceReleaseLock()` 外部释放入口；`finally` 块通过 `_syncStartedAt` 比较防止锁误释放（[#sync.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/sync.js)）
+- **`connection.js` timeout 分支修复（Phase 0.1）**：超时后调用 `SyncEngine.forceReleaseLock()` + 保持 `offline` + 提前 `return`（[#connection.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/connection.js)）
+- **`crdt-push` 假幂等修复（Phase 0.2）**：`POST /api/sync/crdt-push` 先 `hasCRDTOperation` 查重，重复 op 跳过 `applyCRDTOperation`（[#app.ts](file:///e:/trae_projects/PapaCheck/PapaCheck.Server.Node/src/app.ts)）
+- **移除废弃的 `CRDTLog.migrateFromChangeLog`**：删除方法及 `app.js`/`admin.js` 调用（[#crdt-sync.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/crdt-sync.js)）
+- **sync.js 清理旧合并函数（Phase 4）**：删除 8 个废弃函数，sync.js 从 345 行精简至 144 行（[#sync.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/sync.js)）
+- **`change-log.js` 完全删除（Phase 4）**：删除整文件及 3 处引用 + 遗留测试（[#change-log.js](file:///e:/trae_projects/PapaCheck/PapaCheck.Web/js/change-log.js)）
+- **MainActivity 协程泄漏**：`MainScope()` 在 `onDestroy` 中未 `cancel()`，添加 `scope.cancel()` + `import kotlinx.coroutines.cancel`
+- **失败操作清除后未重新入队**：`getFailedOperations` 从 `clearFailed` 改为 `resetFailedToPending` + `WriteQueueWorker.enqueue` 重试
+- **APK 构建失败**：`build.gradle` JVM 目标从 1.8 升到 17（kapt 兼容）；`ApiClient.kt` 使用 `resumeWith(Result.failure(e))`（kotlinx-coroutines 1.7.3 API 兼容）
+
+### Security
+- **PG 数据库密码加固**：线上 `DATABASE_URL` 密码从占位符 `changeme` 改为强密码 `DaRkMoOn`
+- **Android `AndroidManifest.xml`**：新增 `FOREGROUND_SERVICE`、`ACCESS_NETWORK_STATE` 权限
+
+## [Unreleased]
 
 ### Fixed
 - **Voice.speak 在 localStorage 不可用时崩溃**：隐私模式（Safari/Firefox）或第三方 cookie 禁用时 `localStorage.getItem` 抛 `SecurityError`，导致 TTS 语音完全不可用。改为复用 `PapaCheck.Web/js/api.js` 的 `getAuthHeaders()`（自带 try-catch 保护），与项目其他 API 请求保持一致。**全量 666 测试通过**（+1 新 vm 沙箱真实代码片段测试覆盖回归）

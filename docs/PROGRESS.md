@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-21（Phase 0 离线同步重构 — 锁卡死修复 + CRDT 幂等性）
+> 最后更新：2026-06-21（v1.3.8 正式上线 — 离线同步重构 Phase 0~4 + APK 推送）
 
 ## 当前版本
 
-**v1.4.2-beta**（PapaCheck.Site 整合落地页 + 管理面板，713 测试）
+**v1.3.8**（离线同步重构 — 锁超时 + CRDT 幂等 + SQLite 退役 + Android 原生队列，449 测试）
 
 ## 部署状态
 
@@ -70,7 +70,7 @@
 - [ ] iOS 端
 - [ ] 多孩子支持（数据模型已有，UI 未实现）
 - [ ] 更丰富的数据分析与报告
-- [x] 离线模式重构（Phase 0 止血 + Phase 1 简化同步 完成，Phase 2-4 待实施）
+- [x] 离线模式重构（Phase 0~4 全部完成，v1.3.8 已上线）
 - [ ] 离线优先同步优化（spec 已有）
 - [ ] 离线功能差距填补与前端测试（spec 已有）
 - [ ] 简化 Flutter 启动流程（spec 已有）
@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-21 | **v1.3.8 正式上线**：服务器端部署新版 dist/（离线同步重构 Phase 0~4）；PG 密码从 `changeme` 加固为强密码；Android APK `1.3.8+57` 推送至下载目录（`/api/download`），用户打开 APP 自动检测更新 |
 | 2026-06-21 | **Phase 3 Android 原生写队列**：新增 Kotlin 桥接层（Room + WorkManager + OkHttp）、Flutter JavaScriptChannel/MethodChannel 三层桥接、服务端 `POST /api/sync/write` 端点、权限/依赖配置。根治 WebView 锁屏 fetch 冻结导致的写操作丢失问题 |
 | 2026-06-21 | **Phase 2+4 完成**：SQLite 完全退役（删除 SqliteAdapter 等 7 个文件 + 修改 ~17 个文件引用）；`change-log.js` 完全删除（101 行 + 3 处引用 + 遗留测试）；sync.js 清理 8 个旧合并函数（精简至 144 行）；SW 清理（CORE_RESOURCES 移除 change-log + WebView UA 跳过注册）。全量 449 测试通过，128 跳过 |
 | 2026-06-21 | **Phase 1 简化同步模型**：crdtPull 简化为纯全量拉取（删除前端 CRDT 合并空壳）；crdt-sync.js 删除 migrateFromChangeLog（同步清理 app.js/admin.js 调用 + 3 个测试）；服务端 merge.ts 删除 PN-Counter/OR-Set 代码（仅保留 LWW）；db.js 13 个 saveXxx 移除 IndexedDB 写入和 ChangeLog 调用（改为只读缓存模式）；api.js 新增 optimisticWrite + pushOperation；新增 getCachedData 同步方法。全量 707 测试通过 |
