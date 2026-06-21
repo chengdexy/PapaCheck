@@ -67,11 +67,18 @@ var ConnectionManager = (function () {
             console.error('[ConnectionManager] CRDT 同步失败:', crdtErr);
           }
         }
-        // 从 IndexedDB 读取最新数据（CRDT 成功时已更新，失败时保留本地状态）
-        var _hasCachedData = false;
-        try { _hasCachedData = typeof cachedData !== 'undefined'; } catch (e) {}
-        if (typeof DB !== 'undefined' && DB.getFullData && _hasCachedData) {
-          cachedData = await DB.getFullData();
+        // CRDT 同步成功后从服务器拉取最新数据，失败时保留本地 cachedData
+        if (crdtOk && typeof API !== 'undefined' && API.getData) {
+          try {
+            cachedData = await API.getData();
+          } catch (e) {
+            // API.getData 失败时回退到本地缓存
+            var _hasCachedData = false;
+            try { _hasCachedData = typeof cachedData !== 'undefined'; } catch (e2) {}
+            if (typeof DB !== 'undefined' && DB.getFullData && _hasCachedData) {
+              cachedData = await DB.getFullData();
+            }
+          }
         }
       })();
       var raceResult = await Promise.race([
