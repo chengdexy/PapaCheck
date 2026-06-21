@@ -14,6 +14,10 @@ describe.runIf(runPg)('PostgresAdapter', () => {
     await adapter.createTenant(TEST_TENANT_ID, '测试租户');
 
     // 插入该租户的单行表默认行
+    const ALLOWED_TABLES = new Set([
+      'shop_items', 'redemptions', 'badges', 'reward_box',
+      'settings', 'active_buffs', 'bounty_tasks', 'email_config',
+    ]);
     const defaultRows = [
       { table: 'shop_items', data: '[]' },
       { table: 'redemptions', data: '[]' },
@@ -25,6 +29,9 @@ describe.runIf(runPg)('PostgresAdapter', () => {
       { table: 'email_config', data: '{}' },
     ];
     for (const { table, data } of defaultRows) {
+      if (!ALLOWED_TABLES.has(table)) {
+        throw new Error(`不允许的表名: ${table}`);
+      }
       await adapter.pool.query(
         `INSERT INTO ${table} (tenant_id, id, data) VALUES ($1, 1, $2) ON CONFLICT DO NOTHING`,
         [TEST_TENANT_ID, data]
