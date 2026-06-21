@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS children (
   tenant_id UUID NOT NULL REFERENCES users(id),
   name TEXT NOT NULL,
   avatar TEXT,
-  access_code_id UUID REFERENCES access_codes(id),
+  access_code_id UUID REFERENCES access_codes(id) ON DELETE SET NULL,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(tenant_id, name)
@@ -276,6 +276,14 @@ ALTER TABLE active_buffs ADD COLUMN IF NOT EXISTS child_id UUID;
 ALTER TABLE badges ADD COLUMN IF NOT EXISTS child_id UUID;
 
 -- Step 2: Unique indexes with child_id will be added when adapter is updated
+
+-- Step 3: Make children.access_code_id FK ON DELETE SET NULL
+DO $$ BEGIN
+  ALTER TABLE children DROP CONSTRAINT IF EXISTS children_access_code_id_fkey;
+  ALTER TABLE children ADD CONSTRAINT children_access_code_id_fkey
+    FOREIGN KEY (access_code_id) REFERENCES access_codes(id) ON DELETE SET NULL;
+EXCEPTION WHEN undefined_table THEN NULL;
+END $$;
 
 -- Replace old PKs with unique indexes (child_id allowed NULL)
 DO $$ BEGIN ALTER TABLE points DROP CONSTRAINT IF EXISTS points_pkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;
