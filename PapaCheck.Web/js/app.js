@@ -3,11 +3,14 @@
  * 负责初始化、作业计时、屏保、语音、Toast、积分结算
  */
 
+// 孩子端使用独立的 token 键，避免与家长端共享 localStorage
+window._authTokenKey = 'papacheck_child_token';
+
 // 认证检查：验证 token 有效性，无效时重定向到登录页
 (function checkAuth() {
   try {
-    const token = localStorage.getItem('papacheck_token');
-    const role = localStorage.getItem('papacheck_role');
+    const token = localStorage.getItem('papacheck_child_token');
+    const role = localStorage.getItem('papacheck_child_role');
     if (!token || role !== 'child') {
       window.location.href = '/login.html?redirect=' + encodeURIComponent('/child');
       return;
@@ -17,9 +20,9 @@
       headers: { 'Authorization': 'Bearer ' + token }
     }).then(function (resp) {
       if (resp.status === 401) {
-        localStorage.removeItem('papacheck_token');
-        localStorage.removeItem('papacheck_role');
-        localStorage.removeItem('papacheck_nickname');
+        localStorage.removeItem('papacheck_child_token');
+        localStorage.removeItem('papacheck_child_role');
+        localStorage.removeItem('papacheck_child_nickname');
         window.location.href = '/login.html?redirect=' + encodeURIComponent('/child');
       }
     }).catch(function () { });

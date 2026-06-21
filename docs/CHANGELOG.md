@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### Fixed
+- **`_setJson` 只做 UPDATE 不处理行不存在的情况**：新租户的 `bounty_tasks`/`shop_items` 等表无初始行时，UPDATE 影响 0 行导致数据静默丢弃。改为 UPDATE + INSERT（`ON CONFLICT DO NOTHING`）模式，兼容多孩子迁移引入的部分唯一索引（`WHERE child_id IS NULL`）
+- **`refreshAllData()` 结算数据跨孩子泄露**：合并循环未追踪 `cachedData` 来自哪个孩子，切换孩子时将前一个孩子的已评级结算合并到新孩子数据中。新增 `_loadedChildId` 守卫，仅当未切换孩子时才执行合并
+- **`_doReconnect()` 清除 `window._currentChildId` 导致父端 child_id 隔离丢失**：重连时 `API.getData()` 不带参数将 `window._currentChildId` 设为 `undefined`，后续父端 API 调用丢失 query param 隔离。在 `_doReconnect()` 前后保存/恢复 `window._currentChildId`
+- **家长端离线→在线后孩子选择器不恢复**：`loadChildren()` 在初始离线加载失败后不再重试，孩子列表永久为空。`refreshAllData()` 检测到在线但孩子未加载时自动重试（权限不足的 parent 角色通过 `_childrenLoadFailed` 标志排除）
+- **同一浏览器内家长端和孩子端 token 碰撞**：`login.html` 对两种角色使用同一 `localStorage` 键 `papacheck_token`，孩子登录后覆盖家长 JWT，导致家长端 API 调用携带孩子 token。孩子端改用独立键 `papacheck_child_token`，`getAuthHeaders()` 通过 `window._authTokenKey` 选择正确键
+
 ### Added
 - **多孩子支持（Phase 1+2）**：每个家庭支持多个孩子，数据按 child_id 隔离
   - `children` 表：id、tenant_id、name、avatar、access_code_id、is_active

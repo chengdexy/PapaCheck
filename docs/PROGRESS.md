@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-21 | **多孩子隔离 Bug 修复（5 项）**：`_setJson` UPDATE→UPDATE+INSERT 防止新租户数据丢失；`refreshAllData()` 新增 `_loadedChildId` 防止跨孩子结算合并泄露；`_doReconnect()` 保存/恢复 `window._currentChildId` 防止重连丢失 child_id 隔离；离线→在线自动恢复孩子选择器；同一浏览器内家长端/孩子端 `localStorage` token 键分离（`papacheck_child_token`）。涉及 7 个文件，610 测试通过 |
 | 2026-06-21 | **多孩子支持 Phase 1+2 完成**：children 表 + 12 张表 child_id 列 + partial unique index；DatabaseAdapter/PostgresAdapter 新增 childId 参数；Auth 层 JWT 含 child_id + 自动创建 children；API 层 getChildId 过滤 + MISSING_CHILD_ID；admin 成员管理自动 children CRUD + 遗留数据分配；家长端孩子选择栏 + localStorage 持久化；MemberTable 显示 child_id。新增 child-isolation + child-login 等测试文件。全量 579 测试通过 |
 | 2026-06-21 | **v1.3.8 正式上线**：服务器端部署新版 dist/（离线同步重构 Phase 0~4）；PG 密码从 `changeme` 加固为强密码；Android APK `1.3.8+57` 推送至下载目录（`/api/download`），用户打开 APP 自动检测更新 |
 | 2026-06-21 | **测试数据库搭建自动化**：SQLite 退役后所有 Node 测试依赖 PostgreSQL 16。创建 `scripts/setup-test-db.ps1` 一键搭建脚本（检查 PG → 建测试库 → 建表 → 生成 `.env.test`）；`vitest.config.js` 自动加载 `.env.test`（不覆盖已存在的 `DATABASE_URL`）；`.gitignore` 排除 `.env.test`/`.env`；删除 3 个硬编码 `describe.runIf(false)` 的 SQLite 专属测试（`redemption_dup_check`、`shop_daily_reset`、`reward_box_delete`）；更新 `HANDOVER.md` 本地测试数据库搭建文档。`DATABASE_URL` 就绪后全量 128 跳过测试恢复运行 |

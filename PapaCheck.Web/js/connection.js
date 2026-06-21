@@ -54,6 +54,9 @@ var ConnectionManager = (function () {
     _mode = 'reconnecting';
     showReconnectMask('\u6b63\u5728\u540c\u6b65\u6570\u636e\u2026');
     updateConnStatus();
+    // 保存当前 childId，_doReconnect 中的 API.getData() 不带参数会导致
+    // window._currentChildId 被设为 undefined，丢失父端的子选择隔离
+    var savedChildId = (typeof window !== 'undefined') ? window._currentChildId : undefined;
     try {
       var crdtOk = false;
       var crdtAttempted = false;
@@ -89,17 +92,14 @@ var ConnectionManager = (function () {
       ]);
       if (raceResult === 'timeout') {
         console.warn('[ConnectionManager] 同步超时，部分操作可能未完全同步');
-        // 修复：超时后强制释放锁 + 保持 offline，不切 online
         if (typeof SyncEngine !== 'undefined' && SyncEngine.forceReleaseLock) {
           SyncEngine.forceReleaseLock();
         }
         _mode = 'offline';
-        return; // 关键：提前返回，不走到 _mode = 'online'
+        return;
       }
-      // CRDT 同步失败（非超时）降级：尝试用 getData 刷新数据后切 online
       if (crdtAttempted && !crdtOk && raceResult !== 'timeout') {
         console.warn('[ConnectionManager] CRDT 同步失败，尝试降级刷新数据...');
-        // 尝试通过 getData 获取最新数据
         if (typeof API !== 'undefined' && API.getData) {
           try { cachedData = await API.getData(); } catch (e) {
             console.error('[ConnectionManager] getData 降级也失败:', e);
@@ -114,6 +114,10 @@ var ConnectionManager = (function () {
         showToast('同步失败，继续使用离线模式');
       }
     } finally {
+      // 恢复 childId，防止 API.getData() 把它清成了 undefined
+      if (typeof window !== 'undefined' && savedChildId !== undefined) {
+        window._currentChildId = savedChildId;
+      }
       hideReconnectMask();
       updateConnStatus();
       _syncing = false;

@@ -1,6 +1,7 @@
 function getAuthHeaders() {
   try {
-    const token = localStorage.getItem('papacheck_token');
+    const key = (typeof window !== 'undefined' && window._authTokenKey) || 'papacheck_token';
+    const token = localStorage.getItem(key);
     return token ? { 'Authorization': 'Bearer ' + token } : {};
   } catch (e) {
     return {};

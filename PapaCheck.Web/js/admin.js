@@ -26,7 +26,9 @@ let _calendarYear = null;
 let _calendarMonth = null;
 var _children = [];
 var _currentChildId = null;
+var _loadedChildId = null;  // 追踪 cachedData 来自哪个孩子，防止跨孩子数据泄露
 var _loadingChildren = false;
+var _childrenLoadFailed = false;  // 防止权限不足时无限重试 loadChildren
 
 const SETTINGS_DEFAULTS = {
   dailyBasePoints: 50,
@@ -137,6 +139,10 @@ async function loadChildren() {
       }
     } catch (e) {
       _children = [];
+      // 403 表示权限不足（如 parent 角色），不应重试；网络错误可重试
+      if (e && e.message === 'Forbidden') {
+        _childrenLoadFailed = true;
+      }
     }
     _renderChildSelector();
     if (_children.length > 0 && !_currentChildId) {
@@ -263,7 +269,8 @@ async function refreshAllData() {
   if (mode === 'reconnecting') return;
 
   // 修复：从离线恢复到在线后，重新加载孩子列表并恢复上次选中的孩子
-  if (mode === 'online' && (!_children || _children.length === 0)) {
+  // 跳过权限不足的场景（如 parent 角色）避免无限 403 重试
+  if (mode === 'online' && !_childrenLoadFailed && (!_children || _children.length === 0)) {
     await loadChildren();
     return; // loadChildren 内部已调用 refreshAllData + renderCurrentTab
   }
@@ -272,17 +279,21 @@ async function refreshAllData() {
     try {
       var data = await API.getData(_currentChildId);
       if (data) {
-        var oldSettlements = cachedData?.dailySettlement || {};
-        var newSettlements = data.dailySettlement || {};
-        for (var dk of Object.keys(oldSettlements)) {
-          var oldS = oldSettlements[dk];
-          var newS = newSettlements[dk];
-          if (oldS && oldS.rating && !(newS && newS.rating)) {
-            if (!data.dailySettlement) data.dailySettlement = {};
-            data.dailySettlement[dk] = oldS;
+        // 仅当未切换孩子时，保留本地已评级但未同步到服务器的结算数据
+        if (_loadedChildId === _currentChildId) {
+          var oldSettlements = cachedData?.dailySettlement || {};
+          var newSettlements = data.dailySettlement || {};
+          for (var dk of Object.keys(oldSettlements)) {
+            var oldS = oldSettlements[dk];
+            var newS = newSettlements[dk];
+            if (oldS && oldS.rating && !(newS && newS.rating)) {
+              if (!data.dailySettlement) data.dailySettlement = {};
+              data.dailySettlement[dk] = oldS;
+            }
           }
         }
         cachedData = data;
+        _loadedChildId = _currentChildId;
         try { await DB.cacheFullData(data); } catch (e) { }
         _applyCachedData();
       }
@@ -290,6 +301,7 @@ async function refreshAllData() {
       var localData = await DB.getFullData();
       if (localData && Object.keys(localData).length > 0) {
         cachedData = localData;
+        _loadedChildId = _currentChildId;
         _applyCachedData();
       }
     }
@@ -297,6 +309,7 @@ async function refreshAllData() {
     var localData = await DB.getFullData();
     if (localData && Object.keys(localData).length > 0) {
       cachedData = localData;
+      _loadedChildId = _currentChildId;
       _applyCachedData();
     }
   }

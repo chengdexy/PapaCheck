@@ -124,19 +124,51 @@ export class PostgresAdapter extends DatabaseAdapter {
   }
 
   private async _setJson(table: string, data: any, tenantId?: string, childId?: string, idValue: number = 1): Promise<void> {
-    let query: string;
-    let params: any[];
+    // 使用 UPDATE + INSERT 策略，而非 INSERT ON CONFLICT DO UPDATE
+    // 原因：多孩子迁移后 redemptions/reward_box/active_buffs/badges 的 PK 被替换为
+    // 部分唯一索引 (WHERE child_id IS NULL)，INSERT ON CONFLICT 无法指定匹配的冲突目标
+    let setClause: string;
+    let whereClause: string;
+    let whereParams: any[];
+    let insertCols: string;
+    let insertValues: string;
+    let insertParams: any[];
+    const jsonData = JSON.stringify(data);
+
     if (tenantId && childId) {
-      query = `INSERT INTO ${table} (tenant_id, child_id, id, data) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, child_id, id) DO UPDATE SET data = EXCLUDED.data`;
-      params = [tenantId, childId, idValue, JSON.stringify(data)];
+      setClause = `UPDATE ${table} SET data = $1`;
+      whereClause = `WHERE tenant_id = $2 AND child_id = $3 AND id = $4`;
+      whereParams = [jsonData, tenantId, childId, idValue];
+      insertCols = `(tenant_id, child_id, id, data)`;
+      insertValues = `VALUES ($1, $2, $3, $4)`;
+      insertParams = [tenantId, childId, idValue, jsonData];
     } else if (tenantId) {
-      query = `INSERT INTO ${table} (tenant_id, id, data) VALUES ($1, $2, $3) ON CONFLICT (tenant_id, id) DO UPDATE SET data = EXCLUDED.data`;
-      params = [tenantId, idValue, JSON.stringify(data)];
+      setClause = `UPDATE ${table} SET data = $1`;
+      whereClause = `WHERE tenant_id = $2 AND id = $3`;
+      whereParams = [jsonData, tenantId, idValue];
+      insertCols = `(tenant_id, id, data)`;
+      insertValues = `VALUES ($1, $2, $3)`;
+      insertParams = [tenantId, idValue, jsonData];
     } else {
-      query = `INSERT INTO ${table} (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data`;
-      params = [idValue, JSON.stringify(data)];
+      setClause = `UPDATE ${table} SET data = $1`;
+      whereClause = `WHERE id = $2`;
+      whereParams = [jsonData, idValue];
+      insertCols = `(id, data)`;
+      insertValues = `VALUES ($1, $2)`;
+      insertParams = [idValue, jsonData];
     }
-    await this.pool.query(query, params);
+
+    const result = await this.pool.query(
+      `${setClause} ${whereClause}`,
+      whereParams
+    );
+    if (result.rowCount === 0) {
+      // ON CONFLICT DO NOTHING 无需指定冲突目标，安全兜底并发插入
+      await this.pool.query(
+        `INSERT INTO ${table} ${insertCols} ${insertValues} ON CONFLICT DO NOTHING`,
+        insertParams
+      );
+    }
   }
 
   private async _getDateDataRaw(table: string, dateKey: string, tenantId?: string, childId?: string): Promise<any> {
