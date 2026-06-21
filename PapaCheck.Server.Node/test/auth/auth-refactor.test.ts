@@ -123,9 +123,7 @@ describe('Auth Refactor — 认证体系重构测试', () => {
     // --- 数据操作方法（桩） ---
     pool: { query: async () => ({ rows: [] }) } as any,
     createTenant: async (_id: string, _name: string) => {},
-    getAllTenants: async () => [],
-    setTenantActive: async () => {},
-    close: async () => {},
+     close: async () => {},
     getFullData: async () => ({} as any),
     importFullData: async () => {},
     addNotification: async () => 'notif-id',
