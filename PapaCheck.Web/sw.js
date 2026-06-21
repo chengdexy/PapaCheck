@@ -2,8 +2,8 @@ var CACHE_NAME = 'papacheck-v4';
 
 var CORE_RESOURCES = [
   '/',
-  '/child',
-  '/parent',
+  '/app',
+  '/login.html',
   '/index.html',
   '/admin/',
   '/css/style.css',

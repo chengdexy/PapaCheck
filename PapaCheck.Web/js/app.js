@@ -8,8 +8,13 @@
   try {
     const token = sessionStorage.getItem('papacheck_token');
     const role = sessionStorage.getItem('papacheck_role');
-    if (!token || role !== 'child') {
+    if (!token) {
       window.location.href = '/login.html';
+      return;
+    }
+    // 家长角色不应留在孩子端，跳转到管理页
+    if (role === 'parent') {
+      window.location.href = '/admin.html';
       return;
     }
     // 通过 API 验证 token 是否仍有效（未被删除/吊销）

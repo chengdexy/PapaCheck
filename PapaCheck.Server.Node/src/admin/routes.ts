@@ -22,19 +22,18 @@ const errorResponse = {
 const addMemberSchema = {
   body: {
     type: 'object',
-    required: ['role', 'nickname'],
+    required: ['name'],
     properties: {
-      role: { type: 'string', enum: ['parent', 'child'] },
-      nickname: { type: 'string', minLength: 1 },
+      name: { type: 'string', minLength: 1 },
     },
   },
   response: {
     200: {
       type: 'object',
       properties: {
-        id: { type: 'string' },
-        nickname: { type: 'string' },
-        role: { type: 'string' },
+        child_id: { type: 'string' },
+        child_name: { type: 'string' },
+        access_code_id: { type: 'string' },
         access_code: { type: 'string' },
       },
     },
@@ -91,52 +90,60 @@ async function generateAccessHash(): Promise<{ raw: string; hashed: string }> {
 }
 
 export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<void> {
-  // GET /api/admin/members — 访问码列表（user 和 parent 角色可读取）
+  // GET /api/admin/members — 孩子列表（含访问码）
   app.get('/api/admin/members', async (request: any, reply) => {
     const payload = request.jwtPayload as JWTPayload;
     if (!payload || (payload.role !== 'user' && payload.role !== 'parent')) {
       return reply.status(403).send({ error: '仅用户账号可管理成员', code: 'FORBIDDEN' });
     }
 
-    const codes = await db.getAccessCodesByUser(payload.sub);
     const children = await db.getChildrenByTenant(payload.sub, false);
-    const childByAccessCode = new Map<string, string>();
-    for (const c of children) {
-      if (c.access_code_id) childByAccessCode.set(c.access_code_id, c.id);
+    const codes = await db.getAccessCodesByUser(payload.sub);
+    const codeByChildId = new Map<string, typeof codes[0]>();
+    for (const c of codes) {
+      codeByChildId.set(c.child_id, c);
     }
 
-    return codes.map(c => ({
-      id: c.id,
-      nickname: c.nickname,
-      role: c.type,
-      access_code: c.access_code ?? null,
-      last_login: c.last_login ?? null,
-      created_at: c.created_at,
-      child_id: childByAccessCode.get(c.id) ?? null,
-    }));
+    return children.map(ch => {
+      const code = codeByChildId.get(ch.id);
+      return {
+        child_id: ch.id,
+        child_name: ch.name || '(未命名)',
+        is_active: ch.is_active,
+        access_code_id: code?.id ?? null,
+        access_code: code?.access_code ?? null,
+        last_login: code?.last_login ?? null,
+        created_at: code?.created_at ?? ch.created_at,
+      };
+    });
   });
 
-  // POST /api/admin/members — 创建访问码
+  // POST /api/admin/members — 创建孩子 + 访问码
   app.post('/api/admin/members', { schema: addMemberSchema }, async (request: any, reply) => {
     const payload = request.jwtPayload as JWTPayload;
     if (!payload || payload.role !== 'user') {
       return reply.status(403).send({ error: '仅用户账号可管理成员', code: 'FORBIDDEN' });
     }
 
-    const { role, nickname } = request.body as { role: 'parent' | 'child'; nickname: string };
+    const { name } = request.body as { name: string };
 
-    const id = crypto.randomUUID();
+    const accessCodeId = crypto.randomUUID();
+    const childId = crypto.randomUUID();
     const { raw, hashed } = await generateAccessHash();
-    await db.createAccessCode({ id, user_id: payload.sub, type: role, code_hash: hashed, access_code: raw, nickname });
 
-    // 孩子角色：自动创建 children 记录
-    let childId: string | null = null;
-    if (role === 'child') {
-      const child = await db.createChild(payload.sub, nickname, id);
-      childId = child.id;
-    }
+    // 先创建孩子
+    await db.createChild(payload.sub, name, accessCodeId);
 
-    return { id, nickname, role, access_code: raw, child_id: childId };
+    // 再创建关联的访问码
+    await db.createAccessCode({
+      id: accessCodeId,
+      tenant_id: payload.sub,
+      code_hash: hashed,
+      access_code: raw,
+      child_id: childId,
+    });
+
+    return { child_id: childId, child_name: name, access_code_id: accessCodeId, access_code: raw };
   });
 
   // POST /api/admin/members/:id/regenerate — 重新生成访问码

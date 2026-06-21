@@ -173,6 +173,11 @@ function selectRole(role) {
     childBtn.classList.toggle('active', role === 'child');
   }
   hideError();
+  // 如果已输入访问码，直接尝试登录
+  var code = document.getElementById('accessCode').value.trim();
+  if (code) {
+    exchange(code, role);
+  }
 }
 
 async function exchange(code, role) {
@@ -197,7 +202,7 @@ async function exchange(code, role) {
       sessionStorage.setItem('papacheck_role', d.role);
       sessionStorage.setItem('papacheck_child_name', d.child_name || '');
       saveKnownCode(code.trim(), d.child_name || '');
-      window.location.href = '/app';
+      window.location.href = d.role === 'parent' ? '/admin.html' : '/';
     } else {
       var err = await resp.json().catch(function () { return {}; });
       showError(err.error || '登录失败，请检查访问码');
@@ -209,11 +214,12 @@ async function exchange(code, role) {
 
 // 页面加载初始化
 (function () {
-  // 如果已有 token，直接跳转
+  // 如果已有 token，直接跳转到对应页面
   try {
     var existing = sessionStorage.getItem('papacheck_token');
-    if (existing) {
-      window.location.href = '/app';
+    var role = sessionStorage.getItem('papacheck_role');
+    if (existing && role) {
+      window.location.href = role === 'parent' ? '/admin.html' : '/';
       return;
     }
   } catch (e) {}

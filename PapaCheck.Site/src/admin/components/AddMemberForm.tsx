@@ -10,8 +10,7 @@ interface Props {
 export default function AddMemberForm({ onAdded }: Props) {
   const { fetch: apiFetch } = useApi();
   const { showToast } = useToast();
-  const [role, setRole] = useState('child');
-  const [nickname, setNickname] = useState('');
+  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
@@ -20,10 +19,10 @@ export default function AddMemberForm({ onAdded }: Props) {
     try {
       const result = await apiFetch('/api/admin/members', {
         method: 'POST',
-        body: JSON.stringify({ role, nickname }),
+        body: JSON.stringify({ name }),
       });
-      showToast('success', `${result.nickname} 的访问码：${result.access_hash}`);
-      setNickname('');
+      showToast('success', `${result.child_name} 的访问码：${result.access_code}`);
+      setName('');
       onAdded();
     } catch {
       showToast('error', '添加失败');
@@ -37,35 +36,22 @@ export default function AddMemberForm({ onAdded }: Props) {
       onSubmit={handleSubmit}
       className="flex flex-col sm:flex-row gap-3 sm:items-end"
     >
-      <div className="sm:w-32">
-        <label className="block text-xs font-semibold text-[var(--color-ink-700)] mb-1.5">
-          角色
-        </label>
-        <select
-          value={role}
-          onChange={e => setRole(e.target.value)}
-          className="pc-input bg-white cursor-pointer"
-        >
-          <option value="child">孩子</option>
-          <option value="parent">家长</option>
-        </select>
-      </div>
       <div className="flex-1">
         <label className="block text-xs font-semibold text-[var(--color-ink-700)] mb-1.5">
-          昵称
+          孩子姓名
         </label>
         <input
           type="text"
-          value={nickname}
-          onChange={e => setNickname(e.target.value)}
+          value={name}
+          onChange={e => setName(e.target.value)}
           className="pc-input"
-          placeholder="输入昵称"
+          placeholder="输入姓名"
           required
         />
       </div>
       <button
         type="submit"
-        disabled={!nickname.trim() || loading}
+        disabled={!name.trim() || loading}
         className="pc-btn-primary sm:px-6 py-2.5"
       >
         {loading ? (
@@ -76,7 +62,7 @@ export default function AddMemberForm({ onAdded }: Props) {
         ) : (
           <>
             <Plus size={16} />
-            添加
+            添加孩子
           </>
         )}
       </button>

@@ -50,7 +50,7 @@ import crypto from 'crypto';
 // Feature: 家庭成员管理
 //   Scenario: 用户账号创建 parent 访问码
 //     Given 一个 role='user' 的 JWT
-//     When 调用 POST /api/admin/members { role: 'parent', nickname: '妈妈' }
+//     When 调用 POST /api/admin/members { name: '妈妈' }
 //     Then 返回 200 包含 access_code 明文
 
 // Feature: 家庭成员管理
@@ -542,13 +542,12 @@ describe('Auth Refactor — 认证体系重构测试', () => {
         method: 'POST',
         url: '/api/admin/members',
         headers: { Authorization: `Bearer ${userToken}` },
-        payload: { role: 'parent', nickname: '妈妈' },
+        payload: { name: '妈妈' },
       });
       expect(res.statusCode).toBe(200);
       const body = res.json();
-      expect(body).toHaveProperty('id');
-      expect(body.nickname).toBe('妈妈');
-      expect(body.role).toBe('parent');
+      expect(body).toHaveProperty('child_id');
+      expect(body.child_name).toBe('妈妈');
       // 应返回 access_code 明文
       expect(body).toHaveProperty('access_code');
       expect(typeof body.access_code).toBe('string');
@@ -579,7 +578,7 @@ describe('Auth Refactor — 认证体系重构测试', () => {
         method: 'POST',
         url: '/api/admin/members',
         headers: { Authorization: `Bearer ${parentToken}` },
-        payload: { role: 'child', nickname: 'test' },
+        payload: { name: 'test' },
       });
       expect(postRes.statusCode).toBe(403);
     });

@@ -12,10 +12,10 @@ ALTER TABLE access_codes ADD CONSTRAINT access_codes_tenant_id_fkey
 ALTER TABLE access_codes ADD COLUMN child_id UUID REFERENCES children(id);
 
 -- Step 2: Data migration — populate child_id for existing records
--- (Run manually after reviewing existing data)
--- UPDATE access_codes ac SET child_id = c.id
--- FROM children c
--- WHERE c.tenant_id = ac.tenant_id AND c.access_code_id = ac.id;
+UPDATE access_codes ac SET child_id = c.id
+FROM children c
+WHERE c.tenant_id = ac.tenant_id AND c.access_code_id = ac.id
+  AND ac.child_id IS NULL;
 
 -- Step 3: Make child_id NOT NULL after data migration
 -- ALTER TABLE access_codes ALTER COLUMN child_id SET NOT NULL;

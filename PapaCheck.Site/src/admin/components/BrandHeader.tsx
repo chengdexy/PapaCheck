@@ -1,4 +1,7 @@
-import { Key, Baby, User, ArrowLeft, LogOut } from 'lucide-react';
+import { Key, Baby, ArrowLeft, LogOut, ExternalLink } from 'lucide-react';
+
+/** 开发模式下后端地址，生产模式用同源 */
+const APP_BASE = import.meta.env.DEV ? 'http://localhost:8080' : '';
 
 interface BrandHeaderProps {
   title: string;
@@ -43,22 +46,13 @@ export default function BrandHeader({ title, subtitle, role, onLogout }: BrandHe
         {/* 右侧：快捷链接 + 退出 */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <a
-            href="/child"
+            href={`${APP_BASE}/app`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-md transition-colors"
           >
-            <Baby size={12} />
-            孩子端
-          </a>
-          <a
-            href="/parent"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
-          >
-            <User size={12} />
-            家长端
+            <ExternalLink size={12} />
+            客户端
           </a>
           <a
             href="/"

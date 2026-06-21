@@ -2411,6 +2411,10 @@ function updateTitle() {
   var childName = null;
   try { childName = sessionStorage.getItem('papacheck_child_name'); } catch (e) {}
   document.title = childName ? 'PapaCheck 家长端 · ' + childName : 'PapaCheck 家长端';
+  var display = document.getElementById('childNameDisplay');
+  if (display) {
+    display.textContent = childName ? '👤 ' + childName : '';
+  }
 }
 
 // ========== Init ==========

@@ -22,6 +22,6 @@ describe('AddMemberForm', () => {
   // Scenario: 昵称为空时按钮 disabled
   it('昵称为空时按钮 disabled', () => {
     render(<AuthProvider><ToastProvider><AddMemberForm onAdded={() => {}} /></ToastProvider></AuthProvider>);
-    expect(screen.getByText('添加').closest('button')?.disabled).toBe(true);
+    expect(screen.getByText('添加孩子').closest('button')?.disabled).toBe(true);
   });
 });

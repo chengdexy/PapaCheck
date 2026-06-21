@@ -15,7 +15,6 @@ import { AppError, ErrorCodes } from './errors.js';
 import type { CRDTOperation } from './crdt/types.js';
 import { authMiddleware } from './auth/middleware.js';
 import { authRoutes } from './auth/routes.js';
-import { verifyToken } from './auth/jwt.js';
 import { adminRoutes } from './admin/routes.js';
 import { superAdminRoutes } from './auth/super-admin-routes.js';
 import { ensureSuperAdmin } from './auth/super-admin.js';
@@ -1490,24 +1489,12 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
   });
 
-  // GET /app - 统一入口（根据 JWT 角色分发）
-  // 如果 Authorization header 携带有效的家长/管理员 JWT，返回 admin.html；
-  // 否则返回 index.html（孩子端）
-  app.get('/app', async (request, reply) => {
-    const authHeader = request.headers.authorization;
-    let isParent = false;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.slice(7);
-      const payload = verifyToken(token);
-      if (payload && (payload.role === 'parent' || payload.role === 'admin')) {
-        isParent = true;
-      }
-    }
-    const fileName = isParent ? 'admin.html' : 'index.html';
-    const filePath = join(options.webDir, fileName);
+  // GET /app — 统一入口，始终返回孩子端页面（前端根据 JWT role 分流）
+  app.get('/app', async (_request, reply) => {
+    const indexPath = join(options.webDir, 'index.html');
     try {
-      await stat(filePath);
-      return reply.type('text/html; charset=utf-8').send(createReadStream(filePath));
+      await stat(indexPath);
+      return reply.type('text/html; charset=utf-8').send(createReadStream(indexPath));
     } catch {
       return reply.status(404).send({ error: 'File not found', code: ErrorCodes.NOT_FOUND });
     }

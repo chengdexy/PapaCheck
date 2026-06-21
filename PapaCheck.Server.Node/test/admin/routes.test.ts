@@ -28,12 +28,23 @@ describe('Admin Routes', () => {
     password_hash: string | null;
   }> = [];
 
+  let storedChildren: Array<{
+    id: string;
+    tenant_id: string;
+    name: string;
+    access_code_id?: string;
+    is_active: boolean;
+    created_at: string;
+  }> = [];
+
   let storedAccessCodes: Array<{
     id: string;
-    user_id: string;
-    type: 'parent' | 'child';
+    tenant_id: string;
     code_hash: string;
-    nickname: string;
+    access_code?: string;
+    child_id: string;
+    token_version: number;
+    last_login?: string;
     created_at: string;
   }> = [];
 
@@ -68,13 +79,18 @@ describe('Admin Routes', () => {
         password_hash: adminPasswordHash,
       },
     ];
+    storedChildren = [
+      { id: childId, tenant_id: adminId, name: '测试孩子', access_code_id: 'code-child-001', is_active: true, created_at: '2024-01-02T00:00:00.000Z' },
+    ];
     storedAccessCodes = [
       {
-        id: childId,
-        user_id: adminId,
-        type: 'child',
+        id: 'code-child-001',
+        tenant_id: adminId,
         code_hash: childCodeHash,
-        nickname: '测试孩子',
+        access_code: childCode,
+        child_id: childId,
+        token_version: 1,
+        last_login: null,
         created_at: '2024-01-02T00:00:00.000Z',
       },
     ];
@@ -166,15 +182,17 @@ describe('Admin Routes', () => {
     createAccessCode: async (input: any) => {
       storedAccessCodes.push({
         id: input.id,
-        user_id: input.user_id,
-        type: input.type,
+        tenant_id: input.tenant_id,
         code_hash: input.code_hash,
-        nickname: input.nickname,
+        access_code: input.access_code,
+        child_id: input.child_id,
+        token_version: 1,
+        last_login: null,
         created_at: new Date().toISOString(),
       });
       return input.id;
     },
-    getAccessCodesByUser: async (userId: string) => storedAccessCodes.filter(c => c.user_id === userId),
+    getAccessCodesByUser: async (userId: string) => storedAccessCodes.filter(c => c.tenant_id === userId),
     findAccessCodeByCode: async (code: string) => {
       for (const c of storedAccessCodes) {
         if (bcrypt.compareSync(code, c.code_hash)) return c;
@@ -182,7 +200,7 @@ describe('Admin Routes', () => {
       return null;
     },
     getAccessCodeById: async (id: string) => storedAccessCodes.find(c => c.id === id) ?? null,
-    regenerateAccessCode: async (id: string, userId: string) => {
+    regenerateAccessCode: async (id: string, tenantId: string) => {
       const chars = '23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz';
       let raw = '';
       const bytes = crypto.randomBytes(6);
@@ -190,13 +208,13 @@ describe('Admin Routes', () => {
         raw += chars[bytes[i] % chars.length];
       }
       const hash = bcrypt.hashSync(raw, 10);
-      const idx = storedAccessCodes.findIndex(c => c.id === id && c.user_id === userId);
+      const idx = storedAccessCodes.findIndex(c => c.id === id && c.tenant_id === tenantId);
       if (idx === -1) throw new Error('not found');
       storedAccessCodes[idx].code_hash = hash;
       return raw;
     },
-    deleteAccessCode: async (id: string, userId: string) => {
-      storedAccessCodes = storedAccessCodes.filter(c => !(c.id === id && c.user_id === userId));
+    deleteAccessCode: async (id: string, tenantId: string) => {
+      storedAccessCodes = storedAccessCodes.filter(c => !(c.id === id && c.tenant_id === tenantId));
     },
 
     // === children 相关方法 ===
@@ -205,7 +223,7 @@ describe('Admin Routes', () => {
       const child = { id, tenant_id: tenantId, name, access_code_id: accessCodeId ?? undefined, is_active: true, created_at: new Date().toISOString() };
       return child;
     },
-    getChildrenByTenant: async (_tenantId: string, _activeOnly?: boolean) => [],
+    getChildrenByTenant: async (_tenantId: string, _activeOnly?: boolean) => storedChildren.filter(c => c.tenant_id === _tenantId),
     findChildByAccessCodeId: async (_accessCodeId: string, _tenantId: string) => null,
     updateChild: async () => {},
     assignLegacyDataToChild: async () => {},
@@ -490,6 +508,7 @@ describe('Admin Routes', () => {
   it('should return 403 when child role accesses members', async () => {
     const childToken = signToken({
       sub: childId,
+      member_id: 'code-child-001',
       tenant_id: adminTenantId,
       role: 'child',
       token_version: 1,
@@ -531,10 +550,9 @@ describe('Admin Routes', () => {
     expect(Array.isArray(body)).toBe(true);
     // 返回该用户下的所有访问码
     expect(body.length).toBeGreaterThanOrEqual(1);
-    const childEntry = body.find((m: any) => m.id === childId);
+    const childEntry = body.find((m: any) => m.child_id === childId);
     expect(childEntry).toBeDefined();
-    expect(childEntry.role).toBe('child');
-    expect(childEntry.nickname).toBe('测试孩子');
+    expect(childEntry.child_name).toBe('测试孩子');
   });
 
   // ==================== 添加成员 ====================
@@ -548,7 +566,7 @@ describe('Admin Routes', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/admin/members',
-      payload: { role: 'child', nickname: '新孩子' },
+      payload: { name: '新孩子' },
     });
     expect(res.statusCode).toBe(401);
   });
@@ -561,6 +579,7 @@ describe('Admin Routes', () => {
   it('should return 403 when child role adds member', async () => {
     const childToken = signToken({
       sub: childId,
+      member_id: 'code-child-001',
       tenant_id: adminTenantId,
       role: 'child',
       token_version: 1,
@@ -569,7 +588,7 @@ describe('Admin Routes', () => {
       method: 'POST',
       url: '/api/admin/members',
       headers: { Authorization: `Bearer ${childToken}` },
-      payload: { role: 'child', nickname: '新孩子' },
+      payload: { name: '新孩子' },
     });
     expect(res.statusCode).toBe(403);
     expect(res.json().code).toBe('FORBIDDEN');
@@ -591,7 +610,7 @@ describe('Admin Routes', () => {
       method: 'POST',
       url: '/api/admin/members',
       headers: { Authorization: `Bearer ${adminToken}` },
-      payload: { role: 'child' },
+      payload: { },
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe('VALIDATION_ERROR');
@@ -613,7 +632,7 @@ describe('Admin Routes', () => {
       method: 'POST',
       url: '/api/admin/members',
       headers: { Authorization: `Bearer ${adminToken}` },
-      payload: { role: 'guest', nickname: '访客' },
+      payload: { name: '' },
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe('VALIDATION_ERROR');
@@ -635,18 +654,16 @@ describe('Admin Routes', () => {
       method: 'POST',
       url: '/api/admin/members',
       headers: { Authorization: `Bearer ${adminToken}` },
-      payload: { role: 'child', nickname: '新孩子' },
+      payload: { name: '新孩子' },
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body).toHaveProperty('id');
-    expect(body.nickname).toBe('新孩子');
-    expect(body.role).toBe('child');
+    expect(body).toHaveProperty('child_id');
+    expect(body.child_name).toBe('新孩子');
     expect(body.access_code).toMatch(/^[A-Za-z2-9]{6}$/); // 返回明文访问码
     // 验证访问码已存入存储
-    const newCode = storedAccessCodes.find(c => c.id === body.id);
+    const newCode = storedAccessCodes.find(c => c.id === body.access_code_id);
     expect(newCode).toBeDefined();
-    expect(newCode?.nickname).toBe('新孩子');
   });
 
   // ==================== 重新生成访问码 ====================
@@ -672,6 +689,7 @@ describe('Admin Routes', () => {
   it('should return 403 when child role regenerates hash', async () => {
     const childToken = signToken({
       sub: childId,
+      member_id: 'code-child-001',
       tenant_id: adminTenantId,
       role: 'child',
       token_version: 1,
@@ -697,19 +715,20 @@ describe('Admin Routes', () => {
       role: 'user',
       token_version: 1,
     });
-    const oldCodeHash = storedAccessCodes.find(c => c.id === childId)?.code_hash;
+    const codeId = 'code-child-001';
+    const oldCodeHash = storedAccessCodes.find(c => c.id === codeId)?.code_hash;
     const res = await app.inject({
       method: 'POST',
-      url: `/api/admin/members/${childId}/regenerate`,
+      url: `/api/admin/members/${codeId}/regenerate`,
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.id).toBe(childId);
+    expect(body.id).toBe(codeId);
     expect(body.access_code).toMatch(/^[A-Za-z2-9]{6}$/); // 返回明文访问码
     expect(body.message).toBe('已重新生成，旧访问码已失效');
     // 验证 code_hash 已更新
-    const updatedCode = storedAccessCodes.find(c => c.id === childId);
+    const updatedCode = storedAccessCodes.find(c => c.id === codeId);
     expect(updatedCode?.code_hash).not.toBe(oldCodeHash);
   });
 
@@ -734,12 +753,12 @@ describe('Admin Routes', () => {
   //     When  调用 DELETE /api/admin/members/:id
   //     Then  返回 403
   it('should return 403 when child role deletes member', async () => {
-    const currentChildVersion = storedUsers.find(u => u.id === childId)?.token_version ?? 1;
     const childToken = signToken({
       sub: childId,
+      member_id: 'code-child-001',
       tenant_id: adminTenantId,
       role: 'child',
-      token_version: currentChildVersion,
+      token_version: 1,
     });
     const res = await app.inject({
       method: 'DELETE',
@@ -766,10 +785,12 @@ describe('Admin Routes', () => {
     const tempId = 'temp-child-001';
     storedAccessCodes.push({
       id: tempId,
-      user_id: adminId,
-      type: 'child',
+      tenant_id: adminId,
       code_hash: '$2a$10$dummy',
-      nickname: '待删除',
+      access_code: 'TEMP123',
+      child_id: 'temp-child-' + Date.now(),
+      token_version: 1,
+      last_login: null,
       created_at: '2024-03-01T00:00:00.000Z',
     });
     expect(storedAccessCodes.find(c => c.id === tempId)).toBeDefined();

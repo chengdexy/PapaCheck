@@ -26,7 +26,7 @@ describe('MemberTable', () => {
   it('加载中显示 loading', () => {
     mockFetch.mockImplementation(() => new Promise(() => {}));
     render(<AuthProvider><ToastProvider><MemberTable refreshKey={0} /></ToastProvider></AuthProvider>);
-    expect(screen.getByText('加载成员列表...')).toBeDefined();
+    expect(screen.getByText('加载孩子列表...')).toBeDefined();
   });
 
   // Scenario: 加载失败显示重试
@@ -44,14 +44,14 @@ describe('MemberTable', () => {
     await act(async () => {
       render(<AuthProvider><ToastProvider><MemberTable refreshKey={0} /></ToastProvider></AuthProvider>);
     });
-    await waitFor(() => { expect(screen.getByText('暂无家庭成员')).toBeDefined(); }, { timeout: 3000 });
+    await waitFor(() => { expect(screen.getByText('暂无孩子')).toBeDefined(); }, { timeout: 3000 });
   });
 
   // Scenario: 加载成功显示成员列表
   it('加载成功显示成员列表', async () => {
     const members = [
-      { id: '1', nickname: '爸爸', role: 'parent', access_hash: 'abc123', last_login: '2024-01-01', created_at: '2024-01-01' },
-      { id: '2', nickname: '小明', role: 'child', access_hash: 'def456', last_login: null, created_at: '2024-01-02' },
+      { child_id: '1', child_name: '爸爸', is_active: true, access_code_id: 'ac-1', access_code: 'ABC123', last_login: '2024-01-01', created_at: '2024-01-01' },
+      { child_id: '2', child_name: '小明', is_active: true, access_code_id: 'ac-2', access_code: 'DEF456', last_login: null, created_at: '2024-01-02' },
     ];
     mockFetch.mockResolvedValue({ ok: true, json: async () => members });
     await act(async () => {

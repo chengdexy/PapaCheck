@@ -7,7 +7,15 @@
 ## [Unreleased]
 
 ### Added
-- **统一登录页重写**：`login.html` 完全重写，新增渐变背景、白底圆角卡片、最近使用列表（localStorage 持久化，最多 5 条）、家长/孩子角色选择按钮。页面加载时检查 `sessionStorage` 有 token 则直接跳转 `/app`，新码登录后自动保存到最近使用。新增 15 个 TDD 测试覆盖 `loadKnownCodes`、`saveKnownCode`、`exchange` API 调用、角色切换、sessionStorage 跳转检测。全量 627 测试通过
+- **统一登录页重写**：`login.html` 完全重写，新增渐变背景、白底圆角卡片、最近使用列表（localStorage 持久化，最多 5 条）、家长/孩子角色选择按钮。新码登录后自动保存到最近使用。新增 15 个 TDD 测试。全量 627 测试通过
+- **管理面板适配新模型**：`AddMemberForm` 删除角色选择，只接收孩子姓名；`MemberTable` 删除角色列，按孩子展示；`BrandHeader` 合并为孩子端/家长端为"客户端"链接；后端 `admin/routes.ts` 适配新 access_codes 结构
+- **管理员页面头部显示孩子名**：`admin.html` header 新增 `#childNameDisplay`，显示 `👤 孩子名`
+- **登录流程优化**：点击角色按钮时若已输入访问码直接触发登录，不再需要额外点击"进入"
+
+### Fixed
+- **`/app` 路由无法判断角色导致死循环**：服务端 `/app` 无法读取浏览器页面导航的 Authorization header，导致家长登录后被跳转到 `/login.html` → `/app` 死循环。改为前端按 sessionStorage role 分流：家长→`/admin.html`，孩子→`/`
+- **管理面板孩子名不显示**：`GET /api/admin/members` 数据源从 access_codes 改为 children 表后，现有数据的 `child_id` 为 null 导致关联不上。执行数据迁移填充 `child_id`，更新迁移脚本 Step 2 为自动执行
+- **`login.html` 角色按钮无反应**：角色按钮只切换选中态，没有触发登录入口。改为选择角色时若已有访问码直接调用 exchange API
 
 ### Fixed
 - **`_setJson` 只做 UPDATE 不处理行不存在的情况**：新租户的 `bounty_tasks`/`shop_items` 等表无初始行时，UPDATE 影响 0 行导致数据静默丢弃。改为 UPDATE + INSERT（`ON CONFLICT DO NOTHING`）模式，兼容多孩子迁移引入的部分唯一索引（`WHERE child_id IS NULL`）
