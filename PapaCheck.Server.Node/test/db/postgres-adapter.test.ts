@@ -14,22 +14,14 @@ describe.runIf(runPg)('PostgresAdapter', () => {
     await adapter.createTenant(TEST_TENANT_ID, '测试租户');
 
     // 插入该租户的单行表默认行
-    const ALLOWED_TABLES = new Set([
-      'shop_items', 'redemptions', 'badges', 'reward_box',
-      'settings', 'active_buffs', 'bounty_tasks', 'email_config',
-    ]);
-    const defaultRows = [
-      { table: 'shop_items', data: '[]' },
-      { table: 'redemptions', data: '[]' },
-      { table: 'badges', data: '[]' },
-      { table: 'reward_box', data: '[]' },
-      { table: 'settings', data: '{}' },
-      { table: 'active_buffs', data: '[]' },
-      { table: 'bounty_tasks', data: '[]' },
-      { table: 'email_config', data: '{}' },
-    ];
+    const ALLOWED_TABLES = ['shop_items', 'redemptions', 'badges', 'reward_box', 'settings', 'active_buffs', 'bounty_tasks', 'email_config'];
+    const allowSet = new Set(ALLOWED_TABLES);
+    const defaultRows = ALLOWED_TABLES.map(table => ({
+      table,
+      data: table === 'email_config' || table === 'settings' ? '{}' : '[]',
+    }));
     for (const { table, data } of defaultRows) {
-      if (!ALLOWED_TABLES.has(table)) {
+      if (!allowSet.has(table)) {
         throw new Error(`不允许的表名: ${table}`);
       }
       await adapter.pool.query(
