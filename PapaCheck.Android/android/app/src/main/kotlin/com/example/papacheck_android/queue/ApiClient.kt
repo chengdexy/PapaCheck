@@ -1,6 +1,7 @@
 package com.example.papacheck_android.queue
 
 import android.content.Context
+import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -26,15 +27,15 @@ class ApiClient(private val context: Context) {
     }
 }
 
+/** 将 OkHttp Call 转为可暂停的函数 */
 private suspend fun Call.await(): Response {
-    return kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+    return suspendCancellableCoroutine { continuation ->
         enqueue(object : Callback {
             override fun onResponse(call: Call, response: Response) {
-                continuation.resume(response) {}
+                continuation.resumeWith(Result.success(response))
             }
             override fun onFailure(call: Call, e: java.io.IOException) {
-                if (continuation.isCancelled) return
-                continuation.resumeWithException(e)
+                continuation.resumeWith(Result.failure(e))
             }
         })
         continuation.invokeOnCancellation {
