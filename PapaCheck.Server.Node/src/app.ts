@@ -938,16 +938,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   // 统一写端点（供乐观写入和原生队列使用）
   app.post('/api/sync/write', async (request: any, reply) => {
-    const op = request.body as {
-      id: string;
-      type: 'update' | 'delete';
-      table: string;
-      resourceId: string;
-      field?: string | null;
-      value: any;
-      timestamp: string;
-      nodeId: string;
-    };
+    const op = request.body as CRDTOperation;
     const tenantId = request.jwtPayload?.tenant_id;
     const existed = await db.hasCRDTOperation(op.id, tenantId);
     await db.saveCRDTOperation(op, tenantId);
