@@ -4,6 +4,22 @@
 
 ---
 
+## [Unreleased]
+
+### Added
+- **本地测试数据库搭建脚本**：`scripts/setup-test-db.ps1` 一键完成 PG 检测→建测试库→建表→生成 `.env.test`（[#setup-test-db.ps1](file:///e:/trae_projects/PapaCheck/PapaCheck.Server.Node/scripts/setup-test-db.ps1)）
+- **`vitest.config.js` 自动加载 `.env.test`**：自动读取 `PapaCheck.Server.Node/.env.test`，不覆盖已存在的 `DATABASE_URL` 环境变量（[#vitest.config.js](file:///e:/trae_projects/PapaCheck/vitest.config.js)）
+- **调试配置 launch.json**：3 个调试配置（全功能调试 F5 + 当前文件测试 + 全量测试）+ 复合任务"启动 + 测试"
+
+### Fixed
+- **postgres-adapter.test.ts 6 个测试修复**：添加测试租户上下文，适配 PostgreSQL 的 `tenant_id` NOT NULL 约束（[#postgres-adapter.test.ts](file:///e:/trae_projects/PapaCheck/PapaCheck.Server.Node/test/db/postgres-adapter.test.ts)）
+- **api.test.ts 44 个测试修复**：注入 `onRequest` hook 提供 JWT payload，解决无认证环境下 `tenant_id` 为空导致的 500 错误；通知测试 SQLite `(db as any).db.prepare` 改为 `pool.query`（[#api.test.ts](file:///e:/trae_projects/PapaCheck/PapaCheck.Server.Node/test/api.test.ts)）
+- **email.test.ts 3 个测试修复**：注入 `onRequest` hook 提供 JWT payload + 初始化默认行（[#email.test.ts](file:///e:/trae_projects/PapaCheck/PapaCheck.Server.Node/test/email.test.ts)）
+- **`src/index.ts` 清理废弃 `--db-path` 参数**：SQLite 退役后残留的命令行参数（[#index.ts](file:///e:/trae_projects/PapaCheck/PapaCheck.Server.Node/src/index.ts)）
+
+### Removed
+- **删除 3 个 SQLite 专属死测试**：`redemption_dup_check.test.ts`、`shop_daily_reset.test.ts`、`reward_box_delete.test.ts`（硬编码 `describe.runIf(false)`，业务逻辑已被 `api.test.ts` 覆盖）
+
 ## [1.3.8] - 2026-06-21
 
 ### Added

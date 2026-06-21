@@ -115,6 +115,7 @@ vi.mock('imap', () => {
 vi.stubGlobal('fetch', vi.fn());
 
 const hasDB = !!process.env['DATABASE_URL'];
+const TEST_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
 describe.runIf(hasDB)('EmailSync', () => {
   let app: FastifyInstance;
@@ -124,6 +125,22 @@ describe.runIf(hasDB)('EmailSync', () => {
     imapShouldFail = false;
     openBoxShouldFail = false;
     app = await buildApp({ port: 0, webDir: '', showPollingLog: false });
+    app.addHook('onRequest', async (request: any) => {
+      request.jwtPayload = {
+        tenant_id: TEST_TENANT_ID,
+        sub: TEST_TENANT_ID,
+        role: 'user',
+        token_version: 1,
+      };
+    });
+    // Ensure default email_config row exists for test tenant and is reset to empty
+    const db = (app as any).papaCheckDB;
+    if (db && db.pool) {
+      await db.pool.query(
+        `INSERT INTO email_config (tenant_id, id, data) VALUES ($1, 1, '{}') ON CONFLICT (tenant_id, id) DO UPDATE SET data = '{}'`,
+        [TEST_TENANT_ID]
+      );
+    }
     await app.listen({ port: 0, host: '127.0.0.1' });
   });
 

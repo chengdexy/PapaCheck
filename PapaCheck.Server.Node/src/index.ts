@@ -3,11 +3,10 @@ import minimist from 'minimist';
 import { buildApp } from './app.js';
 
 const args = minimist(process.argv.slice(2), {
-  string: ['port', 'web-dir', 'db-path', 'tts-python'],
+  string: ['port', 'web-dir', 'tts-python'],
   default: {
     port: '8080',
     'web-dir': resolve(process.cwd(), '..', 'PapaCheck.Web'),
-    'db-path': resolve(process.cwd(), 'data.db'),
     'tts-python': 'python',
   },
 });

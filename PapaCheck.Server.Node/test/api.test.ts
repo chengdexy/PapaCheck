@@ -12,8 +12,21 @@ describe.runIf(hasDB)('API 端点完整测试', () => {
 let app: FastifyInstance;
 let db: any;
 
+const TEST_TENANT_ID = '00000000-0000-0000-0000-000000000001';
+
 beforeAll(async () => {
   app = await buildApp({ port: 0, webDir: '', showPollingLog: false, rateLimit: false });
+
+  // 注入测试租户上下文（无需 JWT 认证），使 route handler 能正确获取 tenant_id
+  app.addHook('onRequest', async (request: any) => {
+    request.jwtPayload = {
+      tenant_id: TEST_TENANT_ID,
+      sub: TEST_TENANT_ID,
+      role: 'user',
+      token_version: 1,
+    };
+  });
+
   await app.listen({ port: 0, host: '127.0.0.1' });
   db = (app as any).papaCheckDB;
 });
@@ -1014,8 +1027,7 @@ describe('POST /api/sync/crdt-pull?ack=', () => {
 // ==================== 通知端点 ====================
 
 async function cleanNotifications() {
-  const dbWrite = await (db as any).db;
-  dbWrite.prepare('DELETE FROM notifications').run();
+  await (db as any).pool.query('DELETE FROM notifications');
 }
 
 describe('POST /api/notify', () => {
@@ -1035,7 +1047,7 @@ describe('POST /api/notify', () => {
     const body = JSON.parse(res.body);
     expect(body).toEqual({ ok: true, id: expect.any(String) });
     // Verify stored in db
-    const notifications = await (db as any).getPendingNotifications();
+    const notifications = await (db as any).getPendingNotifications(TEST_TENANT_ID);
     expect(notifications).toHaveLength(1);
     expect(notifications[0].text).toBe('测试通知');
   });
@@ -1072,11 +1084,11 @@ describe('GET /api/notify/pending', () => {
     // Given 数据库中有 1 条有效通知和 1 条过期通知
     // When GET /api/notify/pending
     // Then 只返回有效通知，过期通知被清理
-    const dbWrite = await (db as any).db;
+    const pool = (db as any).pool;
     const validId = 'valid-001';
     const expiredId = 'expired-001';
-    dbWrite.prepare('INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)').run(validId, '有效通知', Date.now());
-    dbWrite.prepare('INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)').run(expiredId, '过期通知', Date.now() - 7200000);
+    await pool.query('INSERT INTO notifications (tenant_id, id, text, created_at) VALUES ($1, $2, $3, $4)', [TEST_TENANT_ID, validId, '有效通知', Date.now()]);
+    await pool.query('INSERT INTO notifications (tenant_id, id, text, created_at) VALUES ($1, $2, $3, $4)', [TEST_TENANT_ID, expiredId, '过期通知', Date.now() - 7200000]);
 
     const res = await app.inject({ method: 'GET', url: '/api/notify/pending' });
     expect(res.statusCode).toBe(200);
@@ -1106,11 +1118,11 @@ describe('DELETE /api/notify/consumed', () => {
     // Given 数据库中有两条通知
     // When DELETE /api/notify/consumed?ids=id1
     // Then 指定通知被删除，其余保留
-    const dbWrite = await (db as any).db;
+    const pool = (db as any).pool;
     const id1 = 'del-001';
     const id2 = 'del-002';
-    dbWrite.prepare('INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)').run(id1, '通知1', Date.now());
-    dbWrite.prepare('INSERT INTO notifications (id, text, created_at) VALUES (?, ?, ?)').run(id2, '通知2', Date.now());
+    await pool.query('INSERT INTO notifications (tenant_id, id, text, created_at) VALUES ($1, $2, $3, $4)', [TEST_TENANT_ID, id1, '通知1', Date.now()]);
+    await pool.query('INSERT INTO notifications (tenant_id, id, text, created_at) VALUES ($1, $2, $3, $4)', [TEST_TENANT_ID, id2, '通知2', Date.now()]);
 
     const res = await app.inject({
       method: 'DELETE',
@@ -1120,9 +1132,9 @@ describe('DELETE /api/notify/consumed', () => {
     const body = JSON.parse(res.body);
     expect(body).toEqual({ ok: true });
 
-    const remaining = dbWrite.prepare('SELECT id FROM notifications ORDER BY id').all() as any[];
-    expect(remaining).toHaveLength(1);
-    expect(remaining[0].id).toBe(id2);
+    const remainingResult = await pool.query('SELECT id FROM notifications WHERE tenant_id = $1 ORDER BY id', [TEST_TENANT_ID]);
+    expect(remainingResult.rows).toHaveLength(1);
+    expect(remainingResult.rows[0].id).toBe(id2);
   });
 
   it('空 ids 列表时返回 ok', async () => {
