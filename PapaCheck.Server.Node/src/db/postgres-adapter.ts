@@ -127,14 +127,14 @@ export class PostgresAdapter extends DatabaseAdapter {
     let query: string;
     let params: any[];
     if (tenantId && childId) {
-      query = `UPDATE ${table} SET data = $1 WHERE tenant_id = $2 AND child_id = $3 AND id = $4`;
-      params = [JSON.stringify(data), tenantId, childId, idValue];
+      query = `INSERT INTO ${table} (tenant_id, child_id, id, data) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, child_id, id) DO UPDATE SET data = EXCLUDED.data`;
+      params = [tenantId, childId, idValue, JSON.stringify(data)];
     } else if (tenantId) {
-      query = `UPDATE ${table} SET data = $1 WHERE tenant_id = $2 AND id = $3`;
-      params = [JSON.stringify(data), tenantId, idValue];
+      query = `INSERT INTO ${table} (tenant_id, id, data) VALUES ($1, $2, $3) ON CONFLICT (tenant_id, id) DO UPDATE SET data = EXCLUDED.data`;
+      params = [tenantId, idValue, JSON.stringify(data)];
     } else {
-      query = `UPDATE ${table} SET data = $1 WHERE id = $2`;
-      params = [JSON.stringify(data), idValue];
+      query = `INSERT INTO ${table} (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data`;
+      params = [idValue, JSON.stringify(data)];
     }
     await this.pool.query(query, params);
   }
