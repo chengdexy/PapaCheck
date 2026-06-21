@@ -80,12 +80,14 @@ describe.runIf(hasDB)('Child API Isolation (孩子 API 隔离)', () => {
     expect(body.homeworks['2026-06-21']?.[0]?.subject).toBe('数学');
   });
 
-  it('家长角色缺少 child_id 参数返回 400', async () => {
+  it('家长缺 child_id 时返回共享数据（不报错）', async () => {
     _testJwt = { tenant_id: tenantA, sub: tenantA, role: 'parent', token_version: 1 };
 
     const res = await app.inject({ method: 'GET', url: '/api/data' });
-    expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body).code).toBe('MISSING_CHILD_ID');
+    expect(res.statusCode).toBe(200);
+    // 不应返回 MISSING_CHILD_ID
+    const body = JSON.parse(res.body);
+    expect(body).not.toHaveProperty('code', 'MISSING_CHILD_ID');
   });
 
   it('家长不能查询其他家庭的孩子', async () => {

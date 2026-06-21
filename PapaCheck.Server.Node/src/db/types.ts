@@ -120,6 +120,7 @@ export interface CreateUserInput {
   email?: string;
   password_hash?: string;
   family_name?: string;
+  tenant_id?: string;
   token_version: number;
 }
 
@@ -150,6 +151,7 @@ export interface CreateAccessCodeInput {
   user_id: string;
   type: 'parent' | 'child';
   code_hash: string;
+  access_code?: string;
   nickname: string;
 }
 

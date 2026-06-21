@@ -37,8 +37,10 @@ CREATE TABLE IF NOT EXISTS access_codes (
   user_id UUID NOT NULL REFERENCES users(id),
   type TEXT NOT NULL CHECK (type IN ('parent', 'child')),
   code_hash TEXT NOT NULL,
+  access_code TEXT,
   nickname TEXT NOT NULL,
   token_version INTEGER NOT NULL DEFAULT 1,
+  last_login TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(user_id, nickname)
 );
@@ -261,7 +263,11 @@ CREATE TABLE IF NOT EXISTS alert_state (
 -- These statements handle existing databases that already have old tables.
 -- For fresh installs they are no-ops (IF NOT EXISTS).
 
--- Step 1: Add child_id column to all per-child tables
+-- Step 1: Add child_id columns to per-child tables
+
+-- Step 1.5: Add access_code + last_login to access_codes (missing from pg migration)
+DO $$ BEGIN ALTER TABLE access_codes ADD COLUMN IF NOT EXISTS access_code TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE access_codes ADD COLUMN IF NOT EXISTS last_login TIMESTAMP; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 ALTER TABLE points ADD COLUMN IF NOT EXISTS child_id UUID;
 ALTER TABLE points_history ADD COLUMN IF NOT EXISTS child_id UUID;
 ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS child_id UUID;

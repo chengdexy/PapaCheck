@@ -110,7 +110,7 @@ function pregenSpeech(texts) {
   if (unique.length === 0) return;
   fetch('/api/pregen-speech', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('papacheck_token') },
     body: JSON.stringify({ texts: unique }),
   }).catch(() => { });
 }
@@ -232,8 +232,8 @@ async function initAdmin() {
   }
 
   await ConnectionManager.start();
-  await refreshAllData();
-  await loadChildren();
+  await loadChildren();  // 先加载孩子列表并恢复/默认选中，内部会调用 refreshAllData
+  await refreshAllData(); // 兜底刷新（无孩子时加载共享数据）
   updateSettingsTabState();
   hideTransitionMask();
   // 恢复上次停留的标签页

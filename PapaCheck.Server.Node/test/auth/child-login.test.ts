@@ -51,7 +51,7 @@ describe.runIf(runPg)('Child Login - JWT contains child_id', () => {
 
   // Scenario: createChild and findChildByAccessCodeId work in DB layer
   it('createChild 然后 findChildByAccessCodeId 能查到', async () => {
-    childId = '11111111-1111-1111-1111-111111111111';
+    childId = '11111111-1111-1111-1111-c1d10ad101aa';
     accessCodeId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaac';
 
     // Create access_code

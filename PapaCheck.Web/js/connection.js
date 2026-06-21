@@ -67,8 +67,8 @@ var ConnectionManager = (function () {
             console.error('[ConnectionManager] CRDT 同步失败:', crdtErr);
           }
         }
-        // CRDT 同步成功后从服务器拉取最新数据，失败时保留本地 cachedData
-        if (crdtOk && typeof API !== 'undefined' && API.getData) {
+        // 尝试使用 getData 刷新数据（不强制依赖 CRDT 成功）
+        if (typeof API !== 'undefined' && API.getData) {
           try {
             cachedData = await API.getData();
           } catch (e) {
@@ -96,10 +96,15 @@ var ConnectionManager = (function () {
         _mode = 'offline';
         return; // 关键：提前返回，不走到 _mode = 'online'
       }
-      // CRDT 同步失败（非超时）时保持 offline，等待下次 ping 重试
-      // 注意：仅当 CRDT 真正尝试且失败时才阻止切 online；SyncEngine 不可用时跳过
+      // CRDT 同步失败（非超时）降级：尝试用 getData 刷新数据后切 online
       if (crdtAttempted && !crdtOk && raceResult !== 'timeout') {
-        throw new Error('CRDT 同步失败，保持离线模式');
+        console.warn('[ConnectionManager] CRDT 同步失败，尝试降级刷新数据...');
+        // 尝试通过 getData 获取最新数据
+        if (typeof API !== 'undefined' && API.getData) {
+          try { cachedData = await API.getData(); } catch (e) {
+            console.error('[ConnectionManager] getData 降级也失败:', e);
+          }
+        }
       }
       _mode = 'online';
       _wasOnline = true;

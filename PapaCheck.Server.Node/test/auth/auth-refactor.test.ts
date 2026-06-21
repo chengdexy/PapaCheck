@@ -121,6 +121,7 @@ describe('Auth Refactor — 认证体系重构测试', () => {
 
   const mockDb: IDatabase = {
     // --- 数据操作方法（桩） ---
+    pool: { query: async () => ({ rows: [] }) } as any,
     close: async () => {},
     getFullData: async () => ({} as any),
     importFullData: async () => {},
@@ -320,6 +321,17 @@ describe('Auth Refactor — 认证体系重构测试', () => {
     deleteAccessCode: async (id: string, userId: string) => {
       storedAccessCodes = storedAccessCodes.filter(ac => !(ac.id === id && ac.user_id === userId));
     },
+
+    // === children 相关方法 ===
+    getChildrenByTenant: async (_tenantId: string, _activeOnly?: boolean) => [],
+    getChildById: async (_id: string, _tenantId: string) => null,
+    findChildByAccessCodeId: async (_accessCodeId: string, _tenantId: string) => null,
+    createChild: async (tenantId: string, name: string, accessCodeId?: string) => {
+      const id = 'child-' + Date.now();
+      return { id, tenant_id: tenantId, name, access_code_id: accessCodeId ?? undefined, is_active: true, created_at: new Date().toISOString() };
+    },
+    updateChild: async () => {},
+    assignLegacyDataToChild: async () => {},
   };
 
   // ==================== 应用启动 ====================
@@ -537,9 +549,8 @@ describe('Auth Refactor — 认证体系重构测试', () => {
     });
 
     // Scenario: parent 子账号不能管理成员
-    it('parent 角色（通过访问码登录）不能管理成员', async () => {
+    it('parent 角色可读取但不能管理成员', async () => {
       // 构造一个 parent 角色的 JWT（模拟通过访问码登录获得的 token）
-      // 真实 /api/auth/exchange 签发的 token 一定包含 member_id（access_code id）
       const parentToken = signToken({
         sub: 'user-001',
         tenant_id: 'tenant-001',
@@ -548,14 +559,22 @@ describe('Auth Refactor — 认证体系重构测试', () => {
         token_version: 1,
       });
 
+      // GET: parent 可以读取成员列表（家长端需要显示孩子选择栏）
       const res = await app.inject({
         method: 'GET',
         url: '/api/admin/members',
         headers: { Authorization: `Bearer ${parentToken}` },
       });
-      expect(res.statusCode).toBe(403);
-      const body = res.json();
-      expect(body.code).toBe('FORBIDDEN');
+      expect(res.statusCode).toBe(200);
+
+      // POST: parent 不能创建成员
+      const postRes = await app.inject({
+        method: 'POST',
+        url: '/api/admin/members',
+        headers: { Authorization: `Bearer ${parentToken}` },
+        payload: { role: 'child', nickname: 'test' },
+      });
+      expect(postRes.statusCode).toBe(403);
     });
   });
 });

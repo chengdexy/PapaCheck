@@ -83,6 +83,7 @@ describe('Admin Routes', () => {
 
   const mockDb: IDatabase = {
     // 已有方法（桩）
+    pool: { query: async () => ({ rows: [] }) } as any,
     close: async () => {},
     getFullData: async () => ({} as any),
     importFullData: async () => {},

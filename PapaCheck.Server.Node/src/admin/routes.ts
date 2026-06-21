@@ -91,10 +91,10 @@ async function generateAccessHash(): Promise<{ raw: string; hashed: string }> {
 }
 
 export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<void> {
-  // GET /api/admin/members — 访问码列表（仅 user 角色可访问）
+  // GET /api/admin/members — 访问码列表（user 和 parent 角色可读取）
   app.get('/api/admin/members', async (request: any, reply) => {
     const payload = request.jwtPayload as JWTPayload;
-    if (!payload || payload.role !== 'user') {
+    if (!payload || (payload.role !== 'user' && payload.role !== 'parent')) {
       return reply.status(403).send({ error: '仅用户账号可管理成员', code: 'FORBIDDEN' });
     }
 
@@ -127,14 +127,12 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
 
     const id = crypto.randomUUID();
     const { raw, hashed } = await generateAccessHash();
-    await db.createAccessCode({ id, user_id: payload.sub, type: role, code_hash: hashed, nickname });
+    await db.createAccessCode({ id, user_id: payload.sub, type: role, code_hash: hashed, access_code: raw, nickname });
 
     // 孩子角色：自动创建 children 记录
     let childId: string | null = null;
     if (role === 'child') {
       const child = await db.createChild(payload.sub, nickname, id);
-      // 将遗留数据（child_id IS NULL）分配给新孩子
-      await db.assignLegacyDataToChild(payload.sub, child.id);
       childId = child.id;
     }
 

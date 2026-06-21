@@ -32,6 +32,12 @@ function updateConnStatus() {
 const API = {
   // ========== 统一请求策略处理器 ==========
 
+  // 附加 child_id query 参数（所有 per-child API 使用）
+  _childQuery: function () {
+    var childId = (typeof window !== 'undefined') ? window._currentChildId : undefined;
+    return childId ? '?child_id=' + encodeURIComponent(childId) : '';
+  },
+
   _strategies: {
     // 优先在线，失败降级到本地
     'online-first': async function (onlineFn, offlineFn, options) {
@@ -77,6 +83,12 @@ const API = {
     if (!options) options = {};
     var method = options.method || 'GET';
     var fetchOptions = { ...options };
+    // 自动附加 child_id 到 per-child API
+    var childId = (typeof window !== 'undefined') ? window._currentChildId : undefined;
+    var sep = url.indexOf('?') === -1 ? '?' : '&';
+    if (childId && !/\/api\/(shop|bounty-tasks|settings|reward-box|notifications|ping|version|pregen-speech|speak|admin\/(members|invite|roles)|auth\/)/.test(url)) {
+      url += sep + 'child_id=' + encodeURIComponent(childId);
+    }
     // DELETE 请求没有 body，不设置 Content-Type，避免 Fastify 报空 JSON body 错误
     if (method !== 'DELETE') {
       if (!fetchOptions.headers) fetchOptions.headers = {};
@@ -104,8 +116,9 @@ const API = {
     // getData 是初始化函数，在 ConnectionManager.start() 之前调用，
     // 此时 CM 模式为 offline，但服务器可能在线，因此不依赖 CM 模式判断
     try {
-      var query = childId ? '?child_id=' + encodeURIComponent(childId) : '';
-      var result = await this._fetch('/api/data' + query);
+      // 更新 window._currentChildId 以便 _fetch 自动附加
+      if (typeof window !== 'undefined') window._currentChildId = childId;
+      var result = await this._fetch('/api/data');
       isServerMode = true;
       cachedData = result;
       // 深拷贝后传给 cacheFullData，防止原地修改 lastModified/uuid 污染 cachedData

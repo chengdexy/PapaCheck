@@ -1636,10 +1636,10 @@ export class PostgresAdapter extends DatabaseAdapter {
   }
 
   async createUser(input: any): Promise<void> {
-    const { id, role, email, password_hash, family_name, token_version } = input;
+    const { id, role, email, password_hash, family_name, tenant_id, token_version } = input;
     await this.pool.query(
-      'INSERT INTO users (id, role, email, password_hash, family_name, token_version, is_active) VALUES ($1, $2, $3, $4, $5, $6, true) ON CONFLICT (id) DO NOTHING',
-      [id, role, email ?? null, password_hash ?? null, family_name ?? null, token_version ?? 1]
+      'INSERT INTO users (id, role, email, password_hash, family_name, tenant_id, token_version, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7, true) ON CONFLICT (id) DO NOTHING',
+      [id, role, email ?? null, password_hash ?? null, family_name ?? null, tenant_id ?? null, token_version ?? 1]
     );
   }
 
@@ -1743,15 +1743,15 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   async createAccessCode(input: CreateAccessCodeInput): Promise<string> {
     await this.pool.query(
-      'INSERT INTO access_codes (id, user_id, type, code_hash, nickname) VALUES ($1, $2, $3, $4, $5)',
-      [input.id, input.user_id, input.type, input.code_hash, input.nickname]
+      'INSERT INTO access_codes (id, user_id, type, code_hash, access_code, nickname) VALUES ($1, $2, $3, $4, $5, $6)',
+      [input.id, input.user_id, input.type, input.code_hash, input.access_code ?? null, input.nickname]
     );
     return input.id;
   }
 
   async getAccessCodesByUser(userId: string): Promise<AccessCodeRecord[]> {
     const result = await this.pool.query(
-      'SELECT id, user_id, type, code_hash, access_code, nickname, last_login, created_at FROM access_codes WHERE user_id = $1 ORDER BY created_at ASC',
+      'SELECT id, user_id, type, code_hash, access_code, token_version, nickname, last_login, created_at FROM access_codes WHERE user_id = $1 ORDER BY created_at ASC',
       [userId]
     );
     return result.rows.map((r: any) => ({

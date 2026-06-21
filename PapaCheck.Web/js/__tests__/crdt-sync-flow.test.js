@@ -163,6 +163,12 @@ function createSyncEngineContext() {
     CRDTLog: mockCRDTLog,
     DB: mockDB,
     fetch: mockFetch.fetch.bind(mockFetch),
+    localStorage: {
+      _data: {},
+      getItem: function(key) { return this._data[key] || null; },
+      setItem: function(key, value) { this._data[key] = value; },
+      removeItem: function(key) { delete this._data[key]; },
+    },
     window: {
       _serverBaseUrl: '',
       location: { origin: 'http://localhost:3000' },

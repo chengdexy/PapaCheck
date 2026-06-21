@@ -63,6 +63,11 @@ function copyAdminAssets(): Plugin {
 
 const viteConfig = {
   plugins: [react(), tailwindcss(), adminBaseRewrite(), copyAdminAssets()],
+  server: {
+    proxy: {
+      '/api': 'http://localhost:8080',
+    },
+  },
   build: {
     rollupOptions: {
       input: {

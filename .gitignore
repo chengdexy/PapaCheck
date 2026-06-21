@@ -79,6 +79,7 @@ PapaCheck.Server.Node/dist/
 *.tsbuildinfo
 
 # Node.js TTS 缓存
+PapaCheck.Server.Node/src/tts_cache/
 PapaCheck.Server.Node/tts_cache/
 PapaCheck.Web/tts_cache/
 

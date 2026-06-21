@@ -110,8 +110,8 @@ function getChildId(request: any, db: any): string | undefined | 'MISSING' {
   }
   if (payload.role === 'parent') {
     const queryChildId = (request.query as any)?.child_id;
-    if (!queryChildId) return 'MISSING';
-    return queryChildId;
+    // parent 未选择孩子时允许加载共享数据（初始加载、商店、设置等）
+    return queryChildId || undefined;
   }
   return undefined;
 }
