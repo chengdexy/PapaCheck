@@ -62,7 +62,7 @@ describe.runIf(runPg)('Tenant Isolation', () => {
     // ===== Tenant A writes data =====
     // Points
     await adapter.pool.query(
-      "INSERT INTO points (tenant_id, id, balance) VALUES ($1, 1, 100) ON CONFLICT (tenant_id, id) DO UPDATE SET balance = 100",
+      "INSERT INTO points (tenant_id, id, balance) VALUES ($1, 1, 100) ON CONFLICT (tenant_id, id) WHERE child_id IS NULL DO UPDATE SET balance = 100",
       [tenantA]
     );
     await adapter.pool.query(
@@ -72,7 +72,7 @@ describe.runIf(runPg)('Tenant Isolation', () => {
 
     // Homeworks
     await adapter.pool.query(
-      "INSERT INTO homeworks (tenant_id, date_key, data) VALUES ($1, '2026-06-14', '[\"hw_A\"]') ON CONFLICT (tenant_id, date_key) DO UPDATE SET data = '[\"hw_A\"]'",
+      "INSERT INTO homeworks (tenant_id, date_key, data) VALUES ($1, '2026-06-14', '[\"hw_A\"]') ON CONFLICT (tenant_id, date_key) WHERE child_id IS NULL DO UPDATE SET data = '[\"hw_A\"]'",
       [tenantA]
     );
 
@@ -84,7 +84,7 @@ describe.runIf(runPg)('Tenant Isolation', () => {
 
     // Settlement
     await adapter.pool.query(
-      "INSERT INTO daily_settlement (tenant_id, date_key, data) VALUES ($1, '2026-06-14', '{\"rating\":5}') ON CONFLICT (tenant_id, date_key) DO UPDATE SET data = '{\"rating\":5}'",
+      "INSERT INTO daily_settlement (tenant_id, date_key, data) VALUES ($1, '2026-06-14', '{\"rating\":5}') ON CONFLICT (tenant_id, date_key) WHERE child_id IS NULL DO UPDATE SET data = '{\"rating\":5}'",
       [tenantA]
     );
 
@@ -115,7 +115,7 @@ describe.runIf(runPg)('Tenant Isolation', () => {
 
     // ===== Tenant B writes different data =====
     await adapter.pool.query(
-      "INSERT INTO points (tenant_id, id, balance) VALUES ($1, 1, 200) ON CONFLICT (tenant_id, id) DO UPDATE SET balance = 200",
+      "INSERT INTO points (tenant_id, id, balance) VALUES ($1, 1, 200) ON CONFLICT (tenant_id, id) WHERE child_id IS NULL DO UPDATE SET balance = 200",
       [tenantB]
     );
     await adapter.pool.query(
@@ -123,7 +123,7 @@ describe.runIf(runPg)('Tenant Isolation', () => {
       [tenantB]
     );
     await adapter.pool.query(
-      "INSERT INTO homeworks (tenant_id, date_key, data) VALUES ($1, '2026-06-14', '[\"hw_B\"]') ON CONFLICT (tenant_id, date_key) DO UPDATE SET data = '[\"hw_B\"]'",
+      "INSERT INTO homeworks (tenant_id, date_key, data) VALUES ($1, '2026-06-14', '[\"hw_B\"]') ON CONFLICT (tenant_id, date_key) WHERE child_id IS NULL DO UPDATE SET data = '[\"hw_B\"]'",
       [tenantB]
     );
     await adapter.pool.query(
@@ -131,7 +131,7 @@ describe.runIf(runPg)('Tenant Isolation', () => {
       [tenantB]
     );
     await adapter.pool.query(
-      "INSERT INTO daily_settlement (tenant_id, date_key, data) VALUES ($1, '2026-06-14', '{\"rating\":3}') ON CONFLICT (tenant_id, date_key) DO UPDATE SET data = '{\"rating\":3}'",
+      "INSERT INTO daily_settlement (tenant_id, date_key, data) VALUES ($1, '2026-06-14', '{\"rating\":3}') ON CONFLICT (tenant_id, date_key) WHERE child_id IS NULL DO UPDATE SET data = '{\"rating\":3}'",
       [tenantB]
     );
     await adapter.pool.query(

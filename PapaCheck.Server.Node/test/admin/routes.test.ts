@@ -198,6 +198,18 @@ describe('Admin Routes', () => {
       storedAccessCodes = storedAccessCodes.filter(c => !(c.id === id && c.user_id === userId));
     },
 
+    // === children 相关方法 ===
+    createChild: async (tenantId: string, name: string, accessCodeId?: string) => {
+      const id = 'child-' + Date.now();
+      const child = { id, tenant_id: tenantId, name, access_code_id: accessCodeId ?? undefined, is_active: true, created_at: new Date().toISOString() };
+      return child;
+    },
+    getChildrenByTenant: async (_tenantId: string, _activeOnly?: boolean) => [],
+    findChildByAccessCodeId: async (_accessCodeId: string, _tenantId: string) => null,
+    updateChild: async () => {},
+    assignLegacyDataToChild: async () => {},
+    getChildById: async () => null,
+
     // === auth routes 需要的方法 ===
     createTenant: async (id: string, name: string) => {
       storedTenants.push({ id, name, admin_id: null });

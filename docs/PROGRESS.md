@@ -68,7 +68,7 @@
 
 - [x] Phase 5e: 客户端适配（Android 远程配置 + Web 登录状态持久化）— Android 首屏默认连接云服务器 `papacheck.chengdexy.cn:443`；Web child/admin 端 localStorage token 刷新恢复
 - [ ] iOS 端
-- [ ] 多孩子支持（数据模型已有，UI 未实现）
+- [ ] 多孩子支持（数据模型已有，UI 未实现）→ **2026-06-21 Phase 1+2 完成：数据库层 + Auth + API + 家长端 UI 全部实现**
 - [ ] 更丰富的数据分析与报告
 - [x] 离线模式重构（Phase 0~4 全部完成，v1.3.8 已上线）
 - [ ] 离线优先同步优化（spec 已有）
@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-21 | **多孩子支持 Phase 1+2 完成**：children 表 + 12 张表 child_id 列 + partial unique index；DatabaseAdapter/PostgresAdapter 新增 childId 参数；Auth 层 JWT 含 child_id + 自动创建 children；API 层 getChildId 过滤 + MISSING_CHILD_ID；admin 成员管理自动 children CRUD + 遗留数据分配；家长端孩子选择栏 + localStorage 持久化；MemberTable 显示 child_id。新增 child-isolation + child-login 等测试文件。全量 579 测试通过 |
 | 2026-06-21 | **v1.3.8 正式上线**：服务器端部署新版 dist/（离线同步重构 Phase 0~4）；PG 密码从 `changeme` 加固为强密码；Android APK `1.3.8+57` 推送至下载目录（`/api/download`），用户打开 APP 自动检测更新 |
 | 2026-06-21 | **测试数据库搭建自动化**：SQLite 退役后所有 Node 测试依赖 PostgreSQL 16。创建 `scripts/setup-test-db.ps1` 一键搭建脚本（检查 PG → 建测试库 → 建表 → 生成 `.env.test`）；`vitest.config.js` 自动加载 `.env.test`（不覆盖已存在的 `DATABASE_URL`）；`.gitignore` 排除 `.env.test`/`.env`；删除 3 个硬编码 `describe.runIf(false)` 的 SQLite 专属测试（`redemption_dup_check`、`shop_daily_reset`、`reward_box_delete`）；更新 `HANDOVER.md` 本地测试数据库搭建文档。`DATABASE_URL` 就绪后全量 128 跳过测试恢复运行 |
 | 2026-06-21 | **Phase 3 Android 原生写队列**：新增 Kotlin 桥接层（Room + WorkManager + OkHttp）、Flutter JavaScriptChannel/MethodChannel 三层桥接、服务端 `POST /api/sync/write` 端点、权限/依赖配置。根治 WebView 锁屏 fetch 冻结导致的写操作丢失问题 |

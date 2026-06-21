@@ -1964,3 +1964,43 @@ input[type="number"] {
   color: var(--accent);
   background: rgba(255, 255, 255, 0.05);
 }
+
+.child-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  flex-wrap: wrap;
+}
+.child-selector-label {
+  font-weight: 600;
+  color: #495057;
+  font-size: 14px;
+}
+.child-selector-empty {
+  color: #868e96;
+  font-size: 13px;
+  text-align: center;
+  width: 100%;
+}
+.child-tag {
+  padding: 4px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 16px;
+  background: white;
+  color: #495057;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.child-tag:hover {
+  background: #e7f5ff;
+  border-color: #4dabf7;
+}
+.child-tag.active {
+  background: #228be6;
+  color: white;
+  border-color: #228be6;
+}

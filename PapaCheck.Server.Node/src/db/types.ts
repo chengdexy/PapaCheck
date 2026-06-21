@@ -72,6 +72,7 @@ export interface JWTPayload {
   sub: string;
   tenant_id: string;
   member_id?: string;
+  child_id?: string;
   role: 'admin' | 'user' | 'parent' | 'child';
   nickname: string;
   token_version: number;
@@ -131,6 +132,16 @@ export interface AccessCodeRecord {
   nickname: string;
   token_version: number;
   last_login?: string;
+  created_at: string;
+}
+
+export interface ChildrenRecord {
+  id: string;
+  tenant_id: string;
+  name: string;
+  avatar?: string;
+  access_code_id?: string;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -231,69 +242,69 @@ export interface SmtpConfig {
 
 export interface IDatabase {
   close(): Promise<void>;
-  getFullData(tenantId?: string): Promise<FullDataSnapshot>;
-  importFullData(data: any, tenantId?: string): Promise<void>;
+  getFullData(tenantId?: string, childId?: string): Promise<FullDataSnapshot>;
+  importFullData(data: any, tenantId?: string, childId?: string): Promise<void>;
   addNotification(text: string, createdAt?: number, tenantId?: string): Promise<string>;
   getPendingNotifications(tenantId?: string): Promise<NotificationItem[]>;
   consumeNotifications(ids: string[], tenantId?: string): Promise<void>;
-  getPointsBalance(tenantId?: string): Promise<number>;
-  updatePoints(action: 'earn' | 'spend', amount: number, detail: string, tenantId?: string): Promise<number>;
-  patchPoints(delta: { earn?: number; spend?: number; detail?: string }, tenantId?: string): Promise<number>;
-  getHomeworks(dateKey: string, tenantId?: string): Promise<any[]>;
-  saveHomeworks(dateKey: string, items: any[], tenantId?: string): Promise<void>;
-  moveHomework(fromDate: string, toDate: string, hwId: string, tenantId?: string): Promise<any | null>;
-  getHomeworkById(id: string, tenantId?: string): Promise<any | null>;
-  putHomework(id: string, data: any, tenantId?: string): Promise<void>;
-  patchHomework(id: string, fields: any, tenantId?: string): Promise<void>;
-  deleteHomework(id: string, tenantId?: string): Promise<void>;
-  getSettlement(dateKey: string, tenantId?: string): Promise<any>;
-  saveSettlement(dateKey: string, data: any, tenantId?: string): Promise<void>;
-  putSettlement(dateKey: string, data: any, tenantId?: string): Promise<void>;
-  patchSettlement(dateKey: string, fields: any, tenantId?: string): Promise<void>;
+  getPointsBalance(tenantId?: string, childId?: string): Promise<number>;
+  updatePoints(action: 'earn' | 'spend', amount: number, detail: string, tenantId?: string, childId?: string): Promise<number>;
+  patchPoints(delta: { earn?: number; spend?: number; detail?: string }, tenantId?: string, childId?: string): Promise<number>;
+  getHomeworks(dateKey: string, tenantId?: string, childId?: string): Promise<any[]>;
+  saveHomeworks(dateKey: string, items: any[], tenantId?: string, childId?: string): Promise<void>;
+  moveHomework(fromDate: string, toDate: string, hwId: string, tenantId?: string, childId?: string): Promise<any | null>;
+  getHomeworkById(id: string, tenantId?: string, childId?: string): Promise<any | null>;
+  putHomework(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  patchHomework(id: string, fields: any, tenantId?: string, childId?: string): Promise<void>;
+  deleteHomework(id: string, tenantId?: string, childId?: string): Promise<void>;
+  getSettlement(dateKey: string, tenantId?: string, childId?: string): Promise<any>;
+  saveSettlement(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  putSettlement(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  patchSettlement(dateKey: string, fields: any, tenantId?: string, childId?: string): Promise<void>;
   getShopItems(tenantId?: string): Promise<any[]>;
   saveShopItems(items: any[], tenantId?: string): Promise<void>;
   getShopItemById(id: string, tenantId?: string): Promise<any | null>;
   putShopItem(id: string, data: any, tenantId?: string): Promise<void>;
   deleteShopItem(id: string, tenantId?: string): Promise<void>;
-  getRedemptions(tenantId?: string): Promise<any[]>;
-  saveRedemptions(items: any[], tenantId?: string): Promise<void>;
-  clearFulfilledRedemptions(tenantId?: string): Promise<void>;
-  putRedemption(id: string, data: any, tenantId?: string): Promise<void>;
-  getRewardBox(tenantId?: string): Promise<any[]>;
-  saveRewardBox(items: any[], tenantId?: string): Promise<void>;
-  putRewardBoxItem(id: string, data: any, tenantId?: string): Promise<void>;
-  deleteRewardBoxItem(id: string, tenantId?: string): Promise<void>;
+  getRedemptions(tenantId?: string, childId?: string): Promise<any[]>;
+  saveRedemptions(items: any[], tenantId?: string, childId?: string): Promise<void>;
+  clearFulfilledRedemptions(tenantId?: string, childId?: string): Promise<void>;
+  putRedemption(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  getRewardBox(tenantId?: string, childId?: string): Promise<any[]>;
+  saveRewardBox(items: any[], tenantId?: string, childId?: string): Promise<void>;
+  putRewardBoxItem(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  deleteRewardBoxItem(id: string, tenantId?: string, childId?: string): Promise<void>;
   getSettings(tenantId?: string): Promise<any>;
   saveSettings(data: any, tenantId?: string): Promise<void>;
   putSettings(data: any, tenantId?: string): Promise<void>;
   patchSettings(fields: any, tenantId?: string): Promise<void>;
-  getActiveBuffs(tenantId?: string): Promise<any[]>;
-  saveActiveBuffs(items: any[], tenantId?: string): Promise<void>;
-  putBuff(id: string, data: any, tenantId?: string): Promise<void>;
-  deleteBuff(id: string, tenantId?: string): Promise<void>;
-  getEfficiency(dateKey: string, tenantId?: string): Promise<any>;
-  saveEfficiency(dateKey: string, data: any, tenantId?: string): Promise<void>;
-  putEfficiency(dateKey: string, data: any, tenantId?: string): Promise<void>;
-  getFreeTime(dateKey: string, tenantId?: string): Promise<any[]>;
-  saveFreeTime(dateKey: string, tasks: any[], tenantId?: string): Promise<void>;
-  putFreeTimeTask(id: string, data: any, tenantId?: string): Promise<void>;
+  getActiveBuffs(tenantId?: string, childId?: string): Promise<any[]>;
+  saveActiveBuffs(items: any[], tenantId?: string, childId?: string): Promise<void>;
+  putBuff(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  deleteBuff(id: string, tenantId?: string, childId?: string): Promise<void>;
+  getEfficiency(dateKey: string, tenantId?: string, childId?: string): Promise<any>;
+  saveEfficiency(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  putEfficiency(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  getFreeTime(dateKey: string, tenantId?: string, childId?: string): Promise<any[]>;
+  saveFreeTime(dateKey: string, tasks: any[], tenantId?: string, childId?: string): Promise<void>;
+  putFreeTimeTask(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
   getBountyTasks(tenantId?: string): Promise<any[]>;
   saveBountyTasks(items: any[], tenantId?: string): Promise<void>;
   getBountyTaskById(id: string, tenantId?: string): Promise<any | null>;
   putBountyTask(id: string, data: any, tenantId?: string): Promise<void>;
   deleteBountyTask(id: string, tenantId?: string): Promise<void>;
-  getBountySubmissions(dateKey: string, tenantId?: string): Promise<any[]>;
-  saveBountySubmissions(dateKey: string, data: any[], tenantId?: string): Promise<void>;
-  putBountySubmission(id: string, data: any, tenantId?: string): Promise<void>;
-  getBountyCompletions(dateKey: string, tenantId?: string): Promise<any>;
-  saveBountyCompletions(dateKey: string, data: any, tenantId?: string): Promise<void>;
-  putBountyCompletion(id: string, data: any, tenantId?: string): Promise<void>;
+  getBountySubmissions(dateKey: string, tenantId?: string, childId?: string): Promise<any[]>;
+  saveBountySubmissions(dateKey: string, data: any[], tenantId?: string, childId?: string): Promise<void>;
+  putBountySubmission(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  getBountyCompletions(dateKey: string, tenantId?: string, childId?: string): Promise<any>;
+  saveBountyCompletions(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  putBountyCompletion(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
   getEmailConfig(tenantId?: string): Promise<any | null>;
   saveEmailConfig(config: any, tenantId?: string): Promise<void>;
-  getModifiedSince(timestamp: string, tenantId?: string): Promise<ModifiedEntry[]>;
-  pushMerge(changes: any[], tenantId?: string): Promise<{ ok: boolean }>;
+  getModifiedSince(timestamp: string, tenantId?: string, childId?: string): Promise<ModifiedEntry[]>;
+  pushMerge(changes: any[], tenantId?: string, childId?: string): Promise<{ ok: boolean }>;
   recordModification(tableName: string, recordKey: string, timestamp: string, tenantId?: string): Promise<void>;
-  resetDate(dateKey: string, tenantId?: string): Promise<void>;
+  resetDate(dateKey: string, tenantId?: string, childId?: string): Promise<void>;
   saveCRDTOperation(op: CRDTOperation, tenantId?: string): Promise<void>;
   hasCRDTOperation(id: string, tenantId?: string): Promise<boolean>;
   applyCRDTOperation(op: CRDTOperation, tenantId?: string): Promise<void>;
@@ -317,6 +328,14 @@ export interface IDatabase {
   getAccessCodeById(id: string): Promise<AccessCodeRecord | null>;
   regenerateAccessCode(id: string, userId: string): Promise<string>;
   deleteAccessCode(id: string, userId: string): Promise<void>;
+
+  // ==================== Children Methods ====================
+  createChild(tenantId: string, name: string, accessCodeId?: string): Promise<ChildrenRecord>;
+  getChildById(id: string, tenantId: string): Promise<ChildrenRecord | null>;
+  getChildrenByTenant(tenantId: string, activeOnly?: boolean): Promise<ChildrenRecord[]>;
+  updateChild(id: string, tenantId: string, fields: { name?: string; is_active?: boolean; access_code_id?: string | null }): Promise<void>;
+  findChildByAccessCodeId(accessCodeId: string, tenantId: string): Promise<ChildrenRecord | null>;
+  assignLegacyDataToChild(tenantId: string, childId: string): Promise<void>;
 
   // ==================== Ops Methods ====================
   insertBackupRecord(record: BackupRecord): Promise<void>;

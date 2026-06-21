@@ -6,7 +6,7 @@ import { Pool } from 'pg';
 import type { Pool as PoolType, QueryResult } from 'pg';
 import bcrypt from 'bcryptjs';
 import { DatabaseAdapter } from './adapter.js';
-import type { FullDataSnapshot, PointsHistoryEntry, ModifiedEntry, NotificationItem, TenantListItem, AccessCodeRecord, CreateAccessCodeInput, AdminUser, BackupRecord, HealthRecord, AlertState, OpsConfig } from './types.js';
+import type { FullDataSnapshot, PointsHistoryEntry, ModifiedEntry, NotificationItem, TenantListItem, ChildrenRecord, AccessCodeRecord, CreateAccessCodeInput, AdminUser, BackupRecord, HealthRecord, AlertState, OpsConfig } from './types.js';
 import type { CRDTOperation } from '../crdt/types.js';
 
 /** date_key 表：以日期为主键，存储 JSON 数据 */
@@ -29,6 +29,14 @@ const SINGLE_ROW_TABLES = new Set([
   'bounty_tasks',
   'badges',
   'points',
+  'email_config',
+]);
+
+/** 共享表：不分配 child_id */
+const SHARED_TABLES = new Set([
+  'shop_items',
+  'settings',
+  'bounty_tasks',
   'email_config',
 ]);
 
@@ -72,14 +80,11 @@ export class PostgresAdapter extends DatabaseAdapter {
       );
     }
 
-    // Insert default rows for each tenant's single-row tables
+    // Insert default rows for each tenant's shared single-row tables
+    // Per-child tables (redemptions, badges, reward_box, active_buffs) are initialized per-child
     const singleRowDefaults: Array<{ table: string; data: string }> = [
       { table: 'shop_items', data: '[]' },
-      { table: 'redemptions', data: '[]' },
-      { table: 'badges', data: '[]' },
-      { table: 'reward_box', data: '[]' },
       { table: 'settings', data: '{}' },
-      { table: 'active_buffs', data: '[]' },
       { table: 'bounty_tasks', data: '[]' },
       { table: 'email_config', data: '{}' },
     ];
@@ -100,10 +105,13 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   // ==================== Internal Helpers ====================
 
-  private async _getJson(table: string, tenantId?: string, idValue: number = 1): Promise<any> {
+  private async _getJson(table: string, tenantId?: string, childId?: string, idValue: number = 1): Promise<any> {
     let query: string;
     let params: any[];
-    if (tenantId) {
+    if (tenantId && childId) {
+      query = `SELECT data FROM ${table} WHERE tenant_id = $1 AND child_id = $2 AND id = $3`;
+      params = [tenantId, childId, idValue];
+    } else if (tenantId) {
       query = `SELECT data FROM ${table} WHERE tenant_id = $1 AND id = $2`;
       params = [tenantId, idValue];
     } else {
@@ -115,10 +123,13 @@ export class PostgresAdapter extends DatabaseAdapter {
     return this._safeJsonParse(result.rows[0].data) ?? null;
   }
 
-  private async _setJson(table: string, data: any, tenantId?: string, idValue: number = 1): Promise<void> {
+  private async _setJson(table: string, data: any, tenantId?: string, childId?: string, idValue: number = 1): Promise<void> {
     let query: string;
     let params: any[];
-    if (tenantId) {
+    if (tenantId && childId) {
+      query = `UPDATE ${table} SET data = $1 WHERE tenant_id = $2 AND child_id = $3 AND id = $4`;
+      params = [JSON.stringify(data), tenantId, childId, idValue];
+    } else if (tenantId) {
       query = `UPDATE ${table} SET data = $1 WHERE tenant_id = $2 AND id = $3`;
       params = [JSON.stringify(data), tenantId, idValue];
     } else {
@@ -128,10 +139,13 @@ export class PostgresAdapter extends DatabaseAdapter {
     await this.pool.query(query, params);
   }
 
-  private async _getDateDataRaw(table: string, dateKey: string, tenantId?: string): Promise<any> {
+  private async _getDateDataRaw(table: string, dateKey: string, tenantId?: string, childId?: string): Promise<any> {
     let query: string;
     let params: any[];
-    if (tenantId) {
+    if (tenantId && childId) {
+      query = `SELECT data FROM ${table} WHERE tenant_id = $1 AND child_id = $2 AND date_key = $3`;
+      params = [tenantId, childId, dateKey];
+    } else if (tenantId) {
       query = `SELECT data FROM ${table} WHERE tenant_id = $1 AND date_key = $2`;
       params = [tenantId, dateKey];
     } else {
@@ -143,8 +157,8 @@ export class PostgresAdapter extends DatabaseAdapter {
     return this._safeJsonParse(result.rows[0].data);
   }
 
-  private async _getDateData(table: string, dateKey: string, defaultVal: any = null, tenantId?: string): Promise<any> {
-    const data = await this._getDateDataRaw(table, dateKey, tenantId);
+  private async _getDateData(table: string, dateKey: string, defaultVal: any = null, tenantId?: string, childId?: string): Promise<any> {
+    const data = await this._getDateDataRaw(table, dateKey, tenantId, childId);
     if (data === undefined) return defaultVal;
     if (Array.isArray(data)) {
       return data.filter((item: any) => !item.isDeleted);
@@ -152,11 +166,14 @@ export class PostgresAdapter extends DatabaseAdapter {
     return data;
   }
 
-  private async _setDateData(table: string, dateKey: string, data: any, tenantId?: string): Promise<void> {
+  private async _setDateData(table: string, dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void> {
     let query: string;
     let params: any[];
-    if (tenantId) {
-      query = `INSERT INTO ${table} (tenant_id, date_key, data) VALUES ($1, $2, $3) ON CONFLICT (tenant_id, date_key) DO UPDATE SET data = $3`;
+    if (tenantId && childId) {
+      query = `INSERT INTO ${table} (tenant_id, child_id, date_key, data) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, child_id, date_key) DO UPDATE SET data = $4`;
+      params = [tenantId, childId, dateKey, JSON.stringify(data)];
+    } else if (tenantId) {
+      query = `INSERT INTO ${table} (tenant_id, date_key, data) VALUES ($1, $2, $3) ON CONFLICT (tenant_id, date_key) WHERE child_id IS NULL DO UPDATE SET data = $3`;
       params = [tenantId, dateKey, JSON.stringify(data)];
     } else {
       query = `INSERT INTO ${table} (date_key, data) VALUES ($1, $2) ON CONFLICT (date_key) DO UPDATE SET data = $2`;
@@ -218,10 +235,13 @@ export class PostgresAdapter extends DatabaseAdapter {
   }
 
   /** 在 date_key 表中按 id 查找记录（跨所有 date_key 搜索） */
-  async _findRecordById(table: string, id: string, tenantId?: string): Promise<{ dateKey: string; index: number; item: any } | null> {
+  async _findRecordById(table: string, id: string, tenantId?: string, childId?: string): Promise<{ dateKey: string; index: number; item: any } | null> {
     let query: string;
     let params: any[];
-    if (tenantId) {
+    if (tenantId && childId) {
+      query = `SELECT date_key, data FROM ${table} WHERE tenant_id = $1 AND child_id = $2`;
+      params = [tenantId, childId];
+    } else if (tenantId) {
       query = `SELECT date_key, data FROM ${table} WHERE tenant_id = $1`;
       params = [tenantId];
     } else {
@@ -242,12 +262,15 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   // ==================== Full Data ====================
 
-  async getFullData(tenantId?: string): Promise<FullDataSnapshot> {
+  async getFullData(tenantId?: string, childId?: string): Promise<FullDataSnapshot> {
     await this._resetDailyShopQuantity(tenantId);
 
     let pointsQuery: string;
     let pointsParams: any[];
-    if (tenantId) {
+    if (tenantId && childId) {
+      pointsQuery = "SELECT balance FROM points WHERE tenant_id = $1 AND child_id = $2 AND id = 1";
+      pointsParams = [tenantId, childId];
+    } else if (tenantId) {
       pointsQuery = "SELECT balance FROM points WHERE tenant_id = $1 AND id = 1";
       pointsParams = [tenantId];
     } else {
@@ -258,7 +281,10 @@ export class PostgresAdapter extends DatabaseAdapter {
 
     let historyQuery: string;
     let historyParams: any[];
-    if (tenantId) {
+    if (tenantId && childId) {
+      historyQuery = "SELECT * FROM points_history WHERE tenant_id = $1 AND child_id = $2 ORDER BY id ASC";
+      historyParams = [tenantId, childId];
+    } else if (tenantId) {
       historyQuery = "SELECT * FROM points_history WHERE tenant_id = $1 ORDER BY id ASC";
       historyParams = [tenantId];
     } else {
@@ -272,16 +298,16 @@ export class PostgresAdapter extends DatabaseAdapter {
         balance: pointsResult.rows[0]?.balance ?? 0,
         history: historyResult.rows as PointsHistoryEntry[],
       },
-      badges: (await this._getJson('badges', tenantId)) ?? [],
+      badges: (await this._getJson('badges', tenantId, childId)) ?? [],
       history: {},
       tasks: {},
       homeworks: {},
       dailySettlement: {},
       shopItems: this._filterDeleted((await this._getJson('shop_items', tenantId))) ?? [],
-      redemptions: this._filterDeleted((await this._getJson('redemptions', tenantId))) ?? [],
-      rewardBox: this._filterDeleted((await this._getJson('reward_box', tenantId))) ?? [],
+      redemptions: this._filterDeleted((await this._getJson('redemptions', tenantId, childId))) ?? [],
+      rewardBox: this._filterDeleted((await this._getJson('reward_box', tenantId, childId))) ?? [],
       settings: (await this._getJson('settings', tenantId)) ?? {},
-      activeBuffs: this._filterDeleted((await this._getJson('active_buffs', tenantId))) ?? [],
+      activeBuffs: this._filterDeleted((await this._getJson('active_buffs', tenantId, childId))) ?? [],
       efficiencyHistory: {},
       freeTimeTasks: {},
       bountyTasks: this._filterDeleted((await this._getJson('bounty_tasks', tenantId))) ?? [],
@@ -292,7 +318,10 @@ export class PostgresAdapter extends DatabaseAdapter {
     // homeworks
     let hwQuery: string;
     let hwParams: any[];
-    if (tenantId) {
+    if (tenantId && childId) {
+      hwQuery = "SELECT date_key, data FROM homeworks WHERE tenant_id = $1 AND child_id = $2";
+      hwParams = [tenantId, childId];
+    } else if (tenantId) {
       hwQuery = "SELECT date_key, data FROM homeworks WHERE tenant_id = $1";
       hwParams = [tenantId];
     } else {
@@ -310,7 +339,10 @@ export class PostgresAdapter extends DatabaseAdapter {
     // dailySettlement
     let dsQuery: string;
     let dsParams: any[];
-    if (tenantId) {
+    if (tenantId && childId) {
+      dsQuery = "SELECT date_key, data FROM daily_settlement WHERE tenant_id = $1 AND child_id = $2";
+      dsParams = [tenantId, childId];
+    } else if (tenantId) {
       dsQuery = "SELECT date_key, data FROM daily_settlement WHERE tenant_id = $1";
       dsParams = [tenantId];
     } else {
@@ -328,7 +360,10 @@ export class PostgresAdapter extends DatabaseAdapter {
     // efficiencyHistory
     let ehQuery: string;
     let ehParams: any[];
-    if (tenantId) {
+    if (tenantId && childId) {
+      ehQuery = "SELECT date_key, data FROM efficiency_history WHERE tenant_id = $1 AND child_id = $2";
+      ehParams = [tenantId, childId];
+    } else if (tenantId) {
       ehQuery = "SELECT date_key, data FROM efficiency_history WHERE tenant_id = $1";
       ehParams = [tenantId];
     } else {
@@ -346,7 +381,10 @@ export class PostgresAdapter extends DatabaseAdapter {
     // freeTimeTasks
     let ftQuery: string;
     let ftParams: any[];
-    if (tenantId) {
+    if (tenantId && childId) {
+      ftQuery = "SELECT date_key, data FROM free_time_tasks WHERE tenant_id = $1 AND child_id = $2";
+      ftParams = [tenantId, childId];
+    } else if (tenantId) {
       ftQuery = "SELECT date_key, data FROM free_time_tasks WHERE tenant_id = $1";
       ftParams = [tenantId];
     } else {
@@ -364,7 +402,10 @@ export class PostgresAdapter extends DatabaseAdapter {
     // bountySubmissions
     let bsQuery: string;
     let bsParams: any[];
-    if (tenantId) {
+    if (tenantId && childId) {
+      bsQuery = "SELECT date_key, data FROM bounty_submissions WHERE tenant_id = $1 AND child_id = $2";
+      bsParams = [tenantId, childId];
+    } else if (tenantId) {
       bsQuery = "SELECT date_key, data FROM bounty_submissions WHERE tenant_id = $1";
       bsParams = [tenantId];
     } else {
@@ -382,7 +423,10 @@ export class PostgresAdapter extends DatabaseAdapter {
     // bountyCompletions
     let bcQuery: string;
     let bcParams: any[];
-    if (tenantId) {
+    if (tenantId && childId) {
+      bcQuery = "SELECT date_key, data FROM bounty_completions WHERE tenant_id = $1 AND child_id = $2";
+      bcParams = [tenantId, childId];
+    } else if (tenantId) {
       bcQuery = "SELECT date_key, data FROM bounty_completions WHERE tenant_id = $1";
       bcParams = [tenantId];
     } else {
@@ -400,11 +444,14 @@ export class PostgresAdapter extends DatabaseAdapter {
     return data;
   }
 
-  async importFullData(data: any, tenantId?: string): Promise<void> {
+  async importFullData(data: any, tenantId?: string, childId?: string): Promise<void> {
     const points = data.points ?? {};
     const balance = typeof points === 'number' ? points : (points.balance ?? 0);
 
-    if (tenantId) {
+    if (tenantId && childId) {
+      await this.pool.query("UPDATE points SET balance = $1 WHERE tenant_id = $2 AND child_id = $3 AND id = 1", [balance, tenantId, childId]);
+      await this.pool.query("DELETE FROM points_history WHERE tenant_id = $1 AND child_id = $2", [tenantId, childId]);
+    } else if (tenantId) {
       await this.pool.query("UPDATE points SET balance = $1 WHERE tenant_id = $2 AND id = 1", [balance, tenantId]);
       await this.pool.query("DELETE FROM points_history WHERE tenant_id = $1", [tenantId]);
     } else {
@@ -414,7 +461,12 @@ export class PostgresAdapter extends DatabaseAdapter {
 
     const history = (typeof points === 'object' && points.history) ? points.history : [];
     for (const h of history) {
-      if (tenantId) {
+      if (tenantId && childId) {
+        await this.pool.query(
+          "INSERT INTO points_history (tenant_id, child_id, date, earned, spent, balance, detail) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+          [tenantId, childId, h.date ?? '', h.earned ?? 0, h.spent ?? 0, h.balance ?? 0, h.detail ?? '']
+        );
+      } else if (tenantId) {
         await this.pool.query(
           "INSERT INTO points_history (tenant_id, date, earned, spent, balance, detail) VALUES ($1, $2, $3, $4, $5, $6)",
           [tenantId, h.date ?? '', h.earned ?? 0, h.spent ?? 0, h.balance ?? 0, h.detail ?? '']
@@ -427,7 +479,7 @@ export class PostgresAdapter extends DatabaseAdapter {
       }
     }
 
-    await this._setJson('badges', data.badges ?? [], tenantId);
+    await this._setJson('badges', data.badges ?? [], tenantId, childId);
 
     // date_key 表
     const dateKeySetters: Array<{ table: string; sourceKey: string; defaultValue: any }> = [
@@ -441,15 +493,22 @@ export class PostgresAdapter extends DatabaseAdapter {
 
     for (const { table, sourceKey, defaultValue } of dateKeySetters) {
       const source = data[sourceKey] ?? defaultValue;
-      if (tenantId) {
+      if (tenantId && childId) {
+        await this.pool.query(`DELETE FROM ${table} WHERE tenant_id = $1 AND child_id = $2`, [tenantId, childId]);
+      } else if (tenantId) {
         await this.pool.query(`DELETE FROM ${table} WHERE tenant_id = $1`, [tenantId]);
       } else {
         await this.pool.query(`DELETE FROM ${table}`);
       }
       for (const [dk, v] of Object.entries(source)) {
-        if (tenantId) {
+        if (tenantId && childId) {
           await this.pool.query(
-            `INSERT INTO ${table} (tenant_id, date_key, data) VALUES ($1, $2, $3) ON CONFLICT (tenant_id, date_key) DO UPDATE SET data = $3`,
+            `INSERT INTO ${table} (tenant_id, child_id, date_key, data) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, child_id, date_key) DO UPDATE SET data = $4`,
+            [tenantId, childId, dk, JSON.stringify(v)]
+          );
+        } else if (tenantId) {
+          await this.pool.query(
+            `INSERT INTO ${table} (tenant_id, date_key, data) VALUES ($1, $2, $3) ON CONFLICT (tenant_id, date_key) WHERE child_id IS NULL DO UPDATE SET data = $3`,
             [tenantId, dk, JSON.stringify(v)]
           );
         } else {
@@ -461,12 +520,12 @@ export class PostgresAdapter extends DatabaseAdapter {
       }
     }
 
-    // 单行表
+    // 单行表（共享表不传 childId，per-child 表传 childId）
     await this._setJson('shop_items', data.shopItems ?? [], tenantId);
-    await this._setJson('redemptions', data.redemptions ?? [], tenantId);
-    await this._setJson('reward_box', data.rewardBox ?? [], tenantId);
+    await this._setJson('redemptions', data.redemptions ?? [], tenantId, childId);
+    await this._setJson('reward_box', data.rewardBox ?? [], tenantId, childId);
     await this._setJson('settings', data.settings ?? {}, tenantId);
-    await this._setJson('active_buffs', data.activeBuffs ?? [], tenantId);
+    await this._setJson('active_buffs', data.activeBuffs ?? [], tenantId, childId);
     await this._setJson('bounty_tasks', data.bountyTasks ?? [], tenantId);
   }
 
@@ -538,10 +597,13 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   // ==================== Points ====================
 
-  async getPointsBalance(tenantId?: string): Promise<number> {
+  async getPointsBalance(tenantId?: string, childId?: string): Promise<number> {
     let query: string;
     let params: any[];
-    if (tenantId) {
+    if (tenantId && childId) {
+      query = "SELECT balance FROM points WHERE tenant_id = $1 AND child_id = $2 AND id = 1";
+      params = [tenantId, childId];
+    } else if (tenantId) {
       query = "SELECT balance FROM points WHERE tenant_id = $1 AND id = 1";
       params = [tenantId];
     } else {
@@ -552,10 +614,13 @@ export class PostgresAdapter extends DatabaseAdapter {
     return result.rows[0]?.balance ?? 0;
   }
 
-  async updatePoints(action: 'earn' | 'spend', amount: number, detail: string, tenantId?: string): Promise<number> {
+  async updatePoints(action: 'earn' | 'spend', amount: number, detail: string, tenantId?: string, childId?: string): Promise<number> {
     let query: string;
     let params: any[];
-    if (tenantId) {
+    if (tenantId && childId) {
+      query = "SELECT balance FROM points WHERE tenant_id = $1 AND child_id = $2 AND id = 1";
+      params = [tenantId, childId];
+    } else if (tenantId) {
       query = "SELECT balance FROM points WHERE tenant_id = $1 AND id = 1";
       params = [tenantId];
     } else {
@@ -571,7 +636,14 @@ export class PostgresAdapter extends DatabaseAdapter {
       balance += amount;
     }
 
-    if (tenantId) {
+    if (tenantId && childId) {
+      await this.pool.query("UPDATE points SET balance = $1 WHERE tenant_id = $2 AND child_id = $3 AND id = 1", [balance, tenantId, childId]);
+      const today = new Date().toISOString().slice(0, 10);
+      await this.pool.query(
+        "INSERT INTO points_history (tenant_id, child_id, date, earned, spent, balance, detail) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        [tenantId, childId, today, action === 'earn' ? amount : 0, action === 'spend' ? amount : 0, balance, detail]
+      );
+    } else if (tenantId) {
       await this.pool.query("UPDATE points SET balance = $1 WHERE tenant_id = $2 AND id = 1", [balance, tenantId]);
       const today = new Date().toISOString().slice(0, 10);
       await this.pool.query(
@@ -590,10 +662,13 @@ export class PostgresAdapter extends DatabaseAdapter {
     return balance;
   }
 
-  async patchPoints(delta: { earn?: number; spend?: number; detail?: string }, tenantId?: string): Promise<number> {
+  async patchPoints(delta: { earn?: number; spend?: number; detail?: string }, tenantId?: string, childId?: string): Promise<number> {
     let query: string;
     let params: any[];
-    if (tenantId) {
+    if (tenantId && childId) {
+      query = "SELECT balance FROM points WHERE tenant_id = $1 AND child_id = $2 AND id = 1";
+      params = [tenantId, childId];
+    } else if (tenantId) {
       query = "SELECT balance FROM points WHERE tenant_id = $1 AND id = 1";
       params = [tenantId];
     } else {
@@ -607,7 +682,15 @@ export class PostgresAdapter extends DatabaseAdapter {
     const spent = delta.spend ?? 0;
     balance += earned - spent;
 
-    if (tenantId) {
+    if (tenantId && childId) {
+      await this.pool.query("UPDATE points SET balance = $1 WHERE tenant_id = $2 AND child_id = $3 AND id = 1", [balance, tenantId, childId]);
+      const today = new Date().toISOString().slice(0, 10);
+      await this.pool.query(
+        "INSERT INTO points_history (tenant_id, child_id, date, earned, spent, balance, detail) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        [tenantId, childId, today, earned, spent, balance, delta.detail ?? '']
+      );
+      await this.recordModification('points', '1', new Date().toISOString(), tenantId);
+    } else if (tenantId) {
       await this.pool.query("UPDATE points SET balance = $1 WHERE tenant_id = $2 AND id = 1", [balance, tenantId]);
       const today = new Date().toISOString().slice(0, 10);
       await this.pool.query(
@@ -630,28 +713,28 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   // ==================== Homeworks ====================
 
-  async getHomeworks(dateKey: string, tenantId?: string): Promise<any[]> {
-    return this._getDateData('homeworks', dateKey, [], tenantId);
+  async getHomeworks(dateKey: string, tenantId?: string, childId?: string): Promise<any[]> {
+    return this._getDateData('homeworks', dateKey, [], tenantId, childId);
   }
 
-  async saveHomeworks(dateKey: string, items: any[], tenantId?: string): Promise<void> {
-    await this._setDateData('homeworks', dateKey, items, tenantId);
+  async saveHomeworks(dateKey: string, items: any[], tenantId?: string, childId?: string): Promise<void> {
+    await this._setDateData('homeworks', dateKey, items, tenantId, childId);
     await this.recordModification('homeworks', dateKey, new Date().toISOString(), tenantId);
   }
 
-  async moveHomework(fromDate: string, toDate: string, hwId: string, tenantId?: string): Promise<any | null> {
-    const fromList = await this._getDateData('homeworks', fromDate, null, tenantId);
+  async moveHomework(fromDate: string, toDate: string, hwId: string, tenantId?: string, childId?: string): Promise<any | null> {
+    const fromList = await this._getDateData('homeworks', fromDate, null, tenantId, childId);
     if (!fromList) return null;
 
     const idx = fromList.findIndex((h: any) => h.id === hwId);
     if (idx === -1) return null;
 
     const [hw] = fromList.splice(idx, 1);
-    await this._setDateData('homeworks', fromDate, fromList, tenantId);
+    await this._setDateData('homeworks', fromDate, fromList, tenantId, childId);
 
-    const toList = await this._getDateData('homeworks', toDate, [], tenantId);
+    const toList = await this._getDateData('homeworks', toDate, [], tenantId, childId);
     toList.push(hw);
-    await this._setDateData('homeworks', toDate, toList, tenantId);
+    await this._setDateData('homeworks', toDate, toList, tenantId, childId);
 
     const now = new Date().toISOString();
     await this.recordModification('homeworks', fromDate, now, tenantId);
@@ -660,84 +743,84 @@ export class PostgresAdapter extends DatabaseAdapter {
     return hw;
   }
 
-  async getHomeworkById(id: string, tenantId?: string): Promise<any | null> {
-    const found = await this._findRecordById('homeworks', id, tenantId);
+  async getHomeworkById(id: string, tenantId?: string, childId?: string): Promise<any | null> {
+    const found = await this._findRecordById('homeworks', id, tenantId, childId);
     return found?.item && !found.item.isDeleted ? found.item : null;
   }
 
-  async putHomework(id: string, data: any, tenantId?: string): Promise<void> {
-    const existing = await this._findRecordById('homeworks', id, tenantId);
+  async putHomework(id: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+    const existing = await this._findRecordById('homeworks', id, tenantId, childId);
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
 
     if (existing && !existing.item.isDeleted) {
-      const items = await this._getDateDataRaw('homeworks', existing.dateKey, tenantId);
+      const items = await this._getDateDataRaw('homeworks', existing.dateKey, tenantId, childId);
       if (!Array.isArray(items)) {
-        await this._setDateData('homeworks', existing.dateKey, [data], tenantId);
+        await this._setDateData('homeworks', existing.dateKey, [data], tenantId, childId);
         await this.recordModification('homeworks', existing.dateKey, now, tenantId);
         return;
       }
       items[existing.index] = data;
-      await this._setDateData('homeworks', existing.dateKey, items, tenantId);
+      await this._setDateData('homeworks', existing.dateKey, items, tenantId, childId);
       await this.recordModification('homeworks', existing.dateKey, now, tenantId);
     } else {
       const dateKey = data.dateKey ?? data.date ?? new Date().toISOString().slice(0, 10);
-      let items = await this._getDateDataRaw('homeworks', dateKey, tenantId);
+      let items = await this._getDateDataRaw('homeworks', dateKey, tenantId, childId);
       if (!Array.isArray(items)) {
         items = [];
       }
       items.push(data);
-      await this._setDateData('homeworks', dateKey, items, tenantId);
+      await this._setDateData('homeworks', dateKey, items, tenantId, childId);
       await this.recordModification('homeworks', dateKey, now, tenantId);
     }
   }
 
-  async patchHomework(id: string, fields: any, tenantId?: string): Promise<void> {
-    const existing = await this._findRecordById('homeworks', id, tenantId);
+  async patchHomework(id: string, fields: any, tenantId?: string, childId?: string): Promise<void> {
+    const existing = await this._findRecordById('homeworks', id, tenantId, childId);
     if (!existing) return;
 
     const now = new Date().toISOString();
-    const items = await this._getDateDataRaw('homeworks', existing.dateKey, tenantId);
+    const items = await this._getDateDataRaw('homeworks', existing.dateKey, tenantId, childId);
     items[existing.index] = { ...items[existing.index], ...fields, lastModified: now };
-    await this._setDateData('homeworks', existing.dateKey, items, tenantId);
+    await this._setDateData('homeworks', existing.dateKey, items, tenantId, childId);
     await this.recordModification('homeworks', existing.dateKey, now, tenantId);
   }
 
-  async deleteHomework(id: string, tenantId?: string): Promise<void> {
-    const existing = await this._findRecordById('homeworks', id, tenantId);
+  async deleteHomework(id: string, tenantId?: string, childId?: string): Promise<void> {
+    const existing = await this._findRecordById('homeworks', id, tenantId, childId);
     if (!existing) return;
 
     const now = new Date().toISOString();
-    const items = await this._getDateDataRaw('homeworks', existing.dateKey, tenantId);
+    const items = await this._getDateDataRaw('homeworks', existing.dateKey, tenantId, childId);
     items[existing.index].isDeleted = true;
     items[existing.index].lastModified = now;
-    await this._setDateData('homeworks', existing.dateKey, items, tenantId);
+    await this._setDateData('homeworks', existing.dateKey, items, tenantId, childId);
     await this.recordModification('homeworks', existing.dateKey, now, tenantId);
   }
 
   // ==================== Settlement ====================
 
-  async getSettlement(dateKey: string, tenantId?: string): Promise<any> {
-    return this._getDateData('daily_settlement', dateKey, null, tenantId);
+  async getSettlement(dateKey: string, tenantId?: string, childId?: string): Promise<any> {
+    return this._getDateData('daily_settlement', dateKey, null, tenantId, childId);
   }
 
-  async saveSettlement(dateKey: string, data: any, tenantId?: string): Promise<void> {
-    await this._setDateData('daily_settlement', dateKey, data, tenantId);
+  async saveSettlement(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+    await this._setDateData('daily_settlement', dateKey, data, tenantId, childId);
     await this.recordModification('daily_settlement', dateKey, new Date().toISOString(), tenantId);
   }
 
-  async putSettlement(dateKey: string, data: any, tenantId?: string): Promise<void> {
+  async putSettlement(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void> {
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
-    await this._setDateData('daily_settlement', dateKey, data, tenantId);
+    await this._setDateData('daily_settlement', dateKey, data, tenantId, childId);
     await this.recordModification('daily_settlement', dateKey, now, tenantId);
   }
 
-  async patchSettlement(dateKey: string, fields: any, tenantId?: string): Promise<void> {
-    const existing = (await this._getDateDataRaw('daily_settlement', dateKey, tenantId)) ?? {};
+  async patchSettlement(dateKey: string, fields: any, tenantId?: string, childId?: string): Promise<void> {
+    const existing = (await this._getDateDataRaw('daily_settlement', dateKey, tenantId, childId)) ?? {};
     const now = new Date().toISOString();
     const merged = { ...existing, ...fields, lastModified: now };
-    await this._setDateData('daily_settlement', dateKey, merged, tenantId);
+    await this._setDateData('daily_settlement', dateKey, merged, tenantId, childId);
     await this.recordModification('daily_settlement', dateKey, now, tenantId);
   }
 
@@ -793,24 +876,24 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   // ==================== Redemptions ====================
 
-  async getRedemptions(tenantId?: string): Promise<any[]> {
-    return (await this._getJson('redemptions', tenantId)) ?? [];
+  async getRedemptions(tenantId?: string, childId?: string): Promise<any[]> {
+    return (await this._getJson('redemptions', tenantId, childId)) ?? [];
   }
 
-  async saveRedemptions(items: any[], tenantId?: string): Promise<void> {
-    await this._setJson('redemptions', items, tenantId);
+  async saveRedemptions(items: any[], tenantId?: string, childId?: string): Promise<void> {
+    await this._setJson('redemptions', items, tenantId, childId);
     await this.recordModification('redemptions', '1', new Date().toISOString(), tenantId);
   }
 
-  async clearFulfilledRedemptions(tenantId?: string): Promise<void> {
-    const items = (await this._getJson('redemptions', tenantId)) ?? [];
+  async clearFulfilledRedemptions(tenantId?: string, childId?: string): Promise<void> {
+    const items = (await this._getJson('redemptions', tenantId, childId)) ?? [];
     const remaining = items.filter((r: any) => r.status !== 'fulfilled');
-    await this._setJson('redemptions', remaining, tenantId);
+    await this._setJson('redemptions', remaining, tenantId, childId);
     await this.recordModification('redemptions', '1', new Date().toISOString(), tenantId);
   }
 
-  async putRedemption(id: string, data: any, tenantId?: string): Promise<void> {
-    const items = (await this._getJson('redemptions', tenantId)) ?? [];
+  async putRedemption(id: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+    const items = (await this._getJson('redemptions', tenantId, childId)) ?? [];
     const { index } = this._findInArray(items, id);
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
@@ -821,23 +904,23 @@ export class PostgresAdapter extends DatabaseAdapter {
       items.push(data);
     }
 
-    await this._setJson('redemptions', items, tenantId);
+    await this._setJson('redemptions', items, tenantId, childId);
     await this.recordModification('redemptions', '1', now, tenantId);
   }
 
   // ==================== Reward Box ====================
 
-  async getRewardBox(tenantId?: string): Promise<any[]> {
-    return this._filterDeleted((await this._getJson('reward_box', tenantId))) ?? [];
+  async getRewardBox(tenantId?: string, childId?: string): Promise<any[]> {
+    return this._filterDeleted((await this._getJson('reward_box', tenantId, childId))) ?? [];
   }
 
-  async saveRewardBox(items: any[], tenantId?: string): Promise<void> {
-    await this._setJson('reward_box', items, tenantId);
+  async saveRewardBox(items: any[], tenantId?: string, childId?: string): Promise<void> {
+    await this._setJson('reward_box', items, tenantId, childId);
     await this.recordModification('reward_box', '1', new Date().toISOString(), tenantId);
   }
 
-  async putRewardBoxItem(id: string, data: any, tenantId?: string): Promise<void> {
-    const items = (await this._getJson('reward_box', tenantId)) ?? [];
+  async putRewardBoxItem(id: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+    const items = (await this._getJson('reward_box', tenantId, childId)) ?? [];
     const { index } = this._findInArray(items, id);
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
@@ -848,19 +931,19 @@ export class PostgresAdapter extends DatabaseAdapter {
       items.push(data);
     }
 
-    await this._setJson('reward_box', items, tenantId);
+    await this._setJson('reward_box', items, tenantId, childId);
     await this.recordModification('reward_box', '1', now, tenantId);
   }
 
-  async deleteRewardBoxItem(id: string, tenantId?: string): Promise<void> {
-    const items = (await this._getJson('reward_box', tenantId)) ?? [];
+  async deleteRewardBoxItem(id: string, tenantId?: string, childId?: string): Promise<void> {
+    const items = (await this._getJson('reward_box', tenantId, childId)) ?? [];
     const { index } = this._findInArray(items, id);
     if (index === -1) return;
 
     const now = new Date().toISOString();
     items[index].isDeleted = true;
     items[index].lastModified = now;
-    await this._setJson('reward_box', items, tenantId);
+    await this._setJson('reward_box', items, tenantId, childId);
     await this.recordModification('reward_box', '1', now, tenantId);
   }
 
@@ -892,17 +975,17 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   // ==================== Active Buffs ====================
 
-  async getActiveBuffs(tenantId?: string): Promise<any[]> {
-    return (await this._getJson('active_buffs', tenantId)) ?? [];
+  async getActiveBuffs(tenantId?: string, childId?: string): Promise<any[]> {
+    return (await this._getJson('active_buffs', tenantId, childId)) ?? [];
   }
 
-  async saveActiveBuffs(items: any[], tenantId?: string): Promise<void> {
-    await this._setJson('active_buffs', items, tenantId);
+  async saveActiveBuffs(items: any[], tenantId?: string, childId?: string): Promise<void> {
+    await this._setJson('active_buffs', items, tenantId, childId);
     await this.recordModification('active_buffs', '1', new Date().toISOString(), tenantId);
   }
 
-  async putBuff(id: string, data: any, tenantId?: string): Promise<void> {
-    const items = (await this._getJson('active_buffs', tenantId)) ?? [];
+  async putBuff(id: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+    const items = (await this._getJson('active_buffs', tenantId, childId)) ?? [];
     const { index } = this._findInArray(items, id);
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
@@ -913,66 +996,66 @@ export class PostgresAdapter extends DatabaseAdapter {
       items.push(data);
     }
 
-    await this._setJson('active_buffs', items, tenantId);
+    await this._setJson('active_buffs', items, tenantId, childId);
     await this.recordModification('active_buffs', '1', now, tenantId);
   }
 
-  async deleteBuff(id: string, tenantId?: string): Promise<void> {
-    const items = (await this._getJson('active_buffs', tenantId)) ?? [];
+  async deleteBuff(id: string, tenantId?: string, childId?: string): Promise<void> {
+    const items = (await this._getJson('active_buffs', tenantId, childId)) ?? [];
     const { index } = this._findInArray(items, id);
     if (index === -1) return;
 
     const now = new Date().toISOString();
     items[index].isDeleted = true;
     items[index].lastModified = now;
-    await this._setJson('active_buffs', items, tenantId);
+    await this._setJson('active_buffs', items, tenantId, childId);
     await this.recordModification('active_buffs', '1', now, tenantId);
   }
 
   // ==================== Efficiency ====================
 
-  async getEfficiency(dateKey: string, tenantId?: string): Promise<any> {
-    return this._getDateData('efficiency_history', dateKey, null, tenantId);
+  async getEfficiency(dateKey: string, tenantId?: string, childId?: string): Promise<any> {
+    return this._getDateData('efficiency_history', dateKey, null, tenantId, childId);
   }
 
-  async saveEfficiency(dateKey: string, data: any, tenantId?: string): Promise<void> {
-    await this._setDateData('efficiency_history', dateKey, data, tenantId);
+  async saveEfficiency(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+    await this._setDateData('efficiency_history', dateKey, data, tenantId, childId);
     await this.recordModification('efficiency_history', dateKey, new Date().toISOString(), tenantId);
   }
 
-  async putEfficiency(dateKey: string, data: any, tenantId?: string): Promise<void> {
+  async putEfficiency(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void> {
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
-    await this._setDateData('efficiency_history', dateKey, data, tenantId);
+    await this._setDateData('efficiency_history', dateKey, data, tenantId, childId);
     await this.recordModification('efficiency_history', dateKey, now, tenantId);
   }
 
   // ==================== Free Time ====================
 
-  async getFreeTime(dateKey: string, tenantId?: string): Promise<any[]> {
-    return this._getDateData('free_time_tasks', dateKey, [], tenantId);
+  async getFreeTime(dateKey: string, tenantId?: string, childId?: string): Promise<any[]> {
+    return this._getDateData('free_time_tasks', dateKey, [], tenantId, childId);
   }
 
-  async saveFreeTime(dateKey: string, tasks: any[], tenantId?: string): Promise<void> {
-    await this._setDateData('free_time_tasks', dateKey, tasks, tenantId);
+  async saveFreeTime(dateKey: string, tasks: any[], tenantId?: string, childId?: string): Promise<void> {
+    await this._setDateData('free_time_tasks', dateKey, tasks, tenantId, childId);
     await this.recordModification('free_time_tasks', dateKey, new Date().toISOString(), tenantId);
   }
 
-  async putFreeTimeTask(id: string, data: any, tenantId?: string): Promise<void> {
-    const existing = await this._findRecordById('free_time_tasks', id, tenantId);
+  async putFreeTimeTask(id: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+    const existing = await this._findRecordById('free_time_tasks', id, tenantId, childId);
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
 
     if (existing) {
-      const items = await this._getDateDataRaw('free_time_tasks', existing.dateKey, tenantId);
+      const items = await this._getDateDataRaw('free_time_tasks', existing.dateKey, tenantId, childId);
       items[existing.index] = data;
-      await this._setDateData('free_time_tasks', existing.dateKey, items, tenantId);
+      await this._setDateData('free_time_tasks', existing.dateKey, items, tenantId, childId);
       await this.recordModification('free_time_tasks', existing.dateKey, now, tenantId);
     } else {
       const dateKey = data.dateKey ?? data.date ?? new Date().toISOString().slice(0, 10);
-      const items = (await this._getDateDataRaw('free_time_tasks', dateKey, tenantId)) ?? [];
+      const items = (await this._getDateDataRaw('free_time_tasks', dateKey, tenantId, childId)) ?? [];
       items.push(data);
-      await this._setDateData('free_time_tasks', dateKey, items, tenantId);
+      await this._setDateData('free_time_tasks', dateKey, items, tenantId, childId);
       await this.recordModification('free_time_tasks', dateKey, now, tenantId);
     }
   }
@@ -1024,49 +1107,49 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   // ==================== Bounty Submissions ====================
 
-  async getBountySubmissions(dateKey: string, tenantId?: string): Promise<any[]> {
-    return this._getDateData('bounty_submissions', dateKey, [], tenantId);
+  async getBountySubmissions(dateKey: string, tenantId?: string, childId?: string): Promise<any[]> {
+    return this._getDateData('bounty_submissions', dateKey, [], tenantId, childId);
   }
 
-  async saveBountySubmissions(dateKey: string, data: any[], tenantId?: string): Promise<void> {
-    await this._setDateData('bounty_submissions', dateKey, data, tenantId);
+  async saveBountySubmissions(dateKey: string, data: any[], tenantId?: string, childId?: string): Promise<void> {
+    await this._setDateData('bounty_submissions', dateKey, data, tenantId, childId);
     await this.recordModification('bounty_submissions', dateKey, new Date().toISOString(), tenantId);
   }
 
-  async putBountySubmission(id: string, data: any, tenantId?: string): Promise<void> {
-    const existing = await this._findRecordById('bounty_submissions', id, tenantId);
+  async putBountySubmission(id: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+    const existing = await this._findRecordById('bounty_submissions', id, tenantId, childId);
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
 
     if (existing) {
-      const items = await this._getDateDataRaw('bounty_submissions', existing.dateKey, tenantId);
+      const items = await this._getDateDataRaw('bounty_submissions', existing.dateKey, tenantId, childId);
       items[existing.index] = data;
-      await this._setDateData('bounty_submissions', existing.dateKey, items, tenantId);
+      await this._setDateData('bounty_submissions', existing.dateKey, items, tenantId, childId);
       await this.recordModification('bounty_submissions', existing.dateKey, now, tenantId);
     } else {
       const dateKey = data.dateKey ?? data.date ?? new Date().toISOString().slice(0, 10);
-      const items = (await this._getDateDataRaw('bounty_submissions', dateKey, tenantId)) ?? [];
+      const items = (await this._getDateDataRaw('bounty_submissions', dateKey, tenantId, childId)) ?? [];
       items.push(data);
-      await this._setDateData('bounty_submissions', dateKey, items, tenantId);
+      await this._setDateData('bounty_submissions', dateKey, items, tenantId, childId);
       await this.recordModification('bounty_submissions', dateKey, now, tenantId);
     }
   }
 
   // ==================== Bounty Completions ====================
 
-  async getBountyCompletions(dateKey: string, tenantId?: string): Promise<any> {
-    return this._getDateData('bounty_completions', dateKey, {}, tenantId);
+  async getBountyCompletions(dateKey: string, tenantId?: string, childId?: string): Promise<any> {
+    return this._getDateData('bounty_completions', dateKey, {}, tenantId, childId);
   }
 
-  async saveBountyCompletions(dateKey: string, data: any, tenantId?: string): Promise<void> {
-    await this._setDateData('bounty_completions', dateKey, data, tenantId);
+  async saveBountyCompletions(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+    await this._setDateData('bounty_completions', dateKey, data, tenantId, childId);
     await this.recordModification('bounty_completions', dateKey, new Date().toISOString(), tenantId);
   }
 
-  async putBountyCompletion(id: string, data: any, tenantId?: string): Promise<void> {
+  async putBountyCompletion(id: string, data: any, tenantId?: string, childId?: string): Promise<void> {
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
-    await this._setDateData('bounty_completions', id, data, tenantId);
+    await this._setDateData('bounty_completions', id, data, tenantId, childId);
     await this.recordModification('bounty_completions', id, now, tenantId);
   }
 
@@ -1087,7 +1170,7 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   // ==================== Sync ====================
 
-  async getModifiedSince(timestamp: string, tenantId?: string): Promise<ModifiedEntry[]> {
+  async getModifiedSince(timestamp: string, tenantId?: string, childId?: string): Promise<ModifiedEntry[]> {
     let result: QueryResult;
     if (tenantId) {
       result = await this.pool.query(
@@ -1109,7 +1192,9 @@ export class PostgresAdapter extends DatabaseAdapter {
 
       if (table === 'points') {
         let pointsResult: QueryResult;
-        if (tenantId) {
+        if (tenantId && childId) {
+          pointsResult = await this.pool.query("SELECT balance FROM points WHERE tenant_id = $1 AND child_id = $2 AND id = 1", [tenantId, childId]);
+        } else if (tenantId) {
           pointsResult = await this.pool.query("SELECT balance FROM points WHERE tenant_id = $1 AND id = 1", [tenantId]);
         } else {
           pointsResult = await this.pool.query("SELECT balance FROM points WHERE id = 1");
@@ -1125,11 +1210,14 @@ export class PostgresAdapter extends DatabaseAdapter {
         continue;
       }
 
+      const isShared = SHARED_TABLES.has(table);
+      const effectiveChildId = isShared ? undefined : childId;
+
       let data: any;
       if (DATE_KEY_TABLES.has(table)) {
-        data = await this._getDateData(table, recordKey, undefined, tenantId);
+        data = await this._getDateData(table, recordKey, undefined, tenantId, effectiveChildId);
       } else if (SINGLE_ROW_TABLES.has(table)) {
-        data = await this._getJson(table, tenantId, parseInt(recordKey, 10));
+        data = await this._getJson(table, tenantId, effectiveChildId, parseInt(recordKey, 10));
       } else {
         continue;
       }
@@ -1145,7 +1233,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     return rows;
   }
 
-  async pushMerge(changes: any[], tenantId?: string): Promise<{ ok: boolean }> {
+  async pushMerge(changes: any[], tenantId?: string, childId?: string): Promise<{ ok: boolean }> {
     for (const change of changes) {
       const changeType = change.type as string;
       const uuid = change.uuid as string;
@@ -1158,9 +1246,14 @@ export class PostgresAdapter extends DatabaseAdapter {
       const table = this._classifyChange(data);
       if (table === null) continue;
 
+      const isShared = SHARED_TABLES.has(table);
+      const effectiveChildId = isShared ? undefined : childId;
+
       if (table === 'points') {
         const newBalance = data.balance ?? 0;
-        if (tenantId) {
+        if (tenantId && effectiveChildId) {
+          await this.pool.query("UPDATE points SET balance = $1 WHERE tenant_id = $2 AND child_id = $3 AND id = 1", [newBalance, tenantId, effectiveChildId]);
+        } else if (tenantId) {
           await this.pool.query("UPDATE points SET balance = $1 WHERE tenant_id = $2 AND id = 1", [newBalance, tenantId]);
         } else {
           await this.pool.query("UPDATE points SET balance = $1 WHERE id = 1", [newBalance]);
@@ -1173,7 +1266,7 @@ export class PostgresAdapter extends DatabaseAdapter {
         const recordKey = data.date || data.dateKey || uuid || '';
         if (!recordKey) continue;
 
-        const existing = await this._getDateDataRaw(table, recordKey, tenantId);
+        const existing = await this._getDateDataRaw(table, recordKey, tenantId, effectiveChildId);
         let existingList: any[] = Array.isArray(existing) ? [...existing] : [];
         let existingDict = !Array.isArray(existing) ? (existing ?? {}) : null;
 
@@ -1206,35 +1299,20 @@ export class PostgresAdapter extends DatabaseAdapter {
             existingList.push(data);
           }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          await this._setDateData(table, recordKey, existingList, tenantId);
+          await this._setDateData(table, recordKey, existingList, tenantId, effectiveChildId);
           await this.recordModification(table, recordKey, timestamp, tenantId);
         } else if (existingDict !== null) {
           const oldLast = existingDict.lastModified ?? '0';
           if (changeType === 'delete') {
             data.isDeleted = true;
-            await this._setDateData(table, recordKey, data, tenantId);
+            await this._setDateData(table, recordKey, data, tenantId, effectiveChildId);
           } else if (newLastModified >= oldLast) {
-            await this._setDateData(table, recordKey, data, tenantId);
+            await this._setDateData(table, recordKey, data, tenantId, effectiveChildId);
           }
           await this.recordModification(table, recordKey, timestamp, tenantId);
         }
       } else if (SINGLE_ROW_TABLES.has(table)) {
-        const existing = await this._getJson(table, tenantId, 1);
+        const existing = await this._getJson(table, tenantId, effectiveChildId, 1);
         const existingList = Array.isArray(existing) ? [...existing] : null;
         const existingDict = !Array.isArray(existing) ? (existing ?? {}) : null;
 
@@ -1265,10 +1343,10 @@ export class PostgresAdapter extends DatabaseAdapter {
           } else {
             existingList.push(data);
           }
-          await this._setJson(table, existingList, tenantId, 1);
+          await this._setJson(table, existingList, tenantId, effectiveChildId, 1);
           await this.recordModification(table, '1', timestamp, tenantId);
         } else if (existingDict) {
-          await this._setJson(table, data, tenantId, 1);
+          await this._setJson(table, data, tenantId, effectiveChildId, 1);
           await this.recordModification(table, '1', timestamp, tenantId);
         }
       }
@@ -1295,8 +1373,15 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   // ==================== Misc ====================
 
-  async resetDate(dateKey: string, tenantId?: string): Promise<void> {
-    if (tenantId) {
+  async resetDate(dateKey: string, tenantId?: string, childId?: string): Promise<void> {
+    if (tenantId && childId) {
+      await this.pool.query("DELETE FROM homeworks WHERE tenant_id = $1 AND child_id = $2 AND date_key = $3", [tenantId, childId, dateKey]);
+      await this.pool.query("DELETE FROM daily_settlement WHERE tenant_id = $1 AND child_id = $2 AND date_key = $3", [tenantId, childId, dateKey]);
+      await this.pool.query("DELETE FROM efficiency_history WHERE tenant_id = $1 AND child_id = $2 AND date_key = $3", [tenantId, childId, dateKey]);
+      await this.pool.query("DELETE FROM free_time_tasks WHERE tenant_id = $1 AND child_id = $2 AND date_key = $3", [tenantId, childId, dateKey]);
+      await this.pool.query("DELETE FROM bounty_submissions WHERE tenant_id = $1 AND child_id = $2 AND date_key = $3", [tenantId, childId, dateKey]);
+      await this.pool.query("DELETE FROM bounty_completions WHERE tenant_id = $1 AND child_id = $2 AND date_key = $3", [tenantId, childId, dateKey]);
+    } else if (tenantId) {
       await this.pool.query("DELETE FROM homeworks WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
       await this.pool.query("DELETE FROM daily_settlement WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
       await this.pool.query("DELETE FROM efficiency_history WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
@@ -1313,7 +1398,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     }
 
     // 清理与当日相关的 active_buffs
-    const buffs = (await this._getJson('active_buffs', tenantId)) ?? [];
+    const buffs = (await this._getJson('active_buffs', tenantId, childId)) ?? [];
     const beforeCount = buffs.length;
     const parts = dateKey.split('-');
     if (parts.length !== 3) return;
@@ -1322,7 +1407,7 @@ export class PostgresAdapter extends DatabaseAdapter {
       b.startDate !== dateKey && !b.startDate?.startsWith(isoPrefix)
     );
     if (filteredBuffs.length !== beforeCount) {
-      await this._setJson('active_buffs', filteredBuffs, tenantId);
+      await this._setJson('active_buffs', filteredBuffs, tenantId, childId);
     }
 
     if (tenantId) {
@@ -1738,6 +1823,77 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   async deleteAccessCode(id: string, userId: string): Promise<void> {
     await this.pool.query('DELETE FROM access_codes WHERE id = $1 AND user_id = $2', [id, userId]);
+  }
+
+  // ==================== Children ====================
+
+  async createChild(tenantId: string, name: string, accessCodeId?: string): Promise<ChildrenRecord> {
+    const id = crypto.randomUUID();
+    await this.pool.query(
+      "INSERT INTO children (id, tenant_id, name, access_code_id) VALUES ($1, $2, $3, $4)",
+      [id, tenantId, name, accessCodeId ?? null]
+    );
+    return { id, tenant_id: tenantId, name, access_code_id: accessCodeId ?? undefined, is_active: true, created_at: new Date().toISOString() };
+  }
+
+  async getChildById(id: string, tenantId: string): Promise<ChildrenRecord | null> {
+    const result = await this.pool.query(
+      'SELECT * FROM children WHERE id = $1 AND tenant_id = $2',
+      [id, tenantId]
+    );
+    if (result.rows.length === 0) return null;
+    return this._mapChildRow(result.rows[0]);
+  }
+
+  async getChildrenByTenant(tenantId: string, activeOnly = true): Promise<ChildrenRecord[]> {
+    const query = activeOnly
+      ? 'SELECT * FROM children WHERE tenant_id = $1 AND is_active = true ORDER BY created_at'
+      : 'SELECT * FROM children WHERE tenant_id = $1 ORDER BY created_at';
+    const result = await this.pool.query(query, [tenantId]);
+    return result.rows.map(row => this._mapChildRow(row));
+  }
+
+  async updateChild(id: string, tenantId: string, fields: { name?: string; is_active?: boolean; access_code_id?: string | null }): Promise<void> {
+    const sets: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+    if (fields.name !== undefined) { sets.push(`name = $${idx++}`); params.push(fields.name); }
+    if (fields.is_active !== undefined) { sets.push(`is_active = $${idx++}`); params.push(fields.is_active); }
+    if (fields.access_code_id !== undefined) { sets.push(`access_code_id = $${idx++}`); params.push(fields.access_code_id); }
+    if (sets.length === 0) return;
+    params.push(id, tenantId);
+    await this.pool.query(
+      `UPDATE children SET ${sets.join(', ')} WHERE id = $${idx++} AND tenant_id = $${idx}`,
+      params
+    );
+  }
+
+  async findChildByAccessCodeId(accessCodeId: string, tenantId: string): Promise<ChildrenRecord | null> {
+    const result = await this.pool.query(
+      'SELECT * FROM children WHERE access_code_id = $1 AND tenant_id = $2',
+      [accessCodeId, tenantId]
+    );
+    if (result.rows.length === 0) return null;
+    return this._mapChildRow(result.rows[0]);
+  }
+
+  async assignLegacyDataToChild(tenantId: string, childId: string): Promise<void> {
+    const perChildTables = ['homeworks', 'daily_settlement', 'efficiency_history', 'free_time_tasks', 'bounty_submissions', 'bounty_completions', 'points', 'points_history', 'redemptions', 'reward_box', 'active_buffs', 'badges'];
+    for (const table of perChildTables) {
+      await this.pool.query(`UPDATE ${table} SET child_id = $1 WHERE tenant_id = $2 AND child_id IS NULL`, [childId, tenantId]);
+    }
+  }
+
+  private _mapChildRow(row: any): ChildrenRecord {
+    return {
+      id: row.id,
+      tenant_id: row.tenant_id,
+      name: row.name,
+      avatar: row.avatar ?? undefined,
+      access_code_id: row.access_code_id ?? undefined,
+      is_active: row.is_active ?? true,
+      created_at: typeof row.created_at === 'object' ? row.created_at.toISOString() : row.created_at,
+    };
   }
 
   // ==================== Ops Methods ====================

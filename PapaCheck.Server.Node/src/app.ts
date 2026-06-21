@@ -100,6 +100,22 @@ function getTomorrow(dateStr: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** 提取 child_id：孩子角色从 JWT 取，家长角色从 query 参数取 */
+function getChildId(request: any, db: any): string | undefined | 'MISSING' {
+  const payload = request.jwtPayload;
+  if (!payload) return undefined;
+
+  if (payload.role === 'child') {
+    return payload.child_id ?? undefined;
+  }
+  if (payload.role === 'parent') {
+    const queryChildId = (request.query as any)?.child_id;
+    if (!queryChildId) return 'MISSING';
+    return queryChildId;
+  }
+  return undefined;
+}
+
 export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   const app = Fastify({
     logger: false,
@@ -394,19 +410,49 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // 3. GET /api/data - 完整数据
   app.get('/api/data', { schema: dataSchema }, async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    return sendJson(reply, await db.getFullData(tenantId));
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    return sendJson(reply, await db.getFullData(tenantId, childId));
   });
 
   // 4. GET /api/homeworks/:date
   app.get<{ Params: { date: string } }>('/api/homeworks/:date', async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    return sendJson(reply, await db.getHomeworks(request.params.date, tenantId));
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    return sendJson(reply, await db.getHomeworks(request.params.date, tenantId, childId));
   });
 
   // 5. GET /api/settlement/:date
   app.get<{ Params: { date: string } }>('/api/settlement/:date', async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    return sendJson(reply, await db.getSettlement(request.params.date, tenantId));
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    return sendJson(reply, await db.getSettlement(request.params.date, tenantId, childId));
   });
 
   // 6. GET /api/shop
@@ -418,13 +464,33 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // 7. GET /api/redemptions
   app.get('/api/redemptions', async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    return sendJson(reply, await db.getRedemptions(tenantId));
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    return sendJson(reply, await db.getRedemptions(tenantId, childId));
   });
 
   // 8. GET /api/reward-box
   app.get('/api/reward-box', async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    return sendJson(reply, await db.getRewardBox(tenantId));
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    return sendJson(reply, await db.getRewardBox(tenantId, childId));
   });
 
   // 9. GET /api/settings
@@ -436,19 +502,49 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // 10. GET /api/active-buffs
   app.get('/api/active-buffs', async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    return sendJson(reply, await db.getActiveBuffs(tenantId));
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    return sendJson(reply, await db.getActiveBuffs(tenantId, childId));
   });
 
   // 11. GET /api/efficiency/:date
   app.get<{ Params: { date: string } }>('/api/efficiency/:date', async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    return sendJson(reply, await db.getEfficiency(request.params.date, tenantId));
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    return sendJson(reply, await db.getEfficiency(request.params.date, tenantId, childId));
   });
 
   // 12. GET /api/freetime/:date
   app.get<{ Params: { date: string } }>('/api/freetime/:date', async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    return sendJson(reply, await db.getFreeTime(request.params.date, tenantId));
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    return sendJson(reply, await db.getFreeTime(request.params.date, tenantId, childId));
   });
 
   // 13. GET /api/bounty-tasks
@@ -460,13 +556,33 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // 14. GET /api/bounty-submissions/:date
   app.get<{ Params: { date: string } }>('/api/bounty-submissions/:date', async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    return sendJson(reply, await db.getBountySubmissions(request.params.date, tenantId));
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    return sendJson(reply, await db.getBountySubmissions(request.params.date, tenantId, childId));
   });
 
   // 15. GET /api/bounty-completions/:date
   app.get<{ Params: { date: string } }>('/api/bounty-completions/:date', async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    return sendJson(reply, await db.getBountyCompletions(request.params.date, tenantId));
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    return sendJson(reply, await db.getBountyCompletions(request.params.date, tenantId, childId));
   });
 
   // 16. GET /api/sync/pull - 同步拉取
@@ -474,7 +590,17 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     const query = request.query as { lastSync?: string };
     const lastSync = query.lastSync || '1970-01-01T00:00:00+00:00';
     const tenantId = request.jwtPayload?.tenant_id;
-    const changes = await db.getModifiedSince(lastSync, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    const changes = await db.getModifiedSince(lastSync, tenantId, childId);
     return sendJson(reply, { changes, serverTime: new Date().toISOString() });
   });
 
@@ -521,7 +647,17 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       return reply.status(400).send({ error: '缺少 dateKey' });
     }
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.saveHomeworks(dateKey, body.homeworks, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    await db.saveHomeworks(dateKey, body.homeworks, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
@@ -542,8 +678,18 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.put<{ Params: { date: string } }>('/api/settlement/:date', async (request: any, reply) => {
     const body = request.body as any;
     const tenantId = request.jwtPayload?.tenant_id;
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
     // 同时兼容 { settlement: data } 和直接 data 两种 payload 格式
-    await db.saveSettlement(request.params.date, body.settlement ?? body, tenantId);
+    await db.saveSettlement(request.params.date, body.settlement ?? body, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
@@ -551,16 +697,26 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.patch('/api/points', async (request: any, reply) => {
     const body = request.body as any;
     const tenantId = request.jwtPayload?.tenant_id;
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
     if (body.action) {
       if (body.action !== 'earn' && body.action !== 'spend') {
         return reply.status(400).send({ error: 'action 必须是 earn 或 spend' });
       }
       // 全量替换风格（原 POST /api/points）
-      const balance = await db.updatePoints(body.action, body.amount, body.detail, tenantId);
+      const balance = await db.updatePoints(body.action, body.amount, body.detail, tenantId, childId);
       return sendJson(reply, { ok: true, balance });
     }
     // 增量更新风格（原 PATCH /api/points）
-    const balance = await db.patchPoints(body, tenantId);
+    const balance = await db.patchPoints(body, tenantId, childId);
     return sendJson(reply, { ok: true, balance });
   });
 
@@ -576,14 +732,34 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.put('/api/redemptions', async (request: any, reply) => {
     const body = request.body as { redemptions: unknown[] };
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.saveRedemptions(body.redemptions, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    await db.saveRedemptions(body.redemptions, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
   // 23b. DELETE /api/redemptions/fulfilled — 清空已兑现记录
   app.delete('/api/redemptions/fulfilled', async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.clearFulfilledRedemptions(tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    await db.clearFulfilledRedemptions(tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
@@ -591,7 +767,17 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.put('/api/reward-box', async (request: any, reply) => {
     const body = request.body as { items: unknown[] };
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.saveRewardBox(body.items, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    await db.saveRewardBox(body.items, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
@@ -608,7 +794,17 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.put('/api/active-buffs', async (request: any, reply) => {
     const body = request.body as { buffs: unknown[] };
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.saveActiveBuffs(body.buffs, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    await db.saveActiveBuffs(body.buffs, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
@@ -616,8 +812,18 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.put<{ Params: { date: string } }>('/api/efficiency/:date', async (request: any, reply) => {
     const body = request.body as any;
     const tenantId = request.jwtPayload?.tenant_id;
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
     // 同时兼容 { efficiency: data } 和直接 data 两种 payload 格式
-    await db.saveEfficiency(request.params.date, body.efficiency ?? body, tenantId);
+    await db.saveEfficiency(request.params.date, body.efficiency ?? body, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
@@ -628,14 +834,34 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       return reply.status(400).send({ error: '缺少 dateKey' });
     }
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.saveFreeTime(body.dateKey, body.tasks, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    await db.saveFreeTime(body.dateKey, body.tasks, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
   // 28b. PUT /api/freetime/:id — 单条自由时间 upsert
   app.put<{ Params: { id: string } }>('/api/freetime/:id', { schema: idParamSchema }, async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.putFreeTimeTask(request.params.id, request.body, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    await db.putFreeTimeTask(request.params.id, request.body, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
@@ -654,14 +880,34 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       return reply.status(400).send({ error: '缺少 dateKey' });
     }
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.saveBountySubmissions(body.dateKey, body.submissions, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    await db.saveBountySubmissions(body.dateKey, body.submissions, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
   // 30b. PUT /api/bounty-submissions/:id — 单条赏金提交 upsert
   app.put<{ Params: { id: string } }>('/api/bounty-submissions/:id', { schema: idParamSchema }, async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.putBountySubmission(request.params.id, request.body, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    await db.putBountySubmission(request.params.id, request.body, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
@@ -672,14 +918,34 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       return reply.status(400).send({ error: '缺少 dateKey' });
     }
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.saveBountyCompletions(body.dateKey, body.completions, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    await db.saveBountyCompletions(body.dateKey, body.completions, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
   // 31b. PUT /api/bounty-completions/:id — 单条赏金完成 upsert
   app.put<{ Params: { id: string } }>('/api/bounty-completions/:id', { schema: idParamSchema }, async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.putBountyCompletion(request.params.id, request.body, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    await db.putBountyCompletion(request.params.id, request.body, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
@@ -693,22 +959,32 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     };
     const { date, hwId, action, requestedAt } = body;
     const tenantId = request.jwtPayload?.tenant_id;
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
 
     if (action === 'request') {
-      const homeworks = await db.getHomeworks(date, tenantId);
+      const homeworks = await db.getHomeworks(date, tenantId, childId);
       const found = homeworks.find((h: any) => h.id === hwId);
       if (found && found.status === 'pending' && !found.deferRequest) {
         found.deferRequest = {
           requestedAt: requestedAt || new Date().toISOString(),
           status: 'pending',
         };
-        await db.saveHomeworks(date, homeworks, tenantId);
+        await db.saveHomeworks(date, homeworks, tenantId, childId);
       }
       return sendJson(reply, { ok: true });
     }
 
     if (action === 'approve') {
-      const homeworks = await db.getHomeworks(date, tenantId);
+      const homeworks = await db.getHomeworks(date, tenantId, childId);
       const idx = homeworks.findIndex((h: any) => h.id === hwId);
       if (idx !== -1) {
         const hw = { ...homeworks[idx] };
@@ -717,14 +993,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
         // 从当前日期移除
         homeworks.splice(idx, 1);
-        await db.saveHomeworks(date, homeworks, tenantId);
+        await db.saveHomeworks(date, homeworks, tenantId, childId);
 
         // 添加到次日
         const tomorrow = getTomorrow(date);
         hw.date = tomorrow;
-        const tomorrowHw = await db.getHomeworks(tomorrow, tenantId);
+        const tomorrowHw = await db.getHomeworks(tomorrow, tenantId, childId);
         tomorrowHw.push(hw);
-        await db.saveHomeworks(tomorrow, tomorrowHw, tenantId);
+        await db.saveHomeworks(tomorrow, tomorrowHw, tenantId, childId);
 
         return sendJson(reply, { ok: true, homework: hw });
       }
@@ -732,11 +1008,11 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
 
     if (action === 'reject') {
-      const homeworks = await db.getHomeworks(date, tenantId);
+      const homeworks = await db.getHomeworks(date, tenantId, childId);
       const found = homeworks.find((h: any) => h.id === hwId);
       if (found) {
         delete found.deferRequest;
-        await db.saveHomeworks(date, homeworks, tenantId);
+        await db.saveHomeworks(date, homeworks, tenantId, childId);
       }
       return sendJson(reply, { ok: true });
     }
@@ -748,7 +1024,17 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.post('/api/reset-date', async (request: any, reply) => {
     const body = request.body as { date: string };
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.resetDate(body.date, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    await db.resetDate(body.date, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
@@ -756,7 +1042,17 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.post('/api/sync/push', async (request: any, reply) => {
     const body = request.body as { changes: unknown[] };
     const tenantId = request.jwtPayload?.tenant_id;
-    const result = await db.pushMerge(body.changes, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    const result = await db.pushMerge(body.changes, tenantId, childId);
     return sendJson(reply, result);
   });
 
@@ -989,7 +1285,17 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // 35. PUT /api/homeworks/:id
   app.put<{ Params: { id: string } }>('/api/homeworks/:id', { schema: idParamSchema }, async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.putHomework(request.params.id, request.body, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    await db.putHomework(request.params.id, request.body, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
@@ -1004,9 +1310,19 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   app.put<{ Params: { id: string } }>('/api/redemptions/:id', { schema: idParamSchema }, async (request: any, reply) => {
     const data = request.body as any;
     const tenantId = request.jwtPayload?.tenant_id;
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
     // 检查同一 rewardBoxItemId 是否已有 pending 兑换（服务端兜底）
     if (data && data.fromRewardBox && data.status === 'pending' && data.rewardBoxItemId) {
-      const redemptions = await db.getRedemptions(tenantId);
+      const redemptions = await db.getRedemptions(tenantId, childId);
       const existing = redemptions.find((r: any) =>
         r.rewardBoxItemId === data.rewardBoxItemId &&
         r.status === 'pending' &&
@@ -1016,7 +1332,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
         return reply.code(409).send({ ok: false, error: 'duplicate_pending_redemption', message: '该物品已有待处理兑换申请' });
       }
     }
-    await db.putRedemption(request.params.id, request.body, tenantId);
+    await db.putRedemption(request.params.id, request.body, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
@@ -1053,14 +1369,34 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // 47. PATCH /api/homeworks/:id
   app.patch<{ Params: { id: string } }>('/api/homeworks/:id', { schema: idParamSchema }, async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.patchHomework(request.params.id, request.body, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    await db.patchHomework(request.params.id, request.body, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
   // 48. PATCH /api/settlement/:date
   app.patch<{ Params: { date: string } }>('/api/settlement/:date', { schema: dateParamSchema }, async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.patchSettlement(request.params.date, request.body, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    await db.patchSettlement(request.params.date, request.body, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 
@@ -1076,7 +1412,17 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // 51. DELETE /api/homeworks/:id
   app.delete<{ Params: { id: string } }>('/api/homeworks/:id', { schema: deleteParamSchema }, async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.deleteHomework(request.params.id, tenantId);
+    const childId = getChildId(request, db);
+    if (childId === 'MISSING') {
+      return reply.status(400).send({ error: '缺少 child_id 参数', code: 'MISSING_CHILD_ID' });
+    }
+    if (typeof childId === 'string') {
+    const child = await db.getChildById(childId, tenantId);
+    if (!child) {
+      return reply.status(403).send({ error: '无权限访问该孩子', code: 'FOREIGN_CHILD' });
+    }
+  }
+    await db.deleteHomework(request.params.id, tenantId, childId);
     return sendJson(reply, { ok: true });
   });
 

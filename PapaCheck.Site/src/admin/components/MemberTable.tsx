@@ -10,6 +10,7 @@ interface Member {
   id: string;
   nickname: string;
   role: string;
+  child_id?: string;
   access_code: string | null;
   last_login?: string;
   created_at: string;
@@ -99,6 +100,7 @@ export default function MemberTable({ refreshKey }: { refreshKey: number }) {
           <tr>
             <th>昵称</th>
             <th>角色</th>
+            <th>数据归属</th>
             <th>访问码</th>
             <th>最后登录</th>
             <th className="text-right">操作</th>
@@ -119,6 +121,9 @@ export default function MemberTable({ refreshKey }: { refreshKey: number }) {
                     <RoleIcon size={12} />
                     {m.role === 'parent' ? '家长' : '孩子'}
                   </span>
+                </td>
+                <td className="text-center">
+                  {m.child_id ? '✓' : '-'}
                 </td>
                 <td>
                   {m.access_code ? (

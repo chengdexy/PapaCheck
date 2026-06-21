@@ -136,6 +136,20 @@ export async function authRoutes(app: FastifyInstance, db: IDatabase): Promise<v
       return reply.status(401).send({ error: '访问码无效', code: 'INVALID_ACCESS_CODE' });
     }
 
+    // 孩子角色：查找或创建 children 记录
+    let childId: string | undefined;
+    if (record.type === 'child') {
+      let child = await db.findChildByAccessCodeId(record.id, record.user_id);
+      if (!child) {
+        // 自动创建 children 记录（兼容迁移遗漏）
+        child = await db.createChild(record.user_id, record.nickname, record.id);
+      }
+      if (!child.is_active) {
+        return reply.status(403).send({ error: '孩子已被禁用', code: 'CHILD_DISABLED' });
+      }
+      childId = child.id;
+    }
+
     // 记录最后登录时间
     await db.updateAccessCodeLastLogin(record.id).catch(() => {});
 
@@ -143,12 +157,16 @@ export async function authRoutes(app: FastifyInstance, db: IDatabase): Promise<v
       sub: record.user_id,
       tenant_id: record.user_id,
       member_id: record.id,
+      child_id: childId,
       role: record.type,
       token_version: record.token_version,
     });
     const response: any = { token, role: record.type, nickname: record.nickname };
     if (record.type === 'child' || record.type === 'parent') {
       response.needs_setup = true;
+    }
+    if (childId) {
+      response.child_id = childId;
     }
     return response;
   });

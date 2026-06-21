@@ -7,6 +7,17 @@
 ## [Unreleased]
 
 ### Added
+- **多孩子支持（Phase 1+2）**：每个家庭支持多个孩子，数据按 child_id 隔离
+  - `children` 表：id、tenant_id、name、avatar、access_code_id、is_active
+  - 12 张 per-child 表添加 `child_id` 列 + partial unique index
+  - `DatabaseAdapter` / `PostgresAdapter` 所有 per-child 方法新增 `childId` 参数
+  - `POST /api/auth/exchange`：child 角色自动查/建 children 记录，JWT 含 child_id
+  - `POST /api/admin/members`：child 角色自动创建 children 记录 + 遗留数据分配
+  - `DELETE /api/admin/members/:id`：清理 children.access_code_id 但不删 children
+  - `GET /api/admin/members`：响应含 child_id
+  - 家长端：孩子选择栏 + localStorage 持久化 + 按 child_id 拉数据
+  - 孩子端：后端 JWT.child_id 自动过滤，前端无改动
+  - `init-pg-schema.sql` 含迁移段（ALTER ADD COLUMN + DROP PK + UNIQUE INDEX）
 - **本地测试数据库搭建脚本**：`scripts/setup-test-db.ps1` 一键完成 PG 检测→建测试库→建表→生成 `.env.test`（[#setup-test-db.ps1](file:///e:/trae_projects/PapaCheck/PapaCheck.Server.Node/scripts/setup-test-db.ps1)）
 - **`vitest.config.js` 自动加载 `.env.test`**：自动读取 `PapaCheck.Server.Node/.env.test`，不覆盖已存在的 `DATABASE_URL` 环境变量（[#vitest.config.js](file:///e:/trae_projects/PapaCheck/vitest.config.js)）
 - **调试配置 launch.json**：3 个调试配置（全功能调试 F5 + 当前文件测试 + 全量测试）+ 复合任务"启动 + 测试"

@@ -99,6 +99,12 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
     }
 
     const codes = await db.getAccessCodesByUser(payload.sub);
+    const children = await db.getChildrenByTenant(payload.sub, false);
+    const childByAccessCode = new Map<string, string>();
+    for (const c of children) {
+      if (c.access_code_id) childByAccessCode.set(c.access_code_id, c.id);
+    }
+
     return codes.map(c => ({
       id: c.id,
       nickname: c.nickname,
@@ -106,6 +112,7 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
       access_code: c.access_code ?? null,
       last_login: c.last_login ?? null,
       created_at: c.created_at,
+      child_id: childByAccessCode.get(c.id) ?? null,
     }));
   });
 
@@ -122,7 +129,16 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
     const { raw, hashed } = await generateAccessHash();
     await db.createAccessCode({ id, user_id: payload.sub, type: role, code_hash: hashed, nickname });
 
-    return { id, nickname, role, access_code: raw };
+    // 孩子角色：自动创建 children 记录
+    let childId: string | null = null;
+    if (role === 'child') {
+      const child = await db.createChild(payload.sub, nickname, id);
+      // 将遗留数据（child_id IS NULL）分配给新孩子
+      await db.assignLegacyDataToChild(payload.sub, child.id);
+      childId = child.id;
+    }
+
+    return { id, nickname, role, access_code: raw, child_id: childId };
   });
 
   // POST /api/admin/members/:id/regenerate — 重新生成访问码
@@ -145,6 +161,13 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
     }
 
     const { id } = request.params as { id: string };
+
+    // 清理 children 表中的 access_code_id 引用（不删除 children 记录）
+    const child = await db.findChildByAccessCodeId(id, payload.sub);
+    if (child) {
+      await db.updateChild(child.id, payload.sub, { access_code_id: null });
+    }
+
     await db.deleteAccessCode(id, payload.sub);
     return { ok: true };
   });

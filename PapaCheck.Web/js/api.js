@@ -10,6 +10,11 @@ function getAuthHeaders() {
 let isServerMode = false;
 let cachedData = null;
 
+// 支持家长端多孩子切换
+if (typeof window !== 'undefined') {
+  window._currentChildId = undefined;
+}
+
 function updateConnStatus() {
   const el = document.getElementById('connStatus');
   if (!el) return;
@@ -95,11 +100,12 @@ const API = {
 
   // ========== 数据获取 ==========
 
-  async getData() {
+  async getData(childId) {
     // getData 是初始化函数，在 ConnectionManager.start() 之前调用，
     // 此时 CM 模式为 offline，但服务器可能在线，因此不依赖 CM 模式判断
     try {
-      var result = await this._fetch('/api/data');
+      var query = childId ? '?child_id=' + encodeURIComponent(childId) : '';
+      var result = await this._fetch('/api/data' + query);
       isServerMode = true;
       cachedData = result;
       // 深拷贝后传给 cacheFullData，防止原地修改 lastModified/uuid 污染 cachedData
@@ -1136,6 +1142,9 @@ const API = {
    * 异步上报写操作
    */
   pushOperation: async function (operation) {
+    if (window._currentChildId) {
+      operation.child_id = window._currentChildId;
+    }
     if (window.PapaCheckBridge && window.PapaCheckBridge.enqueue) {
       window.PapaCheckBridge.enqueue(JSON.stringify(operation));
       return { ok: true, queued: true };

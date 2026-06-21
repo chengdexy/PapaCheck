@@ -1,4 +1,4 @@
-import type { IDatabase, FullDataSnapshot, ModifiedEntry, NotificationItem, AccessCodeRecord, CreateAccessCodeInput, TenantListItem, BackupRecord, HealthRecord, AlertState, OpsConfig } from './types.js';
+import type { IDatabase, FullDataSnapshot, ModifiedEntry, NotificationItem, ChildrenRecord, AccessCodeRecord, CreateAccessCodeInput, TenantListItem, BackupRecord, HealthRecord, AlertState, OpsConfig } from './types.js';
 import type { CRDTOperation } from '../crdt/types.js';
 
 // ==================== DatabaseAdapter 抽象基类 ====================
@@ -25,7 +25,6 @@ export abstract class DatabaseAdapter implements IDatabase {
     return { index: -1, item: null };
   }
 
-  /** 在数组中按 id/uuid/taskId 查找（通用方法） */
   _findInArray(data: any[], id: string): { index: number; item: any } {
     return this._findByUuid(data, id);
   }
@@ -74,69 +73,69 @@ export abstract class DatabaseAdapter implements IDatabase {
   // ==================== Abstract Methods ====================
 
   abstract close(): Promise<void>;
-  abstract getFullData(tenantId?: string): Promise<FullDataSnapshot>;
-  abstract importFullData(data: any, tenantId?: string): Promise<void>;
+  abstract getFullData(tenantId?: string, childId?: string): Promise<FullDataSnapshot>;
+  abstract importFullData(data: any, tenantId?: string, childId?: string): Promise<void>;
   abstract addNotification(text: string, createdAt?: number, tenantId?: string): Promise<string>;
   abstract getPendingNotifications(tenantId?: string): Promise<NotificationItem[]>;
   abstract consumeNotifications(ids: string[], tenantId?: string): Promise<void>;
-  abstract getPointsBalance(tenantId?: string): Promise<number>;
-  abstract updatePoints(action: 'earn' | 'spend', amount: number, detail: string, tenantId?: string): Promise<number>;
-  abstract patchPoints(delta: { earn?: number; spend?: number; detail?: string }, tenantId?: string): Promise<number>;
-  abstract getHomeworks(dateKey: string, tenantId?: string): Promise<any[]>;
-  abstract saveHomeworks(dateKey: string, items: any[], tenantId?: string): Promise<void>;
-  abstract moveHomework(fromDate: string, toDate: string, hwId: string, tenantId?: string): Promise<any | null>;
-  abstract getHomeworkById(id: string, tenantId?: string): Promise<any | null>;
-  abstract putHomework(id: string, data: any, tenantId?: string): Promise<void>;
-  abstract patchHomework(id: string, fields: any, tenantId?: string): Promise<void>;
-  abstract deleteHomework(id: string, tenantId?: string): Promise<void>;
-  abstract getSettlement(dateKey: string, tenantId?: string): Promise<any>;
-  abstract saveSettlement(dateKey: string, data: any, tenantId?: string): Promise<void>;
-  abstract putSettlement(dateKey: string, data: any, tenantId?: string): Promise<void>;
-  abstract patchSettlement(dateKey: string, fields: any, tenantId?: string): Promise<void>;
+  abstract getPointsBalance(tenantId?: string, childId?: string): Promise<number>;
+  abstract updatePoints(action: 'earn' | 'spend', amount: number, detail: string, tenantId?: string, childId?: string): Promise<number>;
+  abstract patchPoints(delta: { earn?: number; spend?: number; detail?: string }, tenantId?: string, childId?: string): Promise<number>;
+  abstract getHomeworks(dateKey: string, tenantId?: string, childId?: string): Promise<any[]>;
+  abstract saveHomeworks(dateKey: string, items: any[], tenantId?: string, childId?: string): Promise<void>;
+  abstract moveHomework(fromDate: string, toDate: string, hwId: string, tenantId?: string, childId?: string): Promise<any | null>;
+  abstract getHomeworkById(id: string, tenantId?: string, childId?: string): Promise<any | null>;
+  abstract putHomework(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  abstract patchHomework(id: string, fields: any, tenantId?: string, childId?: string): Promise<void>;
+  abstract deleteHomework(id: string, tenantId?: string, childId?: string): Promise<void>;
+  abstract getSettlement(dateKey: string, tenantId?: string, childId?: string): Promise<any>;
+  abstract saveSettlement(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  abstract putSettlement(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  abstract patchSettlement(dateKey: string, fields: any, tenantId?: string, childId?: string): Promise<void>;
   abstract getShopItems(tenantId?: string): Promise<any[]>;
   abstract saveShopItems(items: any[], tenantId?: string): Promise<void>;
   abstract getShopItemById(id: string, tenantId?: string): Promise<any | null>;
   abstract putShopItem(id: string, data: any, tenantId?: string): Promise<void>;
   abstract deleteShopItem(id: string, tenantId?: string): Promise<void>;
-  abstract getRedemptions(tenantId?: string): Promise<any[]>;
-  abstract saveRedemptions(items: any[], tenantId?: string): Promise<void>;
-  abstract clearFulfilledRedemptions(tenantId?: string): Promise<void>;
-  abstract putRedemption(id: string, data: any, tenantId?: string): Promise<void>;
-  abstract getRewardBox(tenantId?: string): Promise<any[]>;
-  abstract saveRewardBox(items: any[], tenantId?: string): Promise<void>;
-  abstract putRewardBoxItem(id: string, data: any, tenantId?: string): Promise<void>;
-  abstract deleteRewardBoxItem(id: string, tenantId?: string): Promise<void>;
+  abstract getRedemptions(tenantId?: string, childId?: string): Promise<any[]>;
+  abstract saveRedemptions(items: any[], tenantId?: string, childId?: string): Promise<void>;
+  abstract clearFulfilledRedemptions(tenantId?: string, childId?: string): Promise<void>;
+  abstract putRedemption(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  abstract getRewardBox(tenantId?: string, childId?: string): Promise<any[]>;
+  abstract saveRewardBox(items: any[], tenantId?: string, childId?: string): Promise<void>;
+  abstract putRewardBoxItem(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  abstract deleteRewardBoxItem(id: string, tenantId?: string, childId?: string): Promise<void>;
   abstract getSettings(tenantId?: string): Promise<any>;
   abstract saveSettings(data: any, tenantId?: string): Promise<void>;
   abstract putSettings(data: any, tenantId?: string): Promise<void>;
   abstract patchSettings(fields: any, tenantId?: string): Promise<void>;
-  abstract getActiveBuffs(tenantId?: string): Promise<any[]>;
-  abstract saveActiveBuffs(items: any[], tenantId?: string): Promise<void>;
-  abstract putBuff(id: string, data: any, tenantId?: string): Promise<void>;
-  abstract deleteBuff(id: string, tenantId?: string): Promise<void>;
-  abstract getEfficiency(dateKey: string, tenantId?: string): Promise<any>;
-  abstract saveEfficiency(dateKey: string, data: any, tenantId?: string): Promise<void>;
-  abstract putEfficiency(dateKey: string, data: any, tenantId?: string): Promise<void>;
-  abstract getFreeTime(dateKey: string, tenantId?: string): Promise<any[]>;
-  abstract saveFreeTime(dateKey: string, tasks: any[], tenantId?: string): Promise<void>;
-  abstract putFreeTimeTask(id: string, data: any, tenantId?: string): Promise<void>;
+  abstract getActiveBuffs(tenantId?: string, childId?: string): Promise<any[]>;
+  abstract saveActiveBuffs(items: any[], tenantId?: string, childId?: string): Promise<void>;
+  abstract putBuff(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  abstract deleteBuff(id: string, tenantId?: string, childId?: string): Promise<void>;
+  abstract getEfficiency(dateKey: string, tenantId?: string, childId?: string): Promise<any>;
+  abstract saveEfficiency(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  abstract putEfficiency(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  abstract getFreeTime(dateKey: string, tenantId?: string, childId?: string): Promise<any[]>;
+  abstract saveFreeTime(dateKey: string, tasks: any[], tenantId?: string, childId?: string): Promise<void>;
+  abstract putFreeTimeTask(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
   abstract getBountyTasks(tenantId?: string): Promise<any[]>;
   abstract saveBountyTasks(items: any[], tenantId?: string): Promise<void>;
   abstract getBountyTaskById(id: string, tenantId?: string): Promise<any | null>;
   abstract putBountyTask(id: string, data: any, tenantId?: string): Promise<void>;
   abstract deleteBountyTask(id: string, tenantId?: string): Promise<void>;
-  abstract getBountySubmissions(dateKey: string, tenantId?: string): Promise<any[]>;
-  abstract saveBountySubmissions(dateKey: string, data: any[], tenantId?: string): Promise<void>;
-  abstract putBountySubmission(id: string, data: any, tenantId?: string): Promise<void>;
-  abstract getBountyCompletions(dateKey: string, tenantId?: string): Promise<any>;
-  abstract saveBountyCompletions(dateKey: string, data: any, tenantId?: string): Promise<void>;
-  abstract putBountyCompletion(id: string, data: any, tenantId?: string): Promise<void>;
+  abstract getBountySubmissions(dateKey: string, tenantId?: string, childId?: string): Promise<any[]>;
+  abstract saveBountySubmissions(dateKey: string, data: any[], tenantId?: string, childId?: string): Promise<void>;
+  abstract putBountySubmission(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  abstract getBountyCompletions(dateKey: string, tenantId?: string, childId?: string): Promise<any>;
+  abstract saveBountyCompletions(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  abstract putBountyCompletion(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
   abstract getEmailConfig(tenantId?: string): Promise<any | null>;
   abstract saveEmailConfig(config: any, tenantId?: string): Promise<void>;
-  abstract getModifiedSince(timestamp: string, tenantId?: string): Promise<ModifiedEntry[]>;
-  abstract pushMerge(changes: any[], tenantId?: string): Promise<{ ok: boolean }>;
+  abstract getModifiedSince(timestamp: string, tenantId?: string, childId?: string): Promise<ModifiedEntry[]>;
+  abstract pushMerge(changes: any[], tenantId?: string, childId?: string): Promise<{ ok: boolean }>;
   abstract recordModification(tableName: string, recordKey: string, timestamp: string, tenantId?: string): Promise<void>;
-  abstract resetDate(dateKey: string, tenantId?: string): Promise<void>;
+  abstract resetDate(dateKey: string, tenantId?: string, childId?: string): Promise<void>;
   abstract saveCRDTOperation(op: CRDTOperation, tenantId?: string): Promise<void>;
   abstract hasCRDTOperation(id: string, tenantId?: string): Promise<boolean>;
   abstract applyCRDTOperation(op: CRDTOperation, tenantId?: string): Promise<void>;
@@ -164,4 +163,12 @@ export abstract class DatabaseAdapter implements IDatabase {
   abstract getAccessCodeById(id: string): Promise<AccessCodeRecord | null>;
   abstract regenerateAccessCode(id: string, userId: string): Promise<string>;
   abstract deleteAccessCode(id: string, userId: string): Promise<void>;
+
+  // Children
+  abstract createChild(tenantId: string, name: string, accessCodeId?: string): Promise<ChildrenRecord>;
+  abstract getChildById(id: string, tenantId: string): Promise<ChildrenRecord | null>;
+  abstract getChildrenByTenant(tenantId: string, activeOnly?: boolean): Promise<ChildrenRecord[]>;
+  abstract updateChild(id: string, tenantId: string, fields: { name?: string; is_active?: boolean; access_code_id?: string | null }): Promise<void>;
+  abstract findChildByAccessCodeId(accessCodeId: string, tenantId: string): Promise<ChildrenRecord | null>;
+  abstract assignLegacyDataToChild(tenantId: string, childId: string): Promise<void>;
 }

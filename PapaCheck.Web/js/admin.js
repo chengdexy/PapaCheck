@@ -24,6 +24,8 @@ let _ratingShowCount = 5;
 let _selectedCalendarDate = null;
 let _calendarYear = null;
 let _calendarMonth = null;
+var _children = [];
+var _currentChildId = null;
 
 const SETTINGS_DEFAULTS = {
   dailyBasePoints: 50,
@@ -122,6 +124,69 @@ const AdminUtil = {
   },
 };
 
+async function loadChildren() {
+  try {
+    var resp = await API._fetch('/api/admin/members', 'GET');
+    if (resp && Array.isArray(resp)) {
+      _children = resp.filter(function (m) { return m.role === 'child' && m.child_id; });
+    }
+  } catch (e) {
+    _children = [];
+  }
+  _renderChildSelector();
+  if (_children.length > 0 && !_currentChildId) {
+    // 从 localStorage 恢复上次选中的孩子
+    try {
+      var lastChildId = localStorage.getItem('papacheck_last_child_id');
+      if (lastChildId && _children.find(function (c) { return c.child_id === lastChildId; })) {
+        _currentChildId = lastChildId;
+      } else {
+        _currentChildId = _children[0].child_id;
+      }
+      window._currentChildId = _currentChildId;
+    } catch (e2) { /* 非致命 */ }
+  }
+  if (_currentChildId) {
+    await refreshAllData();
+    renderCurrentTab();
+  }
+}
+
+function _renderChildSelector() {
+  var container = document.getElementById('child-selector');
+  if (!container) return;
+
+  if (_children.length === 0) {
+    container.innerHTML = '<div class="child-selector-empty">请先在管理面板创建孩子</div>';
+    container.style.display = 'block';
+    return;
+  }
+
+  // 商店和设置标签时隐藏
+  if (adminCurrentTab === 'shop' || adminCurrentTab === 'settings') {
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'flex';
+  var html = '<span class="child-selector-label">孩子:</span>';
+  for (var i = 0; i < _children.length; i++) {
+    var c = _children[i];
+    var active = c.child_id === _currentChildId ? ' active' : '';
+    html += '<button class="child-tag' + active + '" data-child-id="' + escapeHtml(c.child_id) + '">' + escapeHtml(c.nickname) + '</button>';
+  }
+  container.innerHTML = html;
+}
+
+async function switchToChild(childId) {
+  _currentChildId = childId;
+  window._currentChildId = childId;
+  try { localStorage.setItem('papacheck_last_child_id', childId); } catch (e) { /* 非致命 */ }
+  _renderChildSelector();
+  await refreshAllData();
+  renderCurrentTab();
+}
+
 // ========== Init ==========
 async function initAdmin() {
   showTransitionMask('正在加载数据…');
@@ -155,11 +220,20 @@ async function initAdmin() {
         const duration = rewardItem.dataset.siDuration || '0';
         addRewardFromShop(name, type, duration);
       }
+      // 孩子切换按钮事件委托
+      const childBtn = e.target.closest('.child-tag');
+      if (childBtn) {
+        var childId = childBtn.getAttribute('data-child-id');
+        if (childId && childId !== _currentChildId) {
+          switchToChild(childId);
+        }
+      }
     });
   }
 
   await ConnectionManager.start();
   await refreshAllData();
+  await loadChildren();
   updateSettingsTabState();
   hideTransitionMask();
   // 恢复上次停留的标签页
@@ -182,7 +256,7 @@ async function refreshAllData() {
 
   if (mode === 'online') {
     try {
-      var data = await API.getData();
+      var data = await API.getData(_currentChildId);
       if (data) {
         var oldSettlements = cachedData?.dailySettlement || {};
         var newSettlements = data.dailySettlement || {};
@@ -241,6 +315,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
+  _renderChildSelector();
   renderCurrentTab();
 }
 

@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS tenants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   display_name TEXT,
-  admin_id UUID,  -- 可空：管理员注册时填写，迁移时无管理员
+  admin_id UUID,
   created_at TIMESTAMP DEFAULT NOW(),
   is_active BOOLEAN DEFAULT true
 );
@@ -30,7 +30,6 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMP DEFAULT NOW(),
   last_login TIMESTAMP
 );
-
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS access_codes (
@@ -44,12 +43,185 @@ CREATE TABLE IF NOT EXISTS access_codes (
   UNIQUE(user_id, nickname)
 );
 
--- ==================== Business Tables ====================
+CREATE TABLE IF NOT EXISTS children (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES users(id),
+  name TEXT NOT NULL,
+  avatar TEXT,
+  access_code_id UUID REFERENCES access_codes(id),
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(tenant_id, name)
+);
+
+-- ==================== Per-Child Tables ====================
 
 CREATE TABLE IF NOT EXISTS points (
   tenant_id UUID NOT NULL,
+  child_id UUID,
   id INTEGER NOT NULL,
   balance INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (tenant_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS points_history (
+  tenant_id UUID NOT NULL,
+  child_id UUID,
+  id SERIAL,
+  date TEXT NOT NULL,
+  earned INTEGER NOT NULL DEFAULT 0,
+  spent INTEGER NOT NULL DEFAULT 0,
+  balance INTEGER NOT NULL DEFAULT 0,
+  detail TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (tenant_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS homeworks (
+  tenant_id UUID NOT NULL,
+  child_id UUID,
+  date_key TEXT NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, date_key)
+);
+
+CREATE TABLE IF NOT EXISTS daily_settlement (
+  tenant_id UUID NOT NULL,
+  child_id UUID,
+  date_key TEXT NOT NULL,
+  data TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (tenant_id, date_key)
+);
+
+CREATE TABLE IF NOT EXISTS efficiency_history (
+  tenant_id UUID NOT NULL,
+  child_id UUID,
+  date_key TEXT NOT NULL,
+  data TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (tenant_id, date_key)
+);
+
+CREATE TABLE IF NOT EXISTS free_time_tasks (
+  tenant_id UUID NOT NULL,
+  child_id UUID,
+  date_key TEXT NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, date_key)
+);
+
+CREATE TABLE IF NOT EXISTS bounty_submissions (
+  tenant_id UUID NOT NULL,
+  child_id UUID,
+  date_key TEXT NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, date_key)
+);
+
+CREATE TABLE IF NOT EXISTS bounty_completions (
+  tenant_id UUID NOT NULL,
+  child_id UUID,
+  date_key TEXT NOT NULL,
+  data TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (tenant_id, date_key)
+);
+
+CREATE TABLE IF NOT EXISTS redemptions (
+  tenant_id UUID NOT NULL,
+  child_id UUID,
+  id INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS reward_box (
+  tenant_id UUID NOT NULL,
+  child_id UUID,
+  id INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS active_buffs (
+  tenant_id UUID NOT NULL,
+  child_id UUID,
+  id INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS badges (
+  tenant_id UUID NOT NULL,
+  child_id UUID,
+  id INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, id)
+);
+
+-- ==================== Shared Tables (no child_id) ====================
+
+CREATE TABLE IF NOT EXISTS shop_items (
+  tenant_id UUID NOT NULL,
+  id INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+  tenant_id UUID NOT NULL,
+  id INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (tenant_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS bounty_tasks (
+  tenant_id UUID NOT NULL,
+  id INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '[]',
+  PRIMARY KEY (tenant_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS email_config (
+  tenant_id UUID NOT NULL,
+  id INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (tenant_id, id)
+);
+
+-- ==================== Infrastructure Tables ====================
+
+CREATE TABLE IF NOT EXISTS meta (
+  tenant_id UUID,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (tenant_id, key)
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  tenant_id UUID NOT NULL,
+  id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at BIGINT NOT NULL,
+  PRIMARY KEY (tenant_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS last_modified (
+  tenant_id UUID NOT NULL,
+  table_name TEXT NOT NULL,
+  record_key TEXT NOT NULL,
+  last_modified TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, table_name, record_key)
+);
+
+CREATE TABLE IF NOT EXISTS crdt_operations (
+  tenant_id UUID NOT NULL,
+  id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  table_name TEXT NOT NULL,
+  resource_id TEXT NOT NULL,
+  field TEXT,
+  value TEXT NOT NULL,
+  timestamp TEXT NOT NULL,
+  node_id TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   PRIMARY KEY (tenant_id, id)
 );
 
@@ -85,148 +257,71 @@ CREATE TABLE IF NOT EXISTS alert_state (
   message TEXT NOT NULL DEFAULT ''
 );
 
-CREATE TABLE IF NOT EXISTS points_history (
-  tenant_id UUID NOT NULL,
-  id SERIAL,
-  date TEXT NOT NULL,
-  earned INTEGER NOT NULL DEFAULT 0,
-  spent INTEGER NOT NULL DEFAULT 0,
-  balance INTEGER NOT NULL DEFAULT 0,
-  detail TEXT NOT NULL DEFAULT '',
-  PRIMARY KEY (tenant_id, id)
-);
+-- ==================== Migration: Multi-Child Support ====================
+-- These statements handle existing databases that already have old tables.
+-- For fresh installs they are no-ops (IF NOT EXISTS).
 
-CREATE TABLE IF NOT EXISTS homeworks (
-  tenant_id UUID NOT NULL,
-  date_key TEXT NOT NULL,
-  data TEXT NOT NULL DEFAULT '[]',
-  PRIMARY KEY (tenant_id, date_key)
-);
+-- Step 1: Add child_id column to all per-child tables
+ALTER TABLE points ADD COLUMN IF NOT EXISTS child_id UUID;
+ALTER TABLE points_history ADD COLUMN IF NOT EXISTS child_id UUID;
+ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS child_id UUID;
+ALTER TABLE daily_settlement ADD COLUMN IF NOT EXISTS child_id UUID;
+ALTER TABLE efficiency_history ADD COLUMN IF NOT EXISTS child_id UUID;
+ALTER TABLE free_time_tasks ADD COLUMN IF NOT EXISTS child_id UUID;
+ALTER TABLE bounty_submissions ADD COLUMN IF NOT EXISTS child_id UUID;
+ALTER TABLE bounty_completions ADD COLUMN IF NOT EXISTS child_id UUID;
+ALTER TABLE redemptions ADD COLUMN IF NOT EXISTS child_id UUID;
+ALTER TABLE reward_box ADD COLUMN IF NOT EXISTS child_id UUID;
+ALTER TABLE active_buffs ADD COLUMN IF NOT EXISTS child_id UUID;
+ALTER TABLE badges ADD COLUMN IF NOT EXISTS child_id UUID;
 
-CREATE TABLE IF NOT EXISTS daily_settlement (
-  tenant_id UUID NOT NULL,
-  date_key TEXT NOT NULL,
-  data TEXT NOT NULL DEFAULT '{}',
-  PRIMARY KEY (tenant_id, date_key)
-);
+-- Step 2: Unique indexes with child_id will be added when adapter is updated
 
-CREATE TABLE IF NOT EXISTS shop_items (
-  tenant_id UUID NOT NULL,
-  id INTEGER NOT NULL,
-  data TEXT NOT NULL DEFAULT '[]',
-  PRIMARY KEY (tenant_id, id)
-);
+-- Replace old PKs with unique indexes (child_id allowed NULL)
+DO $$ BEGIN ALTER TABLE points DROP CONSTRAINT IF EXISTS points_pkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS points_tenant_child_id_idx ON points (tenant_id, child_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS points_tenant_null_idx ON points (tenant_id, id) WHERE child_id IS NULL;
 
-CREATE TABLE IF NOT EXISTS redemptions (
-  tenant_id UUID NOT NULL,
-  id INTEGER NOT NULL,
-  data TEXT NOT NULL DEFAULT '[]',
-  PRIMARY KEY (tenant_id, id)
-);
+DO $$ BEGIN ALTER TABLE points_history DROP CONSTRAINT IF EXISTS points_history_pkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS points_history_tenant_child_id_idx ON points_history (tenant_id, child_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS points_history_tenant_null_idx ON points_history (tenant_id, id) WHERE child_id IS NULL;
 
-CREATE TABLE IF NOT EXISTS efficiency_history (
-  tenant_id UUID NOT NULL,
-  date_key TEXT NOT NULL,
-  data TEXT NOT NULL DEFAULT '{}',
-  PRIMARY KEY (tenant_id, date_key)
-);
+DO $$ BEGIN ALTER TABLE homeworks DROP CONSTRAINT IF EXISTS homeworks_pkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS homeworks_tenant_child_date_idx ON homeworks (tenant_id, child_id, date_key);
+CREATE UNIQUE INDEX IF NOT EXISTS homeworks_tenant_null_date_idx ON homeworks (tenant_id, date_key) WHERE child_id IS NULL;
 
-CREATE TABLE IF NOT EXISTS free_time_tasks (
-  tenant_id UUID NOT NULL,
-  date_key TEXT NOT NULL,
-  data TEXT NOT NULL DEFAULT '[]',
-  PRIMARY KEY (tenant_id, date_key)
-);
+DO $$ BEGIN ALTER TABLE daily_settlement DROP CONSTRAINT IF EXISTS daily_settlement_pkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS daily_settlement_tenant_child_date_idx ON daily_settlement (tenant_id, child_id, date_key);
+CREATE UNIQUE INDEX IF NOT EXISTS daily_settlement_tenant_null_date_idx ON daily_settlement (tenant_id, date_key) WHERE child_id IS NULL;
 
-CREATE TABLE IF NOT EXISTS meta (
-  tenant_id UUID,
-  key TEXT NOT NULL,
-  value TEXT NOT NULL DEFAULT '',
-  PRIMARY KEY (tenant_id, key)
-);
+DO $$ BEGIN ALTER TABLE efficiency_history DROP CONSTRAINT IF EXISTS efficiency_history_pkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS efficiency_history_tenant_child_date_idx ON efficiency_history (tenant_id, child_id, date_key);
+CREATE UNIQUE INDEX IF NOT EXISTS efficiency_history_tenant_null_date_idx ON efficiency_history (tenant_id, date_key) WHERE child_id IS NULL;
 
-CREATE TABLE IF NOT EXISTS badges (
-  tenant_id UUID NOT NULL,
-  id INTEGER NOT NULL,
-  data TEXT NOT NULL DEFAULT '[]',
-  PRIMARY KEY (tenant_id, id)
-);
+DO $$ BEGIN ALTER TABLE free_time_tasks DROP CONSTRAINT IF EXISTS free_time_tasks_pkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS free_time_tasks_tenant_child_date_idx ON free_time_tasks (tenant_id, child_id, date_key);
+CREATE UNIQUE INDEX IF NOT EXISTS free_time_tasks_tenant_null_date_idx ON free_time_tasks (tenant_id, date_key) WHERE child_id IS NULL;
 
-CREATE TABLE IF NOT EXISTS reward_box (
-  tenant_id UUID NOT NULL,
-  id INTEGER NOT NULL,
-  data TEXT NOT NULL DEFAULT '[]',
-  PRIMARY KEY (tenant_id, id)
-);
+DO $$ BEGIN ALTER TABLE bounty_submissions DROP CONSTRAINT IF EXISTS bounty_submissions_pkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS bounty_submissions_tenant_child_date_idx ON bounty_submissions (tenant_id, child_id, date_key);
+CREATE UNIQUE INDEX IF NOT EXISTS bounty_submissions_tenant_null_date_idx ON bounty_submissions (tenant_id, date_key) WHERE child_id IS NULL;
 
-CREATE TABLE IF NOT EXISTS settings (
-  tenant_id UUID NOT NULL,
-  id INTEGER NOT NULL,
-  data TEXT NOT NULL DEFAULT '{}',
-  PRIMARY KEY (tenant_id, id)
-);
+DO $$ BEGIN ALTER TABLE bounty_completions DROP CONSTRAINT IF EXISTS bounty_completions_pkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS bounty_completions_tenant_child_date_idx ON bounty_completions (tenant_id, child_id, date_key);
+CREATE UNIQUE INDEX IF NOT EXISTS bounty_completions_tenant_null_date_idx ON bounty_completions (tenant_id, date_key) WHERE child_id IS NULL;
 
-CREATE TABLE IF NOT EXISTS active_buffs (
-  tenant_id UUID NOT NULL,
-  id INTEGER NOT NULL,
-  data TEXT NOT NULL DEFAULT '[]',
-  PRIMARY KEY (tenant_id, id)
-);
+DO $$ BEGIN ALTER TABLE redemptions DROP CONSTRAINT IF EXISTS redemptions_pkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS redemptions_tenant_child_id_idx ON redemptions (tenant_id, child_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS redemptions_tenant_null_idx ON redemptions (tenant_id, id) WHERE child_id IS NULL;
 
-CREATE TABLE IF NOT EXISTS bounty_tasks (
-  tenant_id UUID NOT NULL,
-  id INTEGER NOT NULL,
-  data TEXT NOT NULL DEFAULT '[]',
-  PRIMARY KEY (tenant_id, id)
-);
+DO $$ BEGIN ALTER TABLE reward_box DROP CONSTRAINT IF EXISTS reward_box_pkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS reward_box_tenant_child_id_idx ON reward_box (tenant_id, child_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS reward_box_tenant_null_idx ON reward_box (tenant_id, id) WHERE child_id IS NULL;
 
-CREATE TABLE IF NOT EXISTS email_config (
-  tenant_id UUID NOT NULL,
-  id INTEGER NOT NULL,
-  data TEXT NOT NULL DEFAULT '{}',
-  PRIMARY KEY (tenant_id, id)
-);
+DO $$ BEGIN ALTER TABLE active_buffs DROP CONSTRAINT IF EXISTS active_buffs_pkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS active_buffs_tenant_child_id_idx ON active_buffs (tenant_id, child_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS active_buffs_tenant_null_idx ON active_buffs (tenant_id, id) WHERE child_id IS NULL;
 
-CREATE TABLE IF NOT EXISTS bounty_submissions (
-  tenant_id UUID NOT NULL,
-  date_key TEXT NOT NULL,
-  data TEXT NOT NULL DEFAULT '[]',
-  PRIMARY KEY (tenant_id, date_key)
-);
-
-CREATE TABLE IF NOT EXISTS bounty_completions (
-  tenant_id UUID NOT NULL,
-  date_key TEXT NOT NULL,
-  data TEXT NOT NULL DEFAULT '{}',
-  PRIMARY KEY (tenant_id, date_key)
-);
-
-CREATE TABLE IF NOT EXISTS notifications (
-  tenant_id UUID NOT NULL,
-  id TEXT NOT NULL,
-  text TEXT NOT NULL,
-  created_at BIGINT NOT NULL,
-  PRIMARY KEY (tenant_id, id)
-);
-
-CREATE TABLE IF NOT EXISTS last_modified (
-  tenant_id UUID NOT NULL,
-  table_name TEXT NOT NULL,
-  record_key TEXT NOT NULL,
-  last_modified TEXT NOT NULL,
-  PRIMARY KEY (tenant_id, table_name, record_key)
-);
-
-CREATE TABLE IF NOT EXISTS crdt_operations (
-  tenant_id UUID NOT NULL,
-  id TEXT NOT NULL,
-  type TEXT NOT NULL,
-  table_name TEXT NOT NULL,
-  resource_id TEXT NOT NULL,
-  field TEXT,
-  value TEXT NOT NULL,
-  timestamp TEXT NOT NULL,
-  node_id TEXT NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (tenant_id, id)
-);
+DO $$ BEGIN ALTER TABLE badges DROP CONSTRAINT IF EXISTS badges_pkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS badges_tenant_child_id_idx ON badges (tenant_id, child_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS badges_tenant_null_idx ON badges (tenant_id, id) WHERE child_id IS NULL;
