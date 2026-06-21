@@ -3,6 +3,7 @@ import { Home, Users } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { useToast } from './Toast';
 import LoadingSpinner from './LoadingSpinner';
+import { formatLocalTime } from '../lib/format';
 
 interface Tenant {
   id: string;
@@ -113,7 +114,7 @@ export default function TenantTable() {
                 </span>
               </td>
               <td className="text-sm text-[var(--color-ink-500)]">
-                {t.created_at || <span className="text-[var(--color-ink-400)]">-</span>}
+                {t.created_at ? formatLocalTime(t.created_at) : <span className="text-[var(--color-ink-400)]">-</span>}
               </td>
               <td className="text-right">
                 {t.is_active ? (

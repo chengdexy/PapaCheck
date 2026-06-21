@@ -4,6 +4,7 @@ import { useApi } from '../hooks/useApi';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from './Toast';
 import LoadingSpinner from './LoadingSpinner';
+import { formatLocalTime } from '../lib/format';
 
 interface Member {
   id: string;
@@ -137,7 +138,7 @@ export default function MemberTable({ refreshKey }: { refreshKey: number }) {
                   )}
                 </td>
                 <td className="text-sm text-[var(--color-ink-500)]">
-                  {m.last_login || <span className="text-[var(--color-ink-400)]">从未</span>}
+                  {m.last_login ? formatLocalTime(m.last_login) : <span className="text-[var(--color-ink-400)]">从未</span>}
                 </td>
                 <td className="text-right">
                   {m.id !== userId ? (

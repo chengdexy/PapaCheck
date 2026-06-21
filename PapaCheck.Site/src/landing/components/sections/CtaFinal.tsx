@@ -1,4 +1,4 @@
-import { Download, MonitorPlay, Heart, Check } from 'lucide-react';
+import { Download, UserPlus, Heart, Check } from 'lucide-react';
 import Mascot from '../Mascot';
 
 export default function CtaFinal() {
@@ -24,13 +24,13 @@ export default function CtaFinal() {
               </p>
 
               <div className="mt-7 flex flex-wrap items-center gap-3">
-                <a href="#download-android" className="cta-primary">
+                <a href="/api/download" className="cta-primary">
                   <Download className="w-5 h-5" />
                   免费下载 Android
                 </a>
-                <a href="#try-online" className="cta-secondary">
-                  <MonitorPlay className="w-5 h-5" />
-                  在线试用
+                <a href="https://papacheck.chengdexy.cn/admin/?tab=register" className="cta-secondary">
+                  <UserPlus className="w-5 h-5" />
+                  注册家庭账号
                 </a>
               </div>
 

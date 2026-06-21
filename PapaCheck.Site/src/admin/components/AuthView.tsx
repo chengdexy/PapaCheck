@@ -3,7 +3,10 @@ import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
 
 export default function AuthView() {
-  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tab') === 'register' ? 'register' : 'login';
+  });
 
   return (
     <div className="min-h-[calc(100vh-2rem)] flex items-center justify-center px-4 py-10">

@@ -18,7 +18,7 @@ export default function Footer() {
               管理面板
             </a>
             <a
-              href="https://github.com/"
+              href="https://github.com/chengdexy/PapaCheck"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 hover:text-brand-600 transition-colors"
