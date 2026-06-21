@@ -26,6 +26,7 @@ let _calendarYear = null;
 let _calendarMonth = null;
 var _children = [];
 var _currentChildId = null;
+var _loadingChildren = false;
 
 const SETTINGS_DEFAULTS = {
   dailyBasePoints: 50,
@@ -125,30 +126,37 @@ const AdminUtil = {
 };
 
 async function loadChildren() {
+  // 防止重入（避免 refreshAllData → loadChildren → refreshAllData 无限递归）
+  if (_loadingChildren) return;
+  _loadingChildren = true;
   try {
-    var resp = await API._fetch('/api/admin/members', 'GET');
-    if (resp && Array.isArray(resp)) {
-      _children = resp.filter(function (m) { return m.role === 'child' && m.child_id; });
-    }
-  } catch (e) {
-    _children = [];
-  }
-  _renderChildSelector();
-  if (_children.length > 0 && !_currentChildId) {
-    // 从 localStorage 恢复上次选中的孩子
     try {
-      var lastChildId = localStorage.getItem('papacheck_last_child_id');
-      if (lastChildId && _children.find(function (c) { return c.child_id === lastChildId; })) {
-        _currentChildId = lastChildId;
-      } else {
-        _currentChildId = _children[0].child_id;
+      var resp = await API._fetch('/api/admin/members', 'GET');
+      if (resp && Array.isArray(resp)) {
+        _children = resp.filter(function (m) { return m.role === 'child' && m.child_id; });
       }
-      window._currentChildId = _currentChildId;
-    } catch (e2) { /* 非致命 */ }
-  }
-  if (_currentChildId) {
-    await refreshAllData();
-    renderCurrentTab();
+    } catch (e) {
+      _children = [];
+    }
+    _renderChildSelector();
+    if (_children.length > 0 && !_currentChildId) {
+      // 从 localStorage 恢复上次选中的孩子
+      try {
+        var lastChildId = localStorage.getItem('papacheck_last_child_id');
+        if (lastChildId && _children.find(function (c) { return c.child_id === lastChildId; })) {
+          _currentChildId = lastChildId;
+        } else {
+          _currentChildId = _children[0].child_id;
+        }
+        window._currentChildId = _currentChildId;
+      } catch (e2) { /* 非致命 */ }
+    }
+    if (_currentChildId) {
+      await refreshAllData();
+      renderCurrentTab();
+    }
+  } finally {
+    _loadingChildren = false;
   }
 }
 
@@ -253,6 +261,12 @@ async function refreshAllData() {
   var mode = ConnectionManager.getMode();
 
   if (mode === 'reconnecting') return;
+
+  // 修复：从离线恢复到在线后，重新加载孩子列表并恢复上次选中的孩子
+  if (mode === 'online' && (!_children || _children.length === 0)) {
+    await loadChildren();
+    return; // loadChildren 内部已调用 refreshAllData + renderCurrentTab
+  }
 
   if (mode === 'online') {
     try {

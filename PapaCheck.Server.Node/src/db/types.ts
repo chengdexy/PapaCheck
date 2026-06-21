@@ -324,6 +324,7 @@ export interface IDatabase {
   updateUserCredentials(userId: string, email: string, passwordHash: string): Promise<void>;
   getAllTenants(): Promise<TenantListItem[]>;
   setTenantActive(tenantId: string, isActive: boolean): Promise<void>;
+  createTenant(id: string, name: string): Promise<void>;
   createAccessCode(input: CreateAccessCodeInput): Promise<string>;
   getAccessCodesByUser(userId: string): Promise<AccessCodeRecord[]>;
   findAccessCodeByCode(code: string): Promise<AccessCodeRecord | null>;

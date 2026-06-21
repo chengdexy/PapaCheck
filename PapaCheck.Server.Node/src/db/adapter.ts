@@ -155,6 +155,7 @@ export abstract class DatabaseAdapter implements IDatabase {
   // Tenants
   abstract getAllTenants(): Promise<TenantListItem[]>;
   abstract setTenantActive(tenantId: string, isActive: boolean): Promise<void>;
+  abstract createTenant(id: string, name: string): Promise<void>;
 
   // Access Codes
   abstract createAccessCode(input: CreateAccessCodeInput): Promise<string>;

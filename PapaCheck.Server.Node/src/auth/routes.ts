@@ -228,10 +228,7 @@ export async function authRoutes(app: FastifyInstance, db: IDatabase): Promise<v
     });
 
     // Create tenant record
-    await (db as any).pool.query(
-      "INSERT INTO tenants (id, name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING",
-      [userId, family_name]
-    );
+    await db.createTenant(userId, family_name);
 
     const token = signToken({
       sub: userId,
