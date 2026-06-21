@@ -4,6 +4,8 @@
  */
 var SyncEngine = (function() {
   var _syncInProgress = false;
+  var _syncStartedAt = 0;
+  var _SYNC_LOCK_TIMEOUT = 15000;
   var _lastSyncTime = null;
   var _baseUrl = '';
 
@@ -15,204 +17,6 @@ var SyncEngine = (function() {
       _baseUrl = window.location.origin;
     }
     return _baseUrl;
-  }
-
-  async function pushChanges() {
-    var pending = await ChangeLog.getPending();
-    if (pending.length === 0) return 0;
-
-    var maxPushedId = pending[pending.length - 1].id;
-
-    var url = _getBaseUrl() + '/api/sync/push';
-    var resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ changes: pending })
-    });
-    if (!resp.ok) throw new Error('Push failed: ' + resp.status);
-    var result = await resp.json();
-    if (result.ok !== true) throw new Error('Push response not ok');
-    return maxPushedId;
-  }
-
-  async function pullChanges(lastSync) {
-    var ts = lastSync || _lastSyncTime || '1970-01-01T00:00:00.000Z';
-    var url = _getBaseUrl() + '/api/sync/pull?lastSync=' + encodeURIComponent(ts);
-
-    for (var attempt = 0; attempt < 3; attempt++) {
-      try {
-        var resp = await fetch(url, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        if (!resp.ok) throw new Error('Pull failed: ' + resp.status);
-        var result = await resp.json();
-
-        var remoteChanges = result.changes || [];
-        var serverTime = result.serverTime;
-
-        if (remoteChanges.length > 0) {
-          await _applyRemoteChanges(remoteChanges);
-        }
-
-        return serverTime;
-      } catch (e) {
-        if (attempt === 2) throw e;
-        await new Promise(function(r) { setTimeout(r, 1000); });
-      }
-    }
-  }
-
-  async function _applyRemoteChanges(changes) {
-    var localData = await DB.getFullData();
-
-    for (var i = 0; i < changes.length; i++) {
-      var change = changes[i];
-      var tableName = change.table_name;
-      var recordKey = change.record_key;
-      var remoteData = change.data;
-      var remoteTime = change.last_modified;
-
-      _mergeIntoLocal(localData, tableName, recordKey, remoteData, remoteTime);
-    }
-
-    await DB.cacheFullData(localData);
-  }
-
-  function _mergeIntoLocal(localData, tableName, recordKey, remoteData, remoteTime) {
-    if (tableName === 'homeworks') {
-      _mergeArrayByUuid(localData, 'homeworks', recordKey, remoteData, remoteTime);
-    } else if (tableName === 'free_time_tasks') {
-      _mergeArrayByUuid(localData, 'freeTimeTasks', recordKey, remoteData, remoteTime);
-    } else if (tableName === 'bounty_submissions') {
-      _mergeArrayByUuid(localData, 'bountySubmissions', recordKey, remoteData, remoteTime);
-    } else if (tableName === 'bounty_completions') {
-      if (!localData.bountyCompletions) localData.bountyCompletions = {};
-      localData.bountyCompletions[recordKey] = remoteData;
-    } else if (tableName === 'daily_settlement') {
-      if (!localData.dailySettlement) localData.dailySettlement = {};
-      _mergeByUuidOrReplace(localData.dailySettlement, recordKey, remoteData, remoteTime);
-    } else if (tableName === 'efficiency_history') {
-      if (!localData.efficiencyHistory) localData.efficiencyHistory = {};
-      localData.efficiencyHistory[recordKey] = remoteData;
-    } else if (tableName === 'shop_items') {
-      _mergeArrayByUuid(localData, 'shopItems', null, remoteData, remoteTime);
-    } else if (tableName === 'redemptions') {
-      _mergeArrayByUuid(localData, 'redemptions', null, remoteData, remoteTime);
-    } else if (tableName === 'reward_box') {
-      _mergeArrayByUuid(localData, 'rewardBox', null, remoteData, remoteTime);
-    } else if (tableName === 'active_buffs') {
-      _mergeArrayByUuid(localData, 'activeBuffs', null, remoteData, remoteTime);
-    } else if (tableName === 'bounty_tasks') {
-      _mergeArrayByUuid(localData, 'bountyTasks', null, remoteData, remoteTime);
-    } else if (tableName === 'settings') {
-      localData.settings = remoteData;
-    } else if (tableName === 'badges') {
-      localData.badges = remoteData;
-    } else if (tableName === 'points') {
-      localData.points = remoteData;
-    }
-  }
-
-  function _mergeByUuidOrReplace(targetObj, key, remoteData, remoteTime) {
-    var localVal = targetObj[key];
-    if (!localVal) {
-      targetObj[key] = remoteData;
-      return;
-    }
-    var localTime = localVal.lastModified || '1970-01-01T00:00:00.000Z';
-    if (remoteTime >= localTime) {
-      targetObj[key] = remoteData;
-    }
-  }
-
-  function _mergeArrayByUuid(localData, localKey, recordKey, remoteData, remoteTime) {
-    if (!localData[localKey]) localData[localKey] = {};
-
-    var localArray;
-    if (recordKey) {
-      if (!localData[localKey][recordKey]) localData[localKey][recordKey] = [];
-      localArray = localData[localKey][recordKey];
-    } else {
-      localArray = localData[localKey];
-      if (!Array.isArray(localArray)) localArray = [];
-    }
-
-    if (!Array.isArray(remoteData)) {
-      _mergeSingleItemIntoArray(localArray, remoteData, remoteTime);
-    } else {
-      for (var i = 0; i < remoteData.length; i++) {
-        _mergeSingleItemIntoArray(localArray, remoteData[i], remoteTime);
-      }
-    }
-
-    if (!recordKey) {
-      localData[localKey] = localArray;
-    }
-  }
-
-  function _mergeSingleItemIntoArray(localArray, remoteItem, remoteTime) {
-    if (!remoteItem || (!remoteItem.uuid && !remoteItem.id)) {
-      localArray.push(remoteItem);
-      return;
-    }
-
-    var matchId = remoteItem.uuid || remoteItem.id;
-    var existingIdx = -1;
-    for (var i = 0; i < localArray.length; i++) {
-      if (localArray[i].uuid === matchId || localArray[i].id === matchId) {
-        existingIdx = i;
-        break;
-      }
-    }
-
-    if (existingIdx === -1) {
-      localArray.push(remoteItem);
-    } else {
-      var localTime = localArray[existingIdx].lastModified || '1970-01-01T00:00:00.000Z';
-      if (remoteTime >= localTime) {
-        localArray[existingIdx] = remoteItem;
-      }
-    }
-  }
-
-  async function fullSync() {
-    if (_syncInProgress) return false;
-    _syncInProgress = true;
-
-    try {
-      var maxPushedId = await pushChanges();
-
-      var serverTime = await pullChanges(_lastSyncTime);
-
-      if (maxPushedId > 0) {
-        await ChangeLog.clearUpTo(maxPushedId);
-      }
-
-      _lastSyncTime = serverTime || new Date().toISOString();
-      await _saveLastSyncTime(_lastSyncTime);
-
-      try {
-        var url = _getBaseUrl() + '/api/data';
-        var resp = await fetch(url, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        if (resp.ok) {
-          var serverData = await resp.json();
-          await DB.cacheFullData(serverData);
-        }
-      } catch (e) {
-        // Server data fetch is best-effort after sync
-      }
-
-      return true;
-    } catch (e) {
-      console.error('Sync failed:', e);
-      return false;
-    } finally {
-      _syncInProgress = false;
-    }
   }
 
   async function getLastSyncTime() {
@@ -265,35 +69,9 @@ var SyncEngine = (function() {
     return result.ok === true;
   }
 
-  // CRDT 同步 - 拉取远程操作并在本地合并
+  // CRDT 同步 - 简化后仅全量拉取（删除前端 CRDT 合并空壳）
   async function crdtPull() {
-    var lastSync = await getLastSyncTime() || '1970-01-01T00:00:00.000Z';
-    var url = _getBaseUrl() + '/api/sync/crdt-pull?since=' + encodeURIComponent(lastSync);
-
-    var resp = await fetch(url, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    if (!resp.ok) throw new Error('CRDT pull failed: ' + resp.status);
-    var result = await resp.json();
-
-    var operations = result.operations || [];
-    if (operations.length === 0) {
-      // 无远程变更时仍刷新全量数据
-      await _refreshFromServer();
-      return true;
-    }
-
-    // 在本地 IndexedDB 中应用远程操作
-    var localData = await DB.getFullData();
-    for (var i = 0; i < operations.length; i++) {
-      var op = operations[i];
-      // 根据操作类型更新本地数据
-      // applyOperation 在服务端已执行，这里只需重新读取全量数据
-    }
-    // 重新拉取全量数据（后续可优化为增量应用）
     await _refreshFromServer();
-
     return true;
   }
 
@@ -314,8 +92,18 @@ var SyncEngine = (function() {
 
   // CRDT 全量同步（替代旧的 fullSync）
   async function crdtFullSync() {
-    if (_syncInProgress) return false;
+    // 超时强制释放：防止 Android WebView 锁屏后 fetch 挂起导致死锁
+    if (_syncInProgress) {
+      if (Date.now() - _syncStartedAt > _SYNC_LOCK_TIMEOUT) {
+        console.warn('[SyncEngine] 锁超时，强制释放');
+        _syncInProgress = false;
+      } else {
+        return false;
+      }
+    }
     _syncInProgress = true;
+    var startedAt = Date.now();
+    _syncStartedAt = startedAt;
 
     try {
       // 1. 推送本地操作日志
@@ -330,18 +118,27 @@ var SyncEngine = (function() {
       console.error('CRDT sync failed:', e);
       return false;
     } finally {
+      // 仅在当前调用仍持有锁时释放，防止超时后被其他调用获取的锁被误释放
+      if (_syncStartedAt === startedAt) {
+        _syncInProgress = false;
+      }
+    }
+  }
+
+  // 新增：供 connection.js 在 timeout 分支后主动调用
+  function forceReleaseLock() {
+    if (_syncInProgress) {
+      console.warn('[SyncEngine] 外部强制释放锁');
       _syncInProgress = false;
     }
   }
 
   return {
-    pushChanges: pushChanges,
-    pullChanges: pullChanges,
-    fullSync: fullSync,
     crdtPush: crdtPush,
     crdtPull: crdtPull,
     crdtFullSync: crdtFullSync,
     getLastSyncTime: getLastSyncTime,
     isSyncing: isSyncing,
+    forceReleaseLock: forceReleaseLock,
   };
 })();

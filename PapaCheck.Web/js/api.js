@@ -1114,4 +1114,38 @@ const API = {
       { allowFallback: true }
     );
   },
+
+  // ========== 乐观写入（Phase 1） ==========
+
+  /**
+   * 乐观更新：立即更新内存 UI，异步上报，失败回滚
+   */
+  optimisticWrite: async function (operation, applyToLocal, rollback) {
+    applyToLocal();
+    try {
+      await this.pushOperation(operation);
+    } catch (e) {
+      rollback();
+      if (typeof showToast === 'function') {
+        showToast('操作未保存，请检查网络');
+      }
+    }
+  },
+
+  /**
+   * 异步上报写操作
+   */
+  pushOperation: async function (operation) {
+    if (window.PapaCheckBridge && window.PapaCheckBridge.enqueue) {
+      window.PapaCheckBridge.enqueue(JSON.stringify(operation));
+      return { ok: true, queued: true };
+    }
+    var resp = await fetch('/api/sync/write', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(operation)
+    });
+    if (!resp.ok) throw new Error('Write failed: ' + resp.status);
+    return resp.json();
+  },
 };

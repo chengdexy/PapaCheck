@@ -9,19 +9,8 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "build": "tsc",
-    "build:sea": "node scripts/build-sea.mjs",
     "test": "vitest run --config ../vitest.config.js",
-    "test:watch": "vitest",
-    "migrate:pg": "npx tsx scripts/migrate-to-pg.ts"
-  },
-  "pkg": {
-    "assets": [
-      "dist/scripts/**/*",
-      "node_modules/better-sqlite3/**/*"
-    ],
-    "targets": [
-      "node18-win-x64"
-    ]
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@fastify/cookie": "^9.4.0",
@@ -30,7 +19,6 @@
     "@fastify/swagger": "^8.15.0",
     "@fastify/swagger-ui": "^3.0.0",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^11.7.0",
     "fastify": "^4.28.0",
     "imap": "^0.8.19",
     "jsonwebtoken": "^9.0.3",
@@ -42,7 +30,6 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/better-sqlite3": "^7.6.12",
     "@types/imap": "^0.8.43",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/mailparser": "^3.4.6",

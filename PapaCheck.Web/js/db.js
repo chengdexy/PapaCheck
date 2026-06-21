@@ -98,6 +98,10 @@ var DB = {
     return await this._load();
   },
 
+  getCachedData: function () {
+    return this._data;
+  },
+
   cacheFullData: async function (fullData) {
     _ensureAllSyncFields(fullData);
     this._data = fullData;
@@ -112,31 +116,11 @@ var DB = {
   saveHomeworks: async function (dateKey, list) {
     var data = await this._load();
     if (!data.homeworks) data.homeworks = {};
-    var oldList = (data.homeworks[dateKey] || []).slice();
     if (list && list.length > 0) {
       list.forEach(ensureSyncFields);
     }
     data.homeworks[dateKey] = list;
-    await this._save();
-    if (list && list.length > 0) {
-      for (var i = 0; i < list.length; i++) {
-        var logItem = JSON.parse(JSON.stringify(list[i]));
-        logItem.date = dateKey;
-        await ChangeLog.add('update', list[i].uuid, logItem);
-      }
-    }
-    var newIds = new Set((list || []).map(function(item) { return item.uuid || item.id; }));
-    for (var j = 0; j < oldList.length; j++) {
-      var oldItem = oldList[j];
-      var oldId = oldItem.uuid || oldItem.id;
-      if (oldId && !newIds.has(oldId)) {
-        var delItem = JSON.parse(JSON.stringify(oldItem));
-        delItem.isDeleted = true;
-        delItem.lastModified = new Date().toISOString();
-        delItem.date = dateKey;
-        await ChangeLog.add('delete', oldItem.uuid || oldItem.id, delItem);
-      }
-    }
+    // 只更新内存，不写 IndexedDB（只读缓存模式）
   },
 
   getFreeTime: async function (dateKey) {
@@ -147,31 +131,10 @@ var DB = {
   saveFreeTime: async function (dateKey, list) {
     var data = await this._load();
     if (!data.freeTimeTasks) data.freeTimeTasks = {};
-    var oldList = (data.freeTimeTasks[dateKey] || []).slice();
     if (list && list.length > 0) {
       list.forEach(ensureSyncFields);
     }
     data.freeTimeTasks[dateKey] = list;
-    await this._save();
-    if (list && list.length > 0) {
-      for (var i = 0; i < list.length; i++) {
-        var logItem2 = JSON.parse(JSON.stringify(list[i]));
-        logItem2.date = dateKey;
-        await ChangeLog.add('update', list[i].uuid, logItem2);
-      }
-    }
-    var newIds2 = new Set((list || []).map(function(item) { return item.uuid || item.id; }));
-    for (var k = 0; k < oldList.length; k++) {
-      var oldItem2 = oldList[k];
-      var oldId2 = oldItem2.uuid || oldItem2.id;
-      if (oldId2 && !newIds2.has(oldId2)) {
-        var delItem2 = JSON.parse(JSON.stringify(oldItem2));
-        delItem2.isDeleted = true;
-        delItem2.lastModified = new Date().toISOString();
-        delItem2.date = dateKey;
-        await ChangeLog.add('delete', oldItem2.uuid || oldItem2.id, delItem2);
-      }
-    }
   },
 
   getSettlement: async function (dateKey) {
@@ -186,12 +149,6 @@ var DB = {
       ensureSyncFields(settlementData);
     }
     data.dailySettlement[dateKey] = settlementData;
-    await this._save();
-    if (settlementData) {
-      var logItem = JSON.parse(JSON.stringify(settlementData));
-      logItem.date = dateKey;
-      await ChangeLog.add('update', settlementData.uuid, logItem);
-    }
   },
 
   getShopItems: async function () {
@@ -205,12 +162,6 @@ var DB = {
       items.forEach(ensureSyncFields);
     }
     data.shopItems = items;
-    await this._save();
-    if (items && items.length > 0) {
-      for (var i = 0; i < items.length; i++) {
-        await ChangeLog.add('update', items[i].uuid, items[i]);
-      }
-    }
   },
 
   getRedemptions: async function () {
@@ -224,12 +175,6 @@ var DB = {
       items.forEach(ensureSyncFields);
     }
     data.redemptions = items;
-    await this._save();
-    if (items && items.length > 0) {
-      for (var i = 0; i < items.length; i++) {
-        await ChangeLog.add('update', items[i].uuid, items[i]);
-      }
-    }
   },
 
   getRewardBox: async function () {
@@ -243,12 +188,6 @@ var DB = {
       items.forEach(ensureSyncFields);
     }
     data.rewardBox = items;
-    await this._save();
-    if (items && items.length > 0) {
-      for (var i = 0; i < items.length; i++) {
-        await ChangeLog.add('update', items[i].uuid, items[i]);
-      }
-    }
   },
 
   getSettings: async function () {
@@ -262,10 +201,6 @@ var DB = {
       ensureSyncFields(settings);
     }
     data.settings = settings;
-    await this._save();
-    if (settings) {
-      await ChangeLog.add('update', settings.uuid, settings);
-    }
   },
 
   getActiveBuffs: async function () {
@@ -279,12 +214,6 @@ var DB = {
       buffs.forEach(ensureSyncFields);
     }
     data.activeBuffs = buffs;
-    await this._save();
-    if (buffs && buffs.length > 0) {
-      for (var i = 0; i < buffs.length; i++) {
-        await ChangeLog.add('update', buffs[i].uuid, buffs[i]);
-      }
-    }
   },
 
   getBountyTasks: async function () {
@@ -298,12 +227,6 @@ var DB = {
       items.forEach(ensureSyncFields);
     }
     data.bountyTasks = items;
-    await this._save();
-    if (items && items.length > 0) {
-      for (var i = 0; i < items.length; i++) {
-        await ChangeLog.add('update', items[i].uuid, items[i]);
-      }
-    }
   },
 
   getBountySubmissions: async function (dateKey) {
@@ -314,36 +237,14 @@ var DB = {
   saveBountySubmissions: async function (dateKey, list) {
     var data = await this._load();
     if (!data.bountySubmissions) data.bountySubmissions = {};
-    var oldList = (data.bountySubmissions[dateKey] || []).slice();
-    if (oldList.length === 0 && typeof cachedData !== 'undefined' && cachedData && cachedData.bountySubmissions && cachedData.bountySubmissions[dateKey]) {
+    var currentList = data.bountySubmissions[dateKey];
+    if ((!currentList || currentList.length === 0) && typeof cachedData !== 'undefined' && cachedData && cachedData.bountySubmissions && cachedData.bountySubmissions[dateKey]) {
       data.bountySubmissions[dateKey] = JSON.parse(JSON.stringify(cachedData.bountySubmissions[dateKey]));
-      oldList = data.bountySubmissions[dateKey].slice();
     }
     if (list && list.length > 0) {
       list.forEach(ensureSyncFields);
     }
     data.bountySubmissions[dateKey] = list;
-    await this._save();
-    if (list && list.length > 0) {
-      for (var i = 0; i < list.length; i++) {
-        var logItem = JSON.parse(JSON.stringify(list[i]));
-        logItem.date = dateKey;
-        await ChangeLog.add('update', list[i].uuid, logItem);
-      }
-    }
-    var newIds = new Set((list || []).map(function(item) { return item.uuid || item.id; }));
-    var pending = await ChangeLog.count();
-    for (var j = 0; j < oldList.length; j++) {
-      var oldItem = oldList[j];
-      var oldId = oldItem.uuid || oldItem.id;
-      if (oldId && !newIds.has(oldId)) {
-        var delItem = JSON.parse(JSON.stringify(oldItem));
-        delItem.isDeleted = true;
-        delItem.lastModified = new Date().toISOString();
-        delItem.date = dateKey;
-        await ChangeLog.add('delete', oldItem.uuid || oldItem.id, delItem);
-      }
-    }
   },
 
   getBountyCompletions: async function (dateKey) {
@@ -367,16 +268,6 @@ var DB = {
       }
     }
     data.bountyCompletions[dateKey] = completionData;
-    await this._save();
-    if (completionData) {
-      var logItem = JSON.parse(JSON.stringify(completionData));
-      if (Array.isArray(logItem)) {
-        logItem = logItem[0] || {};
-      }
-      logItem.date = dateKey;
-      logItem._table = 'bounty_completions';
-      await ChangeLog.add('update', completionData.uuid, logItem);
-    }
   },
 
   getEfficiency: async function (dateKey) {
@@ -391,10 +282,6 @@ var DB = {
       ensureSyncFields(efficiencyData);
     }
     data.efficiencyHistory[dateKey] = efficiencyData;
-    await this._save();
-    if (efficiencyData) {
-      await ChangeLog.add('update', efficiencyData.uuid, efficiencyData);
-    }
   },
 
   getPoints: async function () {
@@ -411,10 +298,6 @@ var DB = {
       ensureSyncFields(pointsData);
     }
     data.points = pointsData;
-    await this._save();
-    if (pointsData) {
-      await ChangeLog.add('update', pointsData.uuid, pointsData);
-    }
   },
 };
 

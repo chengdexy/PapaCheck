@@ -295,6 +295,7 @@ export interface IDatabase {
   recordModification(tableName: string, recordKey: string, timestamp: string, tenantId?: string): Promise<void>;
   resetDate(dateKey: string, tenantId?: string): Promise<void>;
   saveCRDTOperation(op: CRDTOperation, tenantId?: string): Promise<void>;
+  hasCRDTOperation(id: string, tenantId?: string): Promise<boolean>;
   applyCRDTOperation(op: CRDTOperation, tenantId?: string): Promise<void>;
   getCRDTOperationsSince(timestamp: string, tenantId?: string): Promise<CRDTOperation[]>;
   ackCRDTOperations(timestamp: string, tenantId?: string): Promise<void>;

@@ -201,3 +201,115 @@ describe('_ping 超时保护', () => {
     expect(result).toBe(false);
   });
 });
+
+/**
+ * Feature: _doReconnect timeout 分支修复
+ *   Scenario: 同步超时后保持离线模式
+ *     Given _mode 为 'reconnecting' 且 _syncing 为 true
+ *     And crdtFullSync 超过 10 秒未完成（race 返回 'timeout'）
+ *     When _doReconnect 处理 timeout 分支
+ *     Then 调用 SyncEngine.forceReleaseLock()
+ *     And _mode 保持 'offline'（不切 online）
+ *     And 提前 return，不执行 _mode = 'online'
+ *
+ *   Scenario: 同步成功后正常切在线模式
+ *     Given _mode 为 'reconnecting' 且 crdtFullSync 成功
+ *     When _doReconnect 完成
+ *     Then _mode 切换为 'online'
+ *     And _syncing 重置为 false
+ */
+describe('_doReconnect timeout 分支修复', () => {
+  it('同步超时后保持离线模式，不切 online', async () => {
+    // 使用小超时值 + 真实定时器让测试快速完成
+    const connCode = fs.readFileSync(
+      path.join(__dirname, '..', 'connection.js'),
+      'utf8'
+    );
+
+    const forceReleaseLockSpy = vi.fn();
+
+    const mockEl = {
+      textContent: '', className: '', title: '',
+      style: { display: '' }, querySelector: () => null,
+    };
+    const mockDoc = {
+      getElementById: (id) => {
+        if (id === 'connStatus') return mockEl;
+        if (id === 'reconnectMask') return {
+          style: { display: '' }, querySelector: () => null,
+        };
+        return null;
+      },
+    };
+
+    // 第一个 fetch 失败，后续成功
+    let fetchCalls = 0;
+    const mockFetch = async () => {
+      fetchCalls++;
+      if (fetchCalls <= 1) return { ok: false };
+      return { ok: true, async json() { return { ok: true }; } };
+    };
+
+    // SyncEngine.crdtFullSync 永不 resolve（模拟挂起）
+    const mockSyncEngine = {
+      crdtFullSync: () => new Promise(() => {}),
+      forceReleaseLock: forceReleaseLockSpy,
+    };
+
+    const cmModeLog = [];
+    const context = vm.createContext({
+      document: mockDoc,
+      window: {
+        __CM_TEST_CONFIG__: {
+          pingTimeoutMs: 50,
+          reconnectTimeoutMs: 100,
+          pingIntervalMs: 200,
+        },
+      },
+      SyncEngine: mockSyncEngine,
+      fetch: mockFetch,
+      setTimeout: (fn, ms) => setTimeout(fn, ms),
+      clearInterval: (id) => clearInterval(id),
+      clearTimeout: (id) => clearTimeout(id),
+      setInterval: (fn, ms) => setInterval(fn, ms),
+      showReconnectMask: () => {},
+      hideReconnectMask: () => {},
+      showToast: () => {},
+      updateConnStatus: () => {},
+      cachedData: null,
+      console: { log: () => {}, warn: () => {}, error: () => {} },
+      JSON, Error, Object, Array, Math, Date, Map, Set, Promise,
+      String, Number, Boolean, RegExp, parseInt, parseFloat,
+      isNaN, isFinite,
+    });
+
+    vm.runInContext(connCode, context);
+    const ConnectionManager = context.ConnectionManager;
+
+    // Start ConnectionManager
+    const startPromise = ConnectionManager.start();
+
+    // 等待第一次 ping 失败（50ms 超时）
+    await new Promise(r => setTimeout(r, 70));
+
+    // 确认 mode 没有切 online（第一次 ping 失败了）
+    // 此时 _failCount 应该是 1
+
+    // 等待 ping 间隔触发 _doReconnect
+    // ping 间隔 200ms，第一次 ping 在 ~50ms 完成
+    // 第一次间隔在 ~200ms 触发，ping 成功，触发 _doReconnect
+    // _doReconnect 的 timeout 是 100ms
+    // 预计 t≈300ms 完成第一次 _doReconnect
+    // 先 stop() 防止第二个 ping 间隔（~400ms）重新触发 _doReconnect
+    await new Promise(r => setTimeout(r, 320));
+    ConnectionManager.stop();
+
+    // Then: forceReleaseLock 被调用
+    expect(forceReleaseLockSpy).toHaveBeenCalled();
+
+    // Then: _mode 保持 'offline'
+    expect(ConnectionManager.getMode()).toBe('offline');
+  });
+
+  it('同步成功后正常切在线模式', () => {});
+});

@@ -62,6 +62,9 @@ class BatteryMonitor {
   static const _pollInterval = Duration(seconds: 30);
   static const _startupDelay = Duration(seconds: 3);
 
+  // MethodChannel 名称，与 Kotlin 端 QueueBridge 的 CHANNEL 常量一致
+  static const _queueChannel = MethodChannel('com.example.papacheck_android/queue');
+
   final Battery _battery = Battery();
   Timer? _pollTimer;
   StreamSubscription<BatteryState>? _stateSubscription;
@@ -352,6 +355,12 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.white)
+      ..addJavaScriptChannel(
+        'PapaCheckBridge',
+        onMessageReceived: (message) {
+          _handleBridgeMessage(message.message);
+        },
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onWebResourceError: (error) {
@@ -367,6 +376,34 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
 
     _controller!.loadRequest(Uri.parse(url));
     _waitForPageReady();
+  }
+
+  void _handleBridgeMessage(String jsonMessage) {
+    try {
+      final data = jsonDecode(jsonMessage) as Map<String, dynamic>;
+      final type = data['type'] as String?;
+      if (type == 'auth_token') {
+        final token = data['token'] as String?;
+        final role = data['role'] as String?;
+        final baseUrl = data['baseUrl'] as String?;
+        if (token != null && baseUrl != null) {
+          _queueChannel.invokeMethod('setAuth', {
+            'token': token,
+            'baseUrl': baseUrl,
+            'tenantId': role ?? '',
+          });
+        }
+      } else if (type == 'enqueue') {
+        final operation = data['operation'] as String?;
+        if (operation != null) {
+          _queueChannel.invokeMethod('enqueue', {
+            'operation': operation,
+          });
+        }
+      }
+    } catch (_) {
+      // 非致命：桥接消息解析失败静默忽略
+    }
   }
 
   Future<void> _initControllerOffline(String baseUrl, String html) async {

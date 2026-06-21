@@ -1334,6 +1334,22 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   // ==================== CRDT Operations ====================
 
+  async hasCRDTOperation(id: string, tenantId?: string): Promise<boolean> {
+    if (tenantId) {
+      const result = await this.pool.query(
+        'SELECT 1 FROM crdt_operations WHERE tenant_id = $1 AND id = $2',
+        [tenantId, id]
+      );
+      return result.rows.length > 0;
+    } else {
+      const result = await this.pool.query(
+        'SELECT 1 FROM crdt_operations WHERE id = $1',
+        [id]
+      );
+      return result.rows.length > 0;
+    }
+  }
+
   async saveCRDTOperation(op: CRDTOperation, tenantId?: string): Promise<void> {
     if (tenantId) {
       await this.pool.query(

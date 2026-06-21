@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { createHash } from 'crypto';
 import { createReadStream } from 'fs';
 import { readdir, stat, readFile } from 'fs/promises';
-import { join, dirname } from 'path';
+import { join } from 'path';
 import { createDatabase } from './db/index.js';
 import { TTSBridge, _moduleDirname } from './tts/index.js';
 import { EmailSync } from './email/index.js';
@@ -25,7 +25,6 @@ import rateLimit from '@fastify/rate-limit';
 export interface AppOptions {
   port: number;
   webDir: string;
-  dbPath: string;
   ttsPython?: string;
   showPollingLog?: boolean;
   /** 启用 JWT Bearer 认证（生产环境设为 true） */
@@ -176,10 +175,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   // 创建数据库和 TTS 实例
-  const db = await createDatabase({ dbPath: options.dbPath });
+  const db = await createDatabase({});
   const tts = new TTSBridge({
     pythonPath: options.ttsPython ?? 'python',
-    cacheDir: join(dirname(options.dbPath ?? join(_moduleDirname, '..', 'data.db')), 'tts_cache'),
+    cacheDir: join(_moduleDirname, '..', 'tts_cache'),
   });
 
   // 暴露给测试使用
@@ -935,6 +934,27 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true });
   });
 
+  // 统一写端点（供乐观写入和原生队列使用）
+  app.post('/api/sync/write', async (request: any, reply) => {
+    const op = request.body as {
+      id: string;
+      type: 'update' | 'delete';
+      table: string;
+      resourceId: string;
+      field?: string | null;
+      value: any;
+      timestamp: string;
+      nodeId: string;
+    };
+    const tenantId = request.jwtPayload?.tenant_id;
+    const existed = await db.hasCRDTOperation(op.id, tenantId);
+    await db.saveCRDTOperation(op, tenantId);
+    if (!existed) {
+      await db.applyCRDTOperation(op, tenantId);
+    }
+    return sendJson(reply, { ok: true });
+  });
+
   // CRDT 同步推送
   app.post('/api/sync/crdt-push', async (request: any, reply) => {
     const body = request.body as { operations: CRDTOperation[] };
@@ -943,8 +963,11 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
     const tenantId = request.jwtPayload?.tenant_id;
     for (const op of body.operations) {
+      const existed = await db.hasCRDTOperation(op.id, tenantId);
       await db.saveCRDTOperation(op, tenantId);
-      await db.applyCRDTOperation(op, tenantId);
+      if (!existed) {
+        await db.applyCRDTOperation(op, tenantId);
+      }
     }
     return sendJson(reply, { ok: true });
   });

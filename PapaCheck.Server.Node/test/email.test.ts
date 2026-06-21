@@ -114,14 +114,16 @@ vi.mock('imap', () => {
 // Mock fetch for AI API calls
 vi.stubGlobal('fetch', vi.fn());
 
-describe('EmailSync', () => {
+const hasDB = !!process.env['DATABASE_URL'];
+
+describe.runIf(hasDB)('EmailSync', () => {
   let app: FastifyInstance;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     imapShouldFail = false;
     openBoxShouldFail = false;
-    app = await buildApp({ port: 0, webDir: '', dbPath: ':memory:', showPollingLog: false });
+    app = await buildApp({ port: 0, webDir: '', showPollingLog: false });
     await app.listen({ port: 0, host: '127.0.0.1' });
   });
 

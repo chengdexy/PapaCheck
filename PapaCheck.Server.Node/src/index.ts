@@ -14,7 +14,6 @@ const args = minimist(process.argv.slice(2), {
 
 const port = parseInt(args.port, 10);
 const webDir = resolve(process.cwd(), args['web-dir']);
-const dbPath = resolve(process.cwd(), args['db-path']);
 const ttsPython = args['tts-python'];
 
 let shuttingDown = false;
@@ -42,7 +41,6 @@ async function main(): Promise<void> {
   const app = await buildApp({
     port,
     webDir,
-    dbPath,
     ttsPython,
     enableAuth: true,
     rateLimit: false,
@@ -61,7 +59,6 @@ async function main(): Promise<void> {
   console.log('╠══════════════════════════════════════════════╣');
   console.log(`║  Port:        ${String(port).padEnd(30)}║`);
   console.log(`║  Web Dir:     ${String(webDir).padEnd(30)}║`);
-  console.log(`║  DB Path:     ${String(dbPath).padEnd(30)}║`);
   console.log(`║  TTS Python:  ${String(ttsPython).padEnd(30)}║`);
   console.log('╠══════════════════════════════════════════════╣');
   console.log('║  API:  http://localhost:' + String(port).padEnd(22) + '║');

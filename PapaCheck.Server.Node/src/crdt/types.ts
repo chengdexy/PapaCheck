@@ -10,13 +10,3 @@ export interface CRDTOperation {
   timestamp: string;    // ISO 时间戳
   nodeId: string;       // 节点标识（区分客户端）
 }
-
-export interface PNCounterState {
-  earn: number;
-  spend: number;
-}
-
-export interface ORSetState<T> {
-  additions: T[];    // 已添加但未删除的元素
-  removals: T[];     // 已删除的元素
-}

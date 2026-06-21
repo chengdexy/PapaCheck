@@ -15,7 +15,6 @@ var CORE_RESOURCES = [
   '/js/big-screen.js',
   '/js/admin.js',
   '/js/db.js',
-  '/js/change-log.js',
   '/js/crdt-sync.js',
   '/js/sync.js',
   '/favicon.png'

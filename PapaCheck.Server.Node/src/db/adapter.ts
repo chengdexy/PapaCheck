@@ -138,6 +138,7 @@ export abstract class DatabaseAdapter implements IDatabase {
   abstract recordModification(tableName: string, recordKey: string, timestamp: string, tenantId?: string): Promise<void>;
   abstract resetDate(dateKey: string, tenantId?: string): Promise<void>;
   abstract saveCRDTOperation(op: CRDTOperation, tenantId?: string): Promise<void>;
+  abstract hasCRDTOperation(id: string, tenantId?: string): Promise<boolean>;
   abstract applyCRDTOperation(op: CRDTOperation, tenantId?: string): Promise<void>;
   abstract getCRDTOperationsSince(timestamp: string, tenantId?: string): Promise<CRDTOperation[]>;
   abstract ackCRDTOperations(timestamp: string, tenantId?: string): Promise<void>;

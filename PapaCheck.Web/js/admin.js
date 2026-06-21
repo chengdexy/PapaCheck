@@ -173,8 +173,6 @@ async function initAdmin() {
     if ((modal && modal.classList.contains('show')) || _editingBalance || _editingSettings) return;
     renderCurrentTab();
   }, 5000);
-
-  try { await CRDTLog.migrateFromChangeLog(); } catch (e) { }
 }
 
 async function refreshAllData() {

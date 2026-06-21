@@ -258,18 +258,12 @@ describe('CRDT 同步流程', () => {
     assert.equal((await mockCRDTLog.getPending()).length, 0);
   });
 
-  // Scenario: crdtPull 拉取远程操作（无远程变更）
-  //   Given 服务端无新操作
+  // Scenario: crdtPull 拉取远程操作（简化后仅调用 _refreshFromServer）
+  //   Given SyncEngine 已初始化
   //   When 拉取远程操作
   //   Then 返回 true，本地数据刷新
-  test('crdtPull 无远程变更时返回 true', async () => {
+  test('crdtPull 简化后仅调用 _refreshFromServer', async () => {
     const { SyncEngine, mockFetch } = createSyncEngineContext();
-
-    // Given: crdt-pull 返回空操作列表
-    mockFetch.add(
-      (url) => url.includes('/api/sync/crdt-pull'),
-      okJson({ operations: [] })
-    );
 
     // _refreshFromServer 的 /api/data 端点
     mockFetch.add(
@@ -284,33 +278,33 @@ describe('CRDT 同步流程', () => {
     assert.equal(result, true);
   });
 
-  // Scenario: crdtPull 拉取远程操作（有远程变更）
-  //   Given 服务端有新操作
+  // Scenario: crdtPull 不会调用 crdt-pull 端点
+  //   Given SyncEngine 已初始化
   //   When 拉取远程操作
-  //   Then 返回 true，本地数据通过全量刷新更新
-  test('crdtPull 有远程变更时返回 true', async () => {
+  //   Then 不调用 /api/sync/crdt-pull
+  test('crdtPull 不调用 crdt-pull 端点', async () => {
     const { SyncEngine, mockFetch } = createSyncEngineContext();
 
-    // Given: crdt-pull 返回有操作，且 /api/data 返回新数据
-    mockFetch.add(
-      (url) => url.includes('/api/sync/crdt-pull'),
-      okJson({
-        operations: [
-          { id: 'op-remote-1', type: 'update', table: 'homeworks', resourceId: 'hw-99', value: { status: 'new' } },
-        ],
-      })
-    );
-
+    // 只 mock /api/data，不 mock crdt-pull
     mockFetch.add(
       (url) => url.includes('/api/data'),
-      okJson({ homeworks: { '2025-01-01': [{ id: 'hw-99', status: 'new' }] } })
+      okJson({ points: { balance: 200 } })
     );
 
-    // When: 拉取远程操作
-    const result = await SyncEngine.crdtPull();
+    // 设置一个哨兵 mock：如果 crdt-pull 被调用会匹配这个
+    let crdtPullCalled = false;
+    mockFetch.add(
+      (url) => url.includes('/api/sync/crdt-pull'),
+      {
+        ok: true,
+        async json() { crdtPullCalled = true; return { operations: [] }; },
+      }
+    );
 
-    // Then: 返回 true
-    assert.equal(result, true);
+    await SyncEngine.crdtPull();
+
+    // Then: crdt-pull 端点未被调用
+    assert.equal(crdtPullCalled, false);
   });
 
   // Scenario: crdtFullSync 全量 CRDT 同步
@@ -336,13 +330,7 @@ describe('CRDT 同步流程', () => {
       okJson({ ok: true })
     );
 
-    // Mock crdt-pull 端点
-    mockFetch.add(
-      (url) => url.includes('/api/sync/crdt-pull'),
-      okJson({ operations: [] })
-    );
-
-    // Mock /api/data 端点
+    // Mock /api/data 端点（简化后 crdtPull 仅调用 _refreshFromServer）
     mockFetch.add(
       (url) => url.includes('/api/data'),
       okJson({ points: { balance: 100 } })
@@ -371,10 +359,6 @@ describe('CRDT 同步流程', () => {
     mockFetch.add(
       (url) => url.includes('/api/sync/crdt-push'),
       okJson({ ok: true })
-    );
-    mockFetch.add(
-      (url) => url.includes('/api/sync/crdt-pull'),
-      okJson({ operations: [] })
     );
     mockFetch.add(
       (url) => url.includes('/api/data'),

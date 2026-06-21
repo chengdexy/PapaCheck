@@ -5,11 +5,15 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vites
 import { buildApp } from '../src/app.js';
 import type { FastifyInstance } from 'fastify';
 
+const hasDB = !!process.env['DATABASE_URL'];
+
+describe.runIf(hasDB)('API 端点完整测试', () => {
+
 let app: FastifyInstance;
 let db: any;
 
 beforeAll(async () => {
-  app = await buildApp({ port: 0, webDir: '', dbPath: ':memory:', showPollingLog: false, rateLimit: false });
+  app = await buildApp({ port: 0, webDir: '', showPollingLog: false, rateLimit: false });
   await app.listen({ port: 0, host: '127.0.0.1' });
   db = (app as any).papaCheckDB;
 });
@@ -30,6 +34,7 @@ describe('GET /api/ping', () => {
     expect(typeof body.serverTime).toBe('string');
   });
 });
+
 
 describe('GET /api/version', () => {
   it('webDir 为空时返回 fallback 版本号', async () => {
@@ -1149,4 +1154,5 @@ describe('DELETE /api/notify/consumed', () => {
     const body = JSON.parse(res.body);
     expect(body).toEqual({ ok: true });
   });
+});
 });

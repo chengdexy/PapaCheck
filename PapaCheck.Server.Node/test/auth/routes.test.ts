@@ -336,8 +336,10 @@ describe('Auth Routes', () => {
 
 // ==================== 速率限制测试 ====================
 
-test('POST /api/auth/exchange 超出速率限制应返回 429', async () => {
-  const app = await buildApp({ port: 0, webDir: '', dbPath: ':memory:', enableAuth: true });
+const hasDB = !!process.env['DATABASE_URL'];
+
+test.runIf(hasDB)('POST /api/auth/exchange 超出速率限制应返回 429', async () => {
+  const app = await buildApp({ port: 0, webDir: '', enableAuth: true });
   // 连续发送 11 次请求，第 11 次应返回 429
   for (let i = 0; i < 10; i++) {
     const res = await app.inject({

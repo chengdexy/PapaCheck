@@ -45,7 +45,8 @@ function escapeHtml(str) {
 }
 
 // ==================== Service Worker ====================
-if ('serviceWorker' in navigator) {
+// Android WebView 跳过 SW 注册（WebView 生命周期与浏览器不同，SW 缓存可能导致意外行为）
+if ('serviceWorker' in navigator && !/Android.*wv/i.test(navigator.userAgent)) {
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('/sw.js').then(function (reg) {
       console.log('[common] SW registered:', reg.scope);

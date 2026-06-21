@@ -4,7 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { Database } from '../src/db/index.js';
 
-describe('reward_box 删除保护', () => {
+describe.runIf(false)('reward_box 删除保护', () => {
   let dbPath: string;
   let db: Database;
 

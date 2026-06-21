@@ -82,8 +82,12 @@ var ConnectionManager = (function () {
       ]);
       if (raceResult === 'timeout') {
         console.warn('[ConnectionManager] 同步超时，部分操作可能未完全同步');
-        // 超时后不立即切 online：若 crdtPush 成功但 crdtPull 未完成，
-        // 下次重连会重新推送（服务端需支持操作幂等）
+        // 修复：超时后强制释放锁 + 保持 offline，不切 online
+        if (typeof SyncEngine !== 'undefined' && SyncEngine.forceReleaseLock) {
+          SyncEngine.forceReleaseLock();
+        }
+        _mode = 'offline';
+        return; // 关键：提前返回，不走到 _mode = 'online'
       }
       // CRDT 同步失败（非超时）时保持 offline，等待下次 ping 重试
       // 注意：仅当 CRDT 真正尝试且失败时才阻止切 online；SyncEngine 不可用时跳过

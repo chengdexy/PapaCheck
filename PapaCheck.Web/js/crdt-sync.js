@@ -87,33 +87,6 @@ var CRDTLog = (function () {
       return result.sort(function (a, b) { return a.timestamp > b.timestamp ? 1 : -1; });
     },
 
-    // 从旧的 ChangeLog 迁移 pending 变更
-    async migrateFromChangeLog() {
-      if (typeof ChangeLog === 'undefined' || !ChangeLog.getPending) return;
-      try {
-        var pending = await ChangeLog.getPending();
-        if (!pending || pending.length === 0) return;
-        for (var i = 0; i < pending.length; i++) {
-          var change = pending[i];
-          // 将旧 ChangeLog 条目转为 CRDT 操作
-          await this.append({
-            type: 'update',
-            table: change.table_name || 'unknown',
-            resourceId: change.record_key || change.uuid || 'unknown',
-            field: null,
-            value: change.data,
-            timestamp: change.timestamp || new Date().toISOString(),
-          });
-        }
-        // 清空旧 ChangeLog
-        if (typeof ChangeLog.clear === 'function') {
-          await ChangeLog.clear();
-        }
-      } catch (e) {
-        console.warn('ChangeLog 迁移失败（非致命）:', e);
-      }
-    },
-
     // 清除已同步的操作日志（数据清理）
     async cleanup() {
       var store = await _getStore();
