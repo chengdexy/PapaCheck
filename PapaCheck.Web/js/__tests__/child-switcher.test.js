@@ -1,29 +1,8 @@
 /**
- * child-switcher.test.js - 家长端孩子切换测试
+ * child-switcher.test.js - 家长端孩子切换测试（已废弃）
  *
- * Feature: 家长端孩子切换
- *   Scenario: 有孩子时显示选择栏
- *     Given 家庭有孩子小明和小红
- *     When 家长打开管理端
- *     Then 显示孩子选择栏，包含"小明"和"小红"标签
- *     And 默认选中第一个孩子
- *
- *   Scenario: 切换孩子时刷新数据
- *     Given 当前选中小明
- *     When 点击"小红"标签
- *     Then 调用 API.getData(小红的child_id)
- *     And 作业列表刷新为小红的作业
- *
- *   Scenario: 无孩子时显示提示
- *     Given 家庭无孩子
- *     When 家长打开管理端
- *     Then 显示"请先在管理面板创建孩子"
- *     And 孩子独立标签不可用
- *
- *   Scenario: 商店标签隐藏孩子选择栏
- *     Given 当前在作业标签，孩子选择栏可见
- *     When 切换到商店标签
- *     Then 孩子选择栏隐藏
+ * 孩子切换功能已从 admin.js 中移除，替换为"切换孩子"按钮（跳转登录页重新选择）。
+ * 此测试文件保留骨架作为功能移除记录。
  */
 
 import { describe, it, expect } from 'vitest';
@@ -31,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 // ==================== Mock render functions ====================
 
 /**
- * 模拟 _renderChildSelector 逻辑
+ * 模拟 _renderChildSelector 逻辑（已废弃）
  */
 function renderChildSelector(children, currentChildId, activeTab) {
   // 共享标签不需要孩子选择器
@@ -55,7 +34,7 @@ function renderChildSelector(children, currentChildId, activeTab) {
 }
 
 /**
- * 模拟 loadChildren 逻辑
+ * 模拟 loadChildren 逻辑（已废弃）
  */
 function loadChildren(members, lastChildId) {
   const children = (members || [])
@@ -74,7 +53,7 @@ function loadChildren(members, lastChildId) {
   return { children, currentChildId };
 }
 
-describe('Child Switcher (家长端孩子切换)', () => {
+describe.skip('Child Switcher (家长端孩子切换 · 功能已移除)', () => {
   // Scenario: 有孩子时显示选择栏，默认选中第一个
   it('有孩子时显示选择栏，默认选中第一个', () => {
     const members = [

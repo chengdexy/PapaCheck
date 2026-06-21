@@ -3,16 +3,13 @@
  * 负责初始化、作业计时、屏保、语音、Toast、积分结算
  */
 
-// 孩子端使用独立的 token 键，避免与家长端共享 localStorage
-window._authTokenKey = 'papacheck_child_token';
-
 // 认证检查：验证 token 有效性，无效时重定向到登录页
 (function checkAuth() {
   try {
-    const token = localStorage.getItem('papacheck_child_token');
-    const role = localStorage.getItem('papacheck_child_role');
+    const token = sessionStorage.getItem('papacheck_token');
+    const role = sessionStorage.getItem('papacheck_role');
     if (!token || role !== 'child') {
-      window.location.href = '/login.html?redirect=' + encodeURIComponent('/child');
+      window.location.href = '/login.html';
       return;
     }
     // 通过 API 验证 token 是否仍有效（未被删除/吊销）
@@ -20,14 +17,14 @@ window._authTokenKey = 'papacheck_child_token';
       headers: { 'Authorization': 'Bearer ' + token }
     }).then(function (resp) {
       if (resp.status === 401) {
-        localStorage.removeItem('papacheck_child_token');
-        localStorage.removeItem('papacheck_child_role');
-        localStorage.removeItem('papacheck_child_nickname');
-        window.location.href = '/login.html?redirect=' + encodeURIComponent('/child');
+        sessionStorage.removeItem('papacheck_token');
+        sessionStorage.removeItem('papacheck_role');
+        sessionStorage.removeItem('papacheck_child_name');
+        window.location.href = '/login.html';
       }
     }).catch(function () { });
   } catch (e) {
-    // 测试环境中 localStorage 不可用，跳过检查
+    // 测试环境中 sessionStorage 不可用，跳过检查
   }
 })();
 
@@ -1318,4 +1315,11 @@ function dedupNewHomeworkNotifications(items) {
   return items.filter((item, index) =>
     item.text !== SEEN_TEXT || index === lastIndex
   );
+}
+
+// 动态更新页面标题，跟随孩子名
+function updateChildTitle() {
+  var childName = null;
+  try { childName = sessionStorage.getItem('papacheck_child_name'); } catch (e) {}
+  document.title = childName ? 'PapaCheck · ' + childName : 'PapaCheck';
 }

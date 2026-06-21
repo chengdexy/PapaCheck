@@ -106,10 +106,9 @@ describe('Auth Refactor — 认证体系重构测试', () => {
     storedAccessCodes = [
       {
         id: 'code-001',
-        user_id: 'user-001',
-        type: 'parent',
+        tenant_id: 'user-001',
         code_hash: bcrypt.hashSync('ABC123', 10),
-        nickname: '妈妈',
+        child_id: 'child-001',
         token_version: 1,
         created_at: '2024-01-01T00:00:00.000Z',
       },
@@ -205,13 +204,13 @@ describe('Auth Refactor — 认证体系重构测试', () => {
       for (const ac of storedAccessCodes) {
         const match = bcrypt.compareSync(accessCode, ac.code_hash);
         if (match) {
-          const user = storedUsers.find(u => u.id === ac.user_id);
+          const user = storedUsers.find(u => u.id === ac.tenant_id);
           if (!user || !user.is_active) return null;
           return {
             id: user.id,
             tenant_id: user.tenant_id,
-            role: ac.type, // 访问码登录后的 role 由 code type 决定
-            nickname: ac.nickname,
+            role: user.role,
+            nickname: user.nickname,
             access_hash: ac.code_hash,
             token_version: user.token_version,
             is_active: user.is_active,
@@ -298,8 +297,8 @@ describe('Auth Refactor — 认证体系重构测试', () => {
       });
       return input.id;
     },
-    getAccessCodesByUser: async (userId: string) => {
-      return storedAccessCodes.filter(ac => ac.user_id === userId);
+    getAccessCodesByUser: async (tenantId: string) => {
+      return storedAccessCodes.filter(ac => ac.tenant_id === tenantId);
     },
     findAccessCodeByCode: async (code: string) => {
       for (const ac of storedAccessCodes) {
@@ -311,8 +310,8 @@ describe('Auth Refactor — 认证体系重构测试', () => {
     getAccessCodeById: async (id: string) => {
       return storedAccessCodes.find(ac => ac.id === id) || null;
     },
-    regenerateAccessCode: async (id: string, userId: string) => {
-      const idx = storedAccessCodes.findIndex(ac => ac.id === id && ac.user_id === userId);
+    regenerateAccessCode: async (id: string, tenantId: string) => {
+      const idx = storedAccessCodes.findIndex(ac => ac.id === id && ac.tenant_id === tenantId);
       if (idx === -1) throw new Error('访问码不存在');
       const newCode = crypto.randomBytes(3).toString('hex').toUpperCase();
       storedAccessCodes[idx] = {
@@ -321,13 +320,18 @@ describe('Auth Refactor — 认证体系重构测试', () => {
       };
       return newCode;
     },
-    deleteAccessCode: async (id: string, userId: string) => {
-      storedAccessCodes = storedAccessCodes.filter(ac => !(ac.id === id && ac.user_id === userId));
+    deleteAccessCode: async (id: string, tenantId: string) => {
+      storedAccessCodes = storedAccessCodes.filter(ac => !(ac.id === id && ac.tenant_id === tenantId));
     },
 
     // === children 相关方法 ===
     getChildrenByTenant: async (_tenantId: string, _activeOnly?: boolean) => [],
-    getChildById: async (_id: string, _tenantId: string) => null,
+    getChildById: async (_id: string, _tenantId: string) => {
+      if (_id === 'child-001') {
+        return { id: 'child-001', tenant_id: 'tenant-001', name: '妈妈', is_active: true, created_at: '2024-01-01T00:00:00.000Z' };
+      }
+      return null;
+    },
     findChildByAccessCodeId: async (_accessCodeId: string, _tenantId: string) => null,
     createChild: async (tenantId: string, name: string, accessCodeId?: string) => {
       const id = 'child-' + Date.now();
@@ -501,7 +505,7 @@ describe('Auth Refactor — 认证体系重构测试', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/auth/exchange',
-        payload: { access_code: 'ABC123' },
+        payload: { access_code: 'ABC123', role: 'parent' },
       });
       expect(res.statusCode).toBe(200);
       const body = res.json();
@@ -514,7 +518,7 @@ describe('Auth Refactor — 认证体系重构测试', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/auth/exchange',
-        payload: { access_code: 'INVALID' },
+        payload: { access_code: 'INVALID', role: 'parent' },
       });
       expect(res.statusCode).toBe(401);
       const body = res.json();

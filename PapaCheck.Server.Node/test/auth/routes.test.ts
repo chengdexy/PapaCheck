@@ -14,10 +14,9 @@ describe('Auth Routes', () => {
   // 用于测试的内存状态
   let storedAccessCodes: Array<{
     id: string;
-    user_id: string;
-    type: 'parent' | 'child';
+    tenant_id: string;
     code_hash: string;
-    nickname: string;
+    child_id: string;
     created_at: string;
   }> = [];
 
@@ -43,10 +42,10 @@ describe('Auth Routes', () => {
   const validCodeHash = bcrypt.hashSync(validCode, 10);
   const accessCodeRecord = {
     id: 'access-code-001',
-    user_id: mockUser.id,
-    type: 'parent' as const,
+    tenant_id: mockUser.id,
     code_hash: validCodeHash,
-    nickname: '测试家长',
+    child_id: 'child-001',
+    token_version: 1,
     created_at: '2024-01-01T00:00:00.000Z',
   };
 
@@ -60,6 +59,9 @@ describe('Auth Routes', () => {
     },
     getAccessCodeById: async (id: string) => {
       return storedAccessCodes.find(c => c.id === id) ?? null;
+    },
+    getChildById: async (_id: string, _tenantId: string) => {
+      return { id: 'child-001', tenant_id: mockUser.tenant_id, name: '测试家长', is_active: true, created_at: '2024-01-01T00:00:00.000Z' };
     },
     getUserById: async (userId: string) => {
       if (userId === mockUser.id) {
@@ -76,25 +78,24 @@ describe('Auth Routes', () => {
     createAccessCode: async (input) => {
       storedAccessCodes.push({
         id: input.id,
-        user_id: input.user_id,
-        type: input.type,
+        tenant_id: input.tenant_id,
         code_hash: input.code_hash,
-        nickname: input.nickname,
+        child_id: input.child_id,
         created_at: new Date().toISOString(),
       });
       return input.id;
     },
-    getAccessCodesByUser: async (userId) => storedAccessCodes.filter(c => c.user_id === userId),
+    getAccessCodesByUser: async (userId) => storedAccessCodes.filter(c => c.tenant_id === userId),
     regenerateAccessCode: async (id, userId) => {
       const code = 'NEW' + require('crypto').randomBytes(2).toString('hex');
       const hash = bcrypt.hashSync(code, 10);
-      const idx = storedAccessCodes.findIndex(c => c.id === id && c.user_id === userId);
+      const idx = storedAccessCodes.findIndex(c => c.id === id && c.tenant_id === userId);
       if (idx === -1) throw new Error('not found');
       storedAccessCodes[idx].code_hash = hash;
       return code;
     },
     deleteAccessCode: async (id, userId) => {
-      storedAccessCodes = storedAccessCodes.filter(c => !(c.id === id && c.user_id === userId));
+      storedAccessCodes = storedAccessCodes.filter(c => !(c.id === id && c.tenant_id === userId));
     },
     // 以下为 IDatabase 其他方法的桩实现
     close: async () => {},
@@ -248,7 +249,7 @@ describe('Auth Routes', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/auth/exchange',
-      payload: { access_code: 'short' },
+      payload: { access_code: 'short', role: 'parent' },
     });
     expect(res.statusCode).toBe(400);
     const body = res.json();
@@ -265,7 +266,7 @@ describe('Auth Routes', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/auth/exchange',
-      payload: { access_code: 'invalid-code-xxx' },
+      payload: { access_code: 'invalid-code-xxx', role: 'parent' },
     });
     expect(res.statusCode).toBe(401);
     const body = res.json();
@@ -282,13 +283,13 @@ describe('Auth Routes', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/auth/exchange',
-      payload: { access_code: 'valid-code-123' },
+      payload: { access_code: 'valid-code-123', role: 'parent' },
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body).toHaveProperty('token');
     expect(body.role).toBe('parent');
-    expect(body.nickname).toBe('测试家长');
+    expect(body.child_name).toBe('测试家长');
   });
 
   // Feature: GET /api/auth/me
@@ -345,7 +346,7 @@ test.runIf(hasDB)('POST /api/auth/exchange 超出速率限制应返回 429', asy
     const res = await app.inject({
       method: 'POST',
       url: '/api/auth/exchange',
-      payload: { access_code: 'invalid-code' },
+      payload: { access_code: 'invalid-code', role: 'parent' },
     });
     // 前 10 次不应限流（可能返回 400 或 401，但不能是 429）
     expect(res.statusCode).not.toBe(429);
@@ -353,7 +354,7 @@ test.runIf(hasDB)('POST /api/auth/exchange 超出速率限制应返回 429', asy
   const res = await app.inject({
     method: 'POST',
     url: '/api/auth/exchange',
-    payload: { access_code: 'invalid-code' },
+    payload: { access_code: 'invalid-code', role: 'parent' },
   });
   const body = JSON.parse(res.body);
   expect(res.statusCode).toBe(429);

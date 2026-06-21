@@ -72,37 +72,36 @@ describe.runIf(hasDB)('Child API Isolation (孩子 API 隔离)', () => {
   });
 
   it('家长角色通过 child_id 查询指定孩子', async () => {
-    _testJwt = { tenant_id: tenantA, sub: tenantA, role: 'parent', token_version: 1 };
+    _testJwt = { tenant_id: tenantA, sub: tenantA, role: 'parent', child_id: childA, token_version: 1 };
 
-    const res = await app.inject({ method: 'GET', url: `/api/data?child_id=${encodeURIComponent(childA)}` });
+    const res = await app.inject({ method: 'GET', url: '/api/data' });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
     expect(body.homeworks['2026-06-21']?.[0]?.subject).toBe('数学');
   });
 
-  it('家长缺 child_id 时返回共享数据（不报错）', async () => {
+  it('家长缺 child_id 时返回 400 错误', async () => {
     _testJwt = { tenant_id: tenantA, sub: tenantA, role: 'parent', token_version: 1 };
 
     const res = await app.inject({ method: 'GET', url: '/api/data' });
-    expect(res.statusCode).toBe(200);
-    // 不应返回 MISSING_CHILD_ID
-    const body = JSON.parse(res.body);
-    expect(body).not.toHaveProperty('code', 'MISSING_CHILD_ID');
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe('MISSING_CHILD_ID');
   });
 
   it('家长不能查询其他家庭的孩子', async () => {
-    _testJwt = { tenant_id: tenantA, sub: tenantA, role: 'parent', token_version: 1 };
+    _testJwt = { tenant_id: tenantA, sub: tenantA, role: 'parent', child_id: foreignChild, token_version: 1 };
 
-    const res = await app.inject({ method: 'GET', url: `/api/data?child_id=${encodeURIComponent(foreignChild)}` });
+    const res = await app.inject({ method: 'GET', url: '/api/data' });
     expect(res.statusCode).toBe(403);
     expect(JSON.parse(res.body).code).toBe('FOREIGN_CHILD');
   });
 
-  it('child 角色 JWT 不含 child_id 时不报错', async () => {
+  it('child 角色 JWT 不含 child_id 时返回 400', async () => {
     _testJwt = { tenant_id: tenantA, sub: tenantA, role: 'child', token_version: 1 };
 
     const res = await app.inject({ method: 'GET', url: '/api/data' });
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe('MISSING_CHILD_ID');
   });
 
   it('admin 角色不受 child_id 限制', async () => {

@@ -22,6 +22,7 @@
       <button class="tab-btn" onclick="switchTab('redeem')" data-tab="redeem"><span class="tab-icon">📋</span><span class="tab-label">兑换</span></button>
       <button class="tab-btn" onclick="switchTab('stats')" data-tab="stats"><span class="tab-icon">📊</span><span class="tab-label">统计</span></button>
       <button class="tab-btn" onclick="switchTab('settings')" data-tab="settings"><span class="tab-icon">⚙️</span><span class="tab-label">设置</span></button>
+      <button class="tab-btn" onclick="switchChild()" style="color:var(--warning);"><span class="tab-icon">🔄</span><span class="tab-label">切换孩子</span></button>
     </div>
 
     <!-- Main Area -->
@@ -32,8 +33,6 @@
         <span class="admin-date" id="adminDate">--</span>
         <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleMobileNav()" title="菜单">☰</button>
       </div>
-
-      <div id="child-selector" class="child-selector" style="display:none;"></div>
 
       <div class="admin-content" id="adminContent"></div>
     </div>
@@ -47,6 +46,7 @@
       <button class="tab-btn" onclick="switchTab('redeem')" data-tab="redeem"><span class="tab-icon">📋</span><span class="tab-label">兑换</span></button>
       <button class="tab-btn" onclick="switchTab('stats')" data-tab="stats"><span class="tab-icon">📊</span><span class="tab-label">统计</span></button>
       <button class="tab-btn" onclick="switchTab('settings')" data-tab="settings"><span class="tab-icon">⚙️</span><span class="tab-label">设置</span></button>
+      <button class="tab-btn" onclick="switchChild()" style="color:var(--warning);"><span class="tab-icon">🔄</span><span class="tab-label">切换孩子</span></button>
     </div>
 
     <!-- Mobile Navigation Overlay -->
@@ -63,6 +63,7 @@
     <button class="tab-btn" onclick="switchTab('redeem'); closeMobileNav()" data-tab="redeem"><span class="tab-icon">📋</span><span class="tab-label">兑换</span></button>
     <button class="tab-btn" onclick="switchTab('stats'); closeMobileNav()" data-tab="stats"><span class="tab-icon">📊</span><span class="tab-label">统计</span></button>
     <button class="tab-btn" onclick="switchTab('settings'); closeMobileNav()" data-tab="settings"><span class="tab-icon">⚙️</span><span class="tab-label">设置</span></button>
+    <button class="tab-btn" onclick="switchChild(); closeMobileNav()" style="color:var(--warning);"><span class="tab-icon">🔄</span><span class="tab-label">切换孩子</span></button>
   </div>
 
   <!-- Modal -->

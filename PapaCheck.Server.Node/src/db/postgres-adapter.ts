@@ -1702,7 +1702,7 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   async getTenantMembers(tenantId: string): Promise<any[]> {
     const result = await this.pool.query(
-      'SELECT id, user_id as tenant_id, type as role, nickname, code_hash as access_hash, created_at FROM access_codes WHERE user_id = $1 ORDER BY created_at ASC',
+      'SELECT ac.id, ac.tenant_id, ac.code_hash as access_hash, ac.created_at, ch.name as nickname FROM access_codes ac LEFT JOIN children ch ON ch.id = ac.child_id WHERE ac.tenant_id = $1 ORDER BY ac.created_at ASC',
       [tenantId]
     );
     return result.rows;
@@ -1750,7 +1750,7 @@ export class PostgresAdapter extends DatabaseAdapter {
   async getAllTenants(): Promise<TenantListItem[]> {
     const result = await this.pool.query(`
       SELECT u.id, u.family_name AS name, u.is_active, u.created_at,
-        (SELECT COUNT(*) FROM access_codes a WHERE a.user_id = u.id) AS member_count
+        (SELECT COUNT(*) FROM access_codes a WHERE a.tenant_id = u.id) AS member_count
       FROM users u
       WHERE u.role = 'user'
       ORDER BY u.created_at ASC
@@ -1775,24 +1775,23 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   async createAccessCode(input: CreateAccessCodeInput): Promise<string> {
     await this.pool.query(
-      'INSERT INTO access_codes (id, user_id, type, code_hash, access_code, nickname) VALUES ($1, $2, $3, $4, $5, $6)',
-      [input.id, input.user_id, input.type, input.code_hash, input.access_code ?? null, input.nickname]
+      'INSERT INTO access_codes (id, tenant_id, code_hash, access_code, child_id) VALUES ($1, $2, $3, $4, $5)',
+      [input.id, input.tenant_id, input.code_hash, input.access_code ?? null, input.child_id]
     );
     return input.id;
   }
 
-  async getAccessCodesByUser(userId: string): Promise<AccessCodeRecord[]> {
+  async getAccessCodesByUser(tenantId: string): Promise<AccessCodeRecord[]> {
     const result = await this.pool.query(
-      'SELECT id, user_id, type, code_hash, access_code, token_version, nickname, last_login, created_at FROM access_codes WHERE user_id = $1 ORDER BY created_at ASC',
-      [userId]
+      'SELECT id, tenant_id, code_hash, access_code, child_id, token_version, last_login, created_at FROM access_codes WHERE tenant_id = $1 ORDER BY created_at ASC',
+      [tenantId]
     );
     return result.rows.map((r: any) => ({
       id: r.id,
-      user_id: r.user_id,
-      type: r.type,
+      tenant_id: r.tenant_id,
       code_hash: r.code_hash,
       access_code: r.access_code ?? undefined,
-      nickname: r.nickname,
+      child_id: r.child_id,
       token_version: r.token_version ?? 1,
       last_login: r.last_login ? (typeof r.last_login === 'object' ? r.last_login.toISOString() : r.last_login) : undefined,
       created_at: typeof r.created_at === 'object' ? r.created_at.toISOString() : r.created_at,
@@ -1805,11 +1804,10 @@ export class PostgresAdapter extends DatabaseAdapter {
       if (bcrypt.compareSync(code, row.code_hash)) {
         return {
           id: row.id,
-          user_id: row.user_id,
-          type: row.type,
+          tenant_id: row.tenant_id,
           code_hash: row.code_hash,
           access_code: row.access_code ?? undefined,
-          nickname: row.nickname,
+          child_id: row.child_id,
           token_version: row.token_version ?? 1,
           last_login: row.last_login ? (typeof row.last_login === 'object' ? row.last_login.toISOString() : row.last_login) : undefined,
           created_at: typeof row.created_at === 'object' ? row.created_at.toISOString() : row.created_at,
@@ -1825,11 +1823,10 @@ export class PostgresAdapter extends DatabaseAdapter {
     const row = result.rows[0];
     return {
       id: row.id,
-      user_id: row.user_id,
-      type: row.type,
+      tenant_id: row.tenant_id,
       code_hash: row.code_hash,
       access_code: row.access_code ?? undefined,
-      nickname: row.nickname,
+      child_id: row.child_id,
       token_version: row.token_version ?? 1,
       last_login: row.last_login ? (typeof row.last_login === 'object' ? row.last_login.toISOString() : row.last_login) : undefined,
       created_at: typeof row.created_at === 'object' ? row.created_at.toISOString() : row.created_at,
@@ -1843,18 +1840,18 @@ export class PostgresAdapter extends DatabaseAdapter {
     );
   }
 
-  async regenerateAccessCode(id: string, userId: string): Promise<string> {
+  async regenerateAccessCode(id: string, tenantId: string): Promise<string> {
     const { raw, hashed } = await generateAccessHash();
     const result = await this.pool.query(
-      'UPDATE access_codes SET code_hash = $1, access_code = $2, token_version = token_version + 1 WHERE id = $3 AND user_id = $4',
-      [hashed, raw, id, userId]
+      'UPDATE access_codes SET code_hash = $1, access_code = $2, token_version = token_version + 1 WHERE id = $3 AND tenant_id = $4',
+      [hashed, raw, id, tenantId]
     );
     if (result.rowCount === 0) throw new Error('访问码不存在或不属于该用户');
     return raw;
   }
 
-  async deleteAccessCode(id: string, userId: string): Promise<void> {
-    await this.pool.query('DELETE FROM access_codes WHERE id = $1 AND user_id = $2', [id, userId]);
+  async deleteAccessCode(id: string, tenantId: string): Promise<void> {
+    await this.pool.query('DELETE FROM access_codes WHERE id = $1 AND tenant_id = $2', [id, tenantId]);
   }
 
   // ==================== Children ====================

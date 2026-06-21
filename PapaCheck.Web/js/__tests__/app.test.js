@@ -41,17 +41,17 @@
  *
  * Feature: /api/speak 鉴权改造
  *   Scenario: Voice.speak 拉取语音时携带 Authorization 头
- *     Given 用户已登录且 localStorage 中有 papacheck_token
+ *     Given 用户已登录且 sessionStorage 中有 papacheck_token
  *     When  Voice.speak 调 /api/speak?text=...
  *     Then  fetch 请求头包含 'Authorization: Bearer <token>'
  *
  *   Scenario: 未登录时拉取语音不抛异常
- *     Given localStorage 中无 papacheck_token
+ *     Given sessionStorage 中无 papacheck_token
  *     When  Voice.speak 调 /api/speak?text=...
  *     Then  fetch 请求头不含 Authorization，服务端会返回 401，走降级逻辑
  *
- *   Scenario: localStorage 抛出异常时（隐私模式/被禁用）不阻断语音功能
- *     Given localStorage.getItem 抛 SecurityError（如 Safari 隐私模式）
+ *   Scenario: sessionStorage 抛出异常时（隐私模式/被禁用）不阻断语音功能
+ *     Given sessionStorage.getItem 抛 SecurityError（如 Safari 隐私模式）
  *     When  Voice.speak 调 /api/speak?text=...
  *     Then  fetch 仍被调用，请求头不含 Authorization，不抛异常
  */
@@ -138,15 +138,15 @@ describe('wakeUp 调用顺序', () => {
 
 describe('/api/speak 鉴权请求', () => {
   // Scenario: 已登录时 fetch /api/speak 携带 Authorization 头
-  //   Given localStorage 中存在 papacheck_token
+  //   Given sessionStorage 中存在 papacheck_token
   //   When  Voice.speak 调 /api/speak?text=...
   //   Then  fetch 请求头包含 'Authorization: Bearer <token>'
 
   it('已登录时 fetch /api/speak 应携带 Authorization 头', async () => {
     const fakeToken = 'test-jwt-token-abc';
-    // 模拟 localStorage
+    // 模拟 sessionStorage
     const storage = { papacheck_token: fakeToken };
-    const localStorageMock = {
+    const sessionStorageMock = {
       getItem: (key) => storage[key] ?? null,
       setItem: (key, val) => { storage[key] = val; },
     };
@@ -161,7 +161,7 @@ describe('/api/speak 鉴权请求', () => {
     // 模拟的 Voice.speak 简化版（仅取本次任务的 fetch 调用）
     async function speakText(text) {
       const url = '/api/speak?' + new URLSearchParams({ text });
-      const token = localStorageMock.getItem('papacheck_token');
+      const token = sessionStorageMock.getItem('papacheck_token');
       const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
       const resp = await fetchMock(url, { headers });
       return resp;
@@ -174,12 +174,12 @@ describe('/api/speak 鉴权请求', () => {
   });
 
   // Scenario: 未登录时 fetch /api/speak 不抛异常
-  //   Given localStorage 中无 papacheck_token
+  //   Given sessionStorage 中无 papacheck_token
   //   When  Voice.speak 调 /api/speak?text=...
   //   Then  fetch 请求头不含 Authorization，调用不抛异常
 
   it('未登录时 fetch /api/speak 不抛异常且不带 Authorization 头', async () => {
-    const localStorageMock = {
+    const sessionStorageMock = {
       getItem: () => null,
     };
 
@@ -191,7 +191,7 @@ describe('/api/speak 鉴权请求', () => {
 
     async function speakText(text) {
       const url = '/api/speak?' + new URLSearchParams({ text });
-      const token = localStorageMock.getItem('papacheck_token');
+      const token = sessionStorageMock.getItem('papacheck_token');
       const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
       const resp = await fetchMock(url, { headers });
       return resp;
@@ -201,14 +201,14 @@ describe('/api/speak 鉴权请求', () => {
     expect(capturedHeaders).not.toHaveProperty('Authorization');
   });
 
-  // Scenario: localStorage 抛异常时（隐私模式/被禁用）不阻断语音功能
-  //   Given localStorage.getItem 抛 SecurityError
+  // Scenario: sessionStorage 抛异常时（隐私模式/被禁用）不阻断语音功能
+  //   Given sessionStorage.getItem 抛 SecurityError
   //   When  Voice.speak 调 /api/speak?text=...
   //   Then  fetch 仍被调用，请求头不含 Authorization，不抛异常
 
-  it('localStorage 抛异常时仍能调用 fetch 且不带 Authorization 头', async () => {
+  it('sessionStorage 抛异常时仍能调用 fetch 且不带 Authorization 头', async () => {
     // 从 app.js 读取真实的"取 token + 构造 fetch"片段并执行，
-    // 确保测试覆盖生产代码（防止有人未来又用裸 localStorage.getItem 替换回去）
+    // 确保测试覆盖生产代码（防止有人未来又用裸 sessionStorage.getItem 替换回去）
     const fs = await import('node:fs');
     const path = await import('node:path');
     const vm = await import('node:vm');
@@ -222,14 +222,14 @@ describe('/api/speak 鉴权请求', () => {
       throw new Error('无法在 app.js 中定位 /api/speak fetch 片段，请检查源码结构');
     }
 
-    // 构造沙箱：注入模拟 localStorage + fetch + URLSearchParams + getAuthHeaders + text 参数
-    // getAuthHeaders 来自 api.js：自带 try-catch 保护隐私模式下 localStorage 禁用场景
+    // 构造沙箱：注入模拟 sessionStorage + fetch + URLSearchParams + getAuthHeaders + text 参数
+    // getAuthHeaders 来自 api.js：自带 try-catch 保护隐私模式下 sessionStorage 禁用场景
     let capturedHeaders = null;
     let fetchCalled = false;
     const sandbox = {
-      localStorage: {
+      sessionStorage: {
         getItem: () => {
-          const err = new Error('SecurityError: localStorage is disabled');
+          const err = new Error('SecurityError: sessionStorage is disabled');
           err.name = 'SecurityError';
           throw err;
         },
@@ -238,7 +238,7 @@ describe('/api/speak 鉴权请求', () => {
       text: '你好',
       getAuthHeaders: () => {
         try {
-          const token = sandbox.localStorage.getItem('papacheck_token');
+          const token = sandbox.sessionStorage.getItem('papacheck_token');
           return token ? { 'Authorization': 'Bearer ' + token } : {};
         } catch (e) {
           return {};

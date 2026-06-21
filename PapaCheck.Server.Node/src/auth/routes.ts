@@ -23,9 +23,10 @@ const errorResponse = {
 const exchangeSchema = {
   body: {
     type: 'object',
-    required: ['access_code'],
+    required: ['access_code', 'role'],
     properties: {
       access_code: { type: 'string', minLength: 6 },
+      role: { type: 'string', enum: ['parent', 'child'] },
     },
   },
   response: {
@@ -34,7 +35,8 @@ const exchangeSchema = {
       properties: {
         token: { type: 'string' },
         role: { type: 'string' },
-        nickname: { type: 'string' },
+        child_id: { type: 'string' },
+        child_name: { type: 'string' },
       },
     },
     ...errorResponse,
@@ -47,7 +49,8 @@ const meSchema = {
       type: 'object',
       properties: {
         id: { type: 'string' },
-        nickname: { type: 'string' },
+        child_id: { type: 'string' },
+        child_name: { type: 'string' },
         role: { type: 'string' },
         tenant_id: { type: 'string' },
         email: { type: 'string' },
@@ -129,46 +132,31 @@ const credentialsSchema = {
 export async function authRoutes(app: FastifyInstance, db: IDatabase): Promise<void> {
   // POST /api/auth/exchange — 访问码换取JWT
   app.post('/api/auth/exchange', { schema: exchangeSchema, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
-    const { access_code } = request.body as { access_code: string };
+    const { access_code, role } = request.body as { access_code: string; role: 'parent' | 'child' };
 
     const record = await db.findAccessCodeByCode(access_code);
     if (!record) {
       return reply.status(401).send({ error: '访问码无效', code: 'INVALID_ACCESS_CODE' });
     }
 
-    // 孩子角色：查找或创建 children 记录
-    let childId: string | undefined;
-    if (record.type === 'child') {
-      let child = await db.findChildByAccessCodeId(record.id, record.user_id);
-      if (!child) {
-        // 自动创建 children 记录（兼容迁移遗漏）
-        child = await db.createChild(record.user_id, record.nickname, record.id);
-      }
-      if (!child.is_active) {
-        return reply.status(403).send({ error: '孩子已被禁用', code: 'CHILD_DISABLED' });
-      }
-      childId = child.id;
+    // 通过 child_id 验证孩子活跃
+    const child = await db.getChildById(record.child_id, record.tenant_id);
+    if (!child || !child.is_active) {
+      return reply.status(403).send({ error: '孩子已被禁用', code: 'CHILD_DISABLED' });
     }
 
     // 记录最后登录时间
     await db.updateAccessCodeLastLogin(record.id).catch(() => {});
 
     const token = signToken({
-      sub: record.user_id,
-      tenant_id: record.user_id,
+      sub: record.tenant_id,
+      tenant_id: record.tenant_id,
       member_id: record.id,
-      child_id: childId,
-      role: record.type,
+      child_id: record.child_id,
+      role: role,
       token_version: record.token_version,
     });
-    const response: any = { token, role: record.type, nickname: record.nickname };
-    if (record.type === 'child' || record.type === 'parent') {
-      response.needs_setup = true;
-    }
-    if (childId) {
-      response.child_id = childId;
-    }
-    return response;
+    return { token, role, child_id: record.child_id, child_name: child.name };
   });
 
   // POST /api/auth/login — 统一登录（admin + user）
@@ -293,10 +281,14 @@ export async function authRoutes(app: FastifyInstance, db: IDatabase): Promise<v
     if (!record) {
       return reply.status(404).send({ error: '访问码不存在', code: 'NOT_FOUND' });
     }
+    // 从 children 表获取 child_name
+    const child = await db.getChildById(record.child_id, record.tenant_id);
     return {
       id: record.id,
-      nickname: record.nickname,
-      role: record.type,
+      child_id: record.child_id,
+      child_name: child?.name ?? '',
+      role: payload.role,
+      tenant_id: record.tenant_id,
     };
   });
 }

@@ -55,19 +55,25 @@ describe.runIf(hasDB)('服务器基础功能', () => {
   });
 
   describe('GET /child', () => {
-    it('返回 index.html（状态码 200，Content-Type 含 text/html）', async () => {
-      const app2 = await buildApp({ port: 0, webDir: testWebDir });
-      const res = await app2.inject({ method: 'GET', url: '/child' });
-      expect(res.statusCode).toBe(200);
-      expect(res.headers['content-type']).toMatch(/text\/html/);
-      await app2.close();
+    it('301 重定向到 /app', async () => {
+      const res = await app.inject({ method: 'GET', url: '/child' });
+      expect(res.statusCode).toBe(301);
+      expect(res.headers.location).toBe('/app');
     });
   });
 
   describe('GET /parent', () => {
-    it('返回 admin.html（状态码 200）', async () => {
+    it('301 重定向到 /app', async () => {
+      const res = await app.inject({ method: 'GET', url: '/parent' });
+      expect(res.statusCode).toBe(301);
+      expect(res.headers.location).toBe('/app');
+    });
+  });
+
+  describe('GET /app', () => {
+    it('无 Authorization 时返回 index.html（状态码 200，Content-Type 含 text/html）', async () => {
       const app2 = await buildApp({ port: 0, webDir: testWebDir });
-      const res = await app2.inject({ method: 'GET', url: '/parent' });
+      const res = await app2.inject({ method: 'GET', url: '/app' });
       expect(res.statusCode).toBe(200);
       expect(res.headers['content-type']).toMatch(/text\/html/);
       await app2.close();

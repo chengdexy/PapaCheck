@@ -34,15 +34,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS
 
 CREATE TABLE IF NOT EXISTS access_codes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id),
-  type TEXT NOT NULL CHECK (type IN ('parent', 'child')),
+  tenant_id UUID NOT NULL REFERENCES users(id),
   code_hash TEXT NOT NULL,
   access_code TEXT,
-  nickname TEXT NOT NULL,
+  child_id UUID NOT NULL REFERENCES children(id),
   token_version INTEGER NOT NULL DEFAULT 1,
   last_login TIMESTAMP,
-  created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(user_id, nickname)
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS children (

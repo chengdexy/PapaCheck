@@ -5,27 +5,245 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PapaCheck 登录</title>
 <style>
-body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f5f5f5}
-.login-box{background:#fff;padding:2rem;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.1);width:320px}
-h1{text-align:center;color:#333;font-size:1.5rem;margin-bottom:.5rem}
-.desc{text-align:center;color:#666;font-size:.9rem;margin-bottom:1.5rem}
-input{width:100%;padding:.75rem;border:1px solid #ddd;border-radius:8px;font-size:1rem;box-sizing:border-box}
-button{width:100%;padding:.75rem;background:#4CAF50;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer;margin-top:1rem}
-button:hover{background:#45a049}
-.error{color:#e74c3c;text-align:center;margin-top:.5rem;display:none}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  display:flex;justify-content:center;align-items:center;
+  min-height:100vh;margin:0;
+  background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)
+}
+.login-card{
+  background:#fff;padding:2rem;
+  border-radius:16px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.15);
+  width:360px;max-width:90vw
+}
+h1{text-align:center;color:#333;font-size:1.5rem;margin-bottom:1.5rem;font-weight:600}
+.recent-title{font-size:0.85rem;color:#888;margin-bottom:0.5rem}
+.recent-list{margin-bottom:1rem}
+.recent-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0.5rem 0;border-bottom:1px solid #f0f0f0
+}
+.recent-item:last-child{border-bottom:none}
+.recent-name{font-weight:500;color:#333;min-width:60px}
+.recent-actions{display:flex;gap:0.5rem}
+.recent-btn{
+  padding:0.2rem 0.7rem;
+  border:1px solid #667eea;border-radius:12px;
+  background:#fff;color:#667eea;
+  font-size:0.8rem;cursor:pointer;transition:all 0.2s
+}
+.recent-btn:hover{background:#667eea;color:#fff}
+.divider{
+  text-align:center;color:#bbb;font-size:0.85rem;
+  margin:1rem 0;position:relative
+}
+.divider::before,.divider::after{
+  content:'';position:absolute;top:50%;
+  width:35%;height:1px;background:#e0e0e0
+}
+.divider::before{left:0}.divider::after{right:0}
+#accessCode{
+  width:100%;padding:0.75rem;
+  border:2px solid #e0e0e0;border-radius:10px;
+  font-size:1rem;box-sizing:border-box;transition:border-color 0.2s
+}
+#accessCode:focus{outline:none;border-color:#667eea}
+.role-buttons{display:flex;gap:0.75rem;margin-top:1rem}
+.role-btn{
+  flex:1;padding:0.7rem;
+  border:2px solid #e0e0e0;border-radius:10px;
+  background:#fff;color:#888;
+  font-size:0.95rem;cursor:pointer;transition:all 0.2s;
+  font-weight:500
+}
+.role-btn:hover{border-color:#a78bfa;color:#a78bfa}
+.role-btn.active{
+  border-color:#667eea;
+  background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+  color:#fff
+}
+.error{
+  color:#e74c3c;text-align:center;margin-top:0.75rem;
+  font-size:0.85rem;display:none
+}
 </style>
 </head>
 <body>
-<div class="login-box">
+<div class="login-card">
 <h1>PapaCheck</h1>
-<p class="desc">请输入您的家庭访问码</p>
-<input type="text" id="accessCode" placeholder="请输入访问码" autocomplete="off">
-<button onclick="login()">进入</button>
-<div class="error" id="error">访问码无效，请联系管理员</div>
+
+<div id="recentSection">
+<div class="recent-title">最近使用</div>
+<div class="recent-list" id="recentList"></div>
 </div>
+
+<div class="divider">或输入新访问码</div>
+
+<input type="text" id="accessCode" placeholder="输入新访问码" autocomplete="off">
+
+<div class="role-buttons">
+<button class="role-btn" data-role="parent" id="roleParent">家长入口</button>
+<button class="role-btn" data-role="child" id="roleChild">孩子入口</button>
+</div>
+
+<div class="error" id="error"></div>
+</div>
+
 <script>
-async function login(){var c=document.getElementById('accessCode').value.trim();if(!c)return;var r=await fetch('/api/auth/exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({access_code:c})});if(r.ok){var d=await r.json();var tokenKey=d.role==='child'?'papacheck_child_token':'papacheck_token';var roleKey=d.role==='child'?'papacheck_child_role':'papacheck_role';var nickKey=d.role==='child'?'papacheck_child_nickname':'papacheck_nickname';localStorage.setItem(tokenKey,d.token);localStorage.setItem(roleKey,d.role);localStorage.setItem(nickKey,d.nickname);var p=new URLSearchParams(window.location.search);window.location.href=p.get('redirect')||'/child'}else document.getElementById('error').style.display='block'}
-document.getElementById('accessCode').addEventListener('keydown',function(e){if(e.key==='Enter')login()})
+function escapeHtml(str) {
+  if (!str && str !== 0) return '';
+  var d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function saveKnownCode(code, name) {
+  var list = [];
+  try {
+    var raw = localStorage.getItem('papacheck_known_codes');
+    if (raw) list = JSON.parse(raw);
+  } catch (e) { list = []; }
+  if (!Array.isArray(list)) list = [];
+  // 去重：已存在的先移除
+  list = list.filter(function (item) { return item.code !== code; });
+  // 追加到末尾
+  list.push({ code: code, name: name });
+  // 最多保留 5 条，删除最旧的
+  if (list.length > 5) list = list.slice(list.length - 5);
+  localStorage.setItem('papacheck_known_codes', JSON.stringify(list));
+}
+
+function loadKnownCodes() {
+  try {
+    var raw = localStorage.getItem('papacheck_known_codes');
+    if (!raw) return [];
+    var parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) { return []; }
+}
+
+function renderRecentList() {
+  var list = loadKnownCodes();
+  var container = document.getElementById('recentList');
+  var section = document.getElementById('recentSection');
+  if (!container) return;
+  if (list.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+  container.innerHTML = '';
+  list.forEach(function (item) {
+    var nameHtml = escapeHtml(item.name || item.code);
+    var code = escapeHtml(item.code);
+    var el = document.createElement('div');
+    el.className = 'recent-item';
+    el.innerHTML =
+      '<span class="recent-name">' + nameHtml + '</span>' +
+      '<div class="recent-actions">' +
+      '<button class="recent-btn" data-code="' + code + '" data-role="parent">家长</button>' +
+      '<button class="recent-btn" data-code="' + code + '" data-role="child">孩子</button>' +
+      '</div>';
+    container.appendChild(el);
+  });
+}
+
+function showError(msg) {
+  var el = document.getElementById('error');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function hideError() {
+  var el = document.getElementById('error');
+  if (el) el.style.display = 'none';
+}
+
+var _selectedRole = null;
+
+function selectRole(role) {
+  _selectedRole = role;
+  var parentBtn = document.getElementById('roleParent');
+  var childBtn = document.getElementById('roleChild');
+  if (parentBtn && childBtn) {
+    parentBtn.classList.toggle('active', role === 'parent');
+    childBtn.classList.toggle('active', role === 'child');
+  }
+  hideError();
+}
+
+async function exchange(code, role) {
+  hideError();
+  if (!code || !code.trim()) {
+    showError('请输入访问码');
+    return;
+  }
+  if (!role) {
+    showError('请选择角色');
+    return;
+  }
+  try {
+    var resp = await fetch('/api/auth/exchange', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access_code: code.trim(), role: role }),
+    });
+    if (resp.ok) {
+      var d = await resp.json();
+      sessionStorage.setItem('papacheck_token', d.token);
+      sessionStorage.setItem('papacheck_role', d.role);
+      sessionStorage.setItem('papacheck_child_name', d.child_name || '');
+      saveKnownCode(code.trim(), d.child_name || '');
+      window.location.href = '/app';
+    } else {
+      var err = await resp.json().catch(function () { return {}; });
+      showError(err.error || '登录失败，请检查访问码');
+    }
+  } catch (e) {
+    showError('网络错误，请稍后重试');
+  }
+}
+
+// 页面加载初始化
+(function () {
+  // 如果已有 token，直接跳转
+  try {
+    var existing = sessionStorage.getItem('papacheck_token');
+    if (existing) {
+      window.location.href = '/app';
+      return;
+    }
+  } catch (e) {}
+
+  renderRecentList();
+
+  // 输入框回车触发
+  document.getElementById('accessCode').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      var code = document.getElementById('accessCode').value;
+      exchange(code, _selectedRole);
+    }
+  });
+
+  // 角色按钮事件委托
+  document.querySelector('.role-buttons').addEventListener('click', function (e) {
+    var btn = e.target.closest('.role-btn');
+    if (btn) selectRole(btn.dataset.role);
+  });
+
+  // 最近使用按钮事件委托
+  document.getElementById('recentList').addEventListener('click', function (e) {
+    var btn = e.target.closest('.recent-btn');
+    if (btn) {
+      var code = btn.dataset.code;
+      var role = btn.dataset.role;
+      exchange(code, role);
+    }
+  });
+})();
 </script>
 </body>
 </html>

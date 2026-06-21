@@ -24,11 +24,7 @@ let _ratingShowCount = 5;
 let _selectedCalendarDate = null;
 let _calendarYear = null;
 let _calendarMonth = null;
-var _children = [];
-var _currentChildId = null;
-var _loadedChildId = null;  // 追踪 cachedData 来自哪个孩子，防止跨孩子数据泄露
-var _loadingChildren = false;
-var _childrenLoadFailed = false;  // 防止权限不足时无限重试 loadChildren
+
 
 const SETTINGS_DEFAULTS = {
   dailyBasePoints: 50,
@@ -113,7 +109,7 @@ function pregenSpeech(texts) {
   if (unique.length === 0) return;
   fetch('/api/pregen-speech', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('papacheck_token') },
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionStorage.getItem('papacheck_token') },
     body: JSON.stringify({ texts: unique }),
   }).catch(() => { });
 }
@@ -126,80 +122,6 @@ const AdminUtil = {
     return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
   },
 };
-
-async function loadChildren() {
-  // 防止重入（避免 refreshAllData → loadChildren → refreshAllData 无限递归）
-  if (_loadingChildren) return;
-  _loadingChildren = true;
-  try {
-    try {
-      var resp = await API._fetch('/api/admin/members', 'GET');
-      if (resp && Array.isArray(resp)) {
-        _children = resp.filter(function (m) { return m.role === 'child' && m.child_id; });
-      }
-    } catch (e) {
-      _children = [];
-      // 403 表示权限不足（如 parent 角色），不应重试；网络错误可重试
-      if (e && e.message === 'Forbidden') {
-        _childrenLoadFailed = true;
-      }
-    }
-    _renderChildSelector();
-    if (_children.length > 0 && !_currentChildId) {
-      // 从 localStorage 恢复上次选中的孩子
-      try {
-        var lastChildId = localStorage.getItem('papacheck_last_child_id');
-        if (lastChildId && _children.find(function (c) { return c.child_id === lastChildId; })) {
-          _currentChildId = lastChildId;
-        } else {
-          _currentChildId = _children[0].child_id;
-        }
-        window._currentChildId = _currentChildId;
-      } catch (e2) { /* 非致命 */ }
-    }
-    if (_currentChildId) {
-      await refreshAllData();
-      renderCurrentTab();
-    }
-  } finally {
-    _loadingChildren = false;
-  }
-}
-
-function _renderChildSelector() {
-  var container = document.getElementById('child-selector');
-  if (!container) return;
-
-  if (_children.length === 0) {
-    container.innerHTML = '<div class="child-selector-empty">请先在管理面板创建孩子</div>';
-    container.style.display = 'block';
-    return;
-  }
-
-  // 商店和设置标签时隐藏
-  if (adminCurrentTab === 'shop' || adminCurrentTab === 'settings') {
-    container.style.display = 'none';
-    return;
-  }
-
-  container.style.display = 'flex';
-  var html = '<span class="child-selector-label">孩子:</span>';
-  for (var i = 0; i < _children.length; i++) {
-    var c = _children[i];
-    var active = c.child_id === _currentChildId ? ' active' : '';
-    html += '<button class="child-tag' + active + '" data-child-id="' + escapeHtml(c.child_id) + '">' + escapeHtml(c.nickname) + '</button>';
-  }
-  container.innerHTML = html;
-}
-
-async function switchToChild(childId) {
-  _currentChildId = childId;
-  window._currentChildId = childId;
-  try { localStorage.setItem('papacheck_last_child_id', childId); } catch (e) { /* 非致命 */ }
-  _renderChildSelector();
-  await refreshAllData();
-  renderCurrentTab();
-}
 
 // ========== Init ==========
 async function initAdmin() {
@@ -234,20 +156,12 @@ async function initAdmin() {
         const duration = rewardItem.dataset.siDuration || '0';
         addRewardFromShop(name, type, duration);
       }
-      // 孩子切换按钮事件委托
-      const childBtn = e.target.closest('.child-tag');
-      if (childBtn) {
-        var childId = childBtn.getAttribute('data-child-id');
-        if (childId && childId !== _currentChildId) {
-          switchToChild(childId);
-        }
-      }
     });
   }
 
   await ConnectionManager.start();
-  await loadChildren();  // 先加载孩子列表并恢复/默认选中，内部会调用 refreshAllData
-  await refreshAllData(); // 兜底刷新（无孩子时加载共享数据）
+  updateTitle();
+  await refreshAllData();
   updateSettingsTabState();
   hideTransitionMask();
   // 恢复上次停留的标签页
@@ -257,6 +171,7 @@ async function initAdmin() {
   setInterval(async () => {
     await refreshAllData();
     updateSettingsTabState();
+    updateTitle();
     const modal = document.getElementById('adminModal');
     if ((modal && modal.classList.contains('show')) || _editingBalance || _editingSettings) return;
     renderCurrentTab();
@@ -265,53 +180,28 @@ async function initAdmin() {
 
 async function refreshAllData() {
   var mode = ConnectionManager.getMode();
-
   if (mode === 'reconnecting') return;
-
-  // 修复：从离线恢复到在线后，重新加载孩子列表并恢复上次选中的孩子
-  // 跳过权限不足的场景（如 parent 角色）避免无限 403 重试
-  if (mode === 'online' && !_childrenLoadFailed && (!_children || _children.length === 0)) {
-    await loadChildren();
-    return; // loadChildren 内部已调用 refreshAllData + renderCurrentTab
-  }
 
   if (mode === 'online') {
     try {
-      var data = await API.getData(_currentChildId);
+      var data = await API.getData();
       if (data) {
-        // 仅当未切换孩子时，保留本地已评级但未同步到服务器的结算数据
-        if (_loadedChildId === _currentChildId) {
-          var oldSettlements = cachedData?.dailySettlement || {};
-          var newSettlements = data.dailySettlement || {};
-          for (var dk of Object.keys(oldSettlements)) {
-            var oldS = oldSettlements[dk];
-            var newS = newSettlements[dk];
-            if (oldS && oldS.rating && !(newS && newS.rating)) {
-              if (!data.dailySettlement) data.dailySettlement = {};
-              data.dailySettlement[dk] = oldS;
-            }
-          }
-        }
         cachedData = data;
-        _loadedChildId = _currentChildId;
         try { await DB.cacheFullData(data); } catch (e) { }
         _applyCachedData();
       }
     } catch (e) {
-      var localData = await DB.getFullData();
-      if (localData && Object.keys(localData).length > 0) {
-        cachedData = localData;
-        _loadedChildId = _currentChildId;
+      // 离线降级
+    }
+  }
+  if (mode === 'offline') {
+    try {
+      var data = await DB.getFullData();
+      if (data) {
+        cachedData = data;
         _applyCachedData();
       }
-    }
-  } else {
-    var localData = await DB.getFullData();
-    if (localData && Object.keys(localData).length > 0) {
-      cachedData = localData;
-      _loadedChildId = _currentChildId;
-      _applyCachedData();
-    }
+    } catch (e) { }
   }
 }
 
@@ -342,7 +232,6 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
-  _renderChildSelector();
   renderCurrentTab();
 }
 
@@ -2507,6 +2396,21 @@ async function confirmAdjustPoints() {
 function closeAdminModal() {
   document.getElementById('adminModal').classList.remove('show');
   adminEditingId = null;
+}
+
+function switchChild() {
+  if (confirm('确认切换孩子？当前会话将自动退出。')) {
+    sessionStorage.removeItem('papacheck_token');
+    sessionStorage.removeItem('papacheck_role');
+    sessionStorage.removeItem('papacheck_child_name');
+    window.location.href = '/login.html';
+  }
+}
+
+function updateTitle() {
+  var childName = null;
+  try { childName = sessionStorage.getItem('papacheck_child_name'); } catch (e) {}
+  document.title = childName ? 'PapaCheck 家长端 · ' + childName : 'PapaCheck 家长端';
 }
 
 // ========== Init ==========

@@ -21,7 +21,7 @@ describe('Multi-tenant Schema', () => {
     expect(schema).toContain('token_version INTEGER NOT NULL DEFAULT 1');
     expect(schema).toContain('is_super_admin BOOLEAN DEFAULT false');
     expect(schema).toContain('needs_password_change BOOLEAN DEFAULT true');
-    expect(schema).toContain('UNIQUE(user_id, nickname)');
+    expect(schema).toContain('UNIQUE(tenant_id, name)');
   });
 
   it('should add tenant_id to all date-key tables', () => {

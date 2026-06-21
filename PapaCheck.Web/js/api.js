@@ -1,7 +1,6 @@
 function getAuthHeaders() {
   try {
-    const key = (typeof window !== 'undefined' && window._authTokenKey) || 'papacheck_token';
-    const token = localStorage.getItem(key);
+    const token = sessionStorage.getItem('papacheck_token');
     return token ? { 'Authorization': 'Bearer ' + token } : {};
   } catch (e) {
     return {};
@@ -11,10 +10,6 @@ function getAuthHeaders() {
 let isServerMode = false;
 let cachedData = null;
 
-// 支持家长端多孩子切换
-if (typeof window !== 'undefined') {
-  window._currentChildId = undefined;
-}
 
 function updateConnStatus() {
   const el = document.getElementById('connStatus');
@@ -1156,9 +1151,6 @@ const API = {
    * 异步上报写操作
    */
   pushOperation: async function (operation) {
-    if (window._currentChildId) {
-      operation.child_id = window._currentChildId;
-    }
     if (window.PapaCheckBridge && window.PapaCheckBridge.enqueue) {
       window.PapaCheckBridge.enqueue(JSON.stringify(operation));
       return { ok: true, queued: true };

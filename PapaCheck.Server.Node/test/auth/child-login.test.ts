@@ -54,16 +54,22 @@ describe.runIf(runPg)('Child Login - JWT contains child_id', () => {
     childId = '11111111-1111-1111-1111-c1d10ad101aa';
     accessCodeId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaac';
 
-    // Create access_code
+    // Create child first (required by access_codes FK)
     await adapter.pool.query(
-      "INSERT INTO access_codes (id, user_id, type, code_hash, nickname) VALUES ($1, $2, 'child', '$2a$10$placeholderhash1234567890abcdef', '小明') ON CONFLICT (id) DO NOTHING",
-      [accessCodeId, tenantId]
+      "INSERT INTO children (id, tenant_id, name) VALUES ($1, $2, '小明') ON CONFLICT (id) DO NOTHING",
+      [childId, tenantId]
     );
 
-    // Create child associated with access_code
+    // Create access_code referencing the child
     await adapter.pool.query(
-      "INSERT INTO children (id, tenant_id, name, access_code_id) VALUES ($1, $2, '小明', $3) ON CONFLICT (id) DO NOTHING",
-      [childId, tenantId, accessCodeId]
+      "INSERT INTO access_codes (id, tenant_id, code_hash, child_id) VALUES ($1, $2, '$2a$10$placeholderhash1234567890abcdef', $3) ON CONFLICT (id) DO NOTHING",
+      [accessCodeId, tenantId, childId]
+    );
+
+    // Associate child with access_code
+    await adapter.pool.query(
+      "UPDATE children SET access_code_id = $1 WHERE id = $2",
+      [accessCodeId, childId]
     );
 
     // findChildByAccessCodeId should find the child
@@ -76,9 +82,15 @@ describe.runIf(runPg)('Child Login - JWT contains child_id', () => {
   // Scenario: findChildByAccessCodeId returns null if no child
   it('access_code 无 children 记录时 findChildByAccessCodeId 返回 null', async () => {
     const noChildAccessCodeId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+    const orphanChildId = '55555555-5555-5555-5555-555555555555';
+    // Create a child first (required by FK), but don't link it via access_code_id
     await adapter.pool.query(
-      "INSERT INTO access_codes (id, user_id, type, code_hash, nickname) VALUES ($1, $2, 'child', '$2a$10$placeholderhash2abcdefghijklmn', '小华') ON CONFLICT (id) DO NOTHING",
-      [noChildAccessCodeId, tenantId]
+      "INSERT INTO children (id, tenant_id, name) VALUES ($1, $2, '小华') ON CONFLICT (id) DO NOTHING",
+      [orphanChildId, tenantId]
+    );
+    await adapter.pool.query(
+      "INSERT INTO access_codes (id, tenant_id, code_hash, child_id) VALUES ($1, $2, '$2a$10$placeholderhash2abcdefghijklmn', $3) ON CONFLICT (id) DO NOTHING",
+      [noChildAccessCodeId, tenantId, orphanChildId]
     );
 
     const found = await adapter.findChildByAccessCodeId(noChildAccessCodeId, tenantId);
@@ -86,6 +98,7 @@ describe.runIf(runPg)('Child Login - JWT contains child_id', () => {
 
     // Cleanup
     await adapter.pool.query('DELETE FROM access_codes WHERE id = $1', [noChildAccessCodeId]);
+    await adapter.pool.query('DELETE FROM children WHERE id = $1', [orphanChildId]);
   });
 
   // Scenario: createChild auto-creates children record

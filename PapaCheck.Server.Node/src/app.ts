@@ -15,6 +15,7 @@ import { AppError, ErrorCodes } from './errors.js';
 import type { CRDTOperation } from './crdt/types.js';
 import { authMiddleware } from './auth/middleware.js';
 import { authRoutes } from './auth/routes.js';
+import { verifyToken } from './auth/jwt.js';
 import { adminRoutes } from './admin/routes.js';
 import { superAdminRoutes } from './auth/super-admin-routes.js';
 import { ensureSuperAdmin } from './auth/super-admin.js';
@@ -100,20 +101,14 @@ function getTomorrow(dateStr: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** 提取 child_id：孩子角色从 JWT 取，家长角色从 query 参数取 */
-function getChildId(request: any, db: any): string | undefined | 'MISSING' {
+/** 提取 child_id：从 JWT 中直接获取 */
+function getChildId(request: any): string | undefined | 'MISSING' {
   const payload = request.jwtPayload;
   if (!payload) return undefined;
-
-  if (payload.role === 'child') {
-    return payload.child_id ?? undefined;
-  }
-  if (payload.role === 'parent') {
-    const queryChildId = (request.query as any)?.child_id;
-    // parent 未选择孩子时允许加载共享数据（初始加载、商店、设置等）
-    return queryChildId || undefined;
-  }
-  return undefined;
+  // Admin/user 角色无 child_id，不需要获取
+  if (payload.role === 'admin' || payload.role === 'user') return undefined;
+  // parent/child 角色在新模型下 JWT 必定含 child_id
+  return payload.child_id ?? 'MISSING';
 }
 
 export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
@@ -1474,26 +1469,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   // ==================== 语义化路由 ====================
 
-  // GET /child - 孩子端大屏
+  // GET /child - 孩子端大屏（301 重定向到 /app）
   app.get('/child', async (_request, reply) => {
-    const indexPath = join(options.webDir, 'index.html');
-    try {
-      await stat(indexPath);
-      return reply.type('text/html; charset=utf-8').send(createReadStream(indexPath));
-    } catch {
-      return reply.status(404).send({ error: 'File not found', code: ErrorCodes.NOT_FOUND });
-    }
+    return reply.redirect(301, '/app');
   });
 
-  // GET /parent - 家长管理端
+  // GET /parent - 家长管理端（301 重定向到 /app）
   app.get('/parent', async (_request, reply) => {
-    const adminPath = join(options.webDir, 'admin.html');
-    try {
-      await stat(adminPath);
-      return reply.type('text/html; charset=utf-8').send(createReadStream(adminPath));
-    } catch {
-      return reply.status(404).send({ error: 'File not found', code: ErrorCodes.NOT_FOUND });
-    }
+    return reply.redirect(301, '/app');
   });
 
   // GET /login - 统一登录页
@@ -1502,6 +1485,29 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     try {
       await stat(loginPath);
       return reply.type('text/html; charset=utf-8').send(createReadStream(loginPath));
+    } catch {
+      return reply.status(404).send({ error: 'File not found', code: ErrorCodes.NOT_FOUND });
+    }
+  });
+
+  // GET /app - 统一入口（根据 JWT 角色分发）
+  // 如果 Authorization header 携带有效的家长/管理员 JWT，返回 admin.html；
+  // 否则返回 index.html（孩子端）
+  app.get('/app', async (request, reply) => {
+    const authHeader = request.headers.authorization;
+    let isParent = false;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.slice(7);
+      const payload = verifyToken(token);
+      if (payload && (payload.role === 'parent' || payload.role === 'admin')) {
+        isParent = true;
+      }
+    }
+    const fileName = isParent ? 'admin.html' : 'index.html';
+    const filePath = join(options.webDir, fileName);
+    try {
+      await stat(filePath);
+      return reply.type('text/html; charset=utf-8').send(createReadStream(filePath));
     } catch {
       return reply.status(404).send({ error: 'File not found', code: ErrorCodes.NOT_FOUND });
     }

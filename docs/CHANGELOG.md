@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### Added
+- **统一登录页重写**：`login.html` 完全重写，新增渐变背景、白底圆角卡片、最近使用列表（localStorage 持久化，最多 5 条）、家长/孩子角色选择按钮。页面加载时检查 `sessionStorage` 有 token 则直接跳转 `/app`，新码登录后自动保存到最近使用。新增 15 个 TDD 测试覆盖 `loadKnownCodes`、`saveKnownCode`、`exchange` API 调用、角色切换、sessionStorage 跳转检测。全量 627 测试通过
+
 ### Fixed
 - **`_setJson` 只做 UPDATE 不处理行不存在的情况**：新租户的 `bounty_tasks`/`shop_items` 等表无初始行时，UPDATE 影响 0 行导致数据静默丢弃。改为 UPDATE + INSERT（`ON CONFLICT DO NOTHING`）模式，兼容多孩子迁移引入的部分唯一索引（`WHERE child_id IS NULL`）
 - **`refreshAllData()` 结算数据跨孩子泄露**：合并循环未追踪 `cachedData` 来自哪个孩子，切换孩子时将前一个孩子的已评级结算合并到新孩子数据中。新增 `_loadedChildId` 守卫，仅当未切换孩子时才执行合并

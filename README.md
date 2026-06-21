@@ -2,7 +2,7 @@
 
 ![PapaCheck Banner](./docs/imgs/_banner.jpg)
 
-> **v1.3.8** — 离线同步重构，Android 原生写队列，多孩子支持（Phase 1+2+竞态防护），608 测试通过
+> **v1.3.8** — 统一登录页重写（最近使用 + 角色选择），627 测试通过
 
 PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和跟踪孩子的作业完成情况。支持通过转发微信群中老师布置的作业到邮件，AI 自动解析并添加到清单；孩子可以自主开始/暂停/完成作业并获得积分；家长远程评级并管理积分商店。
 
@@ -99,7 +99,7 @@ PapaCheck/
 | **Windows 桌面端** | Python, tkinter, 内嵌 Node.js 子进程（pkg SEA 单 EXE） |
 | **邮件同步**      | Node.js IMAP 模块（内置于服务端）                       |
 | **Android 端**    | Flutter, `webview_flutter`                              |
-| **测试**          | Vitest（608 单元 + PG 集成）、pytest（65）、Flutter（30） |
+| **测试**          | Vitest（627 单元 + PG 集成）、pytest（65）、Flutter（30） |
 | **构建发布**      | release.py（一站式：EXE + APK + ZIP）                    |
 
 ## 🔧 开发

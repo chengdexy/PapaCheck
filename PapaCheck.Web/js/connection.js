@@ -114,10 +114,6 @@ var ConnectionManager = (function () {
         showToast('同步失败，继续使用离线模式');
       }
     } finally {
-      // 恢复 childId，防止 API.getData() 把它清成了 undefined
-      if (typeof window !== 'undefined' && savedChildId !== undefined) {
-        window._currentChildId = savedChildId;
-      }
       hideReconnectMask();
       updateConnStatus();
       _syncing = false;

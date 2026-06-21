@@ -74,7 +74,7 @@ export interface JWTPayload {
   member_id?: string;
   child_id?: string;
   role: 'admin' | 'user' | 'parent' | 'child';
-  nickname: string;
+  nickname?: string;
   token_version: number;
   iat?: number;
   exp?: number;
@@ -126,11 +126,10 @@ export interface CreateUserInput {
 
 export interface AccessCodeRecord {
   id: string;
-  user_id: string;
-  type: 'parent' | 'child';
+  tenant_id: string;
   code_hash: string;
   access_code?: string;
-  nickname: string;
+  child_id: string;
   token_version: number;
   last_login?: string;
   created_at: string;
@@ -148,11 +147,10 @@ export interface ChildrenRecord {
 
 export interface CreateAccessCodeInput {
   id: string;
-  user_id: string;
-  type: 'parent' | 'child';
+  tenant_id: string;
   code_hash: string;
   access_code?: string;
-  nickname: string;
+  child_id: string;
 }
 
 // ==================== Ops Types ====================
@@ -326,11 +324,11 @@ export interface IDatabase {
   setTenantActive(tenantId: string, isActive: boolean): Promise<void>;
   createTenant(id: string, name: string): Promise<void>;
   createAccessCode(input: CreateAccessCodeInput): Promise<string>;
-  getAccessCodesByUser(userId: string): Promise<AccessCodeRecord[]>;
+  getAccessCodesByUser(tenantId: string): Promise<AccessCodeRecord[]>;
   findAccessCodeByCode(code: string): Promise<AccessCodeRecord | null>;
   getAccessCodeById(id: string): Promise<AccessCodeRecord | null>;
-  regenerateAccessCode(id: string, userId: string): Promise<string>;
-  deleteAccessCode(id: string, userId: string): Promise<void>;
+  regenerateAccessCode(id: string, tenantId: string): Promise<string>;
+  deleteAccessCode(id: string, tenantId: string): Promise<void>;
 
   // ==================== Children Methods ====================
   createChild(tenantId: string, name: string, accessCodeId?: string): Promise<ChildrenRecord>;

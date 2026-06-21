@@ -55,7 +55,7 @@ var SyncEngine = (function() {
     var url = _getBaseUrl() + '/api/sync/crdt-push';
     var resp = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem((typeof window !== 'undefined' && window._authTokenKey) || 'papacheck_token') || '') },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (sessionStorage.getItem('papacheck_token') || '') },
       body: JSON.stringify({ operations: pending })
     });
     if (!resp.ok) throw new Error('CRDT push failed: ' + resp.status);
@@ -79,7 +79,7 @@ var SyncEngine = (function() {
   async function _refreshFromServer() {
     try {
       var url = _getBaseUrl() + '/api/data';
-      var resp = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem((typeof window !== 'undefined' && window._authTokenKey) || 'papacheck_token') || '') } });
+      var resp = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (sessionStorage.getItem('papacheck_token') || '') } });
       if (resp.ok) {
         var serverData = await resp.json();
         await DB.cacheFullData(serverData);

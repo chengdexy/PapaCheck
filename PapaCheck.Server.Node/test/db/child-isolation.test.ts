@@ -616,16 +616,22 @@ describe.runIf(runPg)('Delete AccessCode Clears children.access_code_id', () => 
     accessCodeId = 'aaaaaaaa-aaaa-aaaa-aaaa-deadac000001';
     childId = 'cccccccc-cccc-cccc-cccc-deadac000001';
 
-    // Create access_code
+    // Create child first (required by access_codes FK)
     await adapter.pool.query(
-      "INSERT INTO access_codes (id, user_id, type, code_hash, nickname) VALUES ($1, $2, 'child', 'hash', '小明') ON CONFLICT (id) DO NOTHING",
-      [accessCodeId, tenantA]
+      "INSERT INTO children (id, tenant_id, name) VALUES ($1, $2, '小明') ON CONFLICT (id) DO NOTHING",
+      [childId, tenantA]
     );
 
-    // Create child associated with access_code
+    // Create access_code referencing the child
     await adapter.pool.query(
-      "INSERT INTO children (id, tenant_id, name, access_code_id) VALUES ($1, $2, '小明', $3) ON CONFLICT (id) DO NOTHING",
-      [childId, tenantA, accessCodeId]
+      "INSERT INTO access_codes (id, tenant_id, code_hash, child_id) VALUES ($1, $2, 'hash', $3) ON CONFLICT (id) DO NOTHING",
+      [accessCodeId, tenantA, childId]
+    );
+
+    // Associate child with access_code
+    await adapter.pool.query(
+      "UPDATE children SET access_code_id = $1 WHERE id = $2",
+      [accessCodeId, childId]
     );
 
     // Verify child has access_code_id
@@ -924,9 +930,15 @@ describe.runIf(runPg)('New Child Default Row Init (新孩子默认行初始化)'
 
   it('createChild 带 accessCodeId 则关联 access_code', async () => {
     const accessId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaacc';
+    const tempChildId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaacc';
+    // Create a temp child first (required by access_codes FK)
     await adapter.pool.query(
-      "INSERT INTO access_codes (id, user_id, type, code_hash, nickname) VALUES ($1, $2, 'child', 'testhash', '绑定娃') ON CONFLICT (id) DO NOTHING",
-      [accessId, tenantA]
+      "INSERT INTO children (id, tenant_id, name) VALUES ($1, $2, '__temp__') ON CONFLICT (id) DO NOTHING",
+      [tempChildId, tenantA]
+    );
+    await adapter.pool.query(
+      "INSERT INTO access_codes (id, tenant_id, code_hash, child_id) VALUES ($1, $2, 'testhash', $3) ON CONFLICT (id) DO NOTHING",
+      [accessId, tenantA, tempChildId]
     );
 
     const child = await adapter.createChild(tenantA, '绑定娃', accessId);
