@@ -41,4 +41,7 @@ interface WriteOperationDao {
 
     @Query("DELETE FROM write_operations WHERE status = 'failed' AND tenantId = :tenantId")
     suspend fun clearFailed(tenantId: String)
+
+    @Query("UPDATE write_operations SET status = 'pending', attemptCount = 0 WHERE status = 'failed' AND tenantId = :tenantId")
+    suspend fun resetFailedToPending(tenantId: String)
 }

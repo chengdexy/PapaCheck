@@ -45,7 +45,14 @@ class QueueBridge(private val context: Context, private val scope: CoroutineScop
                         val failed = db.dao().getFailed(tenantId)
                         val ids = failed.map { it.id }
                         if (ids.isNotEmpty()) {
-                            db.dao().clearFailed(tenantId)
+                            // 重置为 pending 并清空重试计数，等待下次入队重试
+                            db.dao().resetFailedToPending(tenantId)
+                            // 触发 WorkManager 重新处理
+                            val token = _token ?: ""
+                            val baseUrl = _baseUrl ?: ""
+                            if (token.isNotEmpty() && baseUrl.isNotEmpty()) {
+                                WriteQueueWorker.enqueue(context, tenantId, token, baseUrl)
+                            }
                         }
                         result.success(ids)
                     }
