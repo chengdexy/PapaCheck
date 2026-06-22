@@ -46,7 +46,7 @@ export default function BrandHeader({ title, subtitle, role, onLogout }: BrandHe
         {/* 右侧：快捷链接 + 退出 */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <a
-            href={`${APP_BASE}/app`}
+            href={`${APP_BASE}/app/`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-md transition-colors"

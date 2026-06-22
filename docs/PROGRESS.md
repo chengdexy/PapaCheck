@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-22 | **云端路由对齐 + 多 bug 修复**：迁移脚本自动创建 children；修复 `api.js` localStorage→sessionStorage 不匹配导致登录死循环；`login.html` 孩子跳转 `/`→`/app/` 对齐云端路由；Nginx 新增 `location = /app`；BrandHeader "客户端"按钮加尾部斜杠；`/parent` 路由修复 |
 | 2026-06-22 | **多孩子生产数据迁移 + 全量部署上线**：对线上数据库执行迁移 SQL（children 表 + child_id 列 + access_codes 模型），上传新 dist/ 并重启服务。修复 `getChildId(request, db)` 33 处编译错误。API 验证通过，零错误日志 |
 | 2026-06-22 | **多孩子迁移可靠性验证测试**：新增 4 个 TDD 测试文件（19 个测试），覆盖 schema 结构、12 表数据分配、幂等性、可回滚性。验证多孩子架构变更的数据库迁移可靠性 |
 | 2026-06-22 | **修复管理面板退出后孩子端/家长端 sessionStorage token 未清理**：管理面板 logout 只清除了 localStorage 的 `papacheck_admin_token`，未清除 sessionStorage 中的 `papacheck_token`/`papacheck_role`/`papacheck_child_name`。退出后访问 `/login.html` 被旧 token 自动重定向到孩子/家长端展示旧数据。涉及 1 个文件 |
