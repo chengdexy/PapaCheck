@@ -32,10 +32,10 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
 .step .icon{width:20px;text-align:center;flex-shrink:0}
 .step .desc{flex:1}
 .step .time{color:var(--muted);font-size:11px;min-width:50px;text-align:right}
-.step.pending .icon{color:var(--pending)}.step.pending .icon::before{content:'\u25CB'}
-.step.running .icon{color:var(--blue);animation:spin .8s linear infinite}.step.running .icon::before{content:'\u25D8'}
-.step.success .icon{color:var(--green)}.step.success .icon::before{content:'\u2714'}
-.step.failed .icon{color:var(--red)}.step.failed .icon::before{content:'\u2718'}
+.step.pending .icon{color:var(--pending)}.step.pending .icon::before{content:'\25CB'}
+.step.running .icon{color:var(--blue);animation:spin .8s linear infinite}.step.running .icon::before{content:'\25D8'}
+.step.success .icon{color:var(--green)}.step.success .icon::before{content:'\2714'}
+.step.failed .icon{color:var(--red)}.step.failed .icon::before{content:'\2718'}
 @keyframes spin{to{transform:rotate(360deg)}}
 .log-panel{background:#090b10;border:1px solid var(--border);border-radius:8px;margin-bottom:16px;overflow:hidden}
 .log-header{display:flex;justify-content:space-between;padding:8px 12px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none;border-bottom:1px solid var(--border)}
