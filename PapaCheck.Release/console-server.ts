@@ -16,7 +16,13 @@ export async function startServer(port = 3456) {
 
   const clients = new Set<(event: string, data: any) => void>();
   const broadcast = (event: string, data: any) => {
-    for (const send of clients) send(event, data);
+    for (const send of clients) {
+      try {
+        send(event, data);
+      } catch {
+        clients.delete(send);
+      }
+    }
   };
 
   executor.on('step-start', (e) => broadcast('step-start', e));
@@ -40,7 +46,11 @@ export async function startServer(port = 3456) {
       'Access-Control-Allow-Origin': '*',
     });
     const send = (event: string, data: any) => {
-      reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      try {
+        reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      } catch {
+        clients.delete(send);
+      }
     };
     clients.add(send);
     request.raw.on('close', () => clients.delete(send));
