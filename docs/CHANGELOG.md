@@ -6,13 +6,14 @@
 
 ## [Unreleased]
 
+### Added
+- **多孩子迁移数据可靠性测试**：新增 4 个 TDD 测试文件（19 个测试），覆盖 schema 结构验证、12 张 per-child 表数据分配正确性、迁移幂等性、可回滚性。用于上线前验证多孩子架构变更的数据库迁移可靠性（[#multi-child-schema.test.ts](file:///e:/trae_projects/PapaCheck/PapaCheck.Server.Node/test/migration/multi-child-schema.test.ts)）
+
 ### Fixed
 - **`ensureSuperAdmin` 超管改邮箱后重启重复创建**：判重条件从按默认邮箱查改为按角色查（`findAdminExists` 检查 `role='admin'`），超管修改邮箱后服务重启不再产生两个超管账号。新增 2 个 TDD 测试
 - **超管在管理面板下载备份文件提示"下载失败需要权限"**：备份下载链接使用 `<a href="...">` 标签，浏览器直接请求不带 JWT `Authorization` 头，被服务端中间件拒绝。改为 `fetch` + `createObjectURL` 方式，从 `localStorage` 读取 token 并注入请求头，确保超管认证通过
 - **Vite 构建失败：BrandHeader 未使用的 `Baby` 导入触发 tsc 错误**：`BrandHeader.tsx` 导入了 `lucide-react` 的 `Baby` 图标但未使用，`tsc -b` 将其视为错误导致 `npm run build` 中断，`release.py --site` 部署失败。移除未使用导入后构建恢复正常
 - **管理面板退出后孩子端/家长端 sessionStorage token 未清理导致展示旧数据**：管理面板 `logout` 只清除了 `localStorage` 的 `papacheck_admin_token`，未同时清除 `sessionStorage` 中的 `papacheck_token`/`papacheck_role`/`papacheck_child_name`。用户退出管理面板后访问 `/login.html`，后者发现 `sessionStorage` 中仍有旧 token，跳过登录页直接重定向到孩子/家长端展示旧数据。修复后在 `logout` 中同步清理 sessionStorage 三项
-
-### Added
 - **Android 下载进度条**：`UpdateService.downloadAndInstall` 新增 `onProgress` 回调，逐 chunk 读取响应流计算下载进度；对话框改用 `StatefulBuilder` + determinate 进度条 + 百分比文本。新增 2 个 TDD 测试，全量 32 Flutter 测试通过
 - **统一登录页重写**：`login.html` 完全重写，新增渐变背景、白底圆角卡片、最近使用列表（localStorage 持久化，最多 5 条）、家长/孩子角色选择按钮。新码登录后自动保存到最近使用。新增 15 个 TDD 测试。全量 627 测试通过
 - **管理面板适配新模型**：`AddMemberForm` 删除角色选择，只接收孩子姓名；`MemberTable` 删除角色列，按孩子展示；`BrandHeader` 合并为孩子端/家长端为"客户端"链接；后端 `admin/routes.ts` 适配新 access_codes 结构
