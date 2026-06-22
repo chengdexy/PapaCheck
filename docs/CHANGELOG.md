@@ -11,6 +11,9 @@
 - **生产环境多孩子数据迁移完成**：对线上 `papacheck` 数据库执行 `init-pg-schema.sql` + `migrate-access-code-model.sql`，创建 children 表、12 张表 child_id 列、12 个部分唯一索引、access_codes 模型迁移。备份 + 迁移 + 部署 + 重启 全流程完成
 
 ### Fixed
+- **`migrate-access-code-model.sql` 不会自动创建 children 记录**：脚本 Step 2 先根据旧 `type='child'` 的 access_codes 创建 children 记录，再分配 child_id → 再 DROP type/nickname。新增 Step 3.5 DO 块自动分配 12 张 per-child 表的遗留数据
+- **服务器 `api.js` 用 `localStorage` 导致 `/api/data` 返回 401 死循环**：`login.html` 将 token 存入 `sessionStorage`，但服务器 `api.js` 是旧版本（用 `localStorage`），`API.getData()` 读不到 token → 401 → 重定向登录 → 死循环。上传最新版 `api.js` 等 7 个 JS 文件
+- **云端路由 vs 本地路由不一致**：`/` 在本地是孩子端、在云端是落地页。`/app`（无尾部斜杠）无 Nginx 规则。修复：`login.html` 孩子跳转 `/` → `/app/`；`nginx.conf` 新增 `location = /app`；`BrandHeader.tsx` "客户端"按钮 `/app` → `/app/`
 - **`getChildId` 函数签名不一致导致 tsc 编译失败**：`getChildId` 已改为单参数 `(request)`，但 `app.ts` 中 33 处调用仍传 `(request, db)`。全局替换为 `getChildId(request)`，修复构建阻塞
 - **`ensureSuperAdmin` 超管改邮箱后重启重复创建**：判重条件从按默认邮箱查改为按角色查（`findAdminExists` 检查 `role='admin'`），超管修改邮箱后服务重启不再产生两个超管账号。新增 2 个 TDD 测试
 - **超管在管理面板下载备份文件提示"下载失败需要权限"**：备份下载链接使用 `<a href="...">` 标签，浏览器直接请求不带 JWT `Authorization` 头，被服务端中间件拒绝。改为 `fetch` + `createObjectURL` 方式，从 `localStorage` 读取 token 并注入请求头，确保超管认证通过

@@ -202,7 +202,7 @@ async function exchange(code, role) {
       sessionStorage.setItem('papacheck_role', d.role);
       sessionStorage.setItem('papacheck_child_name', d.child_name || '');
       saveKnownCode(code.trim(), d.child_name || '');
-      window.location.href = d.role === 'parent' ? '/admin.html' : '/';
+      window.location.href = d.role === 'parent' ? '/admin.html' : '/app/';
     } else {
       var err = await resp.json().catch(function () { return {}; });
       showError(err.error || '登录失败，请检查访问码');
@@ -219,7 +219,7 @@ async function exchange(code, role) {
     var existing = sessionStorage.getItem('papacheck_token');
     var role = sessionStorage.getItem('papacheck_role');
     if (existing && role) {
-      window.location.href = role === 'parent' ? '/admin.html' : '/';
+      window.location.href = role === 'parent' ? '/admin.html' : '/app/';
       return;
     }
   } catch (e) {}
