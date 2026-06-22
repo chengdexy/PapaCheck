@@ -31,16 +31,10 @@ export async function sitePublish(executor: Executor): Promise<boolean> {
     id: '3', desc: '上传管理面板', cmd: adminCmd, cwd: ROOT, shell: true, timeout: 120,
   });
 
-  const cleanupCmd = `npx tsx -e "
-const { rmSync, existsSync } = require('fs');
-const dist = '${DIST_DIR.replace(/\\/g, '/')}';
-const f1 = '${landingTar.replace(/\\/g, '/')}';
-const f2 = '${adminTar.replace(/\\/g, '/')}';
-if (existsSync(dist)) rmSync(dist, { recursive: true, force: true });
-if (existsSync(f1)) rmSync(f1);
-if (existsSync(f2)) rmSync(f2);
-console.log('OK');
-"`;
+  const distDir = DIST_DIR.replace(/\\/g, '/');
+  const lTar = landingTar.replace(/\\/g, '/');
+  const aTar = adminTar.replace(/\\/g, '/');
+  const cleanupCmd = `node -e "const{rmSync,existsSync}=require('fs');const d='${distDir}';const f1='${lTar}';const f2='${aTar}';if(existsSync(d))rmSync(d,{recursive:true,force:true});if(existsSync(f1))rmSync(f1);if(existsSync(f2))rmSync(f2);console.log('OK')"`;
   steps.push({
     id: '4', desc: '清理构建产物', cmd: cleanupCmd, cwd: ROOT, shell: true, timeout: 10,
   });
