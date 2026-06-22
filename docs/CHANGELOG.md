@@ -13,7 +13,8 @@
 - （暂无）
 
 ### Fixed
-- （暂无）
+- **修复 `/parent` 路由错误重定向到管理面板**：`GET /parent` 应 301 到 `/app`（客户端家长界面），之前被错误改为 `/admin/`（React 管理面板），已改回（[app.ts](file:///E:/trae_projects/PapaCheck/PapaCheck.Server.Node/src/app.ts)）
+- **修复 CRDT 推送测试使用过时操作格式**：`api.test.ts` 中 CRDT 操作使用旧版 `field: 'status', value: 'completed'` 字符串格式，改为新版 `value: { ... }` 对象格式，消除 `Cannot create property 'lastModified' on string` 错误
 
 ## [1.4.0] - 2026-06-22
 

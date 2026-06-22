@@ -1473,9 +1473,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return reply.redirect(301, '/app');
   });
 
-  // GET /parent - 家长管理端（301 重定向到管理面板）
+  // GET /parent - 家长端 → 跳转到客户端家长界面
   app.get('/parent', async (_request, reply) => {
-    return reply.redirect(301, '/admin/');
+    return reply.redirect(301, '/app');
   });
 
   // GET /login - 统一登录页
