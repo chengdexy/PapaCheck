@@ -119,7 +119,7 @@ npx vitest run
 | [API](docs/API.md)                     | API 接口文档 |
 | [CHANGELOG](docs/CHANGELOG.md)         | 变更日志    |
 | [PROGRESS](docs/PROGRESS.md)           | 进度记录    |
-| [HANDOVER](docs/HANDOVER.md)           | 上云交接文档 |
+| [HANDOVER](docs/HANDOVER.md)           | 上云交接文档（本地部署参考，含敏感信息） |
 
 ### 测试驱动开发
 
