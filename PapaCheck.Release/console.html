@@ -23,6 +23,10 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
 .card p{color:var(--muted);font-size:13px;margin-bottom:12px}
 .card button{width:100%;padding:8px 16px;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;transition:opacity .15s;color:#fff}
 .card button:disabled{opacity:.5;cursor:not-allowed}
+.bump-row{display:flex;gap:6px}
+.bump-row select,.bump-row button{width:auto}
+.bump-select{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;cursor:pointer;flex:1;min-width:0}
+.bump-select:focus{outline:none;border-color:var(--blue)}
 .btn-apk{background:var(--blue)}
 .btn-cloud{background:#7c3aed}
 .btn-site{background:#059669}
@@ -73,8 +77,16 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
   <div class="cards">
     <div class="card">
       <h3>构建 APK</h3>
-      <p>Flutter 构建 Android APK（版本号不变，加 --bump 递增）</p>
-      <button class="btn-apk" onclick="startRelease('build-apk')">开始构建</button>
+      <p>Flutter 构建 Android APK</p>
+      <div class="bump-row">
+        <select class="bump-select" id="bumpSelect">
+          <option value="">保持版本</option>
+          <option value="patch">+ patch</option>
+          <option value="minor">+ minor</option>
+          <option value="major">+ major</option>
+        </select>
+        <button class="btn-apk" onclick="startRelease('build-apk')">构建</button>
+      </div>
     </div>
     <div class="card">
       <h3>同步云端</h3>
@@ -245,7 +257,15 @@ function startRelease(type) {
   document.getElementById('execution').classList.add('visible');
   document.getElementById('taskTitle').textContent = { 'build-apk':'构建 APK', 'cloud':'同步云端', 'site':'部署 Site' }[type] || type;
   document.getElementById('taskTime').textContent = new Date().toLocaleString();
-  fetch('/api/release/' + type, { method:'POST' }).catch(() => {
+  const opts = { method:'POST' };
+  if (type === 'build-apk') {
+    const bump = document.getElementById('bumpSelect').value;
+    if (bump) {
+      opts.headers = { 'Content-Type': 'application/json' };
+      opts.body = JSON.stringify({ bump });
+    }
+  }
+  fetch('/api/release/' + type, opts).catch(() => {
     executing = false;
     document.querySelectorAll('.card button').forEach(b => b.disabled = false);
   });
