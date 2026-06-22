@@ -11,10 +11,17 @@
 - **替换硬编码服务器 IP 为域名**：`cloud-publish.ts` 和 `site-publish.ts` 默认服务器地址从 `123.57.129.243` 改为 `papacheck.chengdexy.cn`，IP 不再出现在 git 跟踪的代码中。`PAPACHECK_CLOUD_IP` 环境变量仍可覆盖
 
 ### Added
-- **Release Console 发布控制台**：`PapaCheck.Release/` 子项目，Node.js/TypeScript 重写原 `release.py`。CLI 四子命令（serve/build-apk/cloud/site）+ Web 控制台（暗色主题、SSE 实时日志、步骤状态追踪、操作记录）。执行引擎 EventEmitter 驱动，支持超时保护、行缓冲日志。BDD/TDD 开发，13 个测试覆盖执行器、版本管理和发布流程（[设计文档](docs/superpowers/specs/2026-06-22-release-console-design.md)）
+- **Release Console 发布控制台**：`PapaCheck.Release/` 子项目，Node.js/TypeScript 重写原 `release.py`。CLI 四子命令（serve/build-apk/cloud/site）+ Web 控制台（暗色主题、SSE 实时日志、步骤状态追踪、操作记录）。执行引擎 EventEmitter 驱动，支持超时保护、行缓冲日志。BDD/TDD 开发，15 个测试覆盖执行器/版本管理/发布流程/模块解析（[设计文档](docs/superpowers/specs/2026-06-22-release-console-design.md)）
+- **云同步前自动重置 PG 测试库**：`lib/reset-test-db.ts` 删库重建 + 重跑 schema，确保集成测试通过
+- **控制台顶部环境变量状态展示**：显示 PAPACHECK_CLOUD_IP 和 PAPACHECK_SSH_USER 配置状态，未设置红色警示
+- **StepDef 新增 env 字段**：支持子进程环境变量覆盖
+- **日志面板保存按钮**：保存日志到 `log/` 目录，文件名 `release-{type}-{timestamp}.txt`
 
 ### Fixed
 - **修复 SSE 连接客户端未清理内存泄漏**：`console-server.ts` 中 broadcast 遍历和 send 写入增加 try-catch，异常客户端立即自清理，防止单个异常阻断后续广播
+- **修复 npx tsx -e 内联脚本 Windows 引号冲突**：版本号递增、APK 归档、清理步骤、schema 重置统一改为直接 fs 调用或独立脚本文件
+- **修复控制台 CSS unicode 转义**：`\uXXXX` 改为 `\XXXX`（CSS 不支持 `\u` 前缀）
+- **构建 APK 默认不递增版本号**：需用户显式选择 bump 或指定 --bump 参数
 - **修复 `/parent` 路由错误重定向到管理面板**：`GET /parent` 应 301 到 `/app`（客户端家长界面），之前被错误改为 `/admin/`（React 管理面板），已改回（[app.ts](file:///E:/trae_projects/PapaCheck/PapaCheck.Server/src/app.ts)）
 - **修复 CRDT 推送测试使用过时操作格式**：`api.test.ts` 中 CRDT 操作使用旧版 `field: 'status', value: 'completed'` 字符串格式，改为新版 `value: { ... }` 对象格式，消除 `Cannot create property 'lastModified' on string` 错误
 

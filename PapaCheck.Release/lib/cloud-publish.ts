@@ -26,11 +26,10 @@ export async function cloudPublish(executor: Executor): Promise<boolean> {
   let idx = 1;
 
   // 重置测试库 schema，确保 PG 测试能通过
-  const testDbUrl = process.env.DATABASE_URL || 'postgresql://papacheck***REDACTED***@localhost:5432/papacheck_test';
   steps.push({
     id: String(idx++), desc: '重置测试数据库 schema',
-    cmd: `npx tsx -e "const{Pool}=require('pg');const{readFileSync}=require('fs');const{resolve}=require('path');new Pool({connectionString:'${testDbUrl}'}).query(readFileSync(resolve('PapaCheck.Server/scripts/init-pg-schema.sql'),'utf-8')).then(()=>{console.log('OK');process.exit(0)}).catch(e=>{console.error(e.message);process.exit(1)})"`,
-    cwd: ROOT, shell: true, timeout: 30,
+    cmd: 'npx tsx lib/reset-test-db.ts',
+    cwd: join(ROOT, 'PapaCheck.Release'), shell: true, timeout: 30,
   });
 
   // 运行全量测试（过滤输出，仅保留失败信息和摘要）

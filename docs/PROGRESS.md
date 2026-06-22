@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-22 | **Release Console 迭代修复 + BDD/TDD 补测试**：修复 npx tsx -e Windows 引号冲突（抽独立脚本）；控制台添加环境变量展示、日志保存按钮、版本递增选择器、CSS unicode 修复；云同步步骤新增自动重置 PG 测试库 + 过滤测试日志；新增 2 个测试文件，共 15 测试通过。全量测试因本地 PG 测试库状态问题未通过，明日继续 |
 | 2026-06-22 | **Release Console 实现 + BDD/TDD 开发**：PapaCheck.Release/ 子项目实现完成（CLI 四子命令 + Web 控制台 + 执行引擎）。BDD/TDD 开发 13 个测试通过。修复 SSE 内存泄漏、替换硬编码 IP 为域名。清理 Python 死代码（release.py、pytest 等），项目不再依赖 Python 运行时 |
 | 2026-06-22 | **PapaCheck.Server.Node 重命名 + Release Console 设计文档**：`PapaCheck.Server.Node` → `PapaCheck.Server`（本地 git mv + 云端目录 mv + service 路径同步）；创建 Release Console 设计文档，规划用 Node.js/TypeScript 重写 release.py 并添加 Web 控制台 |
 | 2026-06-22 | **修复 `/parent` 重定向 + 代码审查修复循环**：`/parent` 路由从 `/admin/` 改回 `/app`；CRDT 推送测试改用新版操作格式；修复 PapaCheck.Server 目录被 PapaCheck.Email 配置自动再生问题；CodeGraph MCP 集成分析确认 Windows/Server/Email 三个弃用子项目安全删除。全量 580 测试通过 |
