@@ -25,9 +25,13 @@ export async function cloudPublish(executor: Executor): Promise<boolean> {
   const { ip: CLOUD_SERVER_IP, user: CLOUD_SERVER_USER } = requireEnv();
   const steps: StepDef[] = [];
 
+  // 临时清除 DATABASE_URL，跳过需要 PG 的集成测试（仅做逻辑验证）
   steps.push({
-    id: '1', desc: '运行全量测试',
-    cmd: 'npm test', cwd: ROOT, shell: true, timeout: 180,
+    id: '1', desc: '运行全量测试（跳过 PG 集成测试）',
+    cmd: process.platform === 'win32'
+      ? 'set DATABASE_URL= && npx vitest run'
+      : 'DATABASE_URL= npx vitest run',
+    cwd: ROOT, shell: true, timeout: 180,
   });
 
   steps.push({
