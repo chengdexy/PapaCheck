@@ -1,5 +1,5 @@
-import { readFileSync, mkdirSync, copyFileSync, readdirSync, unlinkSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, readdirSync, unlinkSync, existsSync } from 'fs';
+import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { Executor, type StepDef } from './executor.js';
 
@@ -44,6 +44,22 @@ export function resolveVersion(current: string, args: { ver?: string; bump?: str
   }
 }
 
+function _updatePubspecVersion(newVer: string): void {
+  let content = readFileSync(PUBSPEC, 'utf-8');
+  content = content.replace(/^(version:\s*)\S+/m, `$1${newVer}+0`);
+  writeFileSync(PUBSPEC, content);
+}
+
+function _archiveApk(newVer: string): void {
+  mkdirSync(APK_ARCHIVE_DIR, { recursive: true });
+  const dst = join(APK_ARCHIVE_DIR, `PapaCheck-${newVer}.apk`);
+  copyFileSync(APK_BUILD_OUTPUT, dst);
+  // 清理旧 APK，保留最新 1 个
+  const files = readdirSync(APK_ARCHIVE_DIR)
+    .filter(f => f.startsWith('PapaCheck-') && f.endsWith('.apk') && f !== `PapaCheck-${newVer}.apk`);
+  for (const f of files) unlinkSync(join(APK_ARCHIVE_DIR, f));
+}
+
 export async function buildApk(executor: Executor, args: { ver?: string; bump?: string; noBump?: boolean } = {}): Promise<boolean> {
   const currentVer = readApkVersion();
   const newVer = resolveVersion(currentVer, args);
@@ -51,17 +67,12 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
   let idx = 1;
 
   if (newVer !== currentVer) {
-    const setVerCmd = `npx tsx -e "
-import { readFileSync, writeFileSync } from 'fs';
-const p = '${PUBSPEC.replace(/\\/g, '/')}';
-let c = readFileSync(p, 'utf-8');
-c = c.replace(/^(version:\\s*)\\S+/m, '$1${newVer}+0');
-writeFileSync(p, c);
-console.log('版本号: ${currentVer} \\u2192 ${newVer}');
-"`;
+    // 版本号递增：直接操作文件，不经过子进程（避免 Windows shell 引号问题）
+    _updatePubspecVersion(newVer);
     steps.push({
       id: String(idx++), desc: `版本号递增 ${currentVer} → ${newVer}`,
-      cmd: setVerCmd, cwd: ROOT, shell: true, timeout: 10,
+      cmd: ['node', '-e', `console.log('版本号: ${currentVer} → ${newVer}')`],
+      timeout: 5,
     });
   }
 
@@ -70,24 +81,15 @@ console.log('版本号: ${currentVer} \\u2192 ${newVer}');
     cmd: 'flutter build apk --release', cwd: ANDROID_DIR, shell: true, timeout: 300,
   });
 
-  steps.push({
-    id: String(idx++), desc: '归档 APK',
-    cmd: `npx tsx -e "
-import { mkdirSync, copyFileSync, readdirSync, unlinkSync, existsSync } from 'fs';
-import { join } from 'path';
-const src = '${APK_BUILD_OUTPUT.replace(/\\/g, '/')}';
-const dstDir = '${APK_ARCHIVE_DIR.replace(/\\/g, '/')}';
-mkdirSync(dstDir, { recursive: true });
-const dst = join(dstDir, 'PapaCheck-${newVer}.apk');
-copyFileSync(src, dst);
-console.log('APK\\u5F52\\u6863\\u2192 ' + dst);
-if (existsSync(dstDir)) {
-  const files = readdirSync(dstDir).filter(f => f.startsWith('PapaCheck-') && f.endsWith('.apk') && f !== 'PapaCheck-${newVer}.apk');
-  files.forEach(f => unlinkSync(join(dstDir, f)));
-}
-"`,
-    cwd: ROOT, shell: true, timeout: 10,
-  });
+  if (existsSync(APK_BUILD_OUTPUT)) {
+    // 归档 APK：直接操作文件
+    _archiveApk(newVer);
+    steps.push({
+      id: String(idx++), desc: `归档 APK → PapaCheck-${newVer}.apk`,
+      cmd: ['node', '-e', `console.log('已归档: PapaCheck-${newVer}.apk')`],
+      timeout: 5,
+    });
+  }
 
   return executor.runAndReport('构建 APK', steps);
 }
