@@ -26,7 +26,7 @@ export async function cloudPublish(executor: Executor): Promise<boolean> {
   const steps: StepDef[] = [];
 
   // 跳过需要 PG 的集成测试（仅做逻辑验证）
-  const excludeFlags = '--exclude=**/test/db/** --exclude=**/test/migration/** --exclude=**/test/email.test.ts --exclude=**/test/api/** --exclude=**/test/auth/routes.test.ts --exclude=**/test/auth/child-login.test.ts --exclude=**/test/ops/backup.test.ts --exclude=**/test/server.test.ts';
+  const excludeFlags = '--exclude=**/test/db/** --exclude=**/test/migration/** --exclude=**/test/email.test.ts --exclude=**/test/api/** --exclude=**/test/auth/routes.test.ts --exclude=**/test/auth/child-login.test.ts --exclude=**/test/ops/backup.test.ts --exclude=**/test/server.test.ts --exclude=**/test/schema.test.ts';
   steps.push({
     id: '1', desc: '运行全量测试（跳过 PG 集成测试）',
     cmd: `npx vitest run ${excludeFlags}`, cwd: ROOT, shell: true, timeout: 180,
