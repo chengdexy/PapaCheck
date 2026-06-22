@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-22（Android WebView 会话持久化修复）
+> 最后更新：2026-06-22（移除弃用的 Windows 桌面端）
 
 ## 当前版本
 
@@ -33,7 +33,7 @@
 - [x] Web 孩子端（大屏界面）
 - [x] Web 管理端（管理界面 + 数据统计图表）
 - [x] Android APP（Flutter WebView + 离线快照 + APK 自动更新 + 更新后自动清缓存）
-- [x] Windows 桌面端（系统托盘 + 开机自启 + 凭据安全存储）
+- [x] ~~Windows 桌面端（系统托盘 + 开机自启 + 凭据安全存储）~~ **已移除（弃用）**
 
 ### 基础设施
 
@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-22 | **移除弃用的 PapaCheck.Windows 桌面端**：删除 `PapaCheck.Windows/` 目录（8 个文件）及 3 个关联测试文件，由 CodeGraph MCP 分析确认零外部引用后执行 |
 | 2026-06-22 | **修复 Android 家长端 WebView 冷启动后跳转到登录页**：认证 token 存储在 WebView 的 `sessionStorage` 中，Android 系统回收 WebView 进程后 token 丢失，API 401 跳转到登录页。Flutter 层新增 `ConfigService.setAuthData/getAuthToken/clearAuth`（5 个方法），WebView 冷启动时通过中间 HTML 页注入 token 到 `sessionStorage`。Web 端代码不变，多标签隔离不受影响。新增 5 个 TDD 测试，全量 37 Flutter 测试通过。涉及 3 个文件 |
 | 2026-06-22 | **本地 Nginx 开发环境（镜像云端路由）**：安装 Nginx 1.31.2；创建 `nginx.dev.conf`（镜像生产路由，HTTP :8081）；`scripts/start-dev.ps1` 一键启动脚本；`.vscode/launch.json + tasks.json` F5 一键拉起全量环境。静态路由验证通过 |
 | 2026-06-22 | **云端路由对齐 + 多 bug 修复**：迁移脚本自动创建 children；修复 `api.js` localStorage→sessionStorage 不匹配导致登录死循环；`login.html` 孩子跳转 `/`→`/app/` 对齐云端路由；Nginx 新增 `location = /app`；BrandHeader "客户端"按钮加尾部斜杠；`/parent` 路由修复 |
