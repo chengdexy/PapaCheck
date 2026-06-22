@@ -147,6 +147,7 @@ export abstract class DatabaseAdapter implements IDatabase {
   abstract updateAccessCodeLastLogin(id: string): Promise<void>;
   abstract createUser(input: any): Promise<void>;
   abstract findAdminByEmail(email: string): Promise<any | null>;
+  abstract findAdminExists(): Promise<boolean>;
   abstract findUserByEmail(email: string): Promise<any | null>;
   abstract findUserByAccessHash(accessHash: string): Promise<any | null>;
   abstract findUserByAccessCode(accessCode: string): Promise<any | null>;

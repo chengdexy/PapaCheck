@@ -1691,6 +1691,13 @@ export class PostgresAdapter extends DatabaseAdapter {
     };
   }
 
+  async findAdminExists(): Promise<boolean> {
+    const result = await this.pool.query(
+      "SELECT 1 FROM users WHERE role = 'admin' AND is_active = true LIMIT 1"
+    );
+    return result.rows.length > 0;
+  }
+
   async findUserByEmail(email: string): Promise<any | null> {
     const result = await this.pool.query(
       'SELECT id, role, email, password_hash, token_version, family_name, first_login, is_active FROM users WHERE email = $1 AND is_active = true LIMIT 1',

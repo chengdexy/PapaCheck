@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- **`ensureSuperAdmin` 超管改邮箱后重启重复创建**：判重条件从按默认邮箱查改为按角色查（`findAdminExists` 检查 `role='admin'`），超管修改邮箱后服务重启不再产生两个超管账号。新增 2 个 TDD 测试
+
 ### Added
 - **Android 下载进度条**：`UpdateService.downloadAndInstall` 新增 `onProgress` 回调，逐 chunk 读取响应流计算下载进度；对话框改用 `StatefulBuilder` + determinate 进度条 + 百分比文本。新增 2 个 TDD 测试，全量 32 Flutter 测试通过
 - **统一登录页重写**：`login.html` 完全重写，新增渐变背景、白底圆角卡片、最近使用列表（localStorage 持久化，最多 5 条）、家长/孩子角色选择按钮。新码登录后自动保存到最近使用。新增 15 个 TDD 测试。全量 627 测试通过

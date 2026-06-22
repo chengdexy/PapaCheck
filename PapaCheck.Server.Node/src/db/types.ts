@@ -318,6 +318,7 @@ export interface IDatabase {
   updateAccessCodeLastLogin(id: string): Promise<void>;
   createUser(input: CreateUserInput): Promise<void>;
   findAdminByEmail(email: string): Promise<AdminUser | null>;
+  findAdminExists(): Promise<boolean>;
   findUserByEmail(email: string): Promise<any | null>;
   updateUserCredentials(userId: string, email: string, passwordHash: string): Promise<void>;
   getAllTenants(): Promise<TenantListItem[]>;

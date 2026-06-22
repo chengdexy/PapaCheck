@@ -5,9 +5,10 @@ import type { IDatabase } from '../db/types.js';
 const DEFAULT_ADMIN_EMAIL = 'admin@papacheck.internal';
 
 export async function ensureSuperAdmin(db: IDatabase): Promise<{ email: string; password: string } | null> {
-  // Check if any super admin already exists
-  const existing = await db.findAdminByEmail(DEFAULT_ADMIN_EMAIL);
-  if (existing) return null;
+  // Check if any super admin already exists (by role, not by default email)
+  // Using role check prevents duplicate creation when admin changes their email
+  const adminExists = await db.findAdminExists();
+  if (adminExists) return null;
 
   const password = 'admin-' + crypto.randomBytes(4).toString('hex');
   const passwordHash = bcrypt.hashSync(password, 10);
