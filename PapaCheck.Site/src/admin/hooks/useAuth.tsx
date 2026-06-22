@@ -178,6 +178,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     localStorage.removeItem(ADMIN_TOKEN_KEY);
+    // 同时清理孩子端/家长端的 sessionStorage token，防止退出后访问 /login.html
+    // 时被旧 token 自动重定向到孩子/家长页面展示旧数据
+    sessionStorage.removeItem('papacheck_token');
+    sessionStorage.removeItem('papacheck_role');
+    sessionStorage.removeItem('papacheck_child_name');
     dispatch({ type: 'LOGOUT' });
   }, []);
 
