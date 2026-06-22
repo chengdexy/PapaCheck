@@ -56,6 +56,33 @@ export default function SystemHealth() {
         }
     }
 
+    async function handleDownload(backupId: string, filename: string) {
+        try {
+            const token = localStorage.getItem('papacheck_admin_token');
+            const res = await fetch(`/api/ops/backups/${backupId}/download`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: '下载失败' }));
+                showToast('error', err.error || '下载失败');
+                return;
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch {
+            showToast('error', '下载失败');
+        }
+    }
+
     function formatBytes(bytes: number): string {
         if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
         if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(1)} MB`;
@@ -144,13 +171,12 @@ export default function SystemHealth() {
                                 </span>
                                 {b.size_bytes && <span className="text-[var(--color-ink-500)]">{formatBytes(b.size_bytes)}</span>}
                                 {b.status === 'success' && (
-                                    <a
-                                        href={`/api/ops/backups/${b.id}/download`}
+                                    <button
+                                        onClick={() => handleDownload(b.id, b.filename)}
                                         className="text-[var(--color-brand-600)] hover:text-[var(--color-brand-700)] font-semibold"
-                                        download
                                     >
                                         下载
-                                    </a>
+                                    </button>
                                 )}
                             </div>
                         ))}
