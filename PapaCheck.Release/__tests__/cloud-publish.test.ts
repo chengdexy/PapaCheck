@@ -9,11 +9,16 @@
 //     Then 步骤数组中包含: 测试 → 编译 → 打包 → (可选APK) → 上传 → SSH
 //     And 至少包含 5 个步骤（APK 上传可选）
 
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, beforeAll } from 'vitest';
 import { Executor } from '../lib/executor.js';
 import { cloudPublish } from '../lib/cloud-publish.js';
 
 describe('cloud-publish', () => {
+
+  beforeAll(() => {
+    process.env.PAPACHECK_CLOUD_IP = 'test.example.com';
+    process.env.PAPACHECK_SSH_USER = 'testuser';
+  });
 
   test('cloudPublish 至少产生 5 个步骤', async () => {
     const executor = new Executor();
