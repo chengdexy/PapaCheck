@@ -9,6 +9,8 @@ export interface StepDef {
   /** shell=true 时 cmd 为完整命令行字符串；shell=false 时 cmd 为 string[] */
   shell?: boolean;
   timeout?: number;
+  /** 自定义环境变量，合并到子进程环境（设 null 可清除父进程继承的值） */
+  env?: Record<string, string | null>;
 }
 
 export interface StepEvent {
@@ -68,6 +70,16 @@ export class Executor extends EventEmitter {
       let cmd: string;
       let args: string[];
       const spawnOptions: SpawnOptions = { cwd: step.cwd, stdio: ['ignore', 'pipe', 'pipe'] };
+
+      // 合并自定义环境变量：设 null 的键从 env 中删除（清除父进程继承值）
+      if (step.env) {
+        const env = { ...process.env };
+        for (const [k, v] of Object.entries(step.env)) {
+          if (v === null) delete env[k];
+          else env[k] = v;
+        }
+        spawnOptions.env = env;
+      }
 
       if (step.shell) {
         cmd = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh';
