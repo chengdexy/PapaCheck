@@ -12,6 +12,7 @@
 - **生产环境多孩子数据迁移完成**：对线上 `papacheck` 数据库执行 `init-pg-schema.sql` + `migrate-access-code-model.sql`，创建 children 表、12 张表 child_id 列、12 个部分唯一索引、access_codes 模型迁移。备份 + 迁移 + 部署 + 重启 全流程完成
 
 ### Fixed
+- **Android 家长端 WebView 冷启动后 sessionStorage 丢失导致跳转到登录页**：认证 token 存储在 WebView 的 `sessionStorage` 中，Android 系统回收 WebView 进程后 token 丢失，API 调用 401 跳转到登录页。Flutter 层新增 ConfigService 持久化 auth token 到 SharedPreferences，WebView 冷启动时通过中间 HTML 页将 token 注入 `sessionStorage` 后再重定向到目标 URL。Web 端代码不变，多标签隔离不受影响。新增 5 个 TDD 测试，全量 37 Flutter 测试通过 ([#config_service.dart](file:///e:/trae_projects/PapaCheck/PapaCheck.Android/lib/services/config_service.dart) [#main.dart](file:///e:/trae_projects/PapaCheck/PapaCheck.Android/lib/main.dart))
 - **`migrate-access-code-model.sql` 不会自动创建 children 记录**：脚本 Step 2 先根据旧 `type='child'` 的 access_codes 创建 children 记录，再分配 child_id → 再 DROP type/nickname。新增 Step 3.5 DO 块自动分配 12 张 per-child 表的遗留数据
 - **服务器 `api.js` 用 `localStorage` 导致 `/api/data` 返回 401 死循环**：`login.html` 将 token 存入 `sessionStorage`，但服务器 `api.js` 是旧版本（用 `localStorage`），`API.getData()` 读不到 token → 401 → 重定向登录 → 死循环。上传最新版 `api.js` 等 7 个 JS 文件
 - **云端路由 vs 本地路由不一致**：`/` 在本地是孩子端、在云端是落地页。`/app`（无尾部斜杠）无 Nginx 规则。修复：`login.html` 孩子跳转 `/` → `/app/`；`nginx.conf` 新增 `location = /app`；`BrandHeader.tsx` "客户端"按钮 `/app` → `/app/`

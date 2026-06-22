@@ -373,8 +373,51 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
           .setMediaPlaybackRequiresUserGesture(false);
     }
 
-    _controller!.loadRequest(Uri.parse(url));
+    // 检查是否有持久化的 auth token，有则先加载注入中间页
+    final savedToken = await ConfigService.getAuthToken();
+    if (savedToken != null && savedToken.isNotEmpty) {
+      final savedRole = await ConfigService.getAuthRole() ?? '';
+      final savedChildName = await ConfigService.getAuthChildName() ?? '';
+      await _loadWithSessionRestore(
+        url, savedToken, savedRole, savedChildName);
+    } else {
+      _controller!.loadRequest(Uri.parse(url));
+    }
+
     _waitForPageReady();
+  }
+
+  /// 加载中间 HTML 页面，将持久化的认证信息写入 WebView 的 sessionStorage，
+  /// 然后重定向到目标 URL。用于 Android WebView 冷启动时恢复登录状态。
+  Future<void> _loadWithSessionRestore(
+    String targetUrl,
+    String token,
+    String role,
+    String childName,
+  ) async {
+    // 安全的字符串转义，防止特殊字符破坏 JavaScript 字面量
+    String escapeJs(String s) {
+      return s
+          .replaceAll('\\', '\\\\')
+          .replaceAll("'", "\\'")
+          .replaceAll('\n', '\\n')
+          .replaceAll('\r', '\\r');
+    }
+
+    final escapedToken = escapeJs(token);
+    final escapedRole = escapeJs(role);
+    final escapedChildName = escapeJs(childName);
+
+    await _controller!.loadHtmlString('''
+<html><head><meta charset="utf-8"></head><body>
+<script>
+sessionStorage.setItem('papacheck_token','$escapedToken');
+sessionStorage.setItem('papacheck_role','$escapedRole');
+sessionStorage.setItem('papacheck_child_name','$escapedChildName');
+window.location.replace('$targetUrl');
+</script>
+</body></html>
+''');
   }
 
   void _handleBridgeMessage(String jsonMessage) {
@@ -384,8 +427,16 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
       if (type == 'auth_token') {
         final token = data['token'] as String?;
         final role = data['role'] as String?;
+        final childName = data['childName'] as String?;
         final baseUrl = data['baseUrl'] as String?;
         if (token != null && baseUrl != null) {
+          // 持久化 auth 数据到 SharedPreferences，
+          // 用于 Android WebView 冷启动后恢复 sessionStorage
+          ConfigService.setAuthData(
+            token: token,
+            role: role ?? '',
+            childName: childName ?? '',
+          );
           _queueChannel.invokeMethod('setAuth', {
             'token': token,
             'baseUrl': baseUrl,
