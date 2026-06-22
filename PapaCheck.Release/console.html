@@ -219,9 +219,8 @@ function copyLog() {
 function saveLog() {
   const body = document.getElementById('logBody');
   const text = body.textContent || '';
-  const typeEl = document.getElementById('taskTitle');
-  const type = (typeEl.textContent || 'unknown').trim();
   const btn = document.getElementById('saveBtn');
+  const type = window._releaseType || 'unknown';
   btn.textContent = '保存中…';
   fetch('/api/release/save-log', {
     method: 'POST',
@@ -238,6 +237,7 @@ function saveLog() {
 
 function startRelease(type) {
   if (executing) return;
+  window._releaseType = type;
   executing = true;
   document.querySelectorAll('.card button').forEach(b => b.disabled = true);
   document.getElementById('steps').innerHTML = '';
