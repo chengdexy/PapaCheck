@@ -96,6 +96,9 @@ PapaCheck.Server/data/
 # Release 控制台保存的日志
 PapaCheck.Release/log/
 
+# Release 控制台本地环境变量配置
+PapaCheck.Release/.env
+
 # 临时构建产物
 .publish.tar.gz
 
