@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-22（超管备份下载权限修复）
+> 最后更新：2026-06-22（多孩子迁移可靠性测试完成）
 
 ## 当前版本
 
-**v1.3.8**（管理面板适配新模型 + /app 死循环修复，79 文件 / 618 测试通过）
+**v1.3.8**（管理面板适配新模型 + /app 死循环修复，79 文件 / 618+ 测试通过）
 
 ## 部署状态
 
@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-22 | **多孩子迁移可靠性验证测试**：新增 4 个 TDD 测试文件（19 个测试），覆盖 schema 结构、12 表数据分配、幂等性、可回滚性。验证多孩子架构变更的数据库迁移可靠性 |
 | 2026-06-22 | **修复管理面板退出后孩子端/家长端 sessionStorage token 未清理**：管理面板 logout 只清除了 localStorage 的 `papacheck_admin_token`，未清除 sessionStorage 中的 `papacheck_token`/`papacheck_role`/`papacheck_child_name`。退出后访问 `/login.html` 被旧 token 自动重定向到孩子/家长端展示旧数据。涉及 1 个文件 |
 | 2026-06-22 | **修复 Vite 构建失败：BrandHeader 未使用的 `Baby` 导入触发 tsc 错误**：`BrandHeader.tsx` 导入 `lucide-react` 的 `Baby` 图标但未使用，`tsc -b` 视其为 error 导致 `npm run build` 中断，`release.py --site` 部署无法执行。移除未使用导入后构建恢复正常。涉及 1 个文件 |
 | 2026-06-22 | **修复超管备份下载权限 Bug**：超管在管理面板点击"下载"备份文件时，浏览器通过 `<a>` 标签直接请求后端，未携带 JWT 认证头导致被拒绝。改为 `fetch` + `createObjectURL` 方式，从 `localStorage` 读取 token 并注入请求头，确保超管认证通过。涉及 1 个文件 |
