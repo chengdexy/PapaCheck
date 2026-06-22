@@ -27,8 +27,8 @@ body{
   // 安全校验：只允许同源或相对路径跳转，防止开放重定向
   if (target && target.indexOf('://') !== -1) {
     try {
-      var targetHost = target.split('/')[2];
-      if (targetHost !== window.location.host) {
+      var targetUrl = new URL(target);
+      if (targetUrl.host !== window.location.host) {
         target = '/';
       }
     } catch (_) {
