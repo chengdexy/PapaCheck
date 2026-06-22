@@ -400,7 +400,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   ) async {
     // 从 targetUrl 提取 baseUrl
     final uri = Uri.parse(targetUrl);
-    final baseUrl = '${uri.scheme}://${uri.host}${uri.port == 80 || uri.port == 443 ? '' : ':${uri.port}'}';
+    final baseUrl = '${uri.scheme}://${uri.host}${(uri.port == 80 || uri.port == 443) ? '' : ':${uri.port}'}';
 
     final queryParams = {
       'token': token,
