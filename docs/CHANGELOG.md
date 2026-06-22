@@ -9,6 +9,7 @@
 ### Fixed
 - **`ensureSuperAdmin` 超管改邮箱后重启重复创建**：判重条件从按默认邮箱查改为按角色查（`findAdminExists` 检查 `role='admin'`），超管修改邮箱后服务重启不再产生两个超管账号。新增 2 个 TDD 测试
 - **超管在管理面板下载备份文件提示"下载失败需要权限"**：备份下载链接使用 `<a href="...">` 标签，浏览器直接请求不带 JWT `Authorization` 头，被服务端中间件拒绝。改为 `fetch` + `createObjectURL` 方式，从 `localStorage` 读取 token 并注入请求头，确保超管认证通过
+- **Vite 构建失败：BrandHeader 未使用的 `Baby` 导入触发 tsc 错误**：`BrandHeader.tsx` 导入了 `lucide-react` 的 `Baby` 图标但未使用，`tsc -b` 将其视为错误导致 `npm run build` 中断，`release.py --site` 部署失败。移除未使用导入后构建恢复正常
 
 ### Added
 - **Android 下载进度条**：`UpdateService.downloadAndInstall` 新增 `onProgress` 回调，逐 chunk 读取响应流计算下载进度；对话框改用 `StatefulBuilder` + determinate 进度条 + 百分比文本。新增 2 个 TDD 测试，全量 32 Flutter 测试通过

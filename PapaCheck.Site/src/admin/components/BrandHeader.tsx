@@ -1,4 +1,4 @@
-import { Key, Baby, ArrowLeft, LogOut, ExternalLink } from 'lucide-react';
+import { Key, ArrowLeft, LogOut, ExternalLink } from 'lucide-react';
 
 /** 开发模式下后端地址，生产模式用同源 */
 const APP_BASE = import.meta.env.DEV ? 'http://localhost:8080' : '';
