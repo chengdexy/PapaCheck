@@ -990,7 +990,7 @@ describe('POST /api/sync/crdt-push', () => {
   it('推送一条操作日志并正确合并', async () => {
     const op = {
       id: 'test-op-1', type: 'update', table: 'homeworks',
-      resourceId: 'hw-crdt-1', field: 'status', value: 'completed',
+      resourceId: 'hw-crdt-1', field: null, value: { id: 'hw-crdt-1', subject: '测试', status: 'completed', dateKey: '2026-06-06' },
       timestamp: '2026-06-06T00:00:00Z', nodeId: 'test-node',
     };
     const res = await app.inject({ method: 'POST', url: '/api/sync/crdt-push', payload: { operations: [op] } });

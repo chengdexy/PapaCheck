@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-22（移除弃用的 Windows 桌面端）
+> 最后更新：2026-06-22（修复 /parent 重定向 + 代码审查修复循环）
 
 ## 当前版本
 
@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-22 | **修复 `/parent` 重定向 + 代码审查修复循环**：`/parent` 路由从 `/admin/` 改回 `/app`；CRDT 推送测试改用新版操作格式；修复 PapaCheck.Server 目录被 PapaCheck.Email 配置自动再生问题；CodeGraph MCP 集成分析确认 Windows/Server/Email 三个弃用子项目安全删除。全量 580 测试通过 |
 | 2026-06-22 | **移除弃用的 PapaCheck.Windows 桌面端**：删除 `PapaCheck.Windows/` 目录（8 个文件）及 3 个关联测试文件，由 CodeGraph MCP 分析确认零外部引用后执行 |
 | 2026-06-22 | **修复 Android 家长端 WebView 冷启动后跳转到登录页**：认证 token 存储在 WebView 的 `sessionStorage` 中，Android 系统回收 WebView 进程后 token 丢失，API 401 跳转到登录页。Flutter 层新增 `ConfigService.setAuthData/getAuthToken/clearAuth`（5 个方法），WebView 冷启动时通过中间 HTML 页注入 token 到 `sessionStorage`。Web 端代码不变，多标签隔离不受影响。新增 5 个 TDD 测试，全量 37 Flutter 测试通过。涉及 3 个文件 |
 | 2026-06-22 | **本地 Nginx 开发环境（镜像云端路由）**：安装 Nginx 1.31.2；创建 `nginx.dev.conf`（镜像生产路由，HTTP :8081）；`scripts/start-dev.ps1` 一键启动脚本；`.vscode/launch.json + tasks.json` F5 一键拉起全量环境。静态路由验证通过 |
