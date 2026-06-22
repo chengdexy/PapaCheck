@@ -202,6 +202,18 @@ async function exchange(code, role) {
       sessionStorage.setItem('papacheck_role', d.role);
       sessionStorage.setItem('papacheck_child_name', d.child_name || '');
       saveKnownCode(code.trim(), d.child_name || '');
+      // 通知 Flutter 层持久化 auth token（Android WebView 会话恢复用）
+      try {
+        if (window.PapaCheckBridge && window.PapaCheckBridge.postMessage) {
+          window.PapaCheckBridge.postMessage(JSON.stringify({
+            type: 'auth_token',
+            token: d.token,
+            role: d.role,
+            childName: d.child_name || '',
+            baseUrl: window.location.origin,
+          }));
+        }
+      } catch (_) {}
       window.location.href = d.role === 'parent' ? '/admin.html' : '/app/';
     } else {
       var err = await resp.json().catch(function () { return {}; });
