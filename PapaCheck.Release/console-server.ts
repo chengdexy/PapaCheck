@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { readFileSync } from 'fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { Executor } from './lib/executor.js';
 import { buildApk, readApkVersion } from './lib/build-apk.js';
 import { cloudPublish } from './lib/cloud-publish.js';
@@ -9,6 +9,7 @@ import { sitePublish } from './lib/site-publish.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HTML_PATH = join(__dirname, 'console.html');
+const LOG_DIR = join(__dirname, 'log');
 
 export async function startServer(port = 3456) {
   const executor = new Executor();
@@ -76,6 +77,18 @@ export async function startServer(port = 3456) {
       console.error(err);
     });
     return { ok: true, message: 'Site 部署已启动' };
+  });
+
+  app.post('/api/release/save-log', async (request) => {
+    const body = request.body as any || {};
+    const type = body.type || 'unknown';
+    const content = body.content || '';
+    const now = new Date();
+    const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
+    mkdirSync(LOG_DIR, { recursive: true });
+    const filePath = join(LOG_DIR, `release-${type}-${ts}.txt`);
+    writeFileSync(filePath, content, 'utf-8');
+    return { ok: true, path: filePath };
   });
 
   await app.listen({ port, host: '127.0.0.1' });
