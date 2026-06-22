@@ -13,7 +13,6 @@ const APK_BUILD_OUTPUT = join(ANDROID_DIR, 'build', 'app', 'outputs', 'flutter-a
 const SSH_OPTS = ['-o', 'StrictHostKeyChecking=accept-new'];
 
 function requireEnv(): { ip: string; user: string } {
-  // 在函数内部读取 env，方便测试中通过 beforeAll 设置
   const ip = process.env.PAPACHECK_CLOUD_IP;
   const user = process.env.PAPACHECK_SSH_USER;
   if (!ip) throw new Error('请设置环境变量 PAPACHECK_CLOUD_IP（服务器地址或域名）');
@@ -24,19 +23,29 @@ function requireEnv(): { ip: string; user: string } {
 export async function cloudPublish(executor: Executor): Promise<boolean> {
   const { ip: CLOUD_SERVER_IP, user: CLOUD_SERVER_USER } = requireEnv();
   const steps: StepDef[] = [];
+  let idx = 1;
 
-  // 跳过需要 PG 的集成测试（仅做逻辑验证）
-  const excludeFlags = '--exclude=**/test/db/** --exclude=**/test/migration/** --exclude=**/test/email.test.ts --exclude=**/test/api/** --exclude=**/test/auth/routes.test.ts --exclude=**/test/auth/child-login.test.ts --exclude=**/test/ops/backup.test.ts --exclude=**/test/server.test.ts --exclude=**/test/schema.test.ts';
+  // 重置测试库 schema，确保 PG 测试能通过
+  const testDbUrl = process.env.DATABASE_URL || 'postgresql://papacheck***REDACTED***@localhost:5432/papacheck_test';
   steps.push({
-    id: '1', desc: '运行全量测试（跳过 PG 集成测试）',
-    cmd: `npx vitest run ${excludeFlags}`, cwd: ROOT, shell: true, timeout: 180,
+    id: String(idx++), desc: '重置测试数据库 schema',
+    cmd: `npx tsx -e "const{Pool}=require('pg');const{readFileSync}=require('fs');const{resolve}=require('path');new Pool({connectionString:'${testDbUrl}'}).query(readFileSync(resolve('PapaCheck.Server/scripts/init-pg-schema.sql'),'utf-8')).then(()=>{console.log('OK');process.exit(0)}).catch(e=>{console.error(e.message);process.exit(1)})"`,
+    cwd: ROOT, shell: true, timeout: 30,
   });
 
+  // 运行全量测试
   steps.push({
-    id: '2', desc: '编译 TypeScript',
+    id: String(idx++), desc: '运行全量测试',
+    cmd: 'npx vitest run', cwd: ROOT, shell: true, timeout: 180,
+  });
+
+  // 编译 TypeScript
+  steps.push({
+    id: String(idx++), desc: '编译 TypeScript',
     cmd: 'npm run build', cwd: NODE_DIR, shell: true, timeout: 180,
   });
 
+  // 打包代码
   const tarExcludes = [
     '--exclude=node_modules', '--exclude=test',
     '--exclude=PapaCheck.Android', '--exclude=PapaCheck.Tests',
@@ -48,11 +57,12 @@ export async function cloudPublish(executor: Executor): Promise<boolean> {
   ];
   const tarPath = join(ROOT, '.publish.tar.gz');
   steps.push({
-    id: '3', desc: '打包代码',
+    id: String(idx++), desc: '打包代码',
     cmd: ['tar', ...tarExcludes, '-czf', tarPath, 'PapaCheck.Server', 'PapaCheck.Web'],
     cwd: ROOT, timeout: 120,
   });
 
+  // 可选：上传 APK
   let apkFile: string | null = null;
   if (existsSync(APK_ARCHIVE_DIR)) {
     const files = readdirSync(APK_ARCHIVE_DIR)
@@ -67,18 +77,20 @@ export async function cloudPublish(executor: Executor): Promise<boolean> {
   if (apkFile) {
     const apkName = apkFile.split('\\').pop() || apkFile.split('/').pop() || 'unknown.apk';
     steps.push({
-      id: '4', desc: `上传 APK (${apkName})`,
+      id: String(idx++), desc: `上传 APK (${apkName})`,
       cmd: ['scp', ...SSH_OPTS, apkFile, `${CLOUD_SERVER_USER}@${CLOUD_SERVER_IP}:/opt/papacheck/PapaCheck.Web/apk/`],
       timeout: 120,
     });
   }
 
+  // 上传代码到服务器
   steps.push({
-    id: String(apkFile ? 5 : 4), desc: '上传代码到服务器',
+    id: String(idx++), desc: '上传代码到服务器',
     cmd: ['scp', ...SSH_OPTS, tarPath, `${CLOUD_SERVER_USER}@${CLOUD_SERVER_IP}:/opt/`],
     timeout: 120,
   });
 
+  // 远程安装依赖并重启
   const remoteCmd = 'mkdir -p /opt/papacheck && '
     + 'cd /opt && tar xzf .publish.tar.gz -C /opt/papacheck && '
     + 'rm -f .publish.tar.gz && '
@@ -86,7 +98,7 @@ export async function cloudPublish(executor: Executor): Promise<boolean> {
     + 'npm ci --omit=dev --ignore-scripts && '
     + 'systemctl restart papacheck';
   steps.push({
-    id: String(apkFile ? 6 : 5), desc: '远程安装依赖并重启',
+    id: String(idx++), desc: '远程安装依赖并重启',
     cmd: ['ssh', ...SSH_OPTS, `${CLOUD_SERVER_USER}@${CLOUD_SERVER_IP}`, remoteCmd],
     timeout: 300,
   });
@@ -96,7 +108,7 @@ export async function cloudPublish(executor: Executor): Promise<boolean> {
 
   const success = await executor.runAndReport('云同步', steps);
 
-  // 清理本次 tar 文件（如果上传步骤失败，本地 tar 可能未被清理）
+  // 清理本次 tar 文件
   try { unlinkSync(tarPath); } catch {}
 
   return success;
