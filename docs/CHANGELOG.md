@@ -6,14 +6,17 @@
 
 ## [Unreleased]
 
+### Changed
+- **`PapaCheck.Server.Node` 重命名为 `PapaCheck.Server`**：消除历史遗留的 `.Node` 后缀（Python 服务端已删除）。涉及本地目录 git mv、12 个引用文件路径更新、云端目录 mv 及 papacheck.service WorkingDirectory 同步。云端已手动迁移完成，服务正常运行
+
 ### Removed
 - **移除弃用的 PapaCheck.Windows 桌面端**：删除整个 `PapaCheck.Windows/` 目录（8 个文件），包含 Tkinter GUI 主程序、PyInstaller 构建脚本、版本管理工具等。同时清理关联的 3 个测试文件（`test_windows_node_server.py`、`test_windows_quit_guard.py`、`test_release.py`）
 
 ### Added
-- （暂无）
+- **Release Console 设计文档**：`docs/superpowers/specs/2026-06-22-release-console-design.md` — 规划用 Node.js/TypeScript 重写 release.py 并添加 Web 控制台界面
 
 ### Fixed
-- **修复 `/parent` 路由错误重定向到管理面板**：`GET /parent` 应 301 到 `/app`（客户端家长界面），之前被错误改为 `/admin/`（React 管理面板），已改回（[app.ts](file:///E:/trae_projects/PapaCheck/PapaCheck.Server.Node/src/app.ts)）
+- **修复 `/parent` 路由错误重定向到管理面板**：`GET /parent` 应 301 到 `/app`（客户端家长界面），之前被错误改为 `/admin/`（React 管理面板），已改回（[app.ts](file:///E:/trae_projects/PapaCheck/PapaCheck.Server/src/app.ts)）
 - **修复 CRDT 推送测试使用过时操作格式**：`api.test.ts` 中 CRDT 操作使用旧版 `field: 'status', value: 'completed'` 字符串格式，改为新版 `value: { ... }` 对象格式，消除 `Cannot create property 'lastModified' on string` 错误
 
 ## [1.4.0] - 2026-06-22
@@ -103,7 +106,7 @@
 - **APK 构建失败**：`build.gradle` JVM 目标从 1.8 升到 17（kapt 兼容）；`ApiClient.kt` 使用 `resumeWith(Result.failure(e))`（kotlinx-coroutines 1.7.3 API 兼容）
 
 ### Security
-- **PG 数据库密码加固**：线上 `DATABASE_URL` 密码从占位符 `changeme` 改为强密码 `DaRkMoOn`
+- **PG 数据库密码加固**：线上 `DATABASE_URL` 密码从占位符 `changeme` 改为强密码
 - **Android `AndroidManifest.xml`**：新增 `FOREGROUND_SERVICE`、`ACCESS_NETWORK_STATE` 权限
 
 ## [Unreleased]

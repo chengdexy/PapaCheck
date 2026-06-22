@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>PapaCheck 发布控制台</title>
+<style>
+:root{--bg:#0f1117;--card:#1a1d27;--border:#2a2d3a;--text:#e1e4eb;--muted:#8b8fa3;--green:#22c55e;--red:#ef4444;--blue:#3b82f6;--pending:#4a4d5a}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;min-height:100dvh}
+.header{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid var(--border)}
+.header h1{font-size:18px;font-weight:600}
+.header .version{color:var(--muted);font-size:14px}
+.container{max-width:1100px;margin:0 auto;padding:24px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;transition:transform .15s,box-shadow .15s}
+.card:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.card h3{font-size:16px;margin-bottom:4px}
+.card p{color:var(--muted);font-size:13px;margin-bottom:12px}
+.card button{width:100%;padding:8px 16px;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;transition:opacity .15s;color:#fff}
+.card button:disabled{opacity:.5;cursor:not-allowed}
+.btn-apk{background:var(--blue)}
+.btn-cloud{background:#7c3aed}
+.btn-site{background:#059669}
+.section-title{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;padding-top:8px;border-top:1px solid var(--border)}
+.execution{display:none;margin-bottom:24px}
+.execution.visible{display:block}
+.task-header{display:flex;justify-content:space-between;margin-bottom:12px;font-size:14px}
+.task-header .ts{color:var(--muted);font-size:12px}
+.steps{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.step{display:flex;align-items:center;gap:8px;font-size:13px;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,.03)}
+.step .icon{width:20px;text-align:center;flex-shrink:0}
+.step .desc{flex:1}
+.step .time{color:var(--muted);font-size:11px;min-width:50px;text-align:right}
+.step.pending .icon{color:var(--pending)}.step.pending .icon::before{content:'\u25CB'}
+.step.running .icon{color:var(--blue);animation:spin .8s linear infinite}.step.running .icon::before{content:'\u25D8'}
+.step.success .icon{color:var(--green)}.step.success .icon::before{content:'\u2714'}
+.step.failed .icon{color:var(--red)}.step.failed .icon::before{content:'\u2718'}
+@keyframes spin{to{transform:rotate(360deg)}}
+.log-panel{background:#090b10;border:1px solid var(--border);border-radius:8px;margin-bottom:16px;overflow:hidden}
+.log-header{display:flex;justify-content:space-between;padding:8px 12px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none;border-bottom:1px solid var(--border)}
+.log-header:hover{background:rgba(255,255,255,.03)}
+.log-body{display:none;padding:12px;font-family:'Cascadia Code','Fira Code','JetBrains Mono',monospace;font-size:12px;line-height:1.5;max-height:300px;overflow-y:auto;white-space:pre-wrap}
+.log-body.open{display:block}
+.log-body .stderr{color:var(--red)}
+.history-list{display:flex;flex-direction:column;gap:6px}
+.history-item{display:flex;align-items:center;gap:8px;font-size:13px;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,.03)}
+.history-item .h-icon{width:20px;text-align:center}
+.history-item .h-msg{flex:1}
+.history-item .h-time{color:var(--muted);font-size:11px}
+@media(max-width:768px){.cards{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>PapaCheck 发布控制台</h1>
+  <span class="version" id="version">v--</span>
+</div>
+<div class="container">
+  <div class="cards">
+    <div class="card">
+      <h3>构建 APK</h3>
+      <p>Flutter 构建 Android APK，支持版本号递增</p>
+      <button class="btn-apk" onclick="startRelease('build-apk')">开始构建</button>
+    </div>
+    <div class="card">
+      <h3>同步云端</h3>
+      <p>测试 → 编译 → 打包 → 上传 → 远程部署</p>
+      <button class="btn-cloud" onclick="startRelease('cloud')">开始同步</button>
+    </div>
+    <div class="card">
+      <h3>部署 Site</h3>
+      <p>Vite 构建 → 落地页 + 管理面板 → 服务器</p>
+      <button class="btn-site" onclick="startRelease('site')">开始部署</button>
+    </div>
+  </div>
+
+  <div class="execution" id="execution">
+    <div class="task-header">
+      <span id="taskTitle"></span>
+      <span class="ts" id="taskTime"></span>
+    </div>
+    <div class="steps" id="steps"></div>
+    <div class="log-panel">
+      <div class="log-header" onclick="toggleLog()">日志 <span id="logToggle">展开</span></div>
+      <div class="log-body" id="logBody"></div>
+    </div>
+  </div>
+
+  <div class="section-title">最近操作</div>
+  <div class="history-list" id="history"><div style="color:var(--muted);font-size:13px">暂无记录</div></div>
+</div>
+
+<script>
+let executing = false;
+let logPanelOpen = false;
+
+async function init() {
+  try {
+    const ver = await (await fetch('/api/version')).json();
+    document.getElementById('version').textContent = 'v' + (ver.apk || '--');
+  } catch {}
+  try {
+    const hist = await (await fetch('/api/release/history')).json();
+    renderHistory(hist);
+  } catch {}
+  const es = new EventSource('/api/release/events');
+  es.addEventListener('step-start', e => onStepStart(JSON.parse(e.data)));
+  es.addEventListener('step-done', e => onStepDone(JSON.parse(e.data)));
+  es.addEventListener('log', e => onLog(JSON.parse(e.data)));
+  es.addEventListener('release-done', e => onReleaseDone(JSON.parse(e.data)));
+  es.onerror = () => {
+    executing = false;
+    document.querySelectorAll('.card button').forEach(b => b.disabled = false);
+  };
+}
+init();
+
+function onStepStart(data) {
+  document.getElementById('execution').classList.add('visible');
+  const list = document.getElementById('steps');
+  const row = document.createElement('div');
+  row.className = 'step running';
+  row.id = 'step-' + data.id;
+  row.innerHTML = `<span class="icon"></span><span class="desc">[${data.id}/${data.total}] ${data.desc}</span><span class="time"></span>`;
+  list.appendChild(row);
+  ensureLogOpen();
+}
+
+function onStepDone(data) {
+  const row = document.getElementById('step-' + data.id);
+  if (!row) return;
+  row.className = 'step ' + data.status;
+  row.querySelector('.time').textContent = (data.elapsed || 0).toFixed(2) + 's';
+}
+
+function onLog(data) {
+  const body = document.getElementById('logBody');
+  const line = document.createElement('div');
+  line.className = data.stream === 'stderr' ? 'stderr' : '';
+  line.textContent = data.text.trimEnd();
+  body.appendChild(line);
+  body.scrollTop = body.scrollHeight;
+  ensureLogOpen();
+}
+
+function onReleaseDone(data) {
+  executing = false;
+  document.querySelectorAll('.card button').forEach(b => b.disabled = false);
+  // 刷新历史
+  fetch('/api/release/history').then(r => r.json()).then(renderHistory).catch(() => {});
+}
+
+function ensureLogOpen() {
+  const body = document.getElementById('logBody');
+  if (!logPanelOpen) {
+    body.classList.add('open');
+    logPanelOpen = true;
+    document.getElementById('logToggle').textContent = '收起';
+  }
+}
+
+function toggleLog() {
+  const body = document.getElementById('logBody');
+  logPanelOpen = !logPanelOpen;
+  body.classList.toggle('open', logPanelOpen);
+  document.getElementById('logToggle').textContent = logPanelOpen ? '收起' : '展开';
+}
+
+function startRelease(type) {
+  if (executing) return;
+  executing = true;
+  document.querySelectorAll('.card button').forEach(b => b.disabled = true);
+  document.getElementById('steps').innerHTML = '';
+  document.getElementById('logBody').innerHTML = '';
+  document.getElementById('execution').classList.add('visible');
+  document.getElementById('taskTitle').textContent = { 'build-apk':'构建 APK', 'cloud':'同步云端', 'site':'部署 Site' }[type] || type;
+  document.getElementById('taskTime').textContent = new Date().toLocaleString();
+  fetch('/api/release/' + type, { method:'POST' }).catch(() => {
+    executing = false;
+    document.querySelectorAll('.card button').forEach(b => b.disabled = false);
+  });
+}
+
+function renderHistory(list) {
+  const el = document.getElementById('history');
+  if (!list || list.length === 0) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:13px">暂无记录</div>';
+    return;
+  }
+  el.innerHTML = list.slice().reverse().map(h =>
+    `<div class="history-item"><span class="h-icon">${h.status === 'success' ? '\u2705' : '\u274C'}</span><span class="h-msg">${h.message}</span><span class="h-time">${new Date(h.timestamp).toLocaleTimeString()}</span></div>`
+  ).join('');
+}
+</script>
+</body>
+</html>

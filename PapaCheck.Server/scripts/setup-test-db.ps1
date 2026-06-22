@@ -164,7 +164,7 @@ Write-Host "`n$('─' * 60)" -ForegroundColor Cyan
 Write-Host " ✅  测试数据库搭建完成！" -ForegroundColor Green
 Write-Host "`n  ${BOLD}DATABASE_URL${RESET}: ${CYAN}${DATABASE_URL}${RESET}" -ForegroundColor White
 Write-Host "`n  ${BOLD}运行测试：${RESET}" -ForegroundColor White
-Write-Host "    `$env:DATABASE_URL=`"${DATABASE_URL}`"; cd PapaCheck.Server.Node; npx vitest run"
+Write-Host "    `$env:DATABASE_URL=`"${DATABASE_URL}`"; cd PapaCheck.Server; npx vitest run"
 Write-Host "`n  ${BOLD}或一键运行（PowerShell）：${RESET}" -ForegroundColor White
 Write-Host "    `$env:DATABASE_URL=`"${DATABASE_URL}`"; npx vitest run"
 Write-Host "`n  ${BOLD}持久化设置（推荐）：${RESET}" -ForegroundColor White

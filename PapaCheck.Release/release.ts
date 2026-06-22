@@ -1,0 +1,56 @@
+#!/usr/bin/env node
+import { Command } from 'commander';
+import { startServer } from './console-server.js';
+import { buildApk } from './lib/build-apk.js';
+import { cloudPublish } from './lib/cloud-publish.js';
+import { sitePublish } from './lib/site-publish.js';
+import { Executor } from './lib/executor.js';
+
+const program = new Command();
+
+program
+  .name('release')
+  .description('PapaCheck 发布工具')
+  .version('1.0.0');
+
+program
+  .command('serve')
+  .description('启动 Web 控制台')
+  .option('-p, --port <port>', '端口号', '3456')
+  .action(async (options) => {
+    await startServer(parseInt(options.port));
+  });
+
+program
+  .command('build-apk')
+  .description('构建 Android APK')
+  .option('-v, --ver <ver>', '指定版本号 (X.Y.Z)')
+  .option('--bump <level>', '自动递增版本号 (patch|minor|major)')
+  .option('--no-bump', '不递增版本号')
+  .action(async (options) => {
+    const executor = new Executor();
+    const success = await buildApk(executor, {
+      ver: options.ver, bump: options.bump, noBump: options.noBump,
+    });
+    process.exit(success ? 0 : 1);
+  });
+
+program
+  .command('cloud')
+  .description('同步到云端')
+  .action(async () => {
+    const executor = new Executor();
+    const success = await cloudPublish(executor);
+    process.exit(success ? 0 : 1);
+  });
+
+program
+  .command('site')
+  .description('部署 PapaCheck.Site')
+  .action(async () => {
+    const executor = new Executor();
+    const success = await sitePublish(executor);
+    process.exit(success ? 0 : 1);
+  });
+
+program.parse(process.argv);

@@ -1,4 +1,4 @@
-// PapaCheck.Server.Node/test/migration/multi-child-data-assignment.test.ts
+// PapaCheck.Server/test/migration/multi-child-data-assignment.test.ts
 /**
  * Feature: 多孩子数据分配
  *   Scenario: 有孩子的 tenant 所有遗留数据正确分配

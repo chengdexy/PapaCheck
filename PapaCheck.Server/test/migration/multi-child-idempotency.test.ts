@@ -1,4 +1,4 @@
-// PapaCheck.Server.Node/test/migration/multi-child-idempotency.test.ts
+// PapaCheck.Server/test/migration/multi-child-idempotency.test.ts
 /**
  * Feature: 多孩子迁移幂等性
  *   Scenario: assignLegacyDataToChild 重复执行不报错

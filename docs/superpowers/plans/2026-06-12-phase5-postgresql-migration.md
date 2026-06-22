@@ -797,7 +797,7 @@ cd PapaCheck.Server.Node && npx vitest run
 #!/bin/bash
 set -e
 
-SERVER="root@123.57.129.243"
+SERVER="root@<server_ip>"
 REMOTE_DIR="/opt/papacheck"
 APP_DIR="PapaCheck.Server.Node"
 
@@ -974,7 +974,7 @@ curl https://papacheck.chengdexy.cn/api/ping
 curl -I https://papacheck.chengdexy.cn/app/
 
 # 验证 8080 已关闭
-curl -I http://123.57.129.243:8080/  # 应超时或拒绝
+curl -I http://<server_ip>:8080/  # 应超时或拒绝
 ```
 
 ---

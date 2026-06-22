@@ -6,7 +6,7 @@ import { readFileSync, existsSync } from 'fs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // 自动加载 .env.test（如果存在），避免每次都手动设置 DATABASE_URL
-const envTestPath = resolve(__dirname, 'PapaCheck.Server.Node', '.env.test');
+const envTestPath = resolve(__dirname, 'PapaCheck.Server', '.env.test');
 if (existsSync(envTestPath)) {
   const lines = readFileSync(envTestPath, 'utf-8').split('\n');
   for (const line of lines) {
@@ -30,7 +30,7 @@ export default defineConfig({
     globals: true,
     include: [
       'PapaCheck.Tests/**/*.test.js',
-      'PapaCheck.Server.Node/test/**/*.test.ts',
+      'PapaCheck.Server/test/**/*.test.ts',
       'PapaCheck.Site/src/**/*.test.tsx',
       'PapaCheck.Web/js/__tests__/**/*.test.js',
     ],
