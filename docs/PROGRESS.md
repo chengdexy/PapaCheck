@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-22（本地 Nginx 开发环境搭建完成）
+> 最后更新：2026-06-22（Android WebView 会话持久化修复）
 
 ## 当前版本
 
@@ -89,7 +89,8 @@
 
 | 日期 | 变更 |
 |------|------|
-| 2026-06-22 | **本地 Nginx 开发环境**：安装 Nginx 1.31.2；创建 `nginx.dev.conf`（镜像生产路由，HTTP :8081）；`scripts/start-dev.ps1` 一键启动脚本；`.vscode/launch.json + tasks.json` F5 一键拉起全量环境。静态路由验证通过 |
+| 2026-06-22 | **修复 Android 家长端 WebView 冷启动后跳转到登录页**：认证 token 存储在 WebView 的 `sessionStorage` 中，Android 系统回收 WebView 进程后 token 丢失，API 401 跳转到登录页。Flutter 层新增 `ConfigService.setAuthData/getAuthToken/clearAuth`（5 个方法），WebView 冷启动时通过中间 HTML 页注入 token 到 `sessionStorage`。Web 端代码不变，多标签隔离不受影响。新增 5 个 TDD 测试，全量 37 Flutter 测试通过。涉及 3 个文件 |
+| 2026-06-22 | **本地 Nginx 开发环境（镜像云端路由）**：安装 Nginx 1.31.2；创建 `nginx.dev.conf`（镜像生产路由，HTTP :8081）；`scripts/start-dev.ps1` 一键启动脚本；`.vscode/launch.json + tasks.json` F5 一键拉起全量环境。静态路由验证通过 |
 | 2026-06-22 | **云端路由对齐 + 多 bug 修复**：迁移脚本自动创建 children；修复 `api.js` localStorage→sessionStorage 不匹配导致登录死循环；`login.html` 孩子跳转 `/`→`/app/` 对齐云端路由；Nginx 新增 `location = /app`；BrandHeader "客户端"按钮加尾部斜杠；`/parent` 路由修复 |
 | 2026-06-22 | **多孩子生产数据迁移 + 全量部署上线**：对线上数据库执行迁移 SQL（children 表 + child_id 列 + access_codes 模型），上传新 dist/ 并重启服务。修复 `getChildId(request, db)` 33 处编译错误。API 验证通过，零错误日志 |
 | 2026-06-22 | **多孩子迁移可靠性验证测试**：新增 4 个 TDD 测试文件（19 个测试），覆盖 schema 结构、12 表数据分配、幂等性、可回滚性。验证多孩子架构变更的数据库迁移可靠性 |
