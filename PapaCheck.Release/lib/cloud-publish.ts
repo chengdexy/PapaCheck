@@ -25,11 +25,11 @@ export async function cloudPublish(executor: Executor): Promise<boolean> {
   const { ip: CLOUD_SERVER_IP, user: CLOUD_SERVER_USER } = requireEnv();
   const steps: StepDef[] = [];
 
-  // 清除 DATABASE_URL 跳过 PG 集成测试（仅做逻辑验证）
+  // 跳过需要 PG 的集成测试（仅做逻辑验证）
+  const excludeFlags = '--exclude=**/test/db/** --exclude=**/test/migration/** --exclude=**/test/email.test.ts --exclude=**/test/api/** --exclude=**/test/auth/routes.test.ts --exclude=**/test/auth/child-login.test.ts --exclude=**/test/ops/backup.test.ts --exclude=**/test/server.test.ts';
   steps.push({
     id: '1', desc: '运行全量测试（跳过 PG 集成测试）',
-    cmd: 'npx vitest run', cwd: ROOT, shell: true, timeout: 180,
-    env: { DATABASE_URL: null },
+    cmd: `npx vitest run ${excludeFlags}`, cwd: ROOT, shell: true, timeout: 180,
   });
 
   steps.push({
