@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-22（PapaCheck.Server.Node → PapaCheck.Server 重命名 + Release Console 设计文档）
+> 最后更新：2026-06-22（Release Console 实现 + Server 重命名 + IP 域名化）
 
 ## 当前版本
 
@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-22 | **Release Console 实现 + BDD/TDD 开发**：PapaCheck.Release/ 子项目实现完成（CLI 四子命令 + Web 控制台 + 执行引擎）。BDD/TDD 开发 13 个测试通过。修复 SSE 内存泄漏、替换硬编码 IP 为域名。清理 Python 死代码（release.py、pytest 等），项目不再依赖 Python 运行时 |
 | 2026-06-22 | **PapaCheck.Server.Node 重命名 + Release Console 设计文档**：`PapaCheck.Server.Node` → `PapaCheck.Server`（本地 git mv + 云端目录 mv + service 路径同步）；创建 Release Console 设计文档，规划用 Node.js/TypeScript 重写 release.py 并添加 Web 控制台 |
 | 2026-06-22 | **修复 `/parent` 重定向 + 代码审查修复循环**：`/parent` 路由从 `/admin/` 改回 `/app`；CRDT 推送测试改用新版操作格式；修复 PapaCheck.Server 目录被 PapaCheck.Email 配置自动再生问题；CodeGraph MCP 集成分析确认 Windows/Server/Email 三个弃用子项目安全删除。全量 580 测试通过 |
 | 2026-06-22 | **移除弃用的 PapaCheck.Windows 桌面端**：删除 `PapaCheck.Windows/` 目录（8 个文件）及 3 个关联测试文件，由 CodeGraph MCP 分析确认零外部引用后执行 |
