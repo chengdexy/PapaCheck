@@ -2,7 +2,23 @@
 # 启动顺序：Node.js → Nginx
 
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
-$NginxPrefix = "C:\Users\Admin\AppData\Local\Microsoft\WinGet\Packages\nginxinc.nginx_Microsoft.Winget.Source_8wekyb3d8bbwe\nginx-1.31.2"
+
+# Nginx 路径检测：优先使用环境变量 NGINX_PREFIX，否则自动检测
+$NginxPrefix = $env:NGINX_PREFIX
+if (-not $NginxPrefix) {
+    $nginxCmd = Get-Command nginx -ErrorAction SilentlyContinue
+    if (-not $nginxCmd) {
+        Write-Host "✖ Nginx 未安装，请先执行: winget install nginxinc.nginx" -ForegroundColor Red
+        exit 1
+    }
+    # winget 安装 nginx 会在 PATH 创建符号链接，取其目标路径作为 prefix
+    $nginxItem = Get-Item $nginxCmd.Source -ErrorAction SilentlyContinue
+    if ($nginxItem -and $nginxItem.Target) {
+        $NginxPrefix = Split-Path -Parent $nginxItem.Target
+    } else {
+        $NginxPrefix = Split-Path -Parent $nginxCmd.Source
+    }
+}
 $NginxDevConf = Join-Path $ProjectRoot "nginx.dev.conf"
 $NginxTargetConf = Join-Path $NginxPrefix "conf\nginx.dev.conf"
 
