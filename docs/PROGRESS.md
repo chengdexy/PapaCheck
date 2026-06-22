@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-21（管理面板适配新模型 + /app 死循环修复，618 测试通过）
+> 最后更新：2026-06-22（Android 下载进度条 + 百分比文本，32 Flutter 测试通过）
 
 ## 当前版本
 
@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-22 | **Android 下载进度条**：`UpdateService.downloadAndInstall` 新增 `onProgress` 回调，逐 chunk 读取响应流显示下载进度；对话框改用 `StatefulBuilder` + determinate 进度条 + 百分比文本。新增 2 个 TDD 测试，全量 32 Flutter 测试通过。涉及 3 个文件 |
 | 2026-06-21 | **管理面板适配新模型 + /app 死循环修复**：`AddMemberForm`/`MemberTable`/`BrandHeader` 适配以孩子为中心的新 access_codes 模型，删除角色区分；`/app` 路由改为前端 role 分流（家长→admin.html，孩子→index.html），修复登录后无限跳转死循环；`login.html` 角色按钮直接触发登录。涉及 15 个文件，618 测试通过 |
 | 2026-06-21 | **统一登录页重写（最近使用 + 角色选择）**：`login.html` 完全重写，新增渐变背景、白底圆角卡片、最近使用列表（localStorage 持久化，最多 5 条，去重）、家长/孩子角色选择按钮（选中态高亮）。新增 `loadKnownCodes()`、`saveKnownCode()`、`exchange()` 函数。页面加载检查 sessionStorage token 后跳转，新码登录自动保存到最近使用。`escapeHtml()` 防 XSS。新增 15 个 TDD 测试（login.test.js）。全量 627 测试通过。涉及 2 个文件 |
 | 2026-06-21 | **多孩子隔离 Bug 修复（5 项）**：`_setJson` UPDATE→UPDATE+INSERT 防止新租户数据丢失；`refreshAllData()` 新增 `_loadedChildId` 防止跨孩子结算合并泄露；`_doReconnect()` 保存/恢复 `window._currentChildId` 防止重连丢失 child_id 隔离；离线→在线自动恢复孩子选择器；同一浏览器内家长端/孩子端 `localStorage` token 键分离（`papacheck_child_token`）。涉及 7 个文件，610 测试通过 |

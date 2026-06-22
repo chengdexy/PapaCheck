@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- **Android 下载进度条**：`UpdateService.downloadAndInstall` 新增 `onProgress` 回调，逐 chunk 读取响应流计算下载进度；对话框改用 `StatefulBuilder` + determinate 进度条 + 百分比文本。新增 2 个 TDD 测试，全量 32 Flutter 测试通过
 - **统一登录页重写**：`login.html` 完全重写，新增渐变背景、白底圆角卡片、最近使用列表（localStorage 持久化，最多 5 条）、家长/孩子角色选择按钮。新码登录后自动保存到最近使用。新增 15 个 TDD 测试。全量 627 测试通过
 - **管理面板适配新模型**：`AddMemberForm` 删除角色选择，只接收孩子姓名；`MemberTable` 删除角色列，按孩子展示；`BrandHeader` 合并为孩子端/家长端为"客户端"链接；后端 `admin/routes.ts` 适配新 access_codes 结构
 - **管理员页面头部显示孩子名**：`admin.html` header 新增 `#childNameDisplay`，显示 `👤 孩子名`

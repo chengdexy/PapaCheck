@@ -29,15 +29,36 @@ class UpdateService {
   }
 
   /// 下载 APK 并触发安装
-  static Future<void> downloadAndInstall(String url) async {
+  ///
+  /// [onProgress] 可选参数，下载过程中回调进度值（0.0 ~ 1.0）。
+  /// 服务端未返回 content-length 时不回调，进度条保持 indeterminate 模式。
+  static Future<void> downloadAndInstall(
+    String url, {
+    void Function(double progress)? onProgress,
+  }) async {
     final client = HttpClient();
     try {
       final request = await client.getUrl(Uri.parse(url));
       final response = await request.close();
+      final contentLength = response.contentLength;
       final filePath = await getDownloadPath();
       final file = File(filePath);
-      await response.pipe(file.openWrite());
-      await OpenFilex.open(file.path);
+      final sink = file.openWrite();
+
+      int received = 0;
+      await for (final chunk in response) {
+        received += chunk.length;
+        sink.add(chunk);
+        if (onProgress != null && contentLength > 0) {
+          onProgress(received / contentLength);
+        }
+      }
+      await sink.close();
+
+      // 测试环境下跳过安装，避免 OpenFilex 在无 Android 环境时崩溃
+      if (_testDirectory == null) {
+        await OpenFilex.open(file.path);
+      }
     } finally {
       client.close();
     }

@@ -590,17 +590,38 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
 
   Future<void> _downloadAndInstall(String url) async {
     if (!mounted) return;
+    double progress = 0;
+    void Function(void Function())? dialogSetState;
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const AlertDialog(
-        title: Text('正在下载更新...'),
-        content: LinearProgressIndicator(),
+      builder: (_) => AlertDialog(
+        title: const Text('正在下载更新...'),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            dialogSetState = setState;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                LinearProgressIndicator(value: progress > 0 ? progress : null),
+                const SizedBox(height: 8),
+                Text('${(progress * 100).toInt()}%'),
+              ],
+            );
+          },
+        ),
       ),
     );
 
     try {
-      await UpdateService.downloadAndInstall(url);
+      await UpdateService.downloadAndInstall(
+        url,
+        onProgress: (p) {
+          progress = p;
+          dialogSetState?.call(() {});
+        },
+      );
       if (!mounted) return;
       Navigator.of(context).pop();
     } catch (e) {
