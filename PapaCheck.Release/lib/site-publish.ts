@@ -8,10 +8,16 @@ const ROOT = join(__dirname, '..', '..');
 const SITE_DIR = join(ROOT, 'PapaCheck.Site');
 const DIST_DIR = join(SITE_DIR, 'dist');
 
-const CLOUD_SERVER_IP = process.env.PAPACHECK_CLOUD_IP || 'papacheck.chengdexy.cn';
-const CLOUD_SERVER_USER = 'root';
+function requireEnv(): { ip: string; user: string } {
+  const ip = process.env.PAPACHECK_CLOUD_IP;
+  const user = process.env.PAPACHECK_SSH_USER;
+  if (!ip) throw new Error('请设置环境变量 PAPACHECK_CLOUD_IP（服务器地址或域名）');
+  if (!user) throw new Error('请设置环境变量 PAPACHECK_SSH_USER（SSH 登录用户名）');
+  return { ip, user };
+}
 
 export async function sitePublish(executor: Executor): Promise<boolean> {
+  const { ip: CLOUD_SERVER_IP, user: CLOUD_SERVER_USER } = requireEnv();
   const steps: StepDef[] = [];
 
   steps.push({

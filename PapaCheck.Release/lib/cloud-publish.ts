@@ -10,11 +10,19 @@ const ANDROID_DIR = join(ROOT, 'PapaCheck.Android');
 const APK_ARCHIVE_DIR = join(ANDROID_DIR, 'apk');
 const APK_BUILD_OUTPUT = join(ANDROID_DIR, 'build', 'app', 'outputs', 'flutter-apk', 'app-release.apk');
 
-const CLOUD_SERVER_IP = process.env.PAPACHECK_CLOUD_IP || 'papacheck.chengdexy.cn';
-const CLOUD_SERVER_USER = 'root';
 const SSH_OPTS = ['-o', 'StrictHostKeyChecking=accept-new'];
 
+function requireEnv(): { ip: string; user: string } {
+  // 在函数内部读取 env，方便测试中通过 beforeAll 设置
+  const ip = process.env.PAPACHECK_CLOUD_IP;
+  const user = process.env.PAPACHECK_SSH_USER;
+  if (!ip) throw new Error('请设置环境变量 PAPACHECK_CLOUD_IP（服务器地址或域名）');
+  if (!user) throw new Error('请设置环境变量 PAPACHECK_SSH_USER（SSH 登录用户名）');
+  return { ip, user };
+}
+
 export async function cloudPublish(executor: Executor): Promise<boolean> {
+  const { ip: CLOUD_SERVER_IP, user: CLOUD_SERVER_USER } = requireEnv();
   const steps: StepDef[] = [];
 
   steps.push({
