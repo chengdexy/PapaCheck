@@ -10,7 +10,7 @@ const ANDROID_DIR = join(ROOT, 'PapaCheck.Android');
 const APK_ARCHIVE_DIR = join(ANDROID_DIR, 'apk');
 const APK_BUILD_OUTPUT = join(ANDROID_DIR, 'build', 'app', 'outputs', 'flutter-apk', 'app-release.apk');
 
-const CLOUD_SERVER_IP = process.env.PAPACHECK_CLOUD_IP || '123.57.129.243';
+const CLOUD_SERVER_IP = process.env.PAPACHECK_CLOUD_IP || 'papacheck.chengdexy.cn';
 const CLOUD_SERVER_USER = 'root';
 const SSH_OPTS = ['-o', 'StrictHostKeyChecking=accept-new'];
 

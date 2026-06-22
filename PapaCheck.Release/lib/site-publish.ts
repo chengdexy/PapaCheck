@@ -8,7 +8,7 @@ const ROOT = join(__dirname, '..', '..');
 const SITE_DIR = join(ROOT, 'PapaCheck.Site');
 const DIST_DIR = join(SITE_DIR, 'dist');
 
-const CLOUD_SERVER_IP = process.env.PAPACHECK_CLOUD_IP || '123.57.129.243';
+const CLOUD_SERVER_IP = process.env.PAPACHECK_CLOUD_IP || 'papacheck.chengdexy.cn';
 const CLOUD_SERVER_USER = 'root';
 
 export async function sitePublish(executor: Executor): Promise<boolean> {
