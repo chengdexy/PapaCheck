@@ -1693,7 +1693,8 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   async findAdminExists(): Promise<boolean> {
     const result = await this.pool.query(
-      "SELECT 1 FROM users WHERE role = 'admin' AND is_active = true LIMIT 1"
+      'SELECT 1 FROM users WHERE role = $1 AND is_active = $2 LIMIT 1',
+      ['admin', true]
     );
     return result.rows.length > 0;
   }
