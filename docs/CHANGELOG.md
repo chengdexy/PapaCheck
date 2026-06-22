@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+### Removed
+- **移除弃用的 PapaCheck.Windows 桌面端**：删除整个 `PapaCheck.Windows/` 目录（8 个文件），包含 Tkinter GUI 主程序、PyInstaller 构建脚本、版本管理工具等。同时清理关联的 3 个测试文件（`test_windows_node_server.py`、`test_windows_quit_guard.py`、`test_release.py`）
+
 ### Added
 - （暂无）
 
