@@ -32,7 +32,7 @@ Write-Host " ✓" -ForegroundColor Green
 # 1. 启动 Node.js 服务器（后台运行）
 Write-Host "[1/2] 启动 Node.js 服务器 (端口 8080)..." -NoNewline
 $nodeJob = Start-Job -ScriptBlock {
-    cd $using:ProjectRoot\PapaCheck.Server.Node
+    cd $using:ProjectRoot\PapaCheck.Server
     npm run build 2>&1 | Out-Null
     node dist/index.js --web-dir ..\PapaCheck.Web --tts-python python3
 }

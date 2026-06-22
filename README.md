@@ -47,7 +47,7 @@ PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和�
 **方式 B：Node.js 服务器（开发调试）**
 
 ```bash
-cd PapaCheck.Server.Node
+cd PapaCheck.Server
 npm install
 npm run dev -- --port 8080
 ```
@@ -77,15 +77,16 @@ npm run dev -- --port 8080
 
 ```
 PapaCheck/
-├── PapaCheck.Server/        # [已废弃] Python 服务端（保留参考，不再维护）
-├── PapaCheck.Server.Node/   # 服务端（Node.js + Fastify + SQLite/PostgreSQL 双后端）
-│   ├── src/db/              # 数据库抽象层（IDatabase + SqliteAdapter + PostgresAdapter）
-│   ├── src/auth-plugin.ts   # Cookie Session 认证（临时）
+├── PapaCheck.Server/        # 服务端（Node.js + Fastify + PostgreSQL）
+│   ├── src/db/              # 数据库抽象层（IDatabase + PostgresAdapter）
 │   └── scripts/             # 迁移脚本 + PostgreSQL DDL
 ├── PapaCheck.Web/           # Web 前端（孩子大屏 & 管理端 admin.html）
-├── PapaCheck.Windows/       # Windows 桌面端（PyInstaller 单 EXE，内嵌 Node.js 服务器）
 ├── PapaCheck.Android/       # Android 端（Flutter WebView 混合应用）
-├── PapaCheck.Tests/         # 测试（Vitest + pytest）
+├── PapaCheck.Site/          # 落地页 + React 管理面板（Vite + Tailwind）
+├── PapaCheck.Release/       # 发布控制台（Node.js + Fastify + Web UI）
+├── PapaCheck.Tests/         # 测试（Vitest）
+├── PapaCheck.WeChat/        # 微信公众号文章生成
+├── PapaCheck.Memo/          # 开发备忘
 └── docs/                    # 项目文档
 ```
 
@@ -93,26 +94,19 @@ PapaCheck/
 
 | 模块              | 技术                                                    |
 | ----------------- | ------------------------------------------------------- |
-| **Server**        | Node.js, Fastify, better-sqlite3 / pg (PostgreSQL), edge-tts (`tts_bridge.py`) |
+| **Server**        | Node.js, Fastify, pg (PostgreSQL), edge-tts (`tts_bridge.py`) |
 | **Web 前端**      | 原生 HTML/CSS/JS, SVG 图表, Service Worker              |
 | **Site（落地页+管理面板）** | Vite 5, React 18, TypeScript 5, Tailwind CSS 3, Lucide Icons |
-| **Windows 桌面端** | Python, tkinter, 内嵌 Node.js 子进程（pkg SEA 单 EXE） |
-| **邮件同步**      | Node.js IMAP 模块（内置于服务端）                       |
 | **Android 端**    | Flutter, `webview_flutter`                              |
-| **测试**          | Vitest（627 单元 + PG 集成）、pytest（65）、Flutter（30） |
-| **构建发布**      | release.py（一站式：EXE + APK + ZIP）                    |
+| **测试**          | Vitest（627 单元 + PG 集成）                              |
+| **构建发布**      | PapaCheck.Release（Node.js + Web Console）               |
 
 ## 🔧 开发
 
 ### 运行测试
 
 ```bash
-# 全部测试
-npm test                   # 全量测试（Vitest 704 + 11 跳过）
-cd PapaCheck.Android && flutter test  # Android 端测试
-
-# 单个测试文件
-npx vitest run PapaCheck.Tests/duplicate_rating.test.js
+npx vitest run
 ```
 
 ### 项目文档

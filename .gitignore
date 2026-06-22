@@ -73,14 +73,13 @@ PapaCheck.Windows/version_info.txt
 node_modules/
 
 # Node.js 构建产物
-PapaCheck.Server.Node/dist/
+PapaCheck.Server/dist/
 
 # TypeScript 增量编译缓存
 *.tsbuildinfo
 
 # Node.js TTS 缓存
-PapaCheck.Server.Node/src/tts_cache/
-PapaCheck.Server.Node/tts_cache/
+PapaCheck.Server/src/tts_cache/
 PapaCheck.Web/tts_cache/
 
 # WeChat本地临时HTML（正式版在docs/）
@@ -92,7 +91,7 @@ coverage/
 htmlcov/
 
 # 运行时数据（JWT 密钥、管理员凭据等）
-PapaCheck.Server.Node/data/
+PapaCheck.Server/data/
 
 # 临时构建产物
 .publish.tar.gz

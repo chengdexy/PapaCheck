@@ -1,4 +1,4 @@
-// PapaCheck.Server.Node/test/migration/multi-child-reversibility.test.ts
+// PapaCheck.Server/test/migration/multi-child-reversibility.test.ts
 /**
  * Feature: 多孩子迁移可回滚性
  *   Scenario: DROP IF EXISTS child_id 列不报错

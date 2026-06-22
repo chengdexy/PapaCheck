@@ -1,4 +1,4 @@
-# PapaCheck.Server.Node
+# PapaCheck.Server
 
 PapaCheck（爸~检查！）Node.js 服务器 — 基于 Fastify 的 HTTP 服务器，与现有 Python 服务器 API 兼容。
 
@@ -96,7 +96,7 @@ npm run build:sea
 ## 项目结构
 
 ```
-PapaCheck.Server.Node/
+PapaCheck.Server/
 ├── src/
 │   ├── index.ts          # 入口文件（CLI 参数解析 + 启动）
 │   ├── app.ts            # Fastify 应用（路由注册）

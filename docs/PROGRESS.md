@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-22（修复 /parent 重定向 + 代码审查修复循环）
+> 最后更新：2026-06-22（PapaCheck.Server.Node → PapaCheck.Server 重命名 + Release Console 设计文档）
 
 ## 当前版本
 
@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-22 | **PapaCheck.Server.Node 重命名 + Release Console 设计文档**：`PapaCheck.Server.Node` → `PapaCheck.Server`（本地 git mv + 云端目录 mv + service 路径同步）；创建 Release Console 设计文档，规划用 Node.js/TypeScript 重写 release.py 并添加 Web 控制台 |
 | 2026-06-22 | **修复 `/parent` 重定向 + 代码审查修复循环**：`/parent` 路由从 `/admin/` 改回 `/app`；CRDT 推送测试改用新版操作格式；修复 PapaCheck.Server 目录被 PapaCheck.Email 配置自动再生问题；CodeGraph MCP 集成分析确认 Windows/Server/Email 三个弃用子项目安全删除。全量 580 测试通过 |
 | 2026-06-22 | **移除弃用的 PapaCheck.Windows 桌面端**：删除 `PapaCheck.Windows/` 目录（8 个文件）及 3 个关联测试文件，由 CodeGraph MCP 分析确认零外部引用后执行 |
 | 2026-06-22 | **修复 Android 家长端 WebView 冷启动后跳转到登录页**：认证 token 存储在 WebView 的 `sessionStorage` 中，Android 系统回收 WebView 进程后 token 丢失，API 401 跳转到登录页。Flutter 层新增 `ConfigService.setAuthData/getAuthToken/clearAuth`（5 个方法），WebView 冷启动时通过中间 HTML 页注入 token 到 `sessionStorage`。Web 端代码不变，多标签隔离不受影响。新增 5 个 TDD 测试，全量 37 Flutter 测试通过。涉及 3 个文件 |
@@ -160,7 +161,7 @@
 | 2026-06-12 | **修复管理端确认兑现时全量 PUT 兑换记录导致的两个 Bug** |
 | 2026-06-12 | **Phase 5a+5b 代码实施完成 + 服务器部署切换 PostgreSQL** |
 | 2026-06-12 | **修复 Dockerfile TTS Python 路径**：Docker CMD 添加 `--tts-python python3`（Alpine 无 `python` 命令，只有 `python3`，之前 TTS 实际未生效）；优化 pip 安装参数 `--no-cache-dir` 减镜像体积；代码审查修复 SCP 失败后 tar 包提前删除 bug；清理 publish.ps1 统一到 release.py；全量 505 测试通过 |
-| 2026-06-12 | **HTTPS + 域名配置**：DNS A 记录 papacheck → 123.57.129.243；Nginx 容器加端口 443 + Let's Encrypt 免费证书 + HTTP 自动 301 跳转；部署产品落地页（80 端口）；全量 505 测试通过 |
+| 2026-06-12 | **HTTPS + 域名配置**：DNS A 记录 papacheck → 云服务器；Nginx 容器加端口 443 + Let's Encrypt 免费证书 + HTTP 自动 301 跳转；部署产品落地页（80 端口）；全量 505 测试通过 |
 | 2026-06-12 | **修复 OOM 宕机**：docker compose up -d 重建容器时内存溢出（2核2G 无 Swap），导致 SSH 断连、服务器卡死。修复：创建 2GB Swap 分区 + Docker mem_limit 768m + memswap_limit 1536m；更新 docker-compose.yml、Dockerfile、SKILL.md |
 | 2026-06-12 | **阿里云 ECS 上云完成**：购买 2核2G 经济型 e 实例（99元/年）→ Ubuntu 24.04 初始化 → Docker 安装 → SSH 安全加固 + UFW 防火墙 → 本地打包上传代码 → Docker 多阶段构建（node:22-alpine）→ Docker Compose 启动 → 阿里云安全组配置 8080 端口；创建 `cloud-deploy` Skill 记录完整部署流程 |
 | 2026-06-11 | 修复 Windows 端版本号更迭后开机自启动配置被取消：`_cleanup_stale_autostart`（删除无效路径）→ `_repair_autostart`（更新为当前 EXE 路径），保留用户自启动设定；新增 TDD 测试 4 个；全量 565 测试通过（505 JS + 60 Python） |
