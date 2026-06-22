@@ -37,6 +37,11 @@ export async function startServer(port = 3456) {
 
   app.get('/api/version', async () => ({ apk: readApkVersion() }));
 
+  app.get('/api/release/env', async () => ({
+    PAPACHECK_CLOUD_IP: process.env.PAPACHECK_CLOUD_IP || null,
+    PAPACHECK_SSH_USER: process.env.PAPACHECK_SSH_USER || null,
+  }));
+
   app.get('/api/release/history', async () => executor.history);
 
   app.get('/api/release/events', async (request, reply) => {
