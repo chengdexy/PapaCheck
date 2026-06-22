@@ -10,6 +10,10 @@ const testDbUrl = process.env.DATABASE_URL || 'postgresql://papacheck:papacheck@
 async function main() {
   const url = new URL(testDbUrl);
   const testDbName = url.pathname.slice(1);
+  // 校验数据库名合法性（PG 不支持 DDL 参数化查询，只能白名单校验）
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(testDbName)) {
+    throw new Error(`非法数据库名: "${testDbName}"`);
+  }
   url.pathname = '/papacheck';
   const adminUrl = url.toString();
 
