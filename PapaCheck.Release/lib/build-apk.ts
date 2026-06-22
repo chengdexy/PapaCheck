@@ -30,9 +30,10 @@ export function resolveVersion(current: string, args: { ver?: string; bump?: str
     }
     return args.ver;
   }
-  if (args.noBump) return current;
+  // 默认不递增版本号，需用户显式指定 --bump
+  if (args.noBump || !args.bump) return current;
 
-  const bump = args.bump ?? 'patch';
+  const bump = args.bump;
   const m = current.match(VERSION_RE);
   if (!m) return current;
   const ma = Number(m[1]), mi = Number(m[2]), pa = Number(m[3]);

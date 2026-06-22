@@ -45,7 +45,7 @@ program
   .command('build-apk')
   .description('构建 Android APK')
   .option('-v, --ver <ver>', '指定版本号 (X.Y.Z)')
-  .option('--bump <level>', '自动递增版本号 (patch|minor|major)')
+  .option('--bump <level>', '递增版本号 (patch|minor|major)，默认不递增')
   .option('--no-bump', '不递增版本号')
   .action(async (options) => {
     const executor = new Executor();

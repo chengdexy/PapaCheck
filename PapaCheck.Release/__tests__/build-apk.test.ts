@@ -60,8 +60,8 @@ describe('build-apk 版本管理', () => {
     expect(resolveVersion('1.4.0', { bump: 'major' })).toBe('2.0.0');
   });
 
-  test('默认 bump 为 patch', () => {
-    expect(resolveVersion('1.4.0', {})).toBe('1.4.1');
+  test('默认不递增版本号', () => {
+    expect(resolveVersion('1.4.0', {})).toBe('1.4.0');
   });
 
   test('--ver 直接设定版本', () => {
