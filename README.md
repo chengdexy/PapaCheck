@@ -2,7 +2,7 @@
 
 ![PapaCheck Banner](./docs/imgs/_banner.jpg)
 
-> **v1.4.0** — Android WebView 会话持久化修复，37 Flutter 测试 + 173 Web 测试通过
+> **v1.4.0** — Android WebView 会话持久化修复，37 Flutter 测试 + 173 Web 测试通过，13 Release 测试
 
 PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和跟踪孩子的作业完成情况。支持通过转发微信群中老师布置的作业到邮件，AI 自动解析并添加到清单；孩子可以自主开始/暂停/完成作业并获得积分；家长远程评级并管理积分商店。
 
@@ -18,12 +18,13 @@ PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和�
 - **💰 赏金任务**：家长发布任务（如"帮妈妈洗碗"），孩子提交完成证明获取积分
 - **📧 邮件同步**：转发老师作业邮件到指定邮箱，AI 自动解析并发布
 - **📎 附件下载**：邮件中的图片、文件自动下载保存
-- **📱 多端支持**：Web 大屏（孩子端 + 管理端）、Android APP、Windows 桌面端
+- **📱 多端支持**：Web 大屏（孩子端 + 管理端）、Android APP
 - **🔌 离线可用**：断网时核心功能正常，联网后自动同步
 - **💾 自动备份**：每日凌晨 PostgreSQL 自动备份，超管面板可下载
 - **📊 健康监控**：磁盘/PG/备份状态实时监控，异常邮件告警
 - **🎨 品牌落地页**：`PapaCheck.Site` 提供产品介绍 + 下载 + 注册入口，含五态吉祥物插画（wave/point/ok/thumbs/bye）
 - **🛠 统一管理面板**：`PapaCheck.Site/admin` 提供家庭成员/作业/积分商店的远程管理（与落地页同一 Vite + React + TS + Tailwind 技术栈）
+- **🚀 发布控制台**：`PapaCheck.Release` 提供 Web 界面一键构建 APK / 同步云端 / 部署 Site（Node.js + Fastify + SSE 实时日志）
 
 ## 🚀 快速开始
 
