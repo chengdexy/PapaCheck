@@ -680,7 +680,8 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         : baseUrl;
 
     if (role == DeviceRole.parent) {
-      return '$base/parent';
+      // 走 /login → login.html（访问码登录），而非 /parent（会 301 到 React 管理面板）
+      return '$base/login';
     }
     return '$base/child';
   }
