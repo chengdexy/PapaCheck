@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Added
+- **本地 Nginx 开发环境（镜像云端路由）**：新增 `nginx.dev.conf`（HTTP :8081，去 SSL），`scripts/start-dev.ps1` 一键启动脚本，`.vscode/launch.json + tasks.json` 支持 F5 一键拉起 Node.js + Nginx。Nginx 静态路由（`/` 落地页、`/admin/` 管理面板）验证通过，代理路由（`/app/`、`/login`、`/api/`）需 Node.js 后端配合（[#nginx.dev.conf](file:///e:/trae_projects/PapaCheck/nginx.dev.conf)）
 - **多孩子迁移数据可靠性测试**：新增 4 个 TDD 测试文件（19 个测试），覆盖 schema 结构验证、12 张 per-child 表数据分配正确性、迁移幂等性、可回滚性。用于上线前验证多孩子架构变更的数据库迁移可靠性（[#multi-child-schema.test.ts](file:///e:/trae_projects/PapaCheck/PapaCheck.Server.Node/test/migration/multi-child-schema.test.ts)）
 - **生产环境多孩子数据迁移完成**：对线上 `papacheck` 数据库执行 `init-pg-schema.sql` + `migrate-access-code-model.sql`，创建 children 表、12 张表 child_id 列、12 个部分唯一索引、access_codes 模型迁移。备份 + 迁移 + 部署 + 重启 全流程完成
 
