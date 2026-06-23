@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-23（清理过期 spec/plan 文档 68 个文件，15 Release 测试通过）
+> 最后更新：2026-06-23（维护全部项目文档：PROGRESS / PRD / ARCHITECTURE / API / README 同步至 v1.4.0）
 
 ## 当前版本
 
-**v1.4.0**（Android WebView 会话持久化修复，37 Flutter 测试 + 173 Web 测试通过）
+**v1.4.0**（Android WebView 会话持久化修复，37 Flutter 测试 + 618 Vitest 测试 + 15 Release 测试通过）
 
 ## 部署状态
 
@@ -37,30 +37,28 @@
 
 ### 基础设施
 
-- [x] Python HTTP 服务器 + SQLite 数据库
-- [x] Node.js HTTP 服务器（Fastify + TypeScript）
-- [x] **数据库抽象层重构** — `IDatabase` 接口 + `SqliteAdapter` / `PostgresAdapter`（Phase 5a）
+- [x] Node.js HTTP 服务器（Fastify + TypeScript + PostgreSQL 16）
+- [x] **数据库抽象层重构** — `IDatabase` 接口 + `PostgresAdapter`（Phase 5a，SQLite 已退役）
 - [x] **JWT 多租户认证系统** — Hash 码预授权 + token_version 吊销 + 租户行级隔离（Phase 5c）
-- [x] **Cookie Session 临时认证** — 部署密码 + 登录页（Phase 5b，已替换为 JWT）
-- [x] **PostgreSQL 迁移脚本** — `migrate-to-pg.ts` 逐表迁移 + 行数校验
-- [x] **部署脚本 + systemd service** — `scripts/deploy.sh` + `papacheck.service`
-- [x] **服务器已迁移到 systemd + Nginx** — 移除 Docker，Nginx 反向代理 + HTTPS Let's Encrypt
-- [x] **云端数据库已切换到 PostgreSQL 16** — SQLite 数据完整迁移，19 张表行数校验通过
-- [x] TTS 语音提醒（edge-tts，Python 子进程桥接）
+- [x] **认证体系重构（Phase 5f）**：分离账号与访问码，`users` 表合并 `tenants` 表，新增 `access_codes` 表。角色简化为 `admin`/`user`（账号）和 `parent`/`child`（访问码）。统一登录入口，超级管理员首次登录强制修改凭证
+- [x] **PostgreSQL 迁移** — `migrate-to-pg.ts` 逐表迁移 + 行数校验，SQLite 数据完整迁移，26 张表
+- [x] **部署：systemd + Nginx + Let's Encrypt** — 移除 Docker，Nginx 反向代理 + HTTPS 自动续期
+- [x] **多孩子支持（Phase 1+2）** — children 表 + 12 张表 child_id 列 + partial unique index，数据行级隔离
+- [x] **离线同步重构（Phase 0~4）** — CRDT 模型简化、SQLite 退役、Android 原生写队列
+- [x] **Phase 5d 运维增强**：PostgreSQL 自动备份（每日 03:00，保留 3 份）、健康监控（磁盘/PG/备份状态，每 5 分钟）、邮件告警（状态机去重，SMTP 配置面板）、超管面板系统健康页面
+- [x] TTS 语音提醒（edge-tts，常驻 Python 子进程）
 - [x] 邮件同步（IMAP + AI 解析）
 - [x] 附件下载
 - [x] 离线支持（Service Worker + localforage）
 - [x] 增量同步（pull/push）
-- [x] 一站式发布脚本（release.py）
+- [x] **Release Console 发布控制台** — `PapaCheck.Release/` CLI 四子命令 + Web 控制台（SSE 实时日志），替代 release.py
 - [x] OpenAPI 自动文档（Swagger UI）
 - [x] 单 EXE 构建（Node.js SEA）
-- [x] 测试框架（pytest + Vitest 4.x + Flutter test）
+- [x] 测试框架（Vitest + Flutter test）
 - [x] JS/TS 代码覆盖率 85.22%（Stmts）| 71.89%（Branch）| 90.94%（Funcs）| 87.06%（Lines）
-- [x] Python 代码覆盖率 18%（release.py 32%）
 - [x] **自定义科目**：科目从硬编码改为 settings 可配置，设置页可添加/删除/恢复/重置
-- [x] **PapaCheck.Site 官网子项目**：从 `docs/` 搬出官网到独立子项目，管理面板拆为独立页面
-- [x] **认证体系重构（Phase 5f）**：分离账号与访问码，`users` 表合并 `tenants` 表，新增 `access_codes` 表。角色简化为 `admin`/`user`（账号）和 `parent`/`child`（访问码）。统一登录入口，超级管理员首次登录强制修改凭证。639 测试
-- [x] **Phase 5d 运维增强**：PostgreSQL 自动备份（每日 03:00，保留 3 份）、健康监控（磁盘/PG/备份状态，每 5 分钟）、邮件告警（状态机去重，SMTP 配置面板）、超管面板系统健康页面。新增 13 个 TDD 测试，全量 657 测试
+- [x] **PapaCheck.Site 官网子项目**：从 `docs/` 搬出官网到独立子项目，管理面板拆为独立页面（Vite + React + Tailwind）
+- [x] **本地 Nginx 开发环境**：`nginx.dev.conf` 镜像生产路由，`scripts/start-dev.ps1` 一键启动
 
 ---
 
@@ -68,13 +66,13 @@
 
 - [x] Phase 5e: 客户端适配（Android 远程配置 + Web 登录状态持久化）— Android 首屏默认连接云服务器 `papacheck.chengdexy.cn:443`；Web child/admin 端 localStorage token 刷新恢复
 - [ ] iOS 端
-- [ ] 多孩子支持（数据模型已有，UI 未实现）→ **2026-06-21 Phase 1+2 完成：数据库层 + Auth + API + 家长端 UI 全部实现**
+- [x] 多孩子支持 Phase 1+2 — **2026-06-21 完成：数据库层 + Auth + API + 家长端 UI + 生产数据迁移**
+- [ ] 多孩子支持 Phase 3：前端 UI 孩子切换/添加流程完善
 - [ ] 更丰富的数据分析与报告
 - [x] 离线模式重构（Phase 0~4 全部完成，v1.3.8 已上线）
-- [ ] 离线优先同步优化（spec 已有）
-- [ ] 离线功能差距填补与前端测试（spec 已有）
-- [ ] 简化 Flutter 启动流程（spec 已有）
-- [ ] Windows 端合并到服务端（spec 已有）
+- [ ] 离线优先同步优化
+- [ ] 离线功能差距填补与前端测试
+- [ ] 简化 Flutter 启动流程
 
 ---
 
@@ -89,6 +87,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-23 | **维护全部项目文档至 v1.4.0**：同步更新 PROGRESS / PRD / ARCHITECTURE / API / README 五份文档，反映项目当前状态（PostgreSQL、Release Console、多孩子支持、Python 已移除等变更） |
 | 2026-06-23 | **修复构建 APK 版本号不一致 Bug**：`build-apk.ts` 归档步骤在构建前内联执行，导致旧版 APK 用新版名归档（文件名 `1.4.2` 实际 `1.4.1`）；改为 executor step 中执行，构建成功才归档。递增版本时构建号被 `+0` 重置，改为保留已有构建号。清理死代码 |
 | 2026-06-23 | **清理过期 spec/plan 文档（68 个文件）**：删除 `.trae/specs/`（11 个已完成 spec 目录）、`docs/superpowers/`（30 个已实现的设计/计划文档）、`.trae/documents/`（4 个过时方案文档）、`PapaCheck.Memo/`（3 个备忘文件）、`docs/` 下 4 个旧版 HTML 周报 |
 | 2026-06-23 | **修复 Release 控制台 Windows cmd.exe 引号问题系列 Bug**：`cloud-publish.ts` findstr 管道参数经 `cmd.exe /s /c` 被 `\"` 破坏 → 直接运行 vitest；`site-publish.ts` tar 路径引号被 cmd.exe 破坏 → 数组参数 `shell: false`；`site-publish.ts` scp 走 SFTP 协议文件未落到预期路径 → Node.js SSH pipe 上传；`console.html` 日志 ANSI 转义码复制变方框 → `stripAnsi()` 过滤；`site-publish.ts` 清理步骤 `node -e` 引号冲突 → 数组参数。步骤编号改为 1~8。15 Release 测试通过 |
