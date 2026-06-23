@@ -7,6 +7,7 @@ import type { Pool as PoolType, QueryResult } from 'pg';
 import bcrypt from 'bcryptjs';
 import { DatabaseAdapter } from './adapter.js';
 import type { FullDataSnapshot, PointsHistoryEntry, ModifiedEntry, NotificationItem, TenantListItem, ChildrenRecord, AccessCodeRecord, CreateAccessCodeInput, AdminUser, BackupRecord, HealthRecord, AlertState, OpsConfig } from './types.js';
+import type { HomeworkDTO, SettlementDTO, EfficiencyDTO, ShopItemDTO, RedemptionDTO, RewardBoxItemDTO, BuffDTO, FreeTimeTaskDTO, BountyTaskDTO, BountySubmissionDTO, BountyCompletionDTO, SettingsDTO, EmailConfigDTO } from './dto.js';
 import type { CRDTOperation } from '../crdt/types.js';
 
 /** date_key 表：以日期为主键，存储 JSON 数据 */
@@ -490,7 +491,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     return data;
   }
 
-  async importFullData(data: any, tenantId?: string, childId?: string): Promise<void> {
+  async importFullData(data: FullDataSnapshot, tenantId?: string, childId?: string): Promise<void> {
     const points = data.points ?? {};
     const balance = typeof points === 'number' ? points : (points.balance ?? 0);
 
@@ -538,7 +539,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     ];
 
     for (const { table, sourceKey, defaultValue } of dateKeySetters) {
-      const source = data[sourceKey] ?? defaultValue;
+      const source = (data as unknown as Record<string, unknown>)[sourceKey] ?? defaultValue;
       if (tenantId && childId) {
         await this.pool.query(`DELETE FROM ${table} WHERE tenant_id = $1 AND child_id = $2`, [tenantId, childId]);
       } else if (tenantId) {
@@ -763,7 +764,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     return this._getDateData('homeworks', dateKey, [], tenantId, childId);
   }
 
-  async saveHomeworks(dateKey: string, items: any[], tenantId?: string, childId?: string): Promise<void> {
+  async saveHomeworks(dateKey: string, items: HomeworkDTO[], tenantId?: string, childId?: string): Promise<void> {
     await this._setDateData('homeworks', dateKey, items, tenantId, childId);
     await this.recordModification('homeworks', dateKey, new Date().toISOString(), tenantId);
   }
@@ -794,7 +795,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     return found?.item && !found.item.isDeleted ? found.item : null;
   }
 
-  async putHomework(id: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+  async putHomework(id: string, data: HomeworkDTO, tenantId?: string, childId?: string): Promise<void> {
     const existing = await this._findRecordById('homeworks', id, tenantId, childId);
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
@@ -810,7 +811,7 @@ export class PostgresAdapter extends DatabaseAdapter {
       await this._setDateData('homeworks', existing.dateKey, items, tenantId, childId);
       await this.recordModification('homeworks', existing.dateKey, now, tenantId);
     } else {
-      const dateKey = data.dateKey ?? data.date ?? new Date().toISOString().slice(0, 10);
+      const dateKey = (data.dateKey as string | undefined) ?? (data.date as string | undefined) ?? new Date().toISOString().slice(0, 10);
       let items = await this._getDateDataRaw('homeworks', dateKey, tenantId, childId);
       if (!Array.isArray(items)) {
         items = [];
@@ -821,7 +822,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     }
   }
 
-  async patchHomework(id: string, fields: any, tenantId?: string, childId?: string): Promise<void> {
+  async patchHomework(id: string, fields: Partial<HomeworkDTO>, tenantId?: string, childId?: string): Promise<void> {
     const existing = await this._findRecordById('homeworks', id, tenantId, childId);
     if (!existing) return;
 
@@ -850,19 +851,19 @@ export class PostgresAdapter extends DatabaseAdapter {
     return this._getDateData('daily_settlement', dateKey, null, tenantId, childId);
   }
 
-  async saveSettlement(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+  async saveSettlement(dateKey: string, data: SettlementDTO, tenantId?: string, childId?: string): Promise<void> {
     await this._setDateData('daily_settlement', dateKey, data, tenantId, childId);
     await this.recordModification('daily_settlement', dateKey, new Date().toISOString(), tenantId);
   }
 
-  async putSettlement(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+  async putSettlement(dateKey: string, data: SettlementDTO, tenantId?: string, childId?: string): Promise<void> {
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
     await this._setDateData('daily_settlement', dateKey, data, tenantId, childId);
     await this.recordModification('daily_settlement', dateKey, now, tenantId);
   }
 
-  async patchSettlement(dateKey: string, fields: any, tenantId?: string, childId?: string): Promise<void> {
+  async patchSettlement(dateKey: string, fields: Partial<SettlementDTO>, tenantId?: string, childId?: string): Promise<void> {
     const existing = (await this._getDateDataRaw('daily_settlement', dateKey, tenantId, childId)) ?? {};
     const now = new Date().toISOString();
     const merged = { ...existing, ...fields, lastModified: now };
@@ -877,7 +878,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     return (await this._getJson('shop_items', tenantId)) ?? [];
   }
 
-  async saveShopItems(items: any[], tenantId?: string): Promise<void> {
+  async saveShopItems(items: ShopItemDTO[], tenantId?: string): Promise<void> {
     await this._setJson('shop_items', items, tenantId);
     await this.recordModification('shop_items', '1', new Date().toISOString(), tenantId);
   }
@@ -888,14 +889,14 @@ export class PostgresAdapter extends DatabaseAdapter {
     return item && !item.isDeleted ? item : null;
   }
 
-  async putShopItem(id: string, data: any, tenantId?: string): Promise<void> {
+  async putShopItem(id: string, data: ShopItemDTO, tenantId?: string): Promise<void> {
     const items = (await this._getJson('shop_items', tenantId)) ?? [];
     const { index, item: existingItem } = this._findInArray(items, id);
     const now = new Date().toISOString();
-    data.lastModified = data.lastModified ?? now;
+    data.lastModified = (data.lastModified as string) ?? now;
 
     if (index !== -1) {
-      if (existingItem?.lastModified && data.lastModified < existingItem.lastModified) {
+      if (existingItem?.lastModified && (data.lastModified as string) < existingItem.lastModified) {
         data.baseQuantity = existingItem.baseQuantity;
         data.remainingQuantity = existingItem.remainingQuantity;
       }
@@ -926,7 +927,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     return (await this._getJson('redemptions', tenantId, childId)) ?? [];
   }
 
-  async saveRedemptions(items: any[], tenantId?: string, childId?: string): Promise<void> {
+  async saveRedemptions(items: RedemptionDTO[], tenantId?: string, childId?: string): Promise<void> {
     await this._setJson('redemptions', items, tenantId, childId);
     await this.recordModification('redemptions', '1', new Date().toISOString(), tenantId);
   }
@@ -938,7 +939,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     await this.recordModification('redemptions', '1', new Date().toISOString(), tenantId);
   }
 
-  async putRedemption(id: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+  async putRedemption(id: string, data: RedemptionDTO, tenantId?: string, childId?: string): Promise<void> {
     const items = (await this._getJson('redemptions', tenantId, childId)) ?? [];
     const { index } = this._findInArray(items, id);
     const now = new Date().toISOString();
@@ -960,12 +961,12 @@ export class PostgresAdapter extends DatabaseAdapter {
     return this._filterDeleted((await this._getJson('reward_box', tenantId, childId))) ?? [];
   }
 
-  async saveRewardBox(items: any[], tenantId?: string, childId?: string): Promise<void> {
+  async saveRewardBox(items: RewardBoxItemDTO[], tenantId?: string, childId?: string): Promise<void> {
     await this._setJson('reward_box', items, tenantId, childId);
     await this.recordModification('reward_box', '1', new Date().toISOString(), tenantId);
   }
 
-  async putRewardBoxItem(id: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+  async putRewardBoxItem(id: string, data: RewardBoxItemDTO, tenantId?: string, childId?: string): Promise<void> {
     const items = (await this._getJson('reward_box', tenantId, childId)) ?? [];
     const { index } = this._findInArray(items, id);
     const now = new Date().toISOString();
@@ -999,19 +1000,19 @@ export class PostgresAdapter extends DatabaseAdapter {
     return (await this._getJson('settings', tenantId)) ?? {};
   }
 
-  async saveSettings(data: any, tenantId?: string): Promise<void> {
+  async saveSettings(data: SettingsDTO, tenantId?: string): Promise<void> {
     await this._setJson('settings', data, tenantId);
     await this.recordModification('settings', '1', new Date().toISOString(), tenantId);
   }
 
-  async putSettings(data: any, tenantId?: string): Promise<void> {
+  async putSettings(data: SettingsDTO, tenantId?: string): Promise<void> {
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
     await this._setJson('settings', data, tenantId);
     await this.recordModification('settings', '1', now, tenantId);
   }
 
-  async patchSettings(fields: any, tenantId?: string): Promise<void> {
+  async patchSettings(fields: Partial<SettingsDTO>, tenantId?: string): Promise<void> {
     const existing = (await this._getJson('settings', tenantId)) ?? {};
     const now = new Date().toISOString();
     const merged = { ...existing, ...fields, lastModified: now };
@@ -1025,12 +1026,12 @@ export class PostgresAdapter extends DatabaseAdapter {
     return (await this._getJson('active_buffs', tenantId, childId)) ?? [];
   }
 
-  async saveActiveBuffs(items: any[], tenantId?: string, childId?: string): Promise<void> {
+  async saveActiveBuffs(items: BuffDTO[], tenantId?: string, childId?: string): Promise<void> {
     await this._setJson('active_buffs', items, tenantId, childId);
     await this.recordModification('active_buffs', '1', new Date().toISOString(), tenantId);
   }
 
-  async putBuff(id: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+  async putBuff(id: string, data: BuffDTO, tenantId?: string, childId?: string): Promise<void> {
     const items = (await this._getJson('active_buffs', tenantId, childId)) ?? [];
     const { index } = this._findInArray(items, id);
     const now = new Date().toISOString();
@@ -1064,12 +1065,12 @@ export class PostgresAdapter extends DatabaseAdapter {
     return this._getDateData('efficiency_history', dateKey, null, tenantId, childId);
   }
 
-  async saveEfficiency(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+  async saveEfficiency(dateKey: string, data: EfficiencyDTO, tenantId?: string, childId?: string): Promise<void> {
     await this._setDateData('efficiency_history', dateKey, data, tenantId, childId);
     await this.recordModification('efficiency_history', dateKey, new Date().toISOString(), tenantId);
   }
 
-  async putEfficiency(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+  async putEfficiency(dateKey: string, data: EfficiencyDTO, tenantId?: string, childId?: string): Promise<void> {
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
     await this._setDateData('efficiency_history', dateKey, data, tenantId, childId);
@@ -1082,12 +1083,12 @@ export class PostgresAdapter extends DatabaseAdapter {
     return this._getDateData('free_time_tasks', dateKey, [], tenantId, childId);
   }
 
-  async saveFreeTime(dateKey: string, tasks: any[], tenantId?: string, childId?: string): Promise<void> {
+  async saveFreeTime(dateKey: string, tasks: FreeTimeTaskDTO[], tenantId?: string, childId?: string): Promise<void> {
     await this._setDateData('free_time_tasks', dateKey, tasks, tenantId, childId);
     await this.recordModification('free_time_tasks', dateKey, new Date().toISOString(), tenantId);
   }
 
-  async putFreeTimeTask(id: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+  async putFreeTimeTask(id: string, data: FreeTimeTaskDTO, tenantId?: string, childId?: string): Promise<void> {
     const existing = await this._findRecordById('free_time_tasks', id, tenantId, childId);
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
@@ -1098,7 +1099,7 @@ export class PostgresAdapter extends DatabaseAdapter {
       await this._setDateData('free_time_tasks', existing.dateKey, items, tenantId, childId);
       await this.recordModification('free_time_tasks', existing.dateKey, now, tenantId);
     } else {
-      const dateKey = data.dateKey ?? data.date ?? new Date().toISOString().slice(0, 10);
+      const dateKey = (data.dateKey as string | undefined) ?? (data.date as string | undefined) ?? new Date().toISOString().slice(0, 10);
       const items = (await this._getDateDataRaw('free_time_tasks', dateKey, tenantId, childId)) ?? [];
       items.push(data);
       await this._setDateData('free_time_tasks', dateKey, items, tenantId, childId);
@@ -1112,7 +1113,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     return (await this._getJson('bounty_tasks', tenantId)) ?? [];
   }
 
-  async saveBountyTasks(items: any[], tenantId?: string): Promise<void> {
+  async saveBountyTasks(items: BountyTaskDTO[], tenantId?: string): Promise<void> {
     await this._setJson('bounty_tasks', items, tenantId);
     await this.recordModification('bounty_tasks', '1', new Date().toISOString(), tenantId);
   }
@@ -1123,7 +1124,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     return item && !item.isDeleted ? item : null;
   }
 
-  async putBountyTask(id: string, data: any, tenantId?: string): Promise<void> {
+  async putBountyTask(id: string, data: BountyTaskDTO, tenantId?: string): Promise<void> {
     const items = (await this._getJson('bounty_tasks', tenantId)) ?? [];
     const { index } = this._findInArray(items, id);
     const now = new Date().toISOString();
@@ -1157,12 +1158,12 @@ export class PostgresAdapter extends DatabaseAdapter {
     return this._getDateData('bounty_submissions', dateKey, [], tenantId, childId);
   }
 
-  async saveBountySubmissions(dateKey: string, data: any[], tenantId?: string, childId?: string): Promise<void> {
+  async saveBountySubmissions(dateKey: string, data: BountySubmissionDTO[], tenantId?: string, childId?: string): Promise<void> {
     await this._setDateData('bounty_submissions', dateKey, data, tenantId, childId);
     await this.recordModification('bounty_submissions', dateKey, new Date().toISOString(), tenantId);
   }
 
-  async putBountySubmission(id: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+  async putBountySubmission(id: string, data: BountySubmissionDTO, tenantId?: string, childId?: string): Promise<void> {
     const existing = await this._findRecordById('bounty_submissions', id, tenantId, childId);
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
@@ -1173,7 +1174,7 @@ export class PostgresAdapter extends DatabaseAdapter {
       await this._setDateData('bounty_submissions', existing.dateKey, items, tenantId, childId);
       await this.recordModification('bounty_submissions', existing.dateKey, now, tenantId);
     } else {
-      const dateKey = data.dateKey ?? data.date ?? new Date().toISOString().slice(0, 10);
+      const dateKey = (data.dateKey as string | undefined) ?? (data.date as string | undefined) ?? new Date().toISOString().slice(0, 10);
       const items = (await this._getDateDataRaw('bounty_submissions', dateKey, tenantId, childId)) ?? [];
       items.push(data);
       await this._setDateData('bounty_submissions', dateKey, items, tenantId, childId);
@@ -1187,12 +1188,12 @@ export class PostgresAdapter extends DatabaseAdapter {
     return this._getDateData('bounty_completions', dateKey, {}, tenantId, childId);
   }
 
-  async saveBountyCompletions(dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+  async saveBountyCompletions(dateKey: string, data: BountyCompletionDTO, tenantId?: string, childId?: string): Promise<void> {
     await this._setDateData('bounty_completions', dateKey, data, tenantId, childId);
     await this.recordModification('bounty_completions', dateKey, new Date().toISOString(), tenantId);
   }
 
-  async putBountyCompletion(id: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+  async putBountyCompletion(id: string, data: BountyCompletionDTO, tenantId?: string, childId?: string): Promise<void> {
     const now = new Date().toISOString();
     data.lastModified = data.lastModified ?? now;
     await this._setDateData('bounty_completions', id, data, tenantId, childId);
@@ -1209,7 +1210,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     return null;
   }
 
-  async saveEmailConfig(config: any, tenantId?: string): Promise<void> {
+  async saveEmailConfig(config: EmailConfigDTO, tenantId?: string): Promise<void> {
     await this._setJson('email_config', config, tenantId);
     await this.recordModification('email_config', '1', new Date().toISOString(), tenantId);
   }
@@ -1518,24 +1519,24 @@ export class PostgresAdapter extends DatabaseAdapter {
           case 'homeworks': {
             const existingHw = await this._findRecordById('homeworks', op.resourceId, tenantId);
             if (existingHw) {
-              await this.patchHomework(op.resourceId, op.value, tenantId);
+              await this.patchHomework(op.resourceId, op.value as Record<string, unknown>, tenantId);
             } else {
-              await this.putHomework(op.resourceId, op.value, tenantId);
+              await this.putHomework(op.resourceId, op.value as HomeworkDTO, tenantId);
             }
             break;
           }
-          case 'shop_items': await this.putShopItem(op.resourceId, op.value, tenantId); break;
-          case 'bounty_tasks': await this.putBountyTask(op.resourceId, op.value, tenantId); break;
-          case 'bounty_submissions': await this.putBountySubmission(op.resourceId, op.value, tenantId); break;
-          case 'bounty_completions': await this.putBountyCompletion(op.resourceId, op.value, tenantId); break;
-          case 'redemptions': await this.putRedemption(op.resourceId, op.value, tenantId); break;
-          case 'reward_box': await this.putRewardBoxItem(op.resourceId, op.value, tenantId); break;
-          case 'active_buffs': await this.putBuff(op.resourceId, op.value, tenantId); break;
-          case 'free_time_tasks': await this.putFreeTimeTask(op.resourceId, op.value, tenantId); break;
-          case 'daily_settlement': await this.putSettlement(op.resourceId, op.value, tenantId); break;
-          case 'settings': await this.putSettings(op.value, tenantId); break;
+          case 'shop_items': await this.putShopItem(op.resourceId, op.value as ShopItemDTO, tenantId); break;
+          case 'bounty_tasks': await this.putBountyTask(op.resourceId, op.value as BountyTaskDTO, tenantId); break;
+          case 'bounty_submissions': await this.putBountySubmission(op.resourceId, op.value as BountySubmissionDTO, tenantId); break;
+          case 'bounty_completions': await this.putBountyCompletion(op.resourceId, op.value as BountyCompletionDTO, tenantId); break;
+          case 'redemptions': await this.putRedemption(op.resourceId, op.value as RedemptionDTO, tenantId); break;
+          case 'reward_box': await this.putRewardBoxItem(op.resourceId, op.value as RewardBoxItemDTO, tenantId); break;
+          case 'active_buffs': await this.putBuff(op.resourceId, op.value as BuffDTO, tenantId); break;
+          case 'free_time_tasks': await this.putFreeTimeTask(op.resourceId, op.value as FreeTimeTaskDTO, tenantId); break;
+          case 'daily_settlement': await this.putSettlement(op.resourceId, op.value as SettlementDTO, tenantId); break;
+          case 'settings': await this.putSettings(op.value as SettingsDTO, tenantId); break;
           case 'notifications':
-            await this.addNotification(op.value.text, op.value.createdAt, tenantId);
+            await this.addNotification((op.value as { text: string; createdAt: number }).text, (op.value as { text: string; createdAt: number }).createdAt, tenantId);
             break;
         }
       }

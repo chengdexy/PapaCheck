@@ -87,6 +87,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-23 | **全量 `any` 类型替换为 DTO**：定义 14 个 DTO 类型（HomeworkDTO/SettlementDTO/ShopItemDTO 等），替换 `FullDataSnapshot`、`postgres-adapter.ts`、4 个接口文件及杂项文件中共约 190 处 `any`。`CRDTOperation.value` 改为 `unknown`。全量 633 测试通过 |
 | 2026-06-23 | **CodeGraph MCP 项目结构分析 + IDatabase 接口拆分**：使用 CodeGraph MCP 扫描发现 7 类结构性问题（153 死导入、6 自引用循环、IDatabase 接口过大、大量 any 类型等）。`DatabaseAdapter` 按职责拆分为 6 个子接口 + `IDatabase` 组合接口，精简约 100 行 abstract 方法声明；文档版本号同步为 v1.4.2；邮件模块 import 合并。633 测试全部通过 |
 | 2026-06-23 | **维护全部项目文档至 v1.4.2**：同步更新 PROGRESS / PRD / ARCHITECTURE / API / README 五份文档，反映项目当前状态（PostgreSQL、Release Console、多孩子支持、Python 已移除等变更） |
 | 2026-06-23 | **修复构建 APK 版本号不一致 Bug**：`build-apk.ts` 归档步骤在构建前内联执行，导致旧版 APK 用新版名归档（文件名 `1.4.2` 实际 `1.4.1`）；改为 executor step 中执行，构建成功才归档。递增版本时构建号被 `+0` 重置，改为保留已有构建号。清理死代码 |

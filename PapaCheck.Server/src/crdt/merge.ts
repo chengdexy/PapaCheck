@@ -4,14 +4,14 @@ import type { CRDTOperation } from './types.js';
  * 字段级 LWW（Last-Writer-Wins）合并
  * 比较 timestamp，值越大越新；相同时比较 nodeId 字典序，较大者赢
  */
-export function mergeFieldLWW(
-  currentValue: any,
-  incomingValue: any,
+export function mergeFieldLWW<T>(
+  currentValue: T,
+  incomingValue: T,
   currentTime: string,
   incomingTime: string,
   currentNodeId: string,
   incomingNodeId: string
-): any {
+): T {
   if (currentTime > incomingTime) return currentValue;
   if (currentTime < incomingTime) return incomingValue;
   // timestamp 相同，比较 nodeId 字典序
@@ -33,7 +33,7 @@ export function applyOperation(
     const incomingValue = op.value;
     const newValue = mergeFieldLWW(
       currentValue,
-      incomingValue,
+      incomingValue as typeof currentValue,
       currentState._timestamp || '1970-01-01T00:00:00Z',
       op.timestamp,
       currentState._nodeId || '',

@@ -1,12 +1,14 @@
+import type { HomeworkDTO, FreeTimeTaskDTO } from '../dto.js';
+
 export interface IHomeworkStore {
-  getHomeworks(dateKey: string, tenantId?: string, childId?: string): Promise<any[]>;
-  saveHomeworks(dateKey: string, items: any[], tenantId?: string, childId?: string): Promise<void>;
-  moveHomework(fromDate: string, toDate: string, hwId: string, tenantId?: string, childId?: string): Promise<any | null>;
-  getHomeworkById(id: string, tenantId?: string, childId?: string): Promise<any | null>;
-  putHomework(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
-  patchHomework(id: string, fields: any, tenantId?: string, childId?: string): Promise<void>;
+  getHomeworks(dateKey: string, tenantId?: string, childId?: string): Promise<HomeworkDTO[]>;
+  saveHomeworks(dateKey: string, items: HomeworkDTO[], tenantId?: string, childId?: string): Promise<void>;
+  moveHomework(fromDate: string, toDate: string, hwId: string, tenantId?: string, childId?: string): Promise<HomeworkDTO | null>;
+  getHomeworkById(id: string, tenantId?: string, childId?: string): Promise<HomeworkDTO | null>;
+  putHomework(id: string, data: HomeworkDTO, tenantId?: string, childId?: string): Promise<void>;
+  patchHomework(id: string, fields: Partial<HomeworkDTO>, tenantId?: string, childId?: string): Promise<void>;
   deleteHomework(id: string, tenantId?: string, childId?: string): Promise<void>;
-  getFreeTime(dateKey: string, tenantId?: string, childId?: string): Promise<any[]>;
-  saveFreeTime(dateKey: string, tasks: any[], tenantId?: string, childId?: string): Promise<void>;
-  putFreeTimeTask(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
+  getFreeTime(dateKey: string, tenantId?: string, childId?: string): Promise<FreeTimeTaskDTO[]>;
+  saveFreeTime(dateKey: string, tasks: FreeTimeTaskDTO[], tenantId?: string, childId?: string): Promise<void>;
+  putFreeTimeTask(id: string, data: FreeTimeTaskDTO, tenantId?: string, childId?: string): Promise<void>;
 }

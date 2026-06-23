@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import type { IDatabase, JWTPayload, OpsConfig } from '../db/types.js';
+import type { IDatabase, JWTPayload, OpsConfig, HealthSnapshot, AlertItem } from '../db/types.js';
 import { runBackup, listBackups, getBackupFilePath } from '../ops/backup.js';
 import { collectHealth } from '../ops/monitor.js';
 import { sendAlertEmail, encryptPassword } from '../ops/alert.js';
@@ -8,9 +8,9 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 
 // In-memory health cache (updated by monitor every 5 min)
-let healthCache: { snapshot: any; events: any[]; timestamp: number } | null = null;
+let healthCache: { snapshot: HealthSnapshot; events: AlertItem[]; timestamp: number } | null = null;
 
-export function setHealthCache(snapshot: any, events: any[]): void {
+export function setHealthCache(snapshot: HealthSnapshot, events: AlertItem[]): void {
     healthCache = { snapshot, events, timestamp: Date.now() };
 }
 
