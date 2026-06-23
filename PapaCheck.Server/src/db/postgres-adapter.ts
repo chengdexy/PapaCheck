@@ -89,7 +89,9 @@ export class PostgresAdapter extends DatabaseAdapter {
       const afterInsert = await this.pool.query(
         "SELECT id FROM tenants WHERE name = '默认租户' LIMIT 1"
       );
-      effectiveTenantId = afterInsert.rows[0].id;
+      if (afterInsert.rows.length > 0) {
+        effectiveTenantId = afterInsert.rows[0].id;
+      }
     }
 
     // Insert default rows for each tenant's shared single-row tables
