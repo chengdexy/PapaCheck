@@ -40,6 +40,7 @@
 - **移除弃用的迁移验证测试（3 个文件）**：`multi-child-schema.test.ts`（schema 结构验证）、`access-code-model.test.ts`（access_codes 表结构验证）、`multi-tenant-schema.test.ts`（SQL 文件静态验证）。本地 schema 已与云端完全一致，无需重复验证。删除后解决并行测试竞态问题
 - **移除弃用的 PapaCheck.Windows 桌面端**：删除整个 `PapaCheck.Windows/` 目录（8 个文件），包含 Tkinter GUI 主程序、PyInstaller 构建脚本、版本管理工具等。同时清理关联的 3 个测试文件
 - **移除 Python 死代码**：删除 `release.py`、`pytest.ini` 及 `PapaCheck.Tests` 中的 3 个 Windows 测试文件，项目不再依赖 Python 运行时
+- **清理过期 spec/plan 文档（68 个文件）**：删除 `.trae/specs/`（11 个已完成功能的 spec 目录，含 spec/tasks/checklist 共 31 个文件）、`docs/superpowers/`（14 个设计文档 + 16 个计划文档，共 30 个已实现功能的设计方案）、`.trae/documents/`（4 个已过期的方案文档）。同时清理 `PapaCheck.Memo/` 开发备忘目录（3 个文件）及 `docs/` 下旧版 HTML 周报文件（4 个文件）
 
 ## [1.4.0] - 2026-06-22
 
