@@ -14,8 +14,8 @@ async function main() {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(testDbName)) {
     throw new Error(`非法数据库名: "${testDbName}"`);
   }
-  url.pathname = '/papacheck';
-  const adminUrl = url.toString();
+  // 使用 postgres 超级用户连接 template1（始终存在的管理库）
+  const adminUrl = `postgresql://postgres:${process.env.PG_SUPER_PASSWORD || 'papacheck'}@${url.hostname}:${url.port}/template1`;
 
   const adminPool = new pg.Pool({ connectionString: adminUrl });
 
@@ -29,6 +29,12 @@ async function main() {
 
   await adminPool.query(`DROP DATABASE IF EXISTS "${testDbName}"`);
   await adminPool.query(`CREATE DATABASE "${testDbName}"`);
+  // 授予 papacheck 用户 public schema 的所有权限
+  await adminPool.query(`GRANT ALL ON DATABASE "${testDbName}" TO papacheck`);
+  const tmpPool = new pg.Pool({ connectionString: `postgresql://postgres:${process.env.PG_SUPER_PASSWORD || 'papacheck'}@${url.hostname}:${url.port}/${testDbName}` });
+  await tmpPool.query('GRANT ALL ON SCHEMA public TO papacheck');
+  await tmpPool.query('ALTER SCHEMA public OWNER TO papacheck');
+  await tmpPool.end();
   await adminPool.end();
 
   // 在新库上跑 schema

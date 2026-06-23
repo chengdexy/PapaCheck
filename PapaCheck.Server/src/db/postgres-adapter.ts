@@ -62,10 +62,17 @@ export class PostgresAdapter extends DatabaseAdapter {
   // ==================== Schema Init ====================
 
   private async _initSchema(): Promise<void> {
-    // Read schema from SQL file (which already has tenant_id columns from Task 1)
-    const schemaPath = resolve(__dirname, '../../scripts/init-pg-schema.sql');
-    const schema = readFileSync(schemaPath, 'utf-8');
-    await this.pool.query(schema);
+    // 检查 schema 是否已初始化（通过检测 tenants 表是否存在行）
+    // 避免并发测试时重复执行 DDL 导致冲突
+    const checkResult = await this.pool.query(
+      'SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = \'public\' AND table_name = \'tenants\') AS has_table'
+    );
+    if (!checkResult.rows[0].has_table) {
+      // 首次运行：执行完整 DDL schema
+      const schemaPath = resolve(__dirname, '../../scripts/init-pg-schema.sql');
+      const schema = readFileSync(schemaPath, 'utf-8');
+      await this.pool.query(schema);
+    }
 
     // 获取首个已存在的租户 ID（如果表为空则创建一个默认租户）
     const tenantResult = await this.pool.query('SELECT id FROM tenants LIMIT 1');
@@ -75,7 +82,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     } else {
       effectiveTenantId = crypto.randomUUID();
       await this.pool.query(
-        `INSERT INTO tenants (id, name) VALUES ($1, '默认租户') ON CONFLICT (id) DO NOTHING`,
+        `INSERT INTO tenants (id, name) VALUES ($1, '默认租户') ON CONFLICT (name) DO NOTHING`,
         [effectiveTenantId]
       );
     }

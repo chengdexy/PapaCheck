@@ -18,6 +18,10 @@
 - **日志面板保存按钮**：保存日志到 `log/` 目录，文件名 `release-{type}-{timestamp}.txt`
 
 ### Fixed
+- **修复测试数据库 schema 循环 FK 依赖导致建表失败**：`init-pg-schema.sql` 中 `access_codes` 和 `children` 互为外键，但 `access_codes` 在 `children` 之前创建导致失败。交换创建顺序，`children` 先建后建 `access_codes`，两个 FK 约束通过晚绑定 ALTER TABLE 添加
+- **修复并发测试重复执行 DDL 引起 schema 损坏**：`PostgresAdapter._initSchema` 每次创建适配器都执行完整 DDL batch，并发测试下唯一索引创建因重复数据失败导致整批回滚。改为先检测 `tenants` 表是否存在，已存在则跳过 DDL
+- **修复 _initSchema 插入默认租户时唯一键冲突**：`ON CONFLICT (id) DO NOTHING` 无法处理 `uq_tenants_name` 唯一约束，并发测试中多个适配器用同一名称创建租户导致失败。改为 `ON CONFLICT (name) DO NOTHING`
+- **修复多孩子可回滚性测试重新执行 schema 时数据冲突**：`multi-child-reversibility.test.ts` 在已写入数据的表上重新执行 `init-pg-schema.sql`，现有数据导致部分唯一索引创建失败。重新执行前先清理 per-child 表数据
 - **修复 SSE 连接客户端未清理内存泄漏**：`console-server.ts` 中 broadcast 遍历和 send 写入增加 try-catch，异常客户端立即自清理，防止单个异常阻断后续广播
 - **修复 npx tsx -e 内联脚本 Windows 引号冲突**：版本号递增、APK 归档、清理步骤、schema 重置统一改为直接 fs 调用或独立脚本文件
 - **修复控制台 CSS unicode 转义**：`\uXXXX` 改为 `\XXXX`（CSS 不支持 `\u` 前缀）
@@ -26,6 +30,7 @@
 - **修复 CRDT 推送测试使用过时操作格式**：`api.test.ts` 中 CRDT 操作使用旧版 `field: 'status', value: 'completed'` 字符串格式，改为新版 `value: { ... }` 对象格式，消除 `Cannot create property 'lastModified' on string` 错误
 
 ### Removed
+- **移除弃用的迁移验证测试（3 个文件）**：`multi-child-schema.test.ts`（schema 结构验证）、`access-code-model.test.ts`（access_codes 表结构验证）、`multi-tenant-schema.test.ts`（SQL 文件静态验证）。本地 schema 已与云端完全一致，无需重复验证。删除后解决并行测试竞态问题
 - **移除弃用的 PapaCheck.Windows 桌面端**：删除整个 `PapaCheck.Windows/` 目录（8 个文件），包含 Tkinter GUI 主程序、PyInstaller 构建脚本、版本管理工具等。同时清理关联的 3 个测试文件
 - **移除 Python 死代码**：删除 `release.py`、`pytest.ini` 及 `PapaCheck.Tests` 中的 3 个 Windows 测试文件，项目不再依赖 Python 运行时
 
