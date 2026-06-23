@@ -37,7 +37,7 @@ export class OpsScheduler {
         if (!enabled) return;
 
         this.backupJob = cron.schedule(schedule, async () => {
-            let record: any;
+            let record: { status: string; filename: string; size_bytes: number | null; error_message: string | null; created_at: string };
             try {
                 record = await runBackup(db, 'scheduler');
                 console.log(`[ops] 备份 ${record.status}: ${record.filename}`);

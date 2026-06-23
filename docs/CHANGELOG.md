@@ -8,6 +8,7 @@
 
 ### Changed
 - **IDatabase 接口拆分为 6 个子接口**：按职责拆分为 `IHomeworkStore` / `ISettlementStore` / `IShopStore` / `IAuthStore` / `IOpsStore` / `ISyncStore`，组合为 `IDatabase` 保持向后兼容。`DatabaseAdapter` 精简约 100 行 abstract 方法声明，工具方法和 Ops stubs 保留
+- **全量 `any` 类型替换为具体 DTO 或 `unknown`**：定义 14 个 DTO 类型（`HomeworkDTO`/`SettlementDTO`/`ShopItemDTO` 等），替换 `FullDataSnapshot`、`postgres-adapter.ts` 方法签名、4 个接口文件及杂项文件中共约 190 处 `any`。`CRDTOperation.value` 改为 `unknown` 防止随意赋值。路由处理器 `request: any` 保留（Fastify 标准用法）
 - **邮件模块 import 合并**：`email/index.ts` 4 行 import 合并为 2 行，消除冗余的类型导入
 - **`PapaCheck.Server.Node` 重命名为 `PapaCheck.Server`**：消除历史遗留的 `.Node` 后缀（Python 服务端已删除）。涉及本地目录 git mv、12 个引用文件路径更新、云端目录 mv 及 papacheck.service WorkingDirectory 同步。云端已手动迁移完成，服务正常运行
 - **替换硬编码服务器 IP 为域名**：`cloud-publish.ts` 和 `site-publish.ts` 默认服务器地址从 `123.57.129.243` 改为 `papacheck.chengdexy.cn`，IP 不再出现在 git 跟踪的代码中。`PAPACHECK_CLOUD_IP` 环境变量仍可覆盖

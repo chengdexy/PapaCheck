@@ -1,4 +1,11 @@
 import type { CRDTOperation } from '../crdt/types.js';
+import type {
+  HomeworkDTO, SettlementDTO, EfficiencyDTO,
+  ShopItemDTO, RedemptionDTO, RewardBoxItemDTO,
+  BuffDTO, FreeTimeTaskDTO, BountyTaskDTO,
+  BountySubmissionDTO, BountyCompletionDTO,
+  SettingsDTO,
+} from './dto.js';
 
 // ==================== Types ====================
 
@@ -13,27 +20,27 @@ export interface PointsHistoryEntry {
 
 export interface FullDataSnapshot {
   points: { balance: number; history: PointsHistoryEntry[] };
-  badges: any[];
-  history: Record<string, any>;
-  tasks: Record<string, any>;
-  homeworks: Record<string, any[]>;
-  dailySettlement: Record<string, any>;
-  shopItems: any[];
-  redemptions: any[];
-  rewardBox: any[];
-  settings: any;
-  activeBuffs: any[];
-  efficiencyHistory: Record<string, any>;
-  freeTimeTasks: Record<string, any[]>;
-  bountyTasks: any[];
-  bountySubmissions: Record<string, any[]>;
-  bountyCompletions: Record<string, any>;
+  badges: Record<string, unknown>[];
+  history: Record<string, EfficiencyDTO>;
+  tasks: Record<string, unknown>;
+  homeworks: Record<string, HomeworkDTO[]>;
+  dailySettlement: Record<string, SettlementDTO>;
+  shopItems: ShopItemDTO[];
+  redemptions: RedemptionDTO[];
+  rewardBox: RewardBoxItemDTO[];
+  settings: SettingsDTO;
+  activeBuffs: BuffDTO[];
+  efficiencyHistory: Record<string, EfficiencyDTO>;
+  freeTimeTasks: Record<string, FreeTimeTaskDTO[]>;
+  bountyTasks: BountyTaskDTO[];
+  bountySubmissions: Record<string, BountySubmissionDTO[]>;
+  bountyCompletions: Record<string, BountyCompletionDTO>;
 }
 
 export interface ModifiedEntry {
   table_name: string;
   record_key: string;
-  data?: any;
+  data?: Record<string, unknown>;
   last_modified: string;
 }
 
@@ -319,7 +326,7 @@ export interface IDatabase {
   createUser(input: CreateUserInput): Promise<void>;
   findAdminByEmail(email: string): Promise<AdminUser | null>;
   findAdminExists(): Promise<boolean>;
-  findUserByEmail(email: string): Promise<any | null>;
+  findUserByEmail(email: string): Promise<UserRecord | null>;
   updateUserCredentials(userId: string, email: string, passwordHash: string): Promise<void>;
   getAllTenants(): Promise<TenantListItem[]>;
   setTenantActive(tenantId: string, isActive: boolean): Promise<void>;

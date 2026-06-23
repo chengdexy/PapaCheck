@@ -107,7 +107,7 @@ export function parseHomework(text: string): HomeworkItem[] {
     const parsed = JSON.parse(text);
     if (Array.isArray(parsed)) {
       return parsed.filter(
-        (item: any) =>
+        (item: Record<string, unknown>) =>
           item && typeof item.subject === 'string' && typeof item.content === 'string'
       );
     }
@@ -120,7 +120,7 @@ export function parseHomework(text: string): HomeworkItem[] {
         const parsed = JSON.parse(jsonMatch[1].trim());
         if (Array.isArray(parsed)) {
           return parsed.filter(
-            (item: any) =>
+            (item: Record<string, unknown>) =>
               item && typeof item.subject === 'string' && typeof item.content === 'string'
           );
         }
