@@ -33,6 +33,7 @@ export default defineConfig({
       'PapaCheck.Server/test/**/*.test.ts',
       'PapaCheck.Site/src/**/*.test.tsx',
       'PapaCheck.Web/js/__tests__/**/*.test.js',
+      'PapaCheck.Release/__tests__/**/*.test.ts',
     ],
   },
 });

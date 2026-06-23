@@ -32,27 +32,36 @@ CREATE TABLE IF NOT EXISTS users (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL;
 
-CREATE TABLE IF NOT EXISTS access_codes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES users(id),
-  code_hash TEXT NOT NULL,
-  access_code TEXT,
-  child_id UUID NOT NULL REFERENCES children(id),
-  token_version INTEGER NOT NULL DEFAULT 1,
-  last_login TIMESTAMP,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
+-- children must be created before access_codes to resolve circular FK dependency
 CREATE TABLE IF NOT EXISTS children (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES users(id),
   name TEXT NOT NULL,
   avatar TEXT,
-  access_code_id UUID REFERENCES access_codes(id) ON DELETE SET NULL,
+  access_code_id UUID,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(tenant_id, name)
 );
+
+-- access_codes references children(id) via late-bound FK below
+CREATE TABLE IF NOT EXISTS access_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES users(id),
+  code_hash TEXT NOT NULL,
+  access_code TEXT,
+  child_id UUID NOT NULL,
+  token_version INTEGER NOT NULL DEFAULT 1,
+  last_login TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Late-bound FK: access_codes.child_id → children(id) (resolves circular dependency)
+DO $$ BEGIN
+  ALTER TABLE access_codes ADD CONSTRAINT access_codes_child_id_fkey
+    FOREIGN KEY (child_id) REFERENCES children(id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ==================== Per-Child Tables ====================
 
