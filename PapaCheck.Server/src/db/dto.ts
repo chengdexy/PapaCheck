@@ -13,6 +13,7 @@ export interface HomeworkDTO {
   submittedAt?: string;
   hasRating?: boolean;
   isDeleted?: boolean;
+  lastModified?: string;
   [key: string]: unknown;
 }
 
@@ -23,12 +24,14 @@ export interface SettlementDTO {
   efficiencyRatio?: number;
   viewedAt?: string;
   submittedAt?: string;
+  lastModified?: string;
   [key: string]: unknown;
 }
 
 export interface EfficiencyDTO {
   efficiencyRatio?: number;
   averageRatio?: number;
+  lastModified?: string;
   [key: string]: unknown;
 }
 
@@ -40,6 +43,7 @@ export interface ShopItemDTO {
   remainingQuantity?: number;
   dailyLimit?: number;
   isDeleted?: boolean;
+  lastModified?: string;
   [key: string]: unknown;
 }
 
@@ -51,6 +55,7 @@ export interface RedemptionDTO {
   childId?: string;
   fulfilledAt?: string;
   isDeleted?: boolean;
+  lastModified?: string;
   [key: string]: unknown;
 }
 
@@ -59,6 +64,7 @@ export interface RewardBoxItemDTO {
   name: string;
   quantity: number;
   isDeleted?: boolean;
+  lastModified?: string;
   [key: string]: unknown;
 }
 
@@ -69,6 +75,7 @@ export interface BuffDTO {
   unit: string;
   multiplier?: number;
   isDeleted?: boolean;
+  lastModified?: string;
   [key: string]: unknown;
 }
 
@@ -78,6 +85,7 @@ export interface FreeTimeTaskDTO {
   durationMinutes: number;
   startedAt?: string;
   isDeleted?: boolean;
+  lastModified?: string;
   [key: string]: unknown;
 }
 
@@ -88,6 +96,7 @@ export interface BountyTaskDTO {
   createdBy?: string;
   createdAt?: string;
   isDeleted?: boolean;
+  lastModified?: string;
   [key: string]: unknown;
 }
 
@@ -98,6 +107,7 @@ export interface BountySubmissionDTO {
   proof?: string;
   status?: string;
   isDeleted?: boolean;
+  lastModified?: string;
   [key: string]: unknown;
 }
 
@@ -106,6 +116,7 @@ export interface BountyCompletionDTO {
   taskId: string;
   points: number;
   completedAt?: string;
+  lastModified?: string;
   [key: string]: unknown;
 }
 

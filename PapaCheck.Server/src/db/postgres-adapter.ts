@@ -893,10 +893,10 @@ export class PostgresAdapter extends DatabaseAdapter {
     const items = (await this._getJson('shop_items', tenantId)) ?? [];
     const { index, item: existingItem } = this._findInArray(items, id);
     const now = new Date().toISOString();
-    data.lastModified = (data.lastModified as string) ?? now;
+    data.lastModified = data.lastModified ?? now;
 
     if (index !== -1) {
-      if (existingItem?.lastModified && (data.lastModified as string) < existingItem.lastModified) {
+      if (existingItem?.lastModified && (data.lastModified!) < existingItem.lastModified) {
         data.baseQuantity = existingItem.baseQuantity;
         data.remainingQuantity = existingItem.remainingQuantity;
       }
