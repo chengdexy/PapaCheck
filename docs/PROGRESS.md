@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-23（修复 16 个失败测试 + 删除迁移验证冗余测试，618 测试通过）
+> 最后更新：2026-06-23（修复 Release 控制台 Windows cmd.exe 引号问题系列 Bug，15 Release 测试通过）
 
 ## 当前版本
 
@@ -89,6 +89,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-23 | **修复 Release 控制台 Windows cmd.exe 引号问题系列 Bug**：`cloud-publish.ts` findstr 管道参数经 `cmd.exe /s /c` 被 `\"` 破坏 → 直接运行 vitest；`site-publish.ts` tar 路径引号被 cmd.exe 破坏 → 数组参数 `shell: false`；`site-publish.ts` scp 走 SFTP 协议文件未落到预期路径 → Node.js SSH pipe 上传；`console.html` 日志 ANSI 转义码复制变方框 → `stripAnsi()` 过滤；`site-publish.ts` 清理步骤 `node -e` 引号冲突 → 数组参数。步骤编号改为 1~8。15 Release 测试通过 |
 | 2026-06-23 | **修复 16 个 Vitest 失败测试 + 数据库 schema 损坏根因**：修复 `init-pg-schema.sql` 循环 FK 依赖（`access_codes` ↔ `children`）；`PostgresAdapter._initSchema` 跳过已初始化的 DDL 避免并发冲突；修复默认租户 `ON CONFLICT` 冲突目标；`multi-child-reversibility.test.ts` 重新执行 schema 前清理数据。全量 639 测试通过，0 失败 |
 | 2026-06-22 | **Release Console 实现 + BDD/TDD 开发**：PapaCheck.Release/ 子项目实现完成（CLI 四子命令 + Web 控制台 + 执行引擎）。BDD/TDD 开发 13 个测试通过。修复 SSE 内存泄漏、替换硬编码 IP 为域名。清理 Python 死代码（release.py、pytest 等），项目不再依赖 Python 运行时 |
 | 2026-06-22 | **PapaCheck.Server.Node 重命名 + Release Console 设计文档**：`PapaCheck.Server.Node` → `PapaCheck.Server`（本地 git mv + 云端目录 mv + service 路径同步）；创建 Release Console 设计文档，规划用 Node.js/TypeScript 重写 release.py 并添加 Web 控制台 |

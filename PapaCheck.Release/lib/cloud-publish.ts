@@ -35,9 +35,7 @@ export async function cloudPublish(executor: Executor): Promise<boolean> {
   // 运行全量测试（过滤输出，仅保留失败信息和摘要）
   steps.push({
     id: String(idx++), desc: '运行全量测试',
-    cmd: process.platform === 'win32'
-      ? 'npx vitest run 2>&1 | findstr /B /C:" FAIL " /C:"× " /C:"Tests " /C:"Test Files" /C:"Sourcemap"'
-      : 'npx vitest run 2>&1 | grep -E "^(FAIL|×|Tests |Test Files|Sourcemap)" || true',
+    cmd: 'npx vitest run 2>&1',
     cwd: ROOT, shell: true, timeout: 180,
   });
 

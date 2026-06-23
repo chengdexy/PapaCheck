@@ -18,6 +18,11 @@
 - **日志面板保存按钮**：保存日志到 `log/` 目录，文件名 `release-{type}-{timestamp}.txt`
 
 ### Fixed
+- **修复 Windows Release 控制台 findstr 管道参数损坏**：`cloud-publish.ts` 中 vitest 输出过滤使用 `findstr /C:" FAIL "`，经 `cmd.exe /s /c` 执行时 `\"` 被 cmd.exe 当作字面字符而非转义序列，导致 findstr 把 `/C:` 参数当文件名报 `Cannot open`，阻塞整个云同步流程。改为直接运行 `npx vitest run 2>&1` 避免 cmd.exe 引号问题
+- **修复 Windows Release 控制台 tar 命令路径引号问题**：`site-publish.ts` 中 `tar -czf "${landingTar}"` 经 `cmd.exe /s /c` 时 `\"` 被当作字面字符，tar 收到含字面双引号的文件路径。改为数组参数 (`shell: false`) 绕过 cmd.exe 引号处理
+- **修复 Windows scp 使用 SFTP 协议导致上传文件路径丢失**：Windows OpenSSH 9.5 scp 默认走 SFTP 协议，目标路径 `user@host:/tmp/` 处理后文件未落到预期位置。改用 Node.js `createReadStream` + SSH `cat>` pipe 上传，完全绕过 scp 行为差异
+- **修复 Release 控制台日志 ANSI 转义码导致复制时空格变方框**：`console.html` 的 `onLog` 直接显示终端原始输出（含 `ESC[36m` 等控制字符），复制时控制字符渲染为方框。添加 `stripAnsi()` 剔除 ANSI 转义码后显示
+- **修复 Release 控制台清理步骤 node -e 引号冲突**：`site-publish.ts` 步骤 4 使用 `node -e "..."` 通过 `shell: true` 执行，同样被 cmd.exe 引号处理破坏。改为数组参数形式
 - **修复测试数据库 schema 循环 FK 依赖导致建表失败**：`init-pg-schema.sql` 中 `access_codes` 和 `children` 互为外键，但 `access_codes` 在 `children` 之前创建导致失败。交换创建顺序，`children` 先建后建 `access_codes`，两个 FK 约束通过晚绑定 ALTER TABLE 添加
 - **修复并发测试重复执行 DDL 引起 schema 损坏**：`PostgresAdapter._initSchema` 每次创建适配器都执行完整 DDL batch，并发测试下唯一索引创建因重复数据失败导致整批回滚。改为先检测 `tenants` 表是否存在，已存在则跳过 DDL
 - **修复 _initSchema 插入默认租户时唯一键冲突**：`ON CONFLICT (id) DO NOTHING` 无法处理 `uq_tenants_name` 唯一约束，并发测试中多个适配器用同一名称创建租户导致失败。改为 `ON CONFLICT (name) DO NOTHING`

@@ -184,11 +184,15 @@ function onStepDone(data) {
   row.querySelector('.time').textContent = (data.elapsed || 0).toFixed(2) + 's';
 }
 
+function stripAnsi(s) {
+  return s.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
+}
+
 function onLog(data) {
   const body = document.getElementById('logBody');
   const line = document.createElement('div');
   line.className = data.stream === 'stderr' ? 'stderr' : '';
-  line.textContent = data.text.trimEnd();
+  line.textContent = stripAnsi(data.text).trimEnd();
   body.appendChild(line);
   body.scrollTop = body.scrollHeight;
   ensureLogOpen();
