@@ -85,6 +85,11 @@ export class PostgresAdapter extends DatabaseAdapter {
         `INSERT INTO tenants (id, name) VALUES ($1, '默认租户') ON CONFLICT (name) DO NOTHING`,
         [effectiveTenantId]
       );
+      // 重新读取实际 tenant id：若 INSERT 因并发冲突被跳过，使用已有记录的 id
+      const afterInsert = await this.pool.query(
+        "SELECT id FROM tenants WHERE name = '默认租户' LIMIT 1"
+      );
+      effectiveTenantId = afterInsert.rows[0].id;
     }
 
     // Insert default rows for each tenant's shared single-row tables
