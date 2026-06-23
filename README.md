@@ -39,13 +39,7 @@ PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和�
 
 ### 1. 本地启动服务器
 
-**方式 A：Windows 桌面端（推荐）**
-
-从 [Releases](https://github.com/chengdexy/PapaCheck/releases) 下载最新版 `PapaCheck-{version}.exe`（当前 v1.3.1-beta），双击运行即可。
-
-服务默认启动在 `8080` 端口，首次运行会自动创建数据库和 TTS 语音缓存。
-
-**方式 B：Node.js 服务器（开发调试）**
+**Node.js 服务器（推荐）**
 
 ```bash
 cd PapaCheck.Server
@@ -68,11 +62,9 @@ npm run dev -- --port 8080
 
 访问 `http://192.x.x.x:8080/api/download` 下载并安装最新 APK。
 
-> 服务器 IP 地址可在 Windows 桌面端主界面上找到。
-
 ### 3. 邮件同步（可选）
 
-在 Windows 端菜单栏选择 **服务配置**，填写 IMAP 邮箱信息、接收作业的邮箱地址和 API Key（用于解析邮件内容）。点击 **邮件作业同步** 按钮，AI 会自动拉取邮件、解析作业并发布。
+在菜单栏选择 **服务配置**，填写 IMAP 邮箱信息、接收作业的邮箱地址和 API Key（用于解析邮件内容）。点击 **邮件作业同步** 按钮，AI 会自动拉取邮件、解析作业并发布。
 
 ## 🏗 项目结构
 
@@ -85,9 +77,7 @@ PapaCheck/
 ├── PapaCheck.Android/       # Android 端（Flutter WebView 混合应用）
 ├── PapaCheck.Site/          # 落地页 + React 管理面板（Vite + Tailwind）
 ├── PapaCheck.Release/       # 发布控制台（Node.js + Fastify + Web UI）
-├── PapaCheck.Tests/         # 测试（Vitest）
 ├── PapaCheck.WeChat/        # 微信公众号文章生成
-├── PapaCheck.Memo/          # 开发备忘
 └── docs/                    # 项目文档
 ```
 
@@ -99,8 +89,8 @@ PapaCheck/
 | **Web 前端**      | 原生 HTML/CSS/JS, SVG 图表, Service Worker              |
 | **Site（落地页+管理面板）** | Vite 5, React 18, TypeScript 5, Tailwind CSS 3, Lucide Icons |
 | **Android 端**    | Flutter, `webview_flutter`                              |
-| **测试**          | Vitest（627 单元 + PG 集成）                              |
-| **构建发布**      | PapaCheck.Release（Node.js + Web Console）               |
+| **测试**          | Vitest（618 单元 + PG 集成）                              |
+| **构建发布**      | PapaCheck.Release                                         |
 
 ## 🔧 开发
 
