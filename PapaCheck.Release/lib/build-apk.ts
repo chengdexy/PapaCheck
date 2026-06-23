@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, readdirSync, unlinkSync, existsSync } from 'fs';
-import { join, dirname, basename } from 'path';
+import { readFileSync, writeFileSync } from 'fs';
+import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { Executor, type StepDef } from './executor.js';
 
@@ -47,18 +47,11 @@ export function resolveVersion(current: string, args: { ver?: string; bump?: str
 
 function _updatePubspecVersion(newVer: string): void {
   let content = readFileSync(PUBSPEC, 'utf-8');
-  content = content.replace(/^(version:\s*)\S+/m, `$1${newVer}+0`);
+  // 保留已有构建号，防止每次递增版本时构建号被重置为 0
+  const buildMatch = content.match(/^version:\s*\S+\+(\d+)/m);
+  const buildNum = buildMatch ? buildMatch[1] : '0';
+  content = content.replace(/^(version:\s*)\S+/m, `$1${newVer}+${buildNum}`);
   writeFileSync(PUBSPEC, content);
-}
-
-function _archiveApk(newVer: string): void {
-  mkdirSync(APK_ARCHIVE_DIR, { recursive: true });
-  const dst = join(APK_ARCHIVE_DIR, `PapaCheck-${newVer}.apk`);
-  copyFileSync(APK_BUILD_OUTPUT, dst);
-  // 清理旧 APK，保留最新 1 个
-  const files = readdirSync(APK_ARCHIVE_DIR)
-    .filter(f => f.startsWith('PapaCheck-') && f.endsWith('.apk') && f !== `PapaCheck-${newVer}.apk`);
-  for (const f of files) unlinkSync(join(APK_ARCHIVE_DIR, f));
 }
 
 export async function buildApk(executor: Executor, args: { ver?: string; bump?: string; noBump?: boolean } = {}): Promise<boolean> {
@@ -82,13 +75,15 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
     cmd: 'flutter build apk --release', cwd: ANDROID_DIR, shell: true, timeout: 300,
   });
 
-  if (existsSync(APK_BUILD_OUTPUT)) {
-    // 归档 APK：直接操作文件
-    _archiveApk(newVer);
+  // 归档 APK：构建成功后执行，作为 executor step 避免构建前误归档旧版 APK
+  {
+    const src = JSON.stringify(APK_BUILD_OUTPUT);
+    const dir = JSON.stringify(APK_ARCHIVE_DIR);
+    const ver = newVer;
+    const code = `const f=require('fs'),j=require('path');const s=${src};if(!f.existsSync(s)){console.error('APK 未找到: '+s);process.exit(1)}const d=${dir};f.mkdirSync(d,{recursive:true});const dst=j.join(d,'PapaCheck-${ver}.apk');f.copyFileSync(s,dst);f.readdirSync(d).filter(x=>x.startsWith('PapaCheck-')&&x.endsWith('.apk')&&x!=='PapaCheck-${ver}.apk').forEach(x=>f.unlinkSync(j.join(d,x)));console.log('已归档: PapaCheck-${ver}.apk')`;
     steps.push({
       id: String(idx++), desc: `归档 APK → PapaCheck-${newVer}.apk`,
-      cmd: ['node', '-e', `console.log('已归档: PapaCheck-${newVer}.apk')`],
-      timeout: 5,
+      cmd: ['node', '-e', code], timeout: 10,
     });
   }
 

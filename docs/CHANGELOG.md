@@ -18,6 +18,8 @@
 - **日志面板保存按钮**：保存日志到 `log/` 目录，文件名 `release-{type}-{timestamp}.txt`
 
 ### Fixed
+- **修复构建 APK 时归档误用旧版 APK 导致文件名版本与实际不符**：`build-apk.ts` 中 `_archiveApk(newVer)` 在 `executor.runAndReport()` 前内联调用，此时 Flutter 构建尚未执行，归档的是上次构建残留的旧版 APK。改为将归档逻辑内联到 executor step 中（`['node', '-e', code]`），构建成功后才执行归档
+- **修复构建 APK 递增版本时构建号被重置为 0**：`_updatePubspecVersion` 写入 `+0` 导致 `version: 1.4.0+59` 递增后变为 `1.4.1+0`。改为保留已有构建号。删除已废弃的 `_archiveApk` 函数及未使用的 fs/path 导入
 - **修复 Windows Release 控制台 findstr 管道参数损坏**：`cloud-publish.ts` 中 vitest 输出过滤使用 `findstr /C:" FAIL "`，经 `cmd.exe /s /c` 执行时 `\"` 被 cmd.exe 当作字面字符而非转义序列，导致 findstr 把 `/C:` 参数当文件名报 `Cannot open`，阻塞整个云同步流程。改为直接运行 `npx vitest run 2>&1` 避免 cmd.exe 引号问题
 - **修复 Windows Release 控制台 tar 命令路径引号问题**：`site-publish.ts` 中 `tar -czf "${landingTar}"` 经 `cmd.exe /s /c` 时 `\"` 被当作字面字符，tar 收到含字面双引号的文件路径。改为数组参数 (`shell: false`) 绕过 cmd.exe 引号处理
 - **修复 Windows scp 使用 SFTP 协议导致上传文件路径丢失**：Windows OpenSSH 9.5 scp 默认走 SFTP 协议，目标路径 `user@host:/tmp/` 处理后文件未落到预期位置。改用 Node.js `createReadStream` + SSH `cat>` pipe 上传，完全绕过 scp 行为差异
