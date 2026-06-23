@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-23（维护全部项目文档：PROGRESS / PRD / ARCHITECTURE / API / README 同步至 v1.4.0）
+> 最后更新：2026-06-23（维护全部项目文档：PROGRESS / PRD / ARCHITECTURE / API / README 同步至 v1.4.2）
 
 ## 当前版本
 
-**v1.4.0**（Android WebView 会话持久化修复，37 Flutter 测试 + 618 Vitest 测试 + 15 Release 测试通过）
+**v1.4.2**（Android WebView 会话持久化修复，37 Flutter 测试 + 618 Vitest 测试 + 15 Release 测试通过）
 
 ## 部署状态
 
@@ -87,7 +87,8 @@
 
 | 日期 | 变更 |
 |------|------|
-| 2026-06-23 | **维护全部项目文档至 v1.4.0**：同步更新 PROGRESS / PRD / ARCHITECTURE / API / README 五份文档，反映项目当前状态（PostgreSQL、Release Console、多孩子支持、Python 已移除等变更） |
+| 2026-06-23 | **CodeGraph MCP 项目结构分析 + IDatabase 接口拆分**：使用 CodeGraph MCP 扫描发现 7 类结构性问题（153 死导入、6 自引用循环、IDatabase 接口过大、大量 any 类型等）。`DatabaseAdapter` 按职责拆分为 6 个子接口 + `IDatabase` 组合接口，精简约 100 行 abstract 方法声明；文档版本号同步为 v1.4.2；邮件模块 import 合并。633 测试全部通过 |
+| 2026-06-23 | **维护全部项目文档至 v1.4.2**：同步更新 PROGRESS / PRD / ARCHITECTURE / API / README 五份文档，反映项目当前状态（PostgreSQL、Release Console、多孩子支持、Python 已移除等变更） |
 | 2026-06-23 | **修复构建 APK 版本号不一致 Bug**：`build-apk.ts` 归档步骤在构建前内联执行，导致旧版 APK 用新版名归档（文件名 `1.4.2` 实际 `1.4.1`）；改为 executor step 中执行，构建成功才归档。递增版本时构建号被 `+0` 重置，改为保留已有构建号。清理死代码 |
 | 2026-06-23 | **清理过期 spec/plan 文档（68 个文件）**：删除 `.trae/specs/`（11 个已完成 spec 目录）、`docs/superpowers/`（30 个已实现的设计/计划文档）、`.trae/documents/`（4 个过时方案文档）、`PapaCheck.Memo/`（3 个备忘文件）、`docs/` 下 4 个旧版 HTML 周报 |
 | 2026-06-23 | **修复 Release 控制台 Windows cmd.exe 引号问题系列 Bug**：`cloud-publish.ts` findstr 管道参数经 `cmd.exe /s /c` 被 `\"` 破坏 → 直接运行 vitest；`site-publish.ts` tar 路径引号被 cmd.exe 破坏 → 数组参数 `shell: false`；`site-publish.ts` scp 走 SFTP 协议文件未落到预期路径 → Node.js SSH pipe 上传；`console.html` 日志 ANSI 转义码复制变方框 → `stripAnsi()` 过滤；`site-publish.ts` 清理步骤 `node -e` 引号冲突 → 数组参数。步骤编号改为 1~8。15 Release 测试通过 |

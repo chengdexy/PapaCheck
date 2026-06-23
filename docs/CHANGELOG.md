@@ -7,8 +7,13 @@
 ## [Unreleased]
 
 ### Changed
+- **IDatabase 接口拆分为 6 个子接口**：按职责拆分为 `IHomeworkStore` / `ISettlementStore` / `IShopStore` / `IAuthStore` / `IOpsStore` / `ISyncStore`，组合为 `IDatabase` 保持向后兼容。`DatabaseAdapter` 精简约 100 行 abstract 方法声明，工具方法和 Ops stubs 保留
+- **邮件模块 import 合并**：`email/index.ts` 4 行 import 合并为 2 行，消除冗余的类型导入
 - **`PapaCheck.Server.Node` 重命名为 `PapaCheck.Server`**：消除历史遗留的 `.Node` 后缀（Python 服务端已删除）。涉及本地目录 git mv、12 个引用文件路径更新、云端目录 mv 及 papacheck.service WorkingDirectory 同步。云端已手动迁移完成，服务正常运行
 - **替换硬编码服务器 IP 为域名**：`cloud-publish.ts` 和 `site-publish.ts` 默认服务器地址从 `123.57.129.243` 改为 `papacheck.chengdexy.cn`，IP 不再出现在 git 跟踪的代码中。`PAPACHECK_CLOUD_IP` 环境变量仍可覆盖
+
+### Fixed
+- **修复文档版本号与 pubspec.yaml 不同步**：README / PROGRESS / ARCHITECTURE / PRD / API 五份文档版本号从 `v1.4.0` 同步为 `v1.4.2`（事实来源为 `PapaCheck.Android/pubspec.yaml` 的 `1.4.2+0`）
 
 ### Added
 - **Release Console 发布控制台**：`PapaCheck.Release/` 子项目，Node.js/TypeScript 重写原 `release.py`。CLI 四子命令（serve/build-apk/cloud/site）+ Web 控制台（暗色主题、SSE 实时日志、步骤状态追踪、操作记录）。执行引擎 EventEmitter 驱动，支持超时保护、行缓冲日志。BDD/TDD 开发，15 个测试覆盖执行器/版本管理/发布流程/模块解析（[设计文档](docs/superpowers/specs/2026-06-22-release-console-design.md)）

@@ -1,6 +1,6 @@
 # PapaCheck 技术架构文档
 
-> 最后更新：2026-06-23 | 版本：1.4.0
+> 最后更新：2026-06-23 | 版本：1.4.2
 
 ## 一、技术栈
 
@@ -193,7 +193,7 @@ PapaCheck.Release → 一站式发布编排（Node.js/TypeScript）
 - 统一版本号：`PapaCheck.Server/package.json`（主版本号来源）
 - APK 版本号：`PapaCheck.Android/pubspec.yaml`
 - Docker 镜像标签：`papacheck/server:{version}`
-- 当前版本：Server `1.4.0`，APK `1.4.0+40`
+- 当前版本：Server `1.4.2`，APK `1.4.2+40`
 - 部署方式：`docker compose up -d` 一键启动
 
 ---
