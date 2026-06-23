@@ -267,7 +267,7 @@ function loadConnectionManager(options = {}) {
   vm.createContext(sandbox);
 
   const connCode = fs.readFileSync(
-    path.join(__dirname, '..', 'PapaCheck.Web', 'js', 'connection.js'),
+    path.join(__dirname, '..', 'connection.js'),
     'utf8'
   );
 

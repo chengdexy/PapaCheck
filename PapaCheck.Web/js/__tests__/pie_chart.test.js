@@ -13,7 +13,7 @@ import path from 'path';
 
 function loadPieChartFn() {
     const adminCode = fs.readFileSync(
-        path.join(__dirname, '..', 'PapaCheck.Web', 'js', 'admin.js'),
+        path.join(__dirname, '..', 'admin.js'),
         'utf8'
     );
     const match = adminCode.match(/function renderSvgPieChart\s*\([^)]*\)\s*\{[\s\S]*?\n\}/);

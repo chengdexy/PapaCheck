@@ -31,7 +31,7 @@ import { test, assert } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 
-const APP_JS = path.join(__dirname, '..', 'PapaCheck.Web', 'js', 'app.js');
+const APP_JS = path.join(__dirname, '..', 'app.js');
 
 // ========== 辅助：提取轮询代码中的作业变更处理段 ==========
 

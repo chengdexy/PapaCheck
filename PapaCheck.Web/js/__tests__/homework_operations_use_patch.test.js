@@ -33,7 +33,7 @@ import { test, assert, expect } from 'vitest';
 
 function extractFunction(name) {
   const appCode = require('fs').readFileSync(
-    require('path').join(__dirname, '..', 'PapaCheck.Web', 'js', 'app.js'),
+    require('path').join(__dirname, '..', 'app.js'),
     'utf8'
   );
   // 匹配从 "async function <name>" 到最近的 "}\n" (函数级)

@@ -1,7 +1,6 @@
 import Connection from 'imap';
 import { simpleParser } from 'mailparser';
 import type { ParsedMail } from 'mailparser';
-import { PassThrough } from 'stream';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 

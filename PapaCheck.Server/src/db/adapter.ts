@@ -1,5 +1,3 @@
-import type { IDatabase } from './interfaces/index.js';
-import type { CRDTOperation } from '../crdt/types.js';
 import type { BackupRecord, HealthRecord, AlertState, OpsConfig } from './types.js';
 
 export type { IDatabase } from './interfaces/index.js';
