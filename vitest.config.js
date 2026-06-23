@@ -29,7 +29,6 @@ export default defineConfig({
     root: __dirname,
     globals: true,
     include: [
-      'PapaCheck.Tests/**/*.test.js',
       'PapaCheck.Server/test/**/*.test.ts',
       'PapaCheck.Site/src/**/*.test.tsx',
       'PapaCheck.Web/js/__tests__/**/*.test.js',

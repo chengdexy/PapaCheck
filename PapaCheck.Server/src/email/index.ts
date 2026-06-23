@@ -1,9 +1,6 @@
 import { connect, fetchUnseen, type ImapConfig } from './imap.js';
 import { callAI, parseHomework, type HomeworkItem } from './ai.js';
 
-export type { ImapConfig, EmailMessage } from './imap.js';
-export type { HomeworkItem } from './ai.js';
-
 export interface EmailSyncConfig extends ImapConfig {
   apiKey: string;
   apiUrl: string;

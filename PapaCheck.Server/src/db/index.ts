@@ -1,7 +1,6 @@
 import type { IDatabase } from './types.js';
 
 export type { IDatabase } from './types.js';
-export * from './types.js';
 
 export type DatabaseType = IDatabase;
 

@@ -22,14 +22,14 @@ import path from 'path';
 
 function readAppJS() {
   return fs.readFileSync(
-    path.join(__dirname, '..', 'PapaCheck.Web', 'js', 'app.js'),
+    path.join(__dirname, '..', 'app.js'),
     'utf8'
   );
 }
 
 function readBigScreenJS() {
   return fs.readFileSync(
-    path.join(__dirname, '..', 'PapaCheck.Web', 'js', 'big-screen.js'),
+    path.join(__dirname, '..', 'big-screen.js'),
     'utf8'
   );
 }

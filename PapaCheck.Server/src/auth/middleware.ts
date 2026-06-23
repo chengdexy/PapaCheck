@@ -1,6 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { IDatabase } from '../db/types.js';
-import type { JWTPayload } from './types.js';
 import { verifyToken } from './jwt.js';
 
 // PUBLIC_PATHS: 放行的公开 API 路径

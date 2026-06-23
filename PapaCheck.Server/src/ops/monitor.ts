@@ -1,4 +1,4 @@
-import { totalmem, freemem, hostname } from 'node:os';
+import { totalmem, freemem } from 'node:os';
 import { statfs, readFile } from 'node:fs/promises';
 import type { IDatabase, HealthSnapshot, AlertItem, OpsConfig } from '../db/types.js';
 

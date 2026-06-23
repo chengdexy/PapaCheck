@@ -35,7 +35,7 @@ function createMockDoc() {
 
 function loadAdminInVM(mocks) {
     const adminCode = fs.readFileSync(
-        path.join(__dirname, '..', 'PapaCheck.Web', 'js', 'admin.js'),
+        path.join(__dirname, '..', 'admin.js'),
         'utf8'
     );
 

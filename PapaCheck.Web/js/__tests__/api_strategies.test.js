@@ -13,7 +13,7 @@ import vm from 'vm';
 
 function createTestContext(connMode) {
     const apiCode = fs.readFileSync(
-        path.join(__dirname, '..', 'PapaCheck.Web', 'js', 'api.js'),
+        path.join(__dirname, '..', 'api.js'),
         'utf8'
     );
 

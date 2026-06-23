@@ -34,7 +34,7 @@ import path from 'path';
 
 function extractFunction(name) {
   var appCode = fs.readFileSync(
-    path.join(__dirname, '..', 'PapaCheck.Web', 'js', 'app.js'),
+    path.join(__dirname, '..', 'app.js'),
     'utf8'
   );
   var match = appCode.match(new RegExp('async function\\s+' + name + '\\s*\\([^)]*\\)\\s*\\{[\\s\\S]*?\\n\\}'));
@@ -43,7 +43,7 @@ function extractFunction(name) {
 
 function extractNonAsync(name) {
   var appCode = fs.readFileSync(
-    path.join(__dirname, '..', 'PapaCheck.Web', 'js', 'app.js'),
+    path.join(__dirname, '..', 'app.js'),
     'utf8'
   );
   var match = appCode.match(new RegExp('function\\s+' + name + '\\s*\\([^)]*\\)\\s*\\{[\\s\\S]*?\\n\\}'));
@@ -91,7 +91,7 @@ test('RED: resumeActiveTask 在自由时间分支调用 API.putFreeTimeTask', as
 
 test('RED: pollServer 保护进行中的自由时间', async () => {
   var appCode = fs.readFileSync(
-    path.join(__dirname, '..', 'PapaCheck.Web', 'js', 'app.js'),
+    path.join(__dirname, '..', 'app.js'),
     'utf8'
   );
   var pollArea = appCode.match(/const newFtJson[\s\S]{0,600}?freeTimeTasks\s*=\s*newFreeTime/);

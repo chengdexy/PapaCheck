@@ -12,7 +12,7 @@ import path from 'path';
 
 function loadCompleteInSchool() {
     const appCode = fs.readFileSync(
-        path.join(__dirname, '..', 'PapaCheck.Web', 'js', 'app.js'),
+        path.join(__dirname, '..', 'app.js'),
         'utf8'
     );
 
