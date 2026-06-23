@@ -1,7 +1,5 @@
-import { connect, fetchUnseen } from './imap.js';
-import { callAI, parseHomework } from './ai.js';
-import type { ImapConfig } from './imap.js';
-import type { HomeworkItem } from './ai.js';
+import { connect, fetchUnseen, type ImapConfig } from './imap.js';
+import { callAI, parseHomework, type HomeworkItem } from './ai.js';
 
 export type { ImapConfig, EmailMessage } from './imap.js';
 export type { HomeworkItem } from './ai.js';
