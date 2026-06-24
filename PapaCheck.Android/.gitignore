@@ -4,6 +4,7 @@
 *.pyc
 *.swp
 *.keystore
+key.properties
 .DS_Store
 .atom/
 .buildlog/

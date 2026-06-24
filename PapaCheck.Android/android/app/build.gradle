@@ -29,10 +29,15 @@ android {
 
     signingConfigs {
         release {
-            storeFile = file('release.keystore')
-            storePassword = 'PapaCheck2024!'
-            keyAlias = 'papacheck_release'
-            keyPassword = 'PapaCheck2024!'
+            def propsFile = rootProject.file('key.properties')
+            if (propsFile.exists()) {
+                def props = new Properties()
+                props.load(new FileInputStream(propsFile))
+                storeFile = file(props['storeFile'])
+                storePassword = props['storePassword']
+                keyAlias = props['keyAlias']
+                keyPassword = props['keyPassword']
+            }
         }
     }
 
