@@ -38,11 +38,11 @@ android {
                 keyAlias = props['keyAlias']
                 keyPassword = props['keyPassword']
             } else {
-                // 后备配置：请确保 release.keystore 存在，或创建 android/key.properties
+                // 后备配置：从环境变量读取（适用于 CI/CD），或创建 android/key.properties
                 storeFile = file('release.keystore')
-                storePassword = 'PapaCheck2024!'
-                keyAlias = 'papacheck_release'
-                keyPassword = 'PapaCheck2024!'
+                storePassword = System.getenv('PAPACHECK_STORE_PASSWORD')
+                keyAlias = System.getenv('PAPACHECK_KEY_ALIAS')
+                keyPassword = System.getenv('PAPACHECK_KEY_PASSWORD')
             }
         }
     }
