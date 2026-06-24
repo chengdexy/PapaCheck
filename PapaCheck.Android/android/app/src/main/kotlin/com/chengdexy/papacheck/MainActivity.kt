@@ -1,9 +1,9 @@
-package com.example.papacheck_android
+package com.chengdexy.papacheck
 
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
-import com.example.papacheck_android.queue.QueueBridge
+import com.chengdexy.papacheck.queue.QueueBridge
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 

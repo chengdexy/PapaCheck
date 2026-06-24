@@ -1,4 +1,4 @@
-name: papacheck_android
+name: papacheck
 description: "PapaCheck 孩子端 Android 应用"
 publish_to: 'none'
 

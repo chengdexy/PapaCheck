@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:papacheck_android/services/offline_snapshot_service.dart';
+import 'package:papacheck/services/offline_snapshot_service.dart';
 
 void main() {
   late Directory testDir;

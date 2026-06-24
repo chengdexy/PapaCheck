@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:papacheck_android/services/update_service.dart';
+import 'package:papacheck/services/update_service.dart';
 
 /// 启动一个本地 HTTP 服务器，提供指定大小的随机字节响应
 Future<HttpServer> _startTestServer({int contentLength = 1024}) async {

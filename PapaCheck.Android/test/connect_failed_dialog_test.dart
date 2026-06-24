@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:papacheck_android/widgets/connect_failed_dialog.dart';
+import 'package:papacheck/widgets/connect_failed_dialog.dart';
 
 void main() {
   /// Feature: 连接失败对话框

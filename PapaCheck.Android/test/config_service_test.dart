@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:papacheck_android/services/config_service.dart';
+import 'package:papacheck/services/config_service.dart';
 
 void main() {
   // Feature: ConfigService 版本号存储

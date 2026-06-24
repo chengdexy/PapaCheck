@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Changed
+- **Android 包名 `com.example.papacheck_android` → `com.chengdexy.papacheck`**：同步更新 Kotlin 目录结构、Flutter 包引用、MethodChannel 名。生成 Release 签名证书（CN=chengdexy），build.gradle 配置 release 签名。密钥库 `release.keystore` 加入 `.gitignore`
 - **IDatabase 接口拆分为 6 个子接口**：按职责拆分为 `IHomeworkStore` / `ISettlementStore` / `IShopStore` / `IAuthStore` / `IOpsStore` / `ISyncStore`，组合为 `IDatabase` 保持向后兼容。`DatabaseAdapter` 精简约 100 行 abstract 方法声明，工具方法和 Ops stubs 保留
 - **全量 `any` 类型替换为具体 DTO 或 `unknown`**：定义 14 个 DTO 类型（`HomeworkDTO`/`SettlementDTO`/`ShopItemDTO` 等），替换 `FullDataSnapshot`、`postgres-adapter.ts` 方法签名、4 个接口文件及杂项文件中共约 190 处 `any`。`CRDTOperation.value` 改为 `unknown` 防止随意赋值。路由处理器 `request: any` 保留（Fastify 标准用法）
 - **邮件模块 import 合并**：`email/index.ts` 4 行 import 合并为 2 行，消除冗余的类型导入
