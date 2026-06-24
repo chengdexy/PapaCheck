@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:papacheck_android/services/cache_clear_helper.dart';
+import 'package:papacheck/services/cache_clear_helper.dart';
 
 void main() {
   // Feature: shouldClearCache 缓存清理决策

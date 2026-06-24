@@ -19,7 +19,7 @@ import 'services/update_service.dart';
 import 'widgets/connect_failed_dialog.dart';
 import 'widgets/setup_page.dart';
 
-const _queueChannel = MethodChannel('com.example.papacheck_android/queue');
+const _queueChannel = MethodChannel('com.chengdexy.papacheck/queue');
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();

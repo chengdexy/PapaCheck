@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.papacheck_android"
+    namespace = "com.chengdexy.papacheck"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,16 +20,25 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.papacheck_android"
+        applicationId = "com.chengdexy.papacheck"
         minSdk = 21
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        release {
+            storeFile = file('release.keystore')
+            storePassword = 'PapaCheck2024!'
+            keyAlias = 'papacheck_release'
+            keyPassword = 'PapaCheck2024!'
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.debug
+            signingConfig = signingConfigs.release
         }
     }
 }

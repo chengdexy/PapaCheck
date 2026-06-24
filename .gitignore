@@ -24,6 +24,7 @@ Thumbs.db
 # 文档（README 除外）
 *.md
 !README.md
+!CHEATSHEET.md
 !RELEASE_USAGE.md
 !PapaCheck.WeChat/skill.md
 

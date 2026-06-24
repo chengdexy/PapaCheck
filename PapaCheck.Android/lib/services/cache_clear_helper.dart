@@ -1,4 +1,4 @@
-import 'package:papacheck_android/services/config_service.dart';
+import 'package:papacheck/services/config_service.dart';
 
 /// 判断是否需要清理缓存。
 ///

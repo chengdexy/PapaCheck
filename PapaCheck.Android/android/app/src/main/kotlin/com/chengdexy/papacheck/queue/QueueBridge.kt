@@ -1,4 +1,4 @@
-package com.example.papacheck_android.queue
+package com.chengdexy.papacheck.queue
 
 import android.content.Context
 import io.flutter.embedding.engine.FlutterEngine
@@ -8,7 +8,7 @@ import org.json.JSONObject
 
 class QueueBridge(private val context: Context, private val scope: CoroutineScope) {
 
-    private val CHANNEL = "com.example.papacheck_android/queue"
+    private val CHANNEL = "com.chengdexy.papacheck/queue"
     private var _token: String? = null
     private var _baseUrl: String? = null
     private var _tenantId: String? = null
