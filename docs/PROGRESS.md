@@ -87,6 +87,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-24 | **升级 using-superpowers skill 至 v6.0.3（obra/superpowers 官方）**：SKILL.md 全面重写为 action-oriented 语法，新增 "Never read skill files manually" 规则。新增 3 个参考文件（claude-code-tools/pi-tools/antigravity-tools），重写 copilot-tools/codex-tools 为 action-oriented 格式。统一 `debugging` 引用为 `systematic-debugging` |
 | 2026-06-24 | **Android 包名改为 `com.chengdexy.papacheck` + Release 签名证书生成**：包名从 `com.example.papacheck_android` 改为 `com.chengdexy.papacheck`（Kotlin 目录+package/Dart import/MethodChannel 全量同步）。生成 2048 位 RSA release 证书（CN=chengdexy，25 年有效期），build.gradle 配置 release signing。密钥库加入 `.gitignore`。签名信息写入 CHEATSHEET.md |
 | 2026-06-23 | **全量 `any` 类型替换为 DTO**：定义 14 个 DTO 类型（HomeworkDTO/SettlementDTO/ShopItemDTO 等），替换 `FullDataSnapshot`、`postgres-adapter.ts`、4 个接口文件及杂项文件中共约 190 处 `any`。`CRDTOperation.value` 改为 `unknown`。全量 633 测试通过 |
 | 2026-06-23 | **CodeGraph MCP 项目结构分析 + IDatabase 接口拆分**：使用 CodeGraph MCP 扫描发现 7 类结构性问题（153 死导入、6 自引用循环、IDatabase 接口过大、大量 any 类型等）。`DatabaseAdapter` 按职责拆分为 6 个子接口 + `IDatabase` 组合接口，精简约 100 行 abstract 方法声明；文档版本号同步为 v1.4.2；邮件模块 import 合并。633 测试全部通过 |

@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### Changed
+- **升级 using-superpowers skill 至 v6.0.3**：从 obra/superpowers 官方仓库同步更新。SKILL.md 全面重写：工具调用改为 action-oriented 语法、新增"Never read skill files manually"警告、流程图中 `EnterPlanMode` 简化为 `plan mode`、`debugging` 引用统一改为 `systematic-debugging`。新增 3 个参考文件（`claude-code-tools.md`、`pi-tools.md`、`antigravity-tools.md`），重写 `copilot-tools.md`/`codex-tools.md` 为 action-oriented 格式。"Skill Priority" 节新增 `mcp-builder` 实现技能示例
 - **Android 包名 `com.example.papacheck_android` → `com.chengdexy.papacheck`**：同步更新 Kotlin 目录结构、Flutter 包引用、MethodChannel 名。生成 Release 签名证书（CN=chengdexy），build.gradle 配置 release 签名。密钥库 `release.keystore` 加入 `.gitignore`
 - **IDatabase 接口拆分为 6 个子接口**：按职责拆分为 `IHomeworkStore` / `ISettlementStore` / `IShopStore` / `IAuthStore` / `IOpsStore` / `ISyncStore`，组合为 `IDatabase` 保持向后兼容。`DatabaseAdapter` 精简约 100 行 abstract 方法声明，工具方法和 Ops stubs 保留
 - **全量 `any` 类型替换为具体 DTO 或 `unknown`**：定义 14 个 DTO 类型（`HomeworkDTO`/`SettlementDTO`/`ShopItemDTO` 等），替换 `FullDataSnapshot`、`postgres-adapter.ts` 方法签名、4 个接口文件及杂项文件中共约 190 处 `any`。`CRDTOperation.value` 改为 `unknown` 防止随意赋值。路由处理器 `request: any` 保留（Fastify 标准用法）
