@@ -32,13 +32,7 @@ const SETTINGS_DEFAULTS = {
   homeworkDefaultSuggestedDuration: 20,
   ratingMultipliers: { '优': 2.0, '良': 1.5, '可': 1.2, '差': 0 },
   shopDefaultPoints: 50,
-  subjects: [
-    { id: '语文', icon: '📖', color: '#f87171' },
-    { id: '数学', icon: '🔢', color: '#60a5fa' },
-    { id: '英语', icon: '🔤', color: '#fbbf24' },
-    { id: '科学', icon: '🔬', color: '#4ade80' },
-    { id: '其他', icon: '📚', color: '#a78bfa' },
-  ],
+  subjects: DEFAULT_SUBJECTS,
 };
 
 function getSetting(key) {
@@ -50,16 +44,6 @@ function getSetting(key) {
 function getSettingsRatingMultipliers() {
   return adminSettings.ratingMultipliers || SETTINGS_DEFAULTS.ratingMultipliers;
 }
-
-/** 预设 emoji 映射表 */
-const SUBJECT_ICON_PRESETS = {
-  '道德与法治': '⚖️', '道法': '⚖️',
-  '物理': '⚛️', '化学': '🧪', '生物': '🧬',
-  '历史': '📜', '地理': '🌍',
-  '音乐': '🎵', '美术': '🎨', '体育': '⚽',
-  '信息': '💻', '信息科技': '💻', '编程': '🤖',
-  '书法': '✍️', '劳动': '🧹', '心理': '🧠',
-};
 
 /** 获取活跃科目列表 */
 function getActiveSubjects(settings) {
@@ -86,11 +70,6 @@ function removeSubject(subjects, id) {
 /** 获取不在当前列表中的默认科目 */
 function getMissingDefaults(currentSubjects) {
   return SETTINGS_DEFAULTS.subjects.filter(d => !currentSubjects.some(s => s.id === d.id));
-}
-
-/** 智能匹配 emoji */
-function matchSubjectIcon(name) {
-  return SUBJECT_ICON_PRESETS[name] || '📝';
 }
 
 function showToast(msg) {

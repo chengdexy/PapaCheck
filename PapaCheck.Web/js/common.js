@@ -5,6 +5,41 @@
  * 该文件必须在 app.js / admin.js 之前加载，以确保函数全局可用。
  */
 
+// ==================== 科目配置 ====================
+/**
+ * 默认科目配置
+ * @type {Array<{id: string, icon: string, color: string}>}
+ */
+const DEFAULT_SUBJECTS = [
+  { id: '语文', icon: '📖', color: '#f87171' },
+  { id: '数学', icon: '🔢', color: '#60a5fa' },
+  { id: '英语', icon: '🔤', color: '#fbbf24' },
+  { id: '科学', icon: '🔬', color: '#4ade80' },
+  { id: '其他', icon: '📚', color: '#a78bfa' },
+];
+
+/**
+ * 预设科目图标映射表
+ * @type {Object<string, string>}
+ */
+const SUBJECT_ICON_PRESETS = {
+  '道德与法治': '⚖️', '道法': '⚖️',
+  '物理': '⚛️', '化学': '🧪', '生物': '🧬',
+  '历史': '📜', '地理': '🌍',
+  '音乐': '🎵', '美术': '🎨', '体育': '⚽',
+  '信息': '💻', '信息科技': '💻', '编程': '🤖',
+  '书法': '✍️', '劳动': '🧹', '心理': '🧠',
+};
+
+/**
+ * 智能匹配科目图标
+ * @param {string} name - 科目名称
+ * @returns {string} 匹配的 emoji 或默认图标
+ */
+function matchSubjectIcon(name) {
+  return SUBJECT_ICON_PRESETS[name] || '📝';
+}
+
 // ==================== Transition Mask ====================
 /**
  * 显示过渡遮罩层

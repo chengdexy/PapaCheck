@@ -75,6 +75,10 @@ function createMockDoc() {
 }
 
 function loadAdminInVM(mocks) {
+    const commonCode = fs.readFileSync(
+        path.join(__dirname, '..', 'common.js'),
+        'utf8'
+    );
     const adminCode = fs.readFileSync(
         path.join(__dirname, '..', 'admin.js'),
         'utf8'
@@ -147,7 +151,7 @@ function loadAdminInVM(mocks) {
         hideTransitionMask: () => {},
     });
 
-    vm.runInContext(adminCode, context, { timeout: 5000 });
+    vm.runInContext(commonCode + '\n' + adminCode, context, { timeout: 5000 });
     return context;
 }
 
