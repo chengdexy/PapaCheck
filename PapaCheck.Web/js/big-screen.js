@@ -3,14 +3,6 @@
  * 负责当前任务、作业卡片（含计时器）、结算页面、统计的渲染
  */
 
-const DEFAULT_SUBJECTS = [
-  { id: '语文', icon: '📖', color: '#f87171' },
-  { id: '数学', icon: '🔢', color: '#60a5fa' },
-  { id: '英语', icon: '🔤', color: '#fbbf24' },
-  { id: '科学', icon: '🔬', color: '#4ade80' },
-  { id: '其他', icon: '📚', color: '#a78bfa' },
-];
-
 function getSubject(subjectName) {
   const subs = cachedData?.settings?.subjects || DEFAULT_SUBJECTS;
   const found = subs.find(s => s.id === subjectName);
