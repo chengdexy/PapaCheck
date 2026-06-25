@@ -44,7 +44,7 @@ const API = {
       try {
         var result = await onlineFn();
         if (options.syncToLocal && offlineFn) {
-          try { await offlineFn(); } catch (e) { }
+          try { await offlineFn(); } catch (e) { console.warn('[api] 本地同步失败:', e); }
         }
         return result;
       } catch (err) {
@@ -118,7 +118,7 @@ const API = {
       isServerMode = true;
       cachedData = result;
       // 深拷贝后传给 cacheFullData，防止原地修改 lastModified/uuid 污染 cachedData
-      try { await DB.cacheFullData(JSON.parse(JSON.stringify(result))); } catch (e) { }
+      try { await DB.cacheFullData(JSON.parse(JSON.stringify(result))); } catch (e) { console.warn('[api] 本地缓存失败:', e); }
       return result;
     } catch (e) {
       var localData = await DB.getFullData();
@@ -209,7 +209,7 @@ const API = {
           var pts = await DB.getPoints();
           pts.balance = result.balance;
           await DB.savePoints(pts);
-        } catch (e) { }
+        } catch (e) { console.warn('[api] 积分缓存失败:', e); }
         return result.balance;
       },
       async () => {

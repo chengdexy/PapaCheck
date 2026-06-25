@@ -24,6 +24,7 @@ let _ratingShowCount = 5;
 let _selectedCalendarDate = null;
 let _calendarYear = null;
 let _calendarMonth = null;
+let _refreshInterval = null;
 
 
 const SETTINGS_DEFAULTS = {
@@ -147,7 +148,12 @@ async function initAdmin() {
   try { var savedTab = localStorage.getItem('adminTab'); } catch (e) { /* 非致命 */ }
   switchTab(savedTab && ['homework', 'shop', 'rewardBox', 'bounty', 'redeem', 'stats', 'settings'].indexOf(savedTab) !== -1 ? savedTab : 'homework');
 
-  setInterval(async () => {
+  startRefreshTimer();
+}
+
+function startRefreshTimer() {
+  stopRefreshTimer();
+  _refreshInterval = setInterval(async () => {
     await refreshAllData();
     updateSettingsTabState();
     updateTitle();
@@ -156,6 +162,15 @@ async function initAdmin() {
     renderCurrentTab();
   }, 5000);
 }
+
+function stopRefreshTimer() {
+  if (_refreshInterval) {
+    clearInterval(_refreshInterval);
+    _refreshInterval = null;
+  }
+}
+
+window.addEventListener('beforeunload', stopRefreshTimer);
 
 async function refreshAllData() {
   var mode = ConnectionManager.getMode();

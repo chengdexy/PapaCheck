@@ -1269,7 +1269,7 @@ async function init() {
       hideTransitionMask();
       // 立即缓存到本地 DB，确保离线时可用（与 admin.js 的 refreshAllData 保持一致）
       // 深拷贝后传给 cacheFullData，防止 ensureSyncFields 原地修改 lastModified/uuid 污染 cachedData
-      try { await DB.cacheFullData(JSON.parse(JSON.stringify(cachedData))); } catch (e) { }
+      try { await DB.cacheFullData(JSON.parse(JSON.stringify(cachedData))); } catch (e) { console.warn('[app] 初始缓存失败:', e); }
     } catch (e) {
       // CM 检测到在线，但实际请求时网络已断，降级到本地 DB
       try {
@@ -1293,7 +1293,7 @@ async function init() {
               try {
                 cachedData = await API.getData();
                 isServerMode = true;
-                try { await DB.cacheFullData(JSON.parse(JSON.stringify(cachedData))); } catch (e) { }
+                try { await DB.cacheFullData(JSON.parse(JSON.stringify(cachedData))); } catch (e) { console.warn('[app] 恢复缓存失败:', e); }
                 updateBigScreen();
                 startPoll(5000);
                 showToast('已连接服务器，数据已恢复');
@@ -1400,6 +1400,6 @@ function dedupNewHomeworkNotifications(items) {
 // 动态更新页面标题，跟随孩子名
 function updateChildTitle() {
   var childName = null;
-  try { childName = sessionStorage.getItem('papacheck_child_name'); } catch (e) {}
+  try { childName = sessionStorage.getItem('papacheck_child_name'); } catch (e) { console.warn('[app] sessionStorage 读取失败:', e); }
   document.title = childName ? 'PapaCheck · ' + childName : 'PapaCheck';
 }

@@ -475,7 +475,7 @@ function renderActiveHomeworkInCurrentTask(display, hw) {
 
   display.innerHTML = `
     ${subject.icon ? `<div class="current-task-icon">${subject.icon}</div>` : ''}
-    <div class="current-task-name">${hw.subject} · ${hw.content}</div>
+    <div class="current-task-name">${escapeHtml(hw.subject)} · ${escapeHtml(hw.content)}</div>
     <div class="homework-timer ${timerClass}" data-role="ct-timer" style="flex-shrink:0;">${timerHtml}</div>
     ${progressHtml}
     <div class="task-actions">
@@ -714,10 +714,10 @@ function updateHomeworkGrid() {
           ${subject.icon ? `<span style="font-size:28px;flex-shrink:0;">${subject.icon}</span>` : ''}
           <div class="homework-card-info">
             <div style="display:flex;align-items:center;justify-content:space-between;">
-              <span style="font-size:18px;font-weight:600;">${hw.subject}</span>
+              <span style="font-size:18px;font-weight:600;">${escapeHtml(hw.subject)}</span>
               <span style="font-size:12px;color:var(--text-secondary);">${modeLabel}</span>
             </div>
-            <div style="font-size:15px;color:var(--text-secondary);">${hw.content}</div>
+            <div style="font-size:15px;color:var(--text-secondary);">${escapeHtml(hw.content)}</div>
           </div>
           ${rightSection}
         </div>
@@ -963,7 +963,7 @@ function updateSettlementPage() {
         timeInfo = `${hw.actualDuration}分钟`;
       }
       const iconHtml = subject.icon ? subject.icon + ' ' : '';
-      return '<div class="settlement-hw-item">' + iconHtml + hw.subject + ' - ' + hw.content + ' ' + timeInfo + '</div>';
+      return '<div class="settlement-hw-item">' + iconHtml + escapeHtml(hw.subject) + ' - ' + escapeHtml(hw.content) + ' ' + timeInfo + '</div>';
     }).join('')}
       </div>
     </div >
@@ -1302,8 +1302,8 @@ function confirmStartTask(hwId) {
 
   if (hw.rejected) {
     content.innerHTML = `
-    <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon ? subject.icon + ' ' : ''}${hw.subject}</h3>
-      <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;font-size:20px;">${hw.content}</p>
+    <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon ? subject.icon + ' ' : ''}${escapeHtml(hw.subject)}</h3>
+      <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;font-size:20px;">${escapeHtml(hw.content)}</p>
       <p style="text-align:center;color:#f87171;font-size:20px;margin-bottom:16px;">⚠️ 已驳回，不计时重新完成</p>
       <div class="modal-actions">
         <button onclick="closeStartConfirm()" style="padding:10px 16px;border:2px solid var(--text-secondary);border-radius:12px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">✕ 取消</button>
@@ -1316,8 +1316,8 @@ function confirmStartTask(hwId) {
       ? '<button onclick="closeStartConfirm(); requestDeferHomework(\'' + hwId + '\')" style="padding:10px 16px;border:2px solid var(--warning);border-radius:12px;background:transparent;color:var(--warning);font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">⏭️ 明天做</button>'
       : '';
     content.innerHTML = `
-    <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon ? subject.icon + ' ' : ''}${hw.subject}</h3>
-      <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;font-size:20px;">${hw.content}</p>
+    <h3 style="text-align:center;margin-bottom:8px;font-size:32px;">${subject.icon ? subject.icon + ' ' : ''}${escapeHtml(hw.subject)}</h3>
+      <p style="text-align:center;color:var(--text-secondary);margin-bottom:4px;font-size:20px;">${escapeHtml(hw.content)}</p>
       <p style="text-align:center;color:var(--accent);font-size:20px;margin-bottom:16px;">建议 ${hw.suggestedDuration} 分钟内完成</p>
       <div class="modal-actions">
         <button onclick="closeStartConfirm()" style="padding:10px 16px;border:2px solid var(--text-secondary);border-radius:12px;background:transparent;color:var(--text-secondary);font-size:16px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:80px;">✕ 取消</button>
