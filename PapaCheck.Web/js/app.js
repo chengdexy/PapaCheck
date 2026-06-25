@@ -844,6 +844,19 @@ function startPoll(intervalMs) {
     if (mode === 'offline' || mode === 'reconnecting') return;
 
     try {
+      // BUG FIX: 拉取服务端数据前先推送待同步 CRDT 操作，
+      // 防止 PATCH 因网络短暂抖动失败后，服务端数据过时而 pollServer 覆盖本地变更
+      try {
+        if (typeof CRDTLog !== 'undefined') {
+          var pendingOps = await CRDTLog.getPending();
+          if (pendingOps.length > 0 && typeof SyncEngine !== 'undefined') {
+            await SyncEngine.crdtPush();
+          }
+        }
+      } catch (_crdtErr) {
+        console.warn('[pollServer] CRDT 推送失败，继续拉取数据:', _crdtErr);
+      }
+
       var _prevSettlement = cachedData?.dailySettlement?.[Util.dateKey(currentDate)];
       cachedData = await API.getData();
 
@@ -948,6 +961,25 @@ function startPoll(intervalMs) {
           var _wasPaused = _oldActive && _oldActive.paused;
 
           homeworks = newHw;
+
+          // BUG FIX: 重新应用本地待推送的 CRDT 操作，
+          // 防止 CRDT 推送失败后 pollServer 用过期服务端数据覆盖本地变更
+          try {
+            if (typeof CRDTLog !== 'undefined') {
+              var _pendingOps = await CRDTLog.getPending();
+              for (var _po = 0; _po < _pendingOps.length; _po++) {
+                var _op = _pendingOps[_po];
+                if (_op.table === 'homeworks' && _op.type === 'update' && _op.value) {
+                  var _targetHw = homeworks.find(function (_h) { return _h.id === _op.resourceId || _h.uuid === _op.resourceId; });
+                  if (_targetHw) {
+                    Object.assign(_targetHw, _op.value);
+                  }
+                }
+              }
+            }
+          } catch (_reapplyErr) {
+            console.warn('[pollServer] 重新应用 CRDT 操作失败:', _reapplyErr);
+          }
 
           // 恢复本地暂停状态（服务端数据可能尚未包含 paused:true）
           if (_wasPaused) {
