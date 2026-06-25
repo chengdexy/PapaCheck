@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-25（修复 XSS 漏洞 + setInterval 内存泄漏 + 空 catch 块，643 测试通过）
+> 最后更新：2026-06-25（文档对齐实际状态：清除已完成待办、消除已知问题、修复 Docker 残留与版本号不一致，643 测试通过）
 
 ## 当前版本
 
@@ -65,21 +65,25 @@
 ## 待开发功能
 
 - [x] Phase 5e: 客户端适配（Android 远程配置 + Web 登录状态持久化）— Android 首屏默认连接云服务器 `papacheck.chengdexy.cn:443`；Web child/admin 端 localStorage token 刷新恢复
-- [ ] iOS 端
+- [ ] iOS 端（短期不规划，需 Mac + Xcode 环境）
 - [x] 多孩子支持 Phase 1+2 — **2026-06-21 完成：数据库层 + Auth + API + 家长端 UI + 生产数据迁移**
-- [ ] 多孩子支持 Phase 3：前端 UI 孩子切换/添加流程完善
-- [ ] 更丰富的数据分析与报告
+- [x] 多孩子支持 Phase 3：前端 UI 孩子切换/添加流程 — **管理面板以孩子为中心的成员管理已完成**（MemberTable/AddMemberForm，child_id/child_name 模型）；Web 孩子端切换孩子通过 `switchChild()` 退出当前会话后用新访问码登录
+- [x] 更丰富的数据分析与报告 — **管理端折线图/饼图/中值线/LOESS 平滑曲线/在校提前完成比例已全部落地**；运维侧 `sendDailyReport` 每日邮件报告（备份状态/磁盘/PG）已上线
 - [x] 离线模式重构（Phase 0~4 全部完成，v1.3.8 已上线）
-- [ ] 离线优先同步优化
-- [ ] 离线功能差距填补与前端测试
-- [ ] 简化 Flutter 启动流程
+- [x] 离线优先同步优化 — Phase 0~4 完成时一并优化（CRDT 简化、SQLite 退役、Android 原生写队列、`_syncInProgress` 锁超时、`crdt-push` 幂等）
+- [x] 离线功能差距填补与前端测试 — 643 个 Vitest 测试通过，前端覆盖 Stmts 85.22% / Branch 71.89% / Funcs 90.94%
+- [x] 简化 Flutter 启动流程 — `main.dart` 经多次重构（离线快照、版本检测、配置页、电池监控、session 注入），逻辑分层清晰
 
 ---
 
 ## 已知问题
 
-- `GET /api/tasks/{date_key}` 和 `POST /api/tasks/{date_key}` 为预留接口，未实现实际逻辑
-- `bounty_completions` 表使用 `_total` 作为特殊 date_key 存储全局计数器，设计不够清晰
+_无未解决项。_
+
+历史已解决：
+
+- ~~`GET /api/tasks/{date_key}` 和 `POST /api/tasks/{date_key}` 为预留接口，未实现实际逻辑~~ — **已删除预留路由**（grep `/api/tasks` 在 `app.ts` 仅剩 `bounty-tasks`）
+- ~~`bounty_completions` 表使用 `_total` 作为特殊 date_key 存储全局计数器，设计不够清晰~~ — **已重构**（grep `_total` 在 `src` 下零匹配，bounty_completions 完全使用正常 `date_key`）
 
 ---
 
@@ -87,6 +91,7 @@
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-25 | **文档对齐实际状态调研与修复**：① 清除"已知问题"两条已解决项（`/api/tasks/{date_key}` 预留路由已删除；`bounty_completions._total` 设计已重构为正常 date_key）；② 待开发功能中 iOS 端短期不规划，其余 5 项均已实际完成，分别补充完成证据；③ ARCHITECTURE.md 13 处 Docker 残留全部改为 systemd + Nginx；④ API.md 第十九节"预留接口"重命名为"辅助查询接口"并删除已不存在的 `/api/tasks/{date_key}`；⑤ CHANGELOG `[Unreleased]` 段转为 `[1.4.2] - 2026-06-25`；⑥ HANDOVER 版本号 v1.4.0→v1.4.2、APK 路径 1.4.0→1.4.2、勾选监控告警完成、调整异地备份与 FAQ 状态为"短期不规划"；⑦ README 路由 `/child` `/parent` → `/app/` `/app/admin/`；⑧ PRD 第五节"未来规划"清理已完成项，仅保留 iOS 端 + FAQ |
 | 2026-06-25 | **修复 XSS 漏洞 + setInterval 内存泄漏 + 空 catch 块**：big-screen.js 8 处 `hw.subject`/`hw.content` innerHTML 插入未转义（XSS 漏洞），全部包裹 `escapeHtml()`；admin.js `setInterval` 返回值未保存导致定时器泄漏，引入 `start/stopRefreshTimer()` + `beforeunload` 清理；api.js/app.js 6 处 `catch (e) {}` 添加 `console.warn` 日志。TDD 开发，新增 10 个测试（4 XSS + 4 定时器 + 2 空 catch），全量 643 测试通过 |
 | 2026-06-24 | **升级 using-superpowers skill 至 v6.0.3（obra/superpowers 官方）**：SKILL.md 全面重写为 action-oriented 语法，新增 "Never read skill files manually" 规则。新增 3 个参考文件（claude-code-tools/pi-tools/antigravity-tools），重写 copilot-tools/codex-tools 为 action-oriented 格式。统一 `debugging` 引用为 `systematic-debugging` |
 | 2026-06-24 | **Android 包名改为 `com.chengdexy.papacheck` + Release 签名证书生成**：包名从 `com.example.papacheck_android` 改为 `com.chengdexy.papacheck`（Kotlin 目录+package/Dart import/MethodChannel 全量同步）。生成 2048 位 RSA release 证书（CN=chengdexy，25 年有效期），build.gradle 配置 release signing。密钥库加入 `.gitignore`。签名信息写入 CHEATSHEET.md |

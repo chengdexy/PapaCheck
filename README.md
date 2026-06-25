@@ -55,8 +55,8 @@ npm run dev -- --port 8080
 
 在浏览器中访问 `http://192.x.x.x:8080`：
 
-- 孩子端：`http://192.x.x.x:8080/child`
-- 管理端：`http://192.x.x.x:8080/parent`
+- 孩子端：`http://192.x.x.x:8080/app/`
+- 管理端：`http://192.x.x.x:8080/app/admin/`
 
 **Android 平板/手机**
 

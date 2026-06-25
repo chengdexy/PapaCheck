@@ -1,6 +1,6 @@
 # PapaCheck 技术架构文档
 
-> 最后更新：2026-06-23 | 版本：1.4.2
+> 最后更新：2026-06-25 | 版本：1.4.2
 
 ## 一、技术栈
 
@@ -11,7 +11,7 @@
 | **Site（落地页+管理面板）** | Vite 5, React 18, TypeScript 5, Tailwind CSS 3 | Lucide Icons、Tailwind preset、React Router（可选） |
 | **Android 端** | Dart/Flutter | `webview_flutter`、`path_provider` |
 | **测试** | Vitest, Flutter test | Vitest 3.x、Flutter test |
-| **构建发布** | PapaCheck.Release（Node.js/TypeScript）| 版本管理、SEA 打包、Flutter 构建、Docker 部署 |
+| **构建发布** | PapaCheck.Release（Node.js/TypeScript）| 版本管理、SEA 打包、Flutter 构建、systemd 部署 |
 
 ---
 
@@ -37,17 +37,17 @@
 │  └──────────┘                                           │
 │                                                         │
 │  ┌──────────────────┐     ┌────────────────────────┐    │
-│  │  云部署模式       │     │   Docker 容器化部署      │    │
-│  │  ├── Docker Hub  │     │   ├── Server           │    │
-│  │  ├── 阿里云 ECS  │     │   ├── PostgreSQL 16     │    │
-│  │  └── 域名 + SSL  │     │   └── Adminer (可选)    │    │
+│  │  云部署模式       │     │   systemd + Nginx 部署   │    │
+│  │  ├── 阿里云 ECS  │     │   ├── Server (Node.js) │    │
+│  │  ├── 域名 + SSL  │     │   ├── PostgreSQL 16     │    │
+│  │  └── Let's Enc.  │     │   └── Nginx 反代        │    │
 │  └──────────────────┘     └────────────────────────┘    │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ### 核心设计原则
 
-1. **云部署优先**：Docker 容器化部署，支持阿里云 ECS 与家庭局域网双模式
+1. **云部署优先**：systemd + Nginx 直接部署，支持阿里云 ECS 与家庭局域网双模式（Docker 已于 Phase 5b 退役）
 2. **离线优先**：前端 Service Worker + localforage 缓存，Android 离线快照
 3. **增量同步 + CRDT**：基于 `last_modified` 时间戳的 pull/push 机制，`crdt_operations` 表记录离线冲突
 4. **多租户隔离**：JWT 认证 + tenant_id 层，孩子数据按租户/家长隔离
@@ -74,8 +74,7 @@ PapaCheck/
 │   ├── test/                  # Vitest 测试
 │   ├── package.json
 │   ├── tsconfig.json
-│   ├── vitest.config.ts
-│   └── Dockerfile             # Docker 容器化
+│   └── vitest.config.ts
 │
 ├── PapaCheck.Web/             # Web 前端（孩子端 + 管理端）
 │   ├── index.html             # 孩子端大屏界面
@@ -99,15 +98,23 @@ PapaCheck/
 │   └── apk/                   # 预构建 APK 文件
 │
 ├── PapaCheck.Release/         # [v1.4 新增] 发布控制台（Node.js/TypeScript）
-│   ├── src/
-│   │   ├── index.ts           # 发布流程主入口
-│   │   ├── version.ts         # 版本管理
-│   │   └── docker.ts          # Docker 构建与推送
+│   ├── lib/
+│   │   ├── build-apk.ts       # Flutter APK 构建
+│   │   ├── cloud-publish.ts   # 云端 SSH 发布
+│   │   ├── site-publish.ts    # Site 静态资源发布
+│   │   ├── executor.ts        # 步骤执行引擎
+│   │   └── reset-test-db.ts   # 测试库重置
+│   ├── console-server.ts      # Web 控制台 + SSE
+│   ├── console.html           # 控制台前端
+│   ├── release.ts             # CLI 入口
 │   ├── package.json
 │   └── tsconfig.json
 │
-├── docs/                      # 文档 + GitHub Pages 落地页
-└── docker-compose.yml         # Docker Compose 编排（Server + PostgreSQL）
+├── docs/                      # 项目文档
+├── nginx.conf                 # 生产 Nginx 配置（镜像到云端 sites-available/default）
+├── nginx.dev.conf             # 本地开发 Nginx 配置（HTTP :8081）
+├── papacheck.service          # systemd 单元文件
+└── package.json
 ```
 
 ---
@@ -174,7 +181,7 @@ PapaCheck/
 | 接入码配对 | 一次性的 8 字符接入码 | 简化设备绑定流程，无账户注册 |
 | TTS | edge-tts（微软） | 免费高质量中文语音 |
 | AI 解析 | LLM API（如 DeepSeek 等） | 任意支持中文的 LLM 均可，默认使用 DeepSeek |
-| 部署方式 | Docker Compose（Server + PostgreSQL）| 一键部署到阿里云 ECS 或任意 Linux 服务器 |
+| 部署方式 | systemd + Nginx + PostgreSQL 直接部署 | Docker 已于 Phase 5b 退役，资源占用更低 |
 | 落地页图片资源 | `<picture>` + WebP 1x/2x + PNG 兜底 | 资源体积 -94%，LCP 图 preload + fetchpriority=high 抢首屏 |
 
 ---
@@ -183,18 +190,21 @@ PapaCheck/
 
 ```
 PapaCheck.Release → 一站式发布编排（Node.js/TypeScript）
-  ├── version.ts                # 版本管理（递增 version/package.json/README）
-  ├── docker.ts                 # Docker 构建与推送（阿里云/自建 Registry）
-  ├── sea.ts                    # Node.js SEA 单 EXE 打包
-  ├── flutter.ts                # Android APK 构建
-  └── deploy.ts                 # 云部署（阿里云 ECS SSH 推送）
+  ├── release.ts                # CLI 入口（serve / build-apk / cloud / site 四子命令）
+  ├── console-server.ts         # Web 控制台服务 + SSE 实时日志
+  ├── console.html              # 控制台前端（暗色主题）
+  └── lib/
+      ├── executor.ts           # 步骤执行引擎（EventEmitter 驱动，超时保护）
+      ├── build-apk.ts          # Flutter APK 构建 + 归档
+      ├── cloud-publish.ts      # 云端 SSH 发布（Node.js 服务端 dist）
+      ├── site-publish.ts       # Site 静态资源发布（Vite 构建 + tar + SSH 上传）
+      └── reset-test-db.ts      # 云同步前自动重置 PG 测试库
 ```
 
 - 统一版本号：`PapaCheck.Server/package.json`（主版本号来源）
 - APK 版本号：`PapaCheck.Android/pubspec.yaml`
-- Docker 镜像标签：`papacheck/server:{version}`
-- 当前版本：Server `1.4.2`，APK `1.4.2+40`
-- 部署方式：`docker compose up -d` 一键启动
+- 当前版本：Server `1.4.2`，APK `1.4.2+0`（pubspec.yaml）
+- 部署方式：`systemctl restart papacheck`（Nginx 反代，无需容器）
 
 ---
 
@@ -205,11 +215,12 @@ PapaCheck.Release → 一站式发布编排（Node.js/TypeScript）
 | 组件 | 选择 | 理由 |
 |------|------|------|
 | 框架 | Fastify 5.x | 高性能、TypeScript 原生支持、插件生态 |
-| 数据库 | pg（PostgreSQL 16） | 多租户支持、Docker 容器化、生产级 ACID |
+| 数据库 | pg（PostgreSQL 16） | 多租户支持、生产级 ACID、systemd 直接运行 |
 | 认证 | @fastify/jwt | 无状态 JWT，支持多租户 RBAC |
 | 构建 | esbuild + SEA | Node.js 22 原生单 EXE 支持 |
 | 测试 | Vitest 3.x | 与前端测试框架统一 |
-| 部署 | Docker Compose | Server + PostgreSQL 16 一键编排 |
+| 部署 | systemd + Nginx | Server + PostgreSQL 16 直接运行，Nginx 反代 + Let's Encrypt HTTPS |
+| 运维 | 自研 ops 模块 | Phase 5d：自动备份（每日 03:00 保留 3 份）+ 健康监控（5 分钟轮询）+ SMTP 告警 + 每日运维报告 |
 
 ### API 清单
 
