@@ -17,6 +17,9 @@
 
 ### Fixed
 - **修复文档版本号与 pubspec.yaml 不同步**：README / PROGRESS / ARCHITECTURE / PRD / API 五份文档版本号从 `v1.4.0` 同步为 `v1.4.2`（事实来源为 `PapaCheck.Android/pubspec.yaml` 的 `1.4.2+0`）
+- **修复 big-screen.js XSS 漏洞**：`hw.subject` 和 `hw.content`（用户输入的作业数据）在 8 处插入 `innerHTML` 未转义，攻击者可注入恶意脚本。全部包裹 `escapeHtml()` 转义。新增 4 个 XSS 防护测试
+- **修复 admin.js setInterval 内存泄漏**：行 150 `setInterval(...)` 返回值未保存，无法清理，页面切换导致定时器堆积。引入 `_refreshInterval` 变量 + `startRefreshTimer()`/`stopRefreshTimer()` 配对函数 + `beforeunload` 事件清理。新增 4 个定时器生命周期测试
+- **修复 6 处空 catch 块静默吞没错误**：api.js 行 47/121/212、app.js 行 1272/1294/1401 的 `catch (e) {}` 添加 `console.warn('[模块] 操作失败:', e)` 日志，便于调试。新增 2 个空 catch 日志测试
 
 ### Added
 - **Release Console 发布控制台**：`PapaCheck.Release/` 子项目，Node.js/TypeScript 重写原 `release.py`。CLI 四子命令（serve/build-apk/cloud/site）+ Web 控制台（暗色主题、SSE 实时日志、步骤状态追踪、操作记录）。执行引擎 EventEmitter 驱动，支持超时保护、行缓冲日志。BDD/TDD 开发，15 个测试覆盖执行器/版本管理/发布流程/模块解析（[设计文档](docs/superpowers/specs/2026-06-22-release-console-design.md)）

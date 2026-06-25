@@ -2,7 +2,7 @@
 
 ![PapaCheck Banner](./docs/imgs/_banner.jpg)
 
-> **v1.4.2** — Android WebView 会话持久化修复，37 Flutter 测试 + 618 Vitest 测试（0 跳过）通过，15 Release 测试
+> **v1.4.2** — Android WebView 会话持久化修复，37 Flutter 测试 + 643 Vitest 测试（0 跳过）通过，15 Release 测试
 
 PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和跟踪孩子的作业完成情况。支持通过转发微信群中老师布置的作业到邮件，AI 自动解析并添加到清单；孩子可以自主开始/暂停/完成作业并获得积分；家长远程评级并管理积分商店。
 
@@ -89,7 +89,7 @@ PapaCheck/
 | **Web 前端**      | 原生 HTML/CSS/JS, SVG 图表, Service Worker              |
 | **Site（落地页+管理面板）** | Vite 5, React 18, TypeScript 5, Tailwind CSS 3, Lucide Icons |
 | **Android 端**    | Flutter, `webview_flutter`                              |
-| **测试**          | Vitest（618 单元 + PG 集成）                              |
+| **测试**          | Vitest（643 单元 + PG 集成）                              |
 | **构建发布**      | PapaCheck.Release                                         |
 
 ## 🔧 开发
