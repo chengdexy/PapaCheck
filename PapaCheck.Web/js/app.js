@@ -964,15 +964,58 @@ function startPoll(intervalMs) {
 
           // BUG FIX: 重新应用本地待推送的 CRDT 操作，
           // 防止 CRDT 推送失败后 pollServer 用过期服务端数据覆盖本地变更
+          // 覆盖所有可能被 cachedData 替换覆盖的表
           try {
             if (typeof CRDTLog !== 'undefined') {
               var _pendingOps = await CRDTLog.getPending();
+              // table → cachedData 属性名映射（snake_case → camelCase）
+              var _tableMap = {
+                homeworks: null,             // 直接写 local homeworks
+                free_time_tasks: null,       // 直接写 local freeTimeTasks
+                daily_settlement: 'dailySettlement',
+                efficiency_history: 'efficiencyHistory',
+                bounty_submissions: 'bountySubmissions',
+                bounty_completions: 'bountyCompletions',
+                shop_items: 'shopItems',
+                redemptions: 'redemptions',
+                reward_box: 'rewardBox',
+                active_buffs: 'activeBuffs',
+                bounty_tasks: 'bountyTasks',
+                points: 'points',
+                settings: 'settings',
+              };
+              var _dateKey = Util.dateKey(currentDate);
               for (var _po = 0; _po < _pendingOps.length; _po++) {
                 var _op = _pendingOps[_po];
-                if (_op.table === 'homeworks' && _op.type === 'update' && _op.value) {
+                if (_op.type !== 'update' || !_op.value) continue;
+                var _tbl = _op.table;
+                // 处理本地变量
+                if (_tbl === 'homeworks') {
                   var _targetHw = homeworks.find(function (_h) { return _h.id === _op.resourceId || _h.uuid === _op.resourceId; });
-                  if (_targetHw) {
-                    Object.assign(_targetHw, _op.value);
+                  if (_targetHw) Object.assign(_targetHw, _op.value);
+                } else if (_tbl === 'free_time_tasks') {
+                  var _targetFt = freeTimeTasks.find(function (_f) { return _f.id === _op.resourceId || _f.uuid === _op.resourceId; });
+                  if (_targetFt) Object.assign(_targetFt, _op.value);
+                } else {
+                  // 处理 cachedData 中的表
+                  var _cdProp = _tableMap[_tbl];
+                  if (_cdProp && cachedData && cachedData[_cdProp]) {
+                    var _cdVal = cachedData[_cdProp];
+                    if (Array.isArray(_cdVal)) {
+                      // 扁平数组：shopItems, redemptions, rewardBox, activeBuffs, bountyTasks
+                      var _target = _cdVal.find(function (_i) { return _i && (_i.id === _op.resourceId || _i.uuid === _op.resourceId); });
+                      if (_target) Object.assign(_target, _op.value);
+                    } else if (typeof _cdVal === 'object') {
+                      // 日期键对象或单行对象
+                      if (_tbl === 'daily_settlement' || _tbl === 'efficiency_history' || _tbl === 'bounty_completions') {
+                        // 按 dateKey 查找
+                        var _dkEntry = _cdVal[_op.resourceId] || _cdVal[_dateKey];
+                        if (_dkEntry) Object.assign(_dkEntry, _op.value);
+                      } else {
+                        // 单行对象：settings, points
+                        Object.assign(_cdVal, _op.value);
+                      }
+                    }
                   }
                 }
               }
