@@ -85,7 +85,7 @@ PapaCheck/
 
 | 模块              | 技术                                                    |
 | ----------------- | ------------------------------------------------------- |
-| **Server**        | Node.js, Fastify, pg (PostgreSQL), edge-tts (`tts_bridge.py`) |
+| **Server**        | Node.js, Fastify, pg (PostgreSQL), tts-svc (独立 TTS 服务) |
 | **Web 前端**      | 原生 HTML/CSS/JS, SVG 图表, Service Worker              |
 | **Site（落地页+管理面板）** | Vite 5, React 18, TypeScript 5, Tailwind CSS 3, Lucide Icons |
 | **Android 端**    | Flutter, `webview_flutter`                              |

@@ -5,7 +5,6 @@ import { createReadStream } from 'fs';
 import { readdir, stat, readFile } from 'fs/promises';
 import { join } from 'path';
 import { createDatabase } from './db/index.js';
-import { TTSBridge, _moduleDirname } from './tts/index.js';
 import { EmailSync } from './email/index.js';
 import type { HomeworkItem } from './email/ai.js';
 import fastifyStatic from '@fastify/static';
@@ -25,7 +24,6 @@ import rateLimit from '@fastify/rate-limit';
 export interface AppOptions {
   port: number;
   webDir: string;
-  ttsPython?: string;
   showPollingLog?: boolean;
   /** 启用 JWT Bearer 认证（生产环境设为 true） */
   enableAuth?: boolean;
@@ -184,18 +182,11 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     });
   });
 
-  // 创建数据库和 TTS 实例
-  const ttsCacheDir = join(_moduleDirname, '..', 'tts_cache');
+  // 创建数据库
   const db = await createDatabase({});
-  const tts = new TTSBridge({
-    pythonPath: options.ttsPython ?? 'python',
-    cacheDir: ttsCacheDir,
-  });
-  console.log('[App] TTS cache dir:', ttsCacheDir);
 
   // 暴露给测试使用
   app.decorate('papaCheckDB', db);
-  app.decorate('tts', tts);
 
   // ==================== CORS ====================
 
@@ -598,21 +589,55 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { changes, serverTime: new Date().toISOString() });
   });
 
-  // 17. GET /api/speak - TTS 语音合成
+  // 17. GET /api/speak - TTS 语音合成（转发到 tts-svc）
   app.get('/api/speak', async (request, reply) => {
-    const query = request.query as { text?: string };
-    const text = query.text || '';
-    if (!text) {
+    const { text } = request.query as { text?: string };
+    if (!text || !text.trim()) {
       return reply.status(400).send({ error: 'Missing text' });
     }
-    const mp3Data = await tts.speak(text);
-    if (mp3Data.length === 0) {
-      const lastError = tts.getLastError() || 'TTS 返回空数据';
-      return reply.status(500).send({ error: lastError, code: 'TTS_EMPTY' });
+
+    const ttsResponse = await fetch('http://127.0.0.1:8500/speak', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text.trim(), timeout: 8, cache: true }),
+    });
+
+    if (!ttsResponse.ok) {
+      const errBody = await ttsResponse.json().catch(() => ({}));
+      return reply.status(ttsResponse.status).send(errBody);
     }
-    reply.header('Content-Type', 'audio/mpeg');
-    reply.header('Content-Length', mp3Data.length);
-    return reply.send(mp3Data);
+
+    // Stream the response back to the client
+    const contentType = ttsResponse.headers.get('content-type') || 'audio/mpeg';
+    const contentLength = ttsResponse.headers.get('content-length');
+
+    reply.raw.writeHead(200, {
+      'Content-Type': contentType,
+      ...(contentLength ? { 'Content-Length': contentLength } : {}),
+    });
+
+    const reader = ttsResponse.body?.getReader();
+    if (reader) {
+      const pump = async () => {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              reply.raw.end();
+              break;
+            }
+            reply.raw.write(value);
+          }
+        } catch (err) {
+          reply.raw.destroy(err as Error);
+        }
+      };
+      pump();
+    } else {
+      reply.raw.end();
+    }
+
+    return reply.hijack();
   });
 
   // ==================== POST Endpoints ====================
@@ -1050,13 +1075,23 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, result);
   });
 
-  // 35. POST /api/pregen-speech - 预生成语音（后台执行）
+  // 35. POST /api/pregen-speech - 预生成语音（转发到 tts-svc）
   app.post('/api/pregen-speech', async (request, reply) => {
-    const body = request.body as { texts: string[] };
-    if (body.texts && body.texts.length > 0) {
-      tts.pregenSpeech(body.texts);
+    const { texts } = request.body as { texts?: string[] };
+    if (!texts) {
+      return reply.status(400).send({ error: 'Missing texts' });
     }
-    return sendJson(reply, { ok: true });
+
+    // Fire-and-forget to tts-svc
+    fetch('http://127.0.0.1:8500/pregen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ texts }),
+    }).catch((err: Error) => {
+      console.error('Failed to forward pregen to tts-svc:', err);
+    });
+
+    return { ok: true };
   });
 
   // 36. POST /api/email/config - 保存邮箱配置
@@ -1517,14 +1552,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     });
   }
 
-  // 启动时后台预生成固定短语（不阻塞启动）
-  tts.pregenAllFixed().catch(() => { });
-
   // ==================== Graceful Shutdown ====================
 
   app.addHook('onClose', async (_instance) => {
     await db.close();
-    tts.stop();
   });
 
   return app;

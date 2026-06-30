@@ -757,18 +757,30 @@ describe('GET /api/speak', () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it('有 text 参数时返回 MP3 音频', async () => {
-    // Mock TTS to return empty buffer
-    const tts = (app as any).tts;
-    const originalSpeak = tts.speak.bind(tts);
-    tts.speak = vi.fn().mockResolvedValue(Buffer.from('fake-mp3'));
+  it('有 text 参数时转发到 tts-svc 并返回音频', async () => {
+    const originalFetch = globalThis.fetch;
+    // 模拟 tts-svc 返回 MP3 响应
+    const mockResponse = new Response(Buffer.from('fake-mp3'), {
+      status: 200,
+      headers: { 'content-type': 'audio/mpeg', 'content-length': '8' },
+    });
+    globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
 
     const res = await app.inject({ method: 'GET', url: '/api/speak?text=你好' });
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toBe('audio/mpeg');
 
-    // Restore
-    tts.speak = originalSpeak;
+    // 验证 fetch 调用了 tts-svc
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://127.0.0.1:8500/speak',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: '你好', timeout: 8, cache: true }),
+      }),
+    );
+
+    globalThis.fetch = originalFetch;
   });
 });
 

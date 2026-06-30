@@ -65,11 +65,11 @@ PapaCheck/
 │   │   ├── db/
 │   │   │   ├── index.ts       # pg（PostgreSQL 16）数据库层
 │   │   │   └── schema.ts      # 数据库模式定义（26 张表）
-│   │   ├── tts/index.ts       # Python 子进程 TTS 桥接
+│   │   ├── tts/               # （已删除，抽离为独立 tts-svc 服务）
 │   │   ├── auth/              # JWT 多租户认证
 │   │   └── sync/              # 离线同步（CRDT 操作日志）
 │   ├── scripts/
-│   │   ├── tts_bridge.py      # TTS Python 子进程脚本
+│   │   ├── tts_bridge.py      # （已删除，抽离为独立 tts-svc 服务）
 │   │   └── build-sea.mjs      # SEA 单 EXE 构建脚本
 │   ├── test/                  # Vitest 测试
 │   ├── package.json
@@ -179,7 +179,7 @@ PapaCheck/
 | 离线同步 | 增量同步 + CRDT 操作日志 | `crdt_operations` 表记录冲突，设备重连后自动合并 |
 | 多孩子隔离 | child_id 层 + 数据范围查询 | 同一租户下每个孩子可见性隔离 |
 | 接入码配对 | 一次性的 8 字符接入码 | 简化设备绑定流程，无账户注册 |
-| TTS | edge-tts（微软） | 免费高质量中文语音 |
+| TTS | tts-svc（Python FastAPI + edge-tts） | 独立服务，消费端无需 Python |
 | AI 解析 | LLM API（如 DeepSeek 等） | 任意支持中文的 LLM 均可，默认使用 DeepSeek |
 | 部署方式 | systemd + Nginx + PostgreSQL 直接部署 | Docker 已于 Phase 5b 退役，资源占用更低 |
 | 落地页图片资源 | `<picture>` + WebP 1x/2x + PNG 兜底 | 资源体积 -94%，LCP 图 preload + fetchpriority=high 抢首屏 |
