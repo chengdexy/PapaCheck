@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-06-25（文档对齐实际状态：清除已完成待办、消除已知问题、修复 Docker 残留与版本号不一致，643 测试通过）
+> 最后更新：2026-06-30（TTS 桥接抽离为独立 tts-svc 服务，608 测试通过）
 
 ## 当前版本
 
-**v1.4.2**（Android WebView 会话持久化修复，37 Flutter 测试 + 643 Vitest 测试 + 15 Release 测试通过）
+**v1.4.2**（Android WebView 会话持久化修复，37 Flutter 测试 + 608 Vitest 测试 + 15 Release 测试通过）
 
 ## 部署状态
 
@@ -46,7 +46,7 @@
 - [x] **多孩子支持（Phase 1+2）** — children 表 + 12 张表 child_id 列 + partial unique index，数据行级隔离
 - [x] **离线同步重构（Phase 0~4）** — CRDT 模型简化、SQLite 退役、Android 原生写队列
 - [x] **Phase 5d 运维增强**：PostgreSQL 自动备份（每日 03:00，保留 3 份）、健康监控（磁盘/PG/备份状态，每 5 分钟）、邮件告警（状态机去重，SMTP 配置面板）、超管面板系统健康页面
-- [x] TTS 语音提醒（edge-tts，常驻 Python 子进程）
+- [x] TTS 语音提醒（tts-svc 独立服务，Python FastAPI + edge-tts，[设计文档](../tts-svc/docs/2026-06-30-tts-svc-design.md)）
 - [x] 邮件同步（IMAP + AI 解析）
 - [x] 附件下载
 - [x] 离线支持（Service Worker + localforage）
@@ -91,6 +91,7 @@ _无未解决项。_
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-30 | **TTS 桥接抽离为独立 tts-svc 服务**：删除 `src/tts/index.ts`（TTSBridge 401 行）和 `scripts/tts_bridge.py`（Python 子进程桥接）。`/api/speak` 和 `/api/pregen-speech` 改为转发到 tts-svc（Python FastAPI + edge-tts，监听 127.0.0.1:8500）。移除了 `--tts-python` CLI 参数。全量 608 测试通过（-35 因 tts.test.ts 删除）。[设计文档](../tts-svc/docs/2026-06-30-tts-svc-design.md) |
 | 2026-06-25 | **文档对齐实际状态调研与修复**：① 清除"已知问题"两条已解决项（`/api/tasks/{date_key}` 预留路由已删除；`bounty_completions._total` 设计已重构为正常 date_key）；② 待开发功能中 iOS 端短期不规划，其余 5 项均已实际完成，分别补充完成证据；③ ARCHITECTURE.md 13 处 Docker 残留全部改为 systemd + Nginx；④ API.md 第十九节"预留接口"重命名为"辅助查询接口"并删除已不存在的 `/api/tasks/{date_key}`；⑤ CHANGELOG `[Unreleased]` 段转为 `[1.4.2] - 2026-06-25`；⑥ HANDOVER 版本号 v1.4.0→v1.4.2、APK 路径 1.4.0→1.4.2、勾选监控告警完成、调整异地备份与 FAQ 状态为"短期不规划"；⑦ README 路由 `/child` `/parent` → `/app/` `/app/admin/`；⑧ PRD 第五节"未来规划"清理已完成项，仅保留 iOS 端 + FAQ |
 | 2026-06-25 | **修复 XSS 漏洞 + setInterval 内存泄漏 + 空 catch 块**：big-screen.js 8 处 `hw.subject`/`hw.content` innerHTML 插入未转义（XSS 漏洞），全部包裹 `escapeHtml()`；admin.js `setInterval` 返回值未保存导致定时器泄漏，引入 `start/stopRefreshTimer()` + `beforeunload` 清理；api.js/app.js 6 处 `catch (e) {}` 添加 `console.warn` 日志。TDD 开发，新增 10 个测试（4 XSS + 4 定时器 + 2 空 catch），全量 643 测试通过 |
 | 2026-06-24 | **升级 using-superpowers skill 至 v6.0.3（obra/superpowers 官方）**：SKILL.md 全面重写为 action-oriented 语法，新增 "Never read skill files manually" 规则。新增 3 个参考文件（claude-code-tools/pi-tools/antigravity-tools），重写 copilot-tools/codex-tools 为 action-oriented 格式。统一 `debugging` 引用为 `systematic-debugging` |

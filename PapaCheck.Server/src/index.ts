@@ -3,17 +3,15 @@ import minimist from 'minimist';
 import { buildApp } from './app.js';
 
 const args = minimist(process.argv.slice(2), {
-  string: ['port', 'web-dir', 'tts-python'],
+  string: ['port', 'web-dir'],
   default: {
     port: '8080',
     'web-dir': resolve(process.cwd(), '..', 'PapaCheck.Web'),
-    'tts-python': 'python',
   },
 });
 
 const port = parseInt(args.port, 10);
 const webDir = resolve(process.cwd(), args['web-dir']);
-const ttsPython = args['tts-python'];
 
 let shuttingDown = false;
 const gracefulShutdown = (app: Awaited<ReturnType<typeof buildApp>>, signal: string) => {
@@ -40,12 +38,10 @@ async function main(): Promise<void> {
   const app = await buildApp({
     port,
     webDir,
-    ttsPython,
     enableAuth: true,
     rateLimit: false,
   });
 
-  // 替换已有的 SIGTERM/SIGINT 处理器（TTS bridge 有自注册的 process.exit(0) 处理器）
   process.removeAllListeners('SIGTERM');
   process.removeAllListeners('SIGINT');
   process.on('SIGTERM', () => gracefulShutdown(app, 'SIGTERM'));
@@ -58,7 +54,6 @@ async function main(): Promise<void> {
   console.log('╠══════════════════════════════════════════════╣');
   console.log(`║  Port:        ${String(port).padEnd(30)}║`);
   console.log(`║  Web Dir:     ${String(webDir).padEnd(30)}║`);
-  console.log(`║  TTS Python:  ${String(ttsPython).padEnd(30)}║`);
   console.log('╠══════════════════════════════════════════════╣');
   console.log('║  API:  http://localhost:' + String(port).padEnd(22) + '║');
   console.log('║  Docs: http://localhost:' + String(port) + '/docs        ║');
