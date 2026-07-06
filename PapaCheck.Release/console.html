@@ -25,6 +25,8 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
 .card button:disabled{opacity:.5;cursor:not-allowed}
 .bump-row{display:flex;gap:6px}
 .bump-row select,.bump-row button{width:auto}
+.publish-checkbox{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.publish-checkbox input{accent-color:var(--blue)}
 .bump-select{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;cursor:pointer;flex:1;min-width:0}
 .bump-select:focus{outline:none;border-color:var(--blue)}
 .btn-apk{background:var(--blue)}
@@ -85,6 +87,10 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
           <option value="minor">+ minor</option>
           <option value="major">+ major</option>
         </select>
+        <label class="publish-checkbox">
+          <input type="checkbox" id="publishCheck" checked>
+          构建后发布
+        </label>
         <button class="btn-apk" onclick="startRelease('build-apk')">构建</button>
       </div>
     </div>
@@ -264,9 +270,13 @@ function startRelease(type) {
   const opts = { method:'POST' };
   if (type === 'build-apk') {
     const bump = document.getElementById('bumpSelect').value;
-    if (bump) {
+    const publish = document.getElementById('publishCheck').checked;
+    const body = {};
+    if (bump) body.bump = bump;
+    if (publish) body.publish = true;
+    if (Object.keys(body).length) {
       opts.headers = { 'Content-Type': 'application/json' };
-      opts.body = JSON.stringify({ bump });
+      opts.body = JSON.stringify(body);
     }
   }
   fetch('/api/release/' + type, opts).catch(() => {
