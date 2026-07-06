@@ -71,13 +71,8 @@ export async function cloudPublish(executor: Executor): Promise<boolean> {
   if (apk) {
     steps.push({
       id: String(idx++), desc: `上传 APK 到 CloudBase (PapaCheck-${apk.version}.apk)`,
-      cmd: ['tcb', 'storage', 'objects', 'upload',
-        apk.path, `PapaCheck-${apk.version}.apk`,
-        '-b', 'dist',
-        '-e', CLOUDBASE_ENV,
-        '--content-type', 'application/vnd.android.package-archive',
-        '--use-put',
-        '--json'],
+      shell: true,
+      cmd: `tcb storage objects upload "${apk.path}" "PapaCheck-${apk.version}.apk" -b dist -e ${CLOUDBASE_ENV} --content-type "application/vnd.android.package-archive" --use-put --json`,
       timeout: 120,
     });
 
