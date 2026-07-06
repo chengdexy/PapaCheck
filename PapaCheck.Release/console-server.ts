@@ -64,7 +64,7 @@ export async function startServer(port = 3456) {
 
   app.post('/api/release/build-apk', async (request) => {
     const body = request.body as any || {};
-    buildApk(executor, { ver: body.ver, bump: body.bump, noBump: body.noBump }).catch((err) => {
+    buildApk(executor, { ver: body.ver, bump: body.bump, noBump: body.noBump, publish: body.publish }).catch((err) => {
       console.error(err);
     });
     return { ok: true, message: '构建已启动' };

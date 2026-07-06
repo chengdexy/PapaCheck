@@ -47,10 +47,11 @@ program
   .option('-v, --ver <ver>', '指定版本号 (X.Y.Z)')
   .option('--bump <level>', '递增版本号 (patch|minor|major)，默认不递增')
   .option('--no-bump', '不递增版本号')
+  .option('-p, --publish', '构建后自动上传到 CloudBase 并更新版本号')
   .action(async (options) => {
     const executor = new Executor();
     const success = await buildApk(executor, {
-      ver: options.ver, bump: options.bump, noBump: options.noBump,
+      ver: options.ver, bump: options.bump, noBump: options.noBump, publish: options.publish,
     });
     process.exit(success ? 0 : 1);
   });

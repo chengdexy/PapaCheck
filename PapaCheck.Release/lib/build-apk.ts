@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { Executor, type StepDef } from './executor.js';
@@ -9,6 +9,8 @@ const ANDROID_DIR = join(ROOT, 'PapaCheck.Android');
 const PUBSPEC = join(ANDROID_DIR, 'pubspec.yaml');
 const APK_BUILD_OUTPUT = join(ANDROID_DIR, 'build', 'app', 'outputs', 'flutter-apk', 'app-release.apk');
 const APK_ARCHIVE_DIR = join(ANDROID_DIR, 'apk');
+const SSH_OPTS = ['-o', 'StrictHostKeyChecking=accept-new'];
+const CLOUDBASE_ENV = 'child-teacher-parent-d9aef9d2208';
 
 const VERSION_RE = /^(\d+)\.(\d+)\.(\d+)$/;
 
@@ -54,7 +56,7 @@ function _updatePubspecVersion(newVer: string): void {
   writeFileSync(PUBSPEC, content);
 }
 
-export async function buildApk(executor: Executor, args: { ver?: string; bump?: string; noBump?: boolean } = {}): Promise<boolean> {
+export async function buildApk(executor: Executor, args: { ver?: string; bump?: string; noBump?: boolean; publish?: boolean } = {}): Promise<boolean> {
   const currentVer = readApkVersion();
   const newVer = resolveVersion(currentVer, args);
   const steps: StepDef[] = [];
@@ -85,6 +87,33 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
       id: String(idx++), desc: `归档 APK → PapaCheck-${newVer}.apk`,
       cmd: ['node', '-e', code], timeout: 10,
     });
+  }
+
+  // --publish：上传到 CloudBase 并更新 ECS 版本号
+  let remoteIp = '';
+  try {
+    const envFile = readFileSync(join(ROOT, 'PapaCheck.Release', '.env'), 'utf-8');
+    const ipMatch = envFile.match(/^PAPACHECK_CLOUD_IP=(.+)/m);
+    if (ipMatch) remoteIp = ipMatch[1].trim();
+  } catch {}
+  if (!remoteIp) remoteIp = process.env.PAPACHECK_CLOUD_IP || '';
+  if (args.publish && remoteIp) {
+    const apkPath = join(APK_ARCHIVE_DIR, `PapaCheck-${newVer}.apk`);
+    if (existsSync(apkPath)) {
+      steps.push({
+        id: String(idx++), desc: `上传 APK 到 CloudBase (PapaCheck-${newVer}.apk)`,
+        shell: true,
+        cmd: `tcb storage objects upload ${apkPath} PapaCheck-${newVer}.apk -b dist -e ${CLOUDBASE_ENV} --content-type application/vnd.android.package-archive --use-put --json`,
+        timeout: 120,
+      });
+
+      steps.push({
+        id: String(idx++), desc: `更新 ECS 环境变量 PAPACHECK_CLIENT_VERSION=${newVer}`,
+        cmd: ['ssh', ...SSH_OPTS, `root@${remoteIp}`,
+          `grep -q '^Environment=PAPACHECK_CLIENT_VERSION=' /etc/systemd/system/papacheck.service && sed -i "s/^Environment=PAPACHECK_CLIENT_VERSION=.*/Environment=PAPACHECK_CLIENT_VERSION='${newVer}'/" /etc/systemd/system/papacheck.service || sed -i "/^Environment=NODE_ENV=/a Environment=PAPACHECK_CLIENT_VERSION='${newVer}'" /etc/systemd/system/papacheck.service`],
+        timeout: 30,
+      });
+    }
   }
 
   return executor.runAndReport('构建 APK', steps);
