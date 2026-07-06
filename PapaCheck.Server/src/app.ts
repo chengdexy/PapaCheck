@@ -306,30 +306,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   // 2. GET /api/version - 客户端版本号
+  // 从环境变量 PAPACHECK_CLIENT_VERSION 读取，由发布流程在 CloudBase 上传后更新
   app.get('/api/version', { schema: versionSchema }, async (_request, reply) => {
-    let clientVersion = '1.0.0';
-    if (options.webDir) {
-      try {
-        const apkDir = join(options.webDir, 'apk');
-        const apkDirStat = await stat(apkDir);
-        if (!apkDirStat.isDirectory()) {
-          return sendJson(reply, { clientVersion });
-        }
-        const files = await readdir(apkDir);
-        const apkFiles = files
-          .filter(f => f.startsWith('PapaCheck-') && f.endsWith('.apk'))
-          .sort()
-          .reverse();
-        if (apkFiles.length > 0) {
-          const match = apkFiles[0].match(/PapaCheck-(.+)\.apk/);
-          if (match) {
-            clientVersion = match[1];
-          }
-        }
-      } catch (err) {
-        console.error('[/api/version 错误]', err);
-      }
-    }
+    const clientVersion = process.env.PAPACHECK_CLIENT_VERSION || '1.5.0';
     return sendJson(reply, { clientVersion });
   });
 
@@ -361,35 +340,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   // 2b. GET /api/download - 下载最新 APK
+  // 重定向到 CloudBase CDN（由 Nginx 代理到 CloudBase 云存储）
   app.get('/api/download', async (_request, reply) => {
-    if (!options.webDir) {
-      return reply.status(404).send({ error: 'APK not found', code: ErrorCodes.NOT_FOUND });
-    }
-    const apkDir = join(options.webDir, 'apk');
-    try {
-      const apkDirStat = await stat(apkDir);
-      if (!apkDirStat.isDirectory()) {
-        return reply.status(404).send({ error: 'APK not found', code: ErrorCodes.NOT_FOUND });
-      }
-      const files = await readdir(apkDir);
-      const apkFiles = files
-        .filter(f => f.startsWith('PapaCheck-') && f.endsWith('.apk'))
-        .sort()
-        .reverse();
-      if (apkFiles.length === 0) {
-        return reply.status(404).send({ error: 'APK not found', code: ErrorCodes.NOT_FOUND });
-      }
-      const apkName = apkFiles[0];
-      const apkPath = join(apkDir, apkName);
-      const apkStat = await stat(apkPath);
-      reply.header('Content-Type', 'application/vnd.android.package-archive');
-      reply.header('Content-Length', apkStat.size);
-      reply.header('Content-Disposition', `attachment; filename="${apkName}"`);
-      return reply.send(createReadStream(apkPath));
-    } catch (err) {
-      console.error('[/api/download 错误]', err);
-      return reply.status(404).send({ error: 'APK not found', code: ErrorCodes.NOT_FOUND });
-    }
+    const version = process.env.PAPACHECK_CLIENT_VERSION || '1.5.0';
+    return reply.redirect(302, `/download/PapaCheck-${version}.apk`);
   });
 
   // 3. GET /api/data - 完整数据

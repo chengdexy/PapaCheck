@@ -1,4 +1,4 @@
-import { join, dirname } from 'path';
+import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, readdirSync, unlinkSync } from 'fs';
 import { Executor, type StepDef } from './executor.js';
@@ -12,12 +12,33 @@ const APK_BUILD_OUTPUT = join(ANDROID_DIR, 'build', 'app', 'outputs', 'flutter-a
 
 const SSH_OPTS = ['-o', 'StrictHostKeyChecking=accept-new'];
 
+const CLOUDBASE_ENV = 'child-teacher-parent-d9aef9d2208';
+
 function requireEnv(): { ip: string; user: string } {
   const ip = process.env.PAPACHECK_CLOUD_IP;
   const user = process.env.PAPACHECK_SSH_USER;
   if (!ip) throw new Error('请设置环境变量 PAPACHECK_CLOUD_IP（服务器地址或域名）');
   if (!user) throw new Error('请设置环境变量 PAPACHECK_SSH_USER（SSH 登录用户名）');
   return { ip, user };
+}
+
+/** 从 apk 目录找到最新 APK，返回 { path, version } */
+function findLatestApk(): { path: string; version: string } | null {
+  let apkFile: string | null = null;
+  if (existsSync(APK_ARCHIVE_DIR)) {
+    const files = readdirSync(APK_ARCHIVE_DIR)
+      .filter(f => f.startsWith('PapaCheck-') && f.endsWith('.apk'))
+      .sort().reverse();
+    if (files.length > 0) apkFile = join(APK_ARCHIVE_DIR, files[0]);
+  }
+  if (!apkFile && existsSync(APK_BUILD_OUTPUT)) {
+    apkFile = APK_BUILD_OUTPUT;
+  }
+  if (!apkFile) return null;
+  const name = basename(apkFile);
+  const m = name.match(/PapaCheck-(.+)\.apk/);
+  const version = m ? m[1] : '0.0.0';
+  return { path: apkFile, version };
 }
 
 export async function cloudPublish(executor: Executor): Promise<boolean> {
@@ -45,6 +66,30 @@ export async function cloudPublish(executor: Executor): Promise<boolean> {
     cmd: 'npm run build', cwd: NODE_DIR, shell: true, timeout: 180,
   });
 
+  // 上传 APK 到 CloudBase 云存储
+  const apk = findLatestApk();
+  if (apk) {
+    steps.push({
+      id: String(idx++), desc: `上传 APK 到 CloudBase (PapaCheck-${apk.version}.apk)`,
+      cmd: ['tcb', 'storage', 'objects', 'upload',
+        apk.path, `PapaCheck-${apk.version}.apk`,
+        '-b', 'dist',
+        '-e', CLOUDBASE_ENV,
+        '--content-type', 'application/vnd.android.package-archive',
+        '--use-put',
+        '--json'],
+      timeout: 120,
+    });
+
+    // 更新 ECS 上的 PAPACHECK_CLIENT_VERSION 环境变量
+    steps.push({
+      id: String(idx++), desc: `更新 ECS 环境变量 PAPACHECK_CLIENT_VERSION=${apk.version}`,
+      cmd: ['ssh', ...SSH_OPTS, `${CLOUD_SERVER_USER}@${CLOUD_SERVER_IP}`,
+        `grep -q '^Environment=PAPACHECK_CLIENT_VERSION=' /etc/systemd/system/papacheck.service && sed -i 's/^Environment=PAPACHECK_CLIENT_VERSION=.*/Environment=PAPACHECK_CLIENT_VERSION=${apk.version}/' /etc/systemd/system/papacheck.service || sed -i '/^Environment=NODE_ENV=/a Environment=PAPACHECK_CLIENT_VERSION=${apk.version}' /etc/systemd/system/papacheck.service`],
+      timeout: 30,
+    });
+  }
+
   // 打包代码
   const tarExcludes = [
     '--exclude=node_modules', '--exclude=test',
@@ -62,27 +107,6 @@ export async function cloudPublish(executor: Executor): Promise<boolean> {
     cwd: ROOT, timeout: 120,
   });
 
-  // 可选：上传 APK
-  let apkFile: string | null = null;
-  if (existsSync(APK_ARCHIVE_DIR)) {
-    const files = readdirSync(APK_ARCHIVE_DIR)
-      .filter(f => f.startsWith('PapaCheck-') && f.endsWith('.apk'))
-      .sort().reverse();
-    if (files.length > 0) apkFile = join(APK_ARCHIVE_DIR, files[0]);
-  }
-  if (!apkFile && existsSync(APK_BUILD_OUTPUT)) {
-    apkFile = APK_BUILD_OUTPUT;
-  }
-
-  if (apkFile) {
-    const apkName = apkFile.split('\\').pop() || apkFile.split('/').pop() || 'unknown.apk';
-    steps.push({
-      id: String(idx++), desc: `上传 APK (${apkName})`,
-      cmd: ['scp', ...SSH_OPTS, apkFile, `${CLOUD_SERVER_USER}@${CLOUD_SERVER_IP}:/opt/papacheck/PapaCheck.Web/apk/`],
-      timeout: 120,
-    });
-  }
-
   // 上传代码到服务器
   steps.push({
     id: String(idx++), desc: '上传代码到服务器',
@@ -96,6 +120,7 @@ export async function cloudPublish(executor: Executor): Promise<boolean> {
     + 'rm -f .publish.tar.gz && '
     + 'cd /opt/papacheck/PapaCheck.Server && '
     + 'npm ci --omit=dev --ignore-scripts && '
+    + 'systemctl daemon-reload && '
     + 'systemctl restart papacheck';
   steps.push({
     id: String(idx++), desc: '远程安装依赖并重启',
