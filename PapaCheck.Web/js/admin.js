@@ -73,6 +73,46 @@ function getMissingDefaults(currentSubjects) {
   return SETTINGS_DEFAULTS.subjects.filter(d => !currentSubjects.some(s => s.id === d.id));
 }
 
+// ========== Modal State Manager ==========
+/** 统一的模态框状态管理器，消除 window._ 全局变量，集中管理所有模态框的临时状态 */
+const ModalState = {
+  _states: {},
+
+  /** 打开模态框并初始化状态 */
+  init(modalId, initialState) {
+    this._states[modalId] = initialState || {};
+  },
+
+  /** 获取模态框的完整状态 */
+  get(modalId) {
+    return this._states[modalId] || {};
+  },
+
+  /** 获取模态框的单个状态字段值 */
+  getField(modalId, field, defaultValue) {
+    const state = this._states[modalId];
+    if (!state) return defaultValue;
+    const val = state[field];
+    return val !== undefined && val !== null ? val : defaultValue;
+  },
+
+  /** 更新模态框的部分状态 */
+  set(modalId, updates) {
+    if (!this._states[modalId]) this._states[modalId] = {};
+    Object.assign(this._states[modalId], updates);
+  },
+
+  /** 关闭并清理模态框状态 */
+  clear(modalId) {
+    delete this._states[modalId];
+  },
+
+  /** 清理所有模态框状态 */
+  clearAll() {
+    this._states = {};
+  }
+};
+
 function showToast(msg) {
   const toast = document.getElementById('toast');
   toast.textContent = msg;
@@ -441,11 +481,11 @@ function openHwModal(mode, hwId) {
   `;
 
   document.getElementById('adminModal').classList.add('show');
-  window._adminSelectedSubject = hw?.subject || '语文';
+  ModalState.init('homework', { subject: hw?.subject || '语文' });
 }
 
 function selectAdminSubject(subject) {
-  window._adminSelectedSubject = subject;
+  ModalState.set('homework', { subject: subject });
   document.querySelectorAll('#adminSubjectSelector .subject-option').forEach(btn => {
     btn.classList.toggle('selected', btn.dataset.subject === subject);
   });
@@ -455,7 +495,7 @@ async function saveAdminHw() {
   const content = document.getElementById('adminHwContent').value.trim();
   if (!content) { showToast('请输入作业内容'); return; }
 
-  const subject = window._adminSelectedSubject || '语文';
+  const subject = ModalState.getField('homework', 'subject', '语文');
   const suggestedDuration = parseInt(document.getElementById('adminHwDuration').value) || 20;
   const basePoints = parseInt(document.getElementById('adminHwBasePoints').value) || 10;
 
@@ -740,13 +780,12 @@ function openShopModal(mode, itemId) {
     </div>
   `;
 
-  window._adminItemType = item?.type || 'time';
-  window._adminBuffUnit = item?.buffUnit || 'days';
+  ModalState.init('shop', { itemType: item?.type || 'time', buffUnit: item?.buffUnit || 'days' });
   document.getElementById('adminModal').classList.add('show');
 }
 
 function selectAdminItemType(type) {
-  window._adminItemType = type;
+  ModalState.set('shop', { itemType: type });
   document.querySelectorAll('#adminModalContent .mode-option').forEach(btn => {
     const isTime = btn.textContent.includes('⏱️');
     const isItem = btn.textContent.includes('🎁');
@@ -761,7 +800,7 @@ function selectAdminItemType(type) {
 }
 
 function selectAdminBuffUnit(unit) {
-  window._adminBuffUnit = unit;
+  ModalState.set('shop', { buffUnit: unit });
   document.querySelectorAll('#adminBuffUnitGroup .mode-option').forEach(btn => {
     const btnUnit = btn.textContent.includes('分钟') ? 'minutes' : 'days';
     btn.classList.toggle('selected', btnUnit === unit);
@@ -771,10 +810,10 @@ function selectAdminBuffUnit(unit) {
 async function saveShopItem() {
   const name = document.getElementById('adminItemName').value.trim();
   const points = parseInt(document.getElementById('adminItemPoints').value) || getSetting('shopDefaultPoints');
-  const type = window._adminItemType || 'time';
+  const type = ModalState.getField('shop', 'itemType', 'time');
   const durationMinutes = type === 'item' ? 0 : (parseInt(document.getElementById('adminItemDuration').value) || 30);
   const buffDuration = type === 'buff' ? (parseInt(document.getElementById('adminItemDuration').value) || 30) : 0;
-  const buffUnit = type === 'buff' ? (window._adminBuffUnit || 'days') : '';
+  const buffUnit = type === 'buff' ? (ModalState.getField('shop', 'buffUnit', 'days')) : '';
   const baseQuantity = parseInt(document.getElementById('adminItemBaseQty').value) || 3;
   if (!name) { showToast('请输入商品名称'); return; }
 
@@ -902,7 +941,7 @@ function openRewardBoxModal(mode, itemId) {
         <button class="btn-primary" onclick="saveRewardBoxItem()">保存</button>
       </div>
     `;
-    window._adminItemType = item.type;
+    ModalState.init('rewardBox', { itemType: item.type });
   } else {
     modal.innerHTML = `
       <h3>添加奖励 — 从积分商店选择</h3>
@@ -958,7 +997,7 @@ async function addRewardFromShop(name, type, durationMinutes) {
 }
 
 function selectRewardBoxType(type) {
-  window._adminItemType = type;
+  ModalState.set('rewardBox', { itemType: type });
   document.querySelectorAll('#adminModalContent .mode-option').forEach(btn => {
     const isTime = btn.textContent.includes('⏱️');
     const isItem = btn.textContent.includes('🎁');
@@ -969,7 +1008,7 @@ function selectRewardBoxType(type) {
 
 async function saveRewardBoxItem() {
   const name = document.getElementById('adminItemName').value.trim();
-  const type = window._adminItemType || 'time';
+  const type = ModalState.getField('rewardBox', 'itemType', 'time');
   const durationMinutes = type === 'time' ? (parseInt(document.getElementById('adminItemDuration').value) || 30) : 0;
   const quantity = parseInt(document.getElementById('adminItemQty').value) || 1;
   if (!name) { showToast('请输入奖励名称'); return; }
@@ -1134,13 +1173,13 @@ function openBountyModal(mode, itemId) {
     </div>
   `;
 
-  window._bountyType = item?.type || 'recurring';
+  ModalState.init('bounty', { bountyType: item?.type || 'recurring' });
 
   document.getElementById('adminModal').classList.add('show');
 }
 
 function selectBountyType(type) {
-  window._bountyType = type;
+  ModalState.set('bounty', { bountyType: type });
   document.querySelectorAll('#adminBountyTypeSelector .mode-option').forEach(btn => {
     btn.classList.toggle('selected', btn.dataset.type === type);
   });
@@ -1149,7 +1188,7 @@ function selectBountyType(type) {
 async function saveBountyTask() {
   const name = document.getElementById('adminBountyName').value.trim();
   const points = parseInt(document.getElementById('adminBountyPoints').value) || 5;
-  const type = window._bountyType || 'recurring';
+  const type = ModalState.getField('bounty', 'bountyType', 'recurring');
   if (!name) { showToast('请输入任务名称'); return; }
 
   if (adminEditingId) {
@@ -2390,6 +2429,7 @@ async function confirmAdjustPoints() {
 function closeAdminModal() {
   document.getElementById('adminModal').classList.remove('show');
   adminEditingId = null;
+  ModalState.clearAll();
 }
 
 function switchChild() {
