@@ -110,8 +110,8 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
       steps.push({
         id: String(idx++), desc: `更新 ECS 环境变量 PAPACHECK_CLIENT_VERSION=${newVer}`,
         cmd: ['ssh', ...SSH_OPTS, `root@${remoteIp}`,
-          `grep -q '^Environment=PAPACHECK_CLIENT_VERSION=' /etc/systemd/system/papacheck.service && sed -i "s/^Environment=PAPACHECK_CLIENT_VERSION=.*/Environment=PAPACHECK_CLIENT_VERSION='${newVer}'/" /etc/systemd/system/papacheck.service || sed -i "/^Environment=NODE_ENV=/a Environment=PAPACHECK_CLIENT_VERSION='${newVer}'" /etc/systemd/system/papacheck.service`],
-        timeout: 30,
+          `grep -q '^Environment=PAPACHECK_CLIENT_VERSION=' /etc/systemd/system/papacheck.service && sed -i "s/^Environment=PAPACHECK_CLIENT_VERSION=.*/Environment=PAPACHECK_CLIENT_VERSION='${newVer}'/" /etc/systemd/system/papacheck.service || sed -i "/^Environment=NODE_ENV=/a Environment=PAPACHECK_CLIENT_VERSION='${newVer}'" /etc/systemd/system/papacheck.service && systemctl daemon-reload && systemctl restart papacheck`],
+        timeout: 60,
       });
     }
   }
