@@ -85,7 +85,7 @@ export async function cloudPublish(executor: Executor): Promise<boolean> {
     steps.push({
       id: String(idx++), desc: `更新 ECS 环境变量 PAPACHECK_CLIENT_VERSION=${apk.version}`,
       cmd: ['ssh', ...SSH_OPTS, `${CLOUD_SERVER_USER}@${CLOUD_SERVER_IP}`,
-        `grep -q '^Environment=PAPACHECK_CLIENT_VERSION=' /etc/systemd/system/papacheck.service && sed -i 's/^Environment=PAPACHECK_CLIENT_VERSION=.*/Environment=PAPACHECK_CLIENT_VERSION=${apk.version}/' /etc/systemd/system/papacheck.service || sed -i '/^Environment=NODE_ENV=/a Environment=PAPACHECK_CLIENT_VERSION=${apk.version}' /etc/systemd/system/papacheck.service`],
+        `grep -q '^Environment=PAPACHECK_CLIENT_VERSION=' /etc/systemd/system/papacheck.service && sed -i 's/^Environment=PAPACHECK_CLIENT_VERSION=.*/Environment=PAPACHECK_CLIENT_VERSION='\\''${apk.version}'\\''/' /etc/systemd/system/papacheck.service || sed -i '/^Environment=NODE_ENV=/a Environment=PAPACHECK_CLIENT_VERSION='\\''${apk.version}'\\''' /etc/systemd/system/papacheck.service`],
       timeout: 30,
     });
   }
