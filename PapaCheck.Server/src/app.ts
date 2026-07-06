@@ -340,10 +340,11 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   // 2b. GET /api/download - 下载最新 APK
-  // 重定向到 CloudBase CDN（由 Nginx 代理到 CloudBase 云存储）
+  // 直接重定向到 CloudBase CDN（绕过 ECS 代理，速度不受 ECS 3M 带宽限制）
   app.get('/api/download', async (_request, reply) => {
     const version = process.env.PAPACHECK_CLIENT_VERSION || '1.5.0';
-    return reply.redirect(302, `/download/PapaCheck-${version}.apk`);
+    return reply.redirect(302,
+      `https://6368-child-teacher-parent-d9aef9d2208-1253991009.tcb.qcloud.la/dist/PapaCheck-${version}.apk`);
   });
 
   // 3. GET /api/data - 完整数据
