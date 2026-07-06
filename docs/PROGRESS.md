@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-07-06（APK 发布迁移到 CloudBase 云存储，609 测试通过）
+> 最后更新：2026-07-06（build-apk --publish 一键构建发布，609 测试通过）
 
 ## 当前版本
 
-**v1.5.0**（APK 发布迁移到 CloudBase 云存储，37 Flutter 测试 + 609 Vitest 测试 + 15 Release 测试通过）
+**v1.5.2**（build-apk --publish 一键构建发布，37 Flutter 测试 + 609 Vitest 测试 + 15 Release 测试通过）
 
 ## 部署状态
 
@@ -12,6 +12,7 @@
 - [x] **Phase 5c 完成** — JWT 多租户认证系统，官网管理面板，超级管理员
 - [x] **Phase 5d 完成** — PostgreSQL 自动备份 + 健康监控 + 邮件告警
 - [x] **APK 发布迁移到 CloudBase** — 从 ECS 本地 `apk/` 目录切换到腾讯云 CloudBase PG 存储，`/api/download` 重定向到 CloudBase CDN
+- [x] **build-apk --publish 一键构建发布** — `build-apk` 支持 `--publish` 参数，构建后自动上传 CloudBase + 更新 ECS 版本号 + 重启服务
 
 ---
 
@@ -92,6 +93,7 @@ _无未解决项。_
 
 | 日期 | 变更 |
 |------|------|
+| 2026-07-06 | **build-apk --publish 一键构建发布**：新增 `-p/--publish` 参数，构建后自动上传 CloudBase + 更新 ECS 版本号 + 重启服务。控制台前端添加「构建后发布」复选框。`/api/download` 改为直连 CloudBase CDN 绕过 ECS 带宽限制。v1.5.2 |
 | 2026-07-06 | **APK 发布迁移到腾讯云 CloudBase**：APK 上传不再使用 SCP 到 ECS 本地，改为上传到 CloudBase PG 存储 `dist` 桶。`/api/download` 改为 302 重定向到 CloudBase CDN，`/api/version` 改为从环境变量 `PAPACHECK_CLIENT_VERSION` 读取。`cloud-publish.ts` 新增 CloudBase 上传 + ECS 环境变量更新步骤。Nginx 新增 `/download/` 位置代理到 CloudBase CDN。版本号 v1.4.2→v1.5.0。609 测试通过 |
 | 2026-06-30 | **TTS 桥接抽离为独立 tts-svc 服务**：删除 `src/tts/index.ts`（TTSBridge 401 行）和 `scripts/tts_bridge.py`（Python 子进程桥接）。`/api/speak` 和 `/api/pregen-speech` 改为转发到 tts-svc（Python FastAPI + edge-tts，监听 127.0.0.1:8500）。移除了 `--tts-python` CLI 参数。全量 608 测试通过（-35 因 tts.test.ts 删除）。[设计文档](../tts-svc/docs/2026-06-30-tts-svc-design.md) |
 | 2026-06-25 | **文档对齐实际状态调研与修复**：① 清除"已知问题"两条已解决项（`/api/tasks/{date_key}` 预留路由已删除；`bounty_completions._total` 设计已重构为正常 date_key）；② 待开发功能中 iOS 端短期不规划，其余 5 项均已实际完成，分别补充完成证据；③ ARCHITECTURE.md 13 处 Docker 残留全部改为 systemd + Nginx；④ API.md 第十九节"预留接口"重命名为"辅助查询接口"并删除已不存在的 `/api/tasks/{date_key}`；⑤ CHANGELOG `[Unreleased]` 段转为 `[1.4.2] - 2026-06-25`；⑥ HANDOVER 版本号 v1.4.0→v1.4.2、APK 路径 1.4.0→1.4.2、勾选监控告警完成、调整异地备份与 FAQ 状态为"短期不规划"；⑦ README 路由 `/child` `/parent` → `/app/` `/app/admin/`；⑧ PRD 第五节"未来规划"清理已完成项，仅保留 iOS 端 + FAQ |

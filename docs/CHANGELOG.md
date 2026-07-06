@@ -9,6 +9,9 @@
 ### Changed
 - **TTS 桥接抽离为独立服务 tts-svc**：删除 `src/tts/index.ts`（TTSBridge 401 行）和 `scripts/tts_bridge.py`（Python 子进程桥接）。`/api/speak` 和 `/api/pregen-speech` 端点改为转发到独立的 tts-svc（Python FastAPI + edge-tts），监听 127.0.0.1:8500。前端无感知。移除了 `--tts-python` CLI 参数。详见 [tts-svc 设计文档](../tts-svc/docs/2026-06-30-tts-svc-design.md)
 - **APK 发布迁移到腾讯云 CloudBase 云存储**：`/api/download` 改为 302 重定向到 CloudBase CDN，`/api/version` 改为从环境变量 `PAPACHECK_CLIENT_VERSION` 读取。`cloud-publish.ts` 改为上传 APK 到 CloudBase PG 存储 `dist` 桶，并自动更新 ECS 上的版本号环境变量。Nginx 新增 `/download/` 位置代理到 CloudBase CDN。落地页下载链接保持 `/api/download` 动态跳转
+- **`build-apk --publish` 一键构建+发布**：新增 `-p/--publish` 参数，构建完成后自动将 APK 上传到 CloudBase + 更新 ECS 版本号环境变量 + 重启服务。控制台前端添加「构建后发布」复选框（默认勾选）
+- **`/api/download` 直连 CloudBase CDN**：重定向目标从相对路径 `/download/...`（经 ECS 代理）改为直接指向 CloudBase CDN URL，绕过 ECS 3M 带宽限制
+- **构建 APK 流程同步更新版本号**：`build-apk --publish` 执行后自动执行 `systemctl daemon-reload && systemctl restart papacheck`，确保 `/api/version` 立即返回新版本号
 
 ## [1.4.2] - 2026-06-25
 
