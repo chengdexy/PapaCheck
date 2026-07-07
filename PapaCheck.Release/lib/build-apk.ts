@@ -118,41 +118,28 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
     }
   }
 
-  // --publishOnBuild：构建后上传云存储 + 更新云函数环境变量
+  // --publishOnBuild：构建后上传云存储（版本号已硬编码在云函数代码中，重新部署即可生效）
   if (args.publishOnBuild) {
     const apkPath = join(APK_ARCHIVE_DIR, `PapaCheck-${newVer}.apk`);
-    const cdnUrl = `${CDN_BASE_URL}/dist/PapaCheck-${newVer}.apk`;
     steps.push({
       id: String(idx++), desc: `上传 APK 到 CloudBase 云存储 (PapaCheck-${newVer}.apk)`,
       shell: true,
-      // cloudPath 不带 dist/ 前缀，tcb CLI 自动加 bucket 前缀
       cmd: `tcb storage objects upload ${apkPath} PapaCheck-${newVer}.apk --bucket dist --env-id ${CLOUDBASE_ENV} --upsert`,
       timeout: 120,
     });
-    const rcDir = join(tmpdir(), `papacheck-rc-${newVer}`);
-    mkdirSync(rcDir, { recursive: true });
-    const rcFile = join(rcDir, 'cloudbaserc.json');
-    const rcContent = JSON.stringify({
-      envId: CLOUDBASE_ENV,
-      version: '2.0',
-      functions: [{
-        name: 'papacheck-api',
-        config: {
-          envVariables: {
-            APK_VERSION: newVer,
-            APK_CDN_URL: cdnUrl,
-          },
-        },
-      }],
-    }, null, 2);
-    writeFileSync(rcFile, rcContent, 'utf-8');
-    steps.push({
-      id: String(idx++), desc: `更新云函数环境变量 APK_VERSION=${newVer}`,
-      shell: true,
-      cwd: rcDir,
-      cmd: `tcb config update fn papacheck-api --env-id ${CLOUDBASE_ENV} --json`,
-      timeout: 60,
-    });
+    // 同步云函数 package.json 版本号（下次部署云函数时生效）
+    const cfPkgPath = join(ROOT, 'PapaCheck.CloudFunc', 'papacheck-api', 'package.json');
+    if (existsSync(cfPkgPath)) {
+      const cfPkg = JSON.parse(readFileSync(cfPkgPath, 'utf-8'));
+      cfPkg.version = newVer;
+      writeFileSync(cfPkgPath, JSON.stringify(cfPkg, null, 2) + '\n', 'utf-8');
+      steps.push({
+        id: String(idx++), desc: `同步云函数 package.json 版本号 → ${newVer}`,
+        shell: true,
+        cmd: `echo 版号 ${newVer} 已写入 package.json，下次部署云函数时生效`,
+        timeout: 5,
+      });
+    }
   }
 
   return executor.runAndReport('构建 APK', steps);

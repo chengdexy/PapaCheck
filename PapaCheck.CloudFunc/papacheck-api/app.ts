@@ -8,6 +8,18 @@ import { authRoutes } from './src/auth/routes.js';
 import { adminRoutes } from './src/admin/routes.js';
 import { superAdminRoutes } from './src/auth/super-admin-routes.js';
 import rateLimit from '@fastify/rate-limit';
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+// 版本号从 package.json 读取（每次部署随代码更新，无需环境变量）
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PKG = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf-8'));
+const CLIENT_VERSION = PKG.version || '1.5.2';
+
+// CDN 基础地址固定
+const CDN_BASE = 'https://6368-child-teacher-parent-d9aef9d2208-1253991009.tcb.qcloud.la';
 
 export interface AppOptions {
   /** 启用 JWT Bearer 认证（生产环境设为 true） */
@@ -189,16 +201,14 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { ok: true, serverTime: new Date().toISOString() });
   });
 
-  // 2. GET /api/version - 客户端版本号
+  // 2. GET /api/version - 客户端版本号（从 package.json 读取）
   app.get('/api/version', { schema: versionSchema }, async (_request, reply) => {
-    return sendJson(reply, { clientVersion: process.env.APK_VERSION || '1.5.2' });
+    return sendJson(reply, { clientVersion: CLIENT_VERSION });
   });
 
   // 2b. GET /api/download - 下载最新 APK（重定向到 CloudBase CDN）
   app.get('/api/download', async (_request, reply) => {
-    const version = process.env.APK_VERSION || '1.5.2';
-    const cdnUrl = process.env.APK_CDN_URL
-      || `https://6368-child-teacher-parent-d9aef9d2208-1253991009.tcb.qcloud.la/dist/PapaCheck-${version}.apk`;
+    const cdnUrl = `${CDN_BASE}/dist/PapaCheck-${CLIENT_VERSION}.apk`;
     reply.redirect(302, cdnUrl);
   });
 
