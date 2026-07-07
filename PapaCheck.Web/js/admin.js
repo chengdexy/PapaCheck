@@ -2407,7 +2407,7 @@ function switchChild() {
     sessionStorage.removeItem('papacheck_token');
     sessionStorage.removeItem('papacheck_role');
     sessionStorage.removeItem('papacheck_child_name');
-    window.location.href = '/login.html';
+    window.location.href = '/papacheck/app/login.html';
   }
 }
 

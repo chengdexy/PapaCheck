@@ -214,7 +214,7 @@ async function exchange(code, role) {
           }));
         }
       } catch (_) {}
-      window.location.href = d.role === 'parent' ? '/papacheck/admin.html' : '/papacheck/app/';
+      window.location.href = d.role === 'parent' ? '/papacheck/app/admin.html' : '/papacheck/app/';
     } else {
       var err = await resp.json().catch(function () { return {}; });
       showError(err.error || '登录失败，请检查访问码');

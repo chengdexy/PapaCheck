@@ -292,7 +292,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
       if (childName.isNotEmpty) 'childName': childName,
       'target': targetUrl,
     };
-    final restoreUri = Uri.parse('$baseUrl/restore-session.html').replace(queryParameters: queryParams);
+    final restoreUri = Uri.parse('$baseUrl/papacheck/app/restore-session.html').replace(queryParameters: queryParams);
 
     await _controller!.loadRequest(restoreUri);
   }

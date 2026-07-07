@@ -277,6 +277,23 @@ curl -sI https://papacheck.chengdexy.cn/assets/main-C5smNfJo.js | grep -i cache-
 
 ## CloudBase 迁移切换与回滚
 
+### 坑：CloudBase 网关路由 STATIC_STORE 类型无法通过 MCP 工具管理
+
+`manageGateway` MCP 工具的 `createRoute`/`updateRoute` 存在 bug：无论传入 `serviceType: "STATIC_STORE"`，创建的路由始终被转换为 `CBR` 类型，导致静态托管子路径无法正确转发。
+
+**症状**：
+- 通过网关访问 `/papacheck/app/admin.html` 等 HTML 文件时，始终返回 login 页内容（CSS/JS 文件正常）
+- `SERVICE_VERSION_NOT_FOUND` 错误（因为 CBR 类型指向错误的 upstream）
+
+**解决方案**（手动，通过 CloudBase 控制台）：
+1. 登录 [CloudBase 控制台](https://tcb.cloud.tencent.com) → 环境 `child-teacher-parent` → HTTP 访问 → 路由管理
+2. 找到 `/papacheck` 路由（如不存在则新建）
+3. 设置 `UpstreamResourceType = "STATIC_STORE"`，`UpstreamResourceName = "staticstore"`，`enablePathTransmission = true`
+4. 设置 PathRewrite `Prefix = "/papacheck"`
+5. 保存生效
+
+详情见 [CloudBase CLI 路由管理文档](https://docs.cloudbase.net/cli-v1/routes)。
+
 ### 切换流程（网关路由配置）
 
 1. 全量测试通过（npx vitest run，覆盖率达标）
