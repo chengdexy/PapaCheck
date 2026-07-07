@@ -93,6 +93,7 @@ htmlcov/
 
 # 运行时数据（JWT 密钥、管理员凭据等）
 PapaCheck.Server/data/
+PapaCheck.CloudFunc/papacheck-api/data/
 
 # Release 控制台保存的日志
 PapaCheck.Release/log/
