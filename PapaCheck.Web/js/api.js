@@ -40,7 +40,7 @@ async function _fetch(url, options) {
   var resp = await fetch(url, fetchOptions);
   // 未认证，跳转到登录页
   if (resp.status === 401) {
-    window.location.href = '/login.html?redirect=' + encodeURIComponent(window.location.pathname);
+    window.location.href = '/papacheck/app/login.html?redirect=' + encodeURIComponent(window.location.pathname);
     throw new Error('unauthorized');
   }
   if (!resp.ok) throw new Error(resp.statusText);

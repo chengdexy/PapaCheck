@@ -191,7 +191,7 @@ async function exchange(code, role) {
     return;
   }
   try {
-    var resp = await fetch('/api/auth/exchange', {
+    var resp = await fetch('/papacheck/api/auth/exchange', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ access_code: code.trim(), role: role }),
@@ -214,7 +214,7 @@ async function exchange(code, role) {
           }));
         }
       } catch (_) {}
-      window.location.href = d.role === 'parent' ? '/admin.html' : '/app/';
+      window.location.href = d.role === 'parent' ? '/papacheck/app/admin.html' : '/papacheck/app/';
     } else {
       var err = await resp.json().catch(function () { return {}; });
       showError(err.error || '登录失败，请检查访问码');
@@ -231,7 +231,7 @@ async function exchange(code, role) {
     var existing = sessionStorage.getItem('papacheck_token');
     var role = sessionStorage.getItem('papacheck_role');
     if (existing && role) {
-      window.location.href = role === 'parent' ? '/admin.html' : '/app/';
+      window.location.href = role === 'parent' ? '/papacheck/app/admin.html' : '/papacheck/app/';
       return;
     }
   } catch (e) {}
