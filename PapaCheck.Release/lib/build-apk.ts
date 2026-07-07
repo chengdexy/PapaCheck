@@ -141,11 +141,29 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
         cwd: cfDir,
         timeout: 30,
       });
+      // 生成 cloudbaserc.json（包含完整环境变量，避免 tcb fn deploy 清空已有变量）
+      const cfDist = join(cfDir, 'dist');
+      writeFileSync(join(cfDist, 'cloudbaserc.json'), JSON.stringify({
+        version: '2.0',
+        functions: [{
+          name: 'papacheck-api',
+          config: {
+            timeout: 30,
+            runtime: 'Nodejs18.15',
+            envVariables: {
+              DATABASE_URL: 'postgresql://chengdexy:XY%40dly%26xjy1314@172.17.0.8:5432/postgres',
+              ENCRYPTION_KEY: '',
+              JWT_EXPIRES_IN: '30d',
+              JWT_SECRET: 'd6f21d968b5c7315c21c2f4ff0deac260103ef09f21332d9dfafc3d342e553a5',
+            },
+          },
+        }],
+      }, null, 2), 'utf-8');
       steps.push({
         id: String(idx++), desc: `部署云函数 ${newVer}`,
         shell: true,
         cmd: `tcb fn deploy papacheck-api --env-id ${CLOUDBASE_ENV} --force --yes`,
-        cwd: join(cfDir, 'dist'),
+        cwd: cfDist,
         timeout: 60,
       });
     }
