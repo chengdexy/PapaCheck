@@ -28,15 +28,14 @@ describe('云函数部署', () => {
     );
   });
 
-  it('updateFunctionEnv 调用 tcb fn deploy --config-file', async () => {
+  it('updateFunctionEnv 调用 tcb config update fn', async () => {
     await updateFunctionEnv('papacheck-api', { APK_VERSION: '1.6.0' }, {
       envId: 'child-teacher-parent-d9aef9d2208',
     });
     const { execFile } = await import('child_process');
-    // 验证被调用（含 cwd option 时为 4 参数）
     expect(execFile).toHaveBeenCalled();
     const call = (execFile as any).mock.calls[0];
     expect(call[0]).toBe('tcb');
-    expect(call[1]).toEqual(expect.arrayContaining(['fn', 'deploy', 'papacheck-api', '--config-file']));
+    expect(call[1]).toEqual(expect.arrayContaining(['config', 'update', 'fn', 'papacheck-api']));
   });
 });
