@@ -9,7 +9,7 @@ import { uploadApk } from '../lib/storage-upload.js';
 describe('storage-upload', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('uploadApk 调用 tcb storage upload', async () => {
+  it('uploadApk 调用 tcb storage objects upload', async () => {
     await uploadApk({
       envId: 'test-env',
       localPath: '/tmp/PapaCheck-1.5.4.apk',
@@ -18,7 +18,7 @@ describe('storage-upload', () => {
     const { execFile } = await import('child_process');
     expect(execFile).toHaveBeenCalledWith(
       'tcb',
-      expect.arrayContaining(['storage', 'upload']),
+      expect.arrayContaining(['storage', 'objects', 'upload']),
       expect.any(Function)
     );
   });
