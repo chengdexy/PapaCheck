@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
+import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
 import { Executor, type StepDef } from './executor.js';
 import { CDN_BASE_URL } from './storage-upload.js';
@@ -128,11 +129,25 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
       cmd: `tcb storage objects upload ${apkPath} PapaCheck-${newVer}.apk --bucket dist --env-id ${CLOUDBASE_ENV}`,
       timeout: 120,
     });
+    const rcFile = join(tmpdir(), `papacheck-rc-${newVer}.json`);
+    const rcContent = JSON.stringify({
+      envId: CLOUDBASE_ENV,
+      version: '2.0',
+      functions: [{
+        name: 'papacheck-api',
+        config: {
+          envVariables: {
+            APK_VERSION: newVer,
+            APK_CDN_URL: cdnUrl,
+          },
+        },
+      }],
+    }, null, 2);
+    writeFileSync(rcFile, rcContent, 'utf-8');
     steps.push({
       id: String(idx++), desc: `更新云函数环境变量 APK_VERSION=${newVer}`,
       shell: true,
-      // 通过临时 cloudbaserc.json + tcb fn deploy 更新环境变量
-      cmd: `node -e "const{writeFileSync,unlinkSync}=require('fs');const{join}=require('path');const{tmpdir}=require('os');const c=join(tmpdir(),'rc'+Date.now()+'.json');writeFileSync(c,JSON.stringify({envId:'${CLOUDBASE_ENV}',version:'2.0',functions:[{name:'papacheck-api',config:{envVariables:{APK_VERSION:'${newVer}',APK_CDN_URL:'${cdnUrl}'}}}]}));const{execSync}=require('child_process');try{execSync('tcb fn deploy papacheck-api --env-id ${CLOUDBASE_ENV} --force --yes --config-file '+c,{stdio:'pipe'})}finally{try{unlinkSync(c)}catch{}}"`,
+      cmd: `tcb fn deploy papacheck-api --env-id ${CLOUDBASE_ENV} --force --yes --config-file "${rcFile}" && del /f "${rcFile}"`,
       timeout: 60,
     });
   }
