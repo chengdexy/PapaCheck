@@ -216,7 +216,7 @@ async function initAdmin() {
       realtime.callbacks.onFreeTimeTasksChange = onAnyChange;
       realtime.callbacks.onEfficiencyHistoryChange = onAnyChange;
 
-      await realtime.start(token, cachedData.tenant_id, cachedData.child_id);
+      await realtime.start(cachedData.tenant_id, cachedData.child_id);
       window._realtimeManager = realtime;
     }
   } catch (e) {

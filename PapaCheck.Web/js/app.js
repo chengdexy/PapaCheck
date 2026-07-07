@@ -971,7 +971,7 @@ async function init() {
       refreshFromServer();
     };
 
-    await realtime.start(token, cachedData.tenant_id, cachedData.child_id);
+    await realtime.start(cachedData.tenant_id, cachedData.child_id);
     window._realtimeManager = realtime;
   } catch (e) {
     console.warn('[Init] RealtimeManager 启动失败，回退到手动刷新:', e);

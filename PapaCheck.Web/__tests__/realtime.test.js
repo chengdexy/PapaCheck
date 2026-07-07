@@ -17,7 +17,7 @@ describe('RealtimeManager', () => {
     const callback = vi.fn();
     realtime.callbacks.onHomeworksChange = callback;
 
-    await realtime.start('fake-token', 'tenant-1', 'child-1');
+    await realtime.start('tenant-1', 'child-1');
 
     // start 时立即触发一次回调
     expect(callback).toHaveBeenCalledTimes(1);
@@ -34,7 +34,7 @@ describe('RealtimeManager', () => {
     const callback = vi.fn();
     realtime.callbacks.onHomeworksChange = callback;
 
-    await realtime.start('fake-token', 'tenant-1', 'child-1');
+    await realtime.start('tenant-1', 'child-1');
     expect(callback).toHaveBeenCalledTimes(1);
 
     realtime.stop();
@@ -50,7 +50,7 @@ describe('RealtimeManager', () => {
     realtime.callbacks.onHomeworksChange = errorCb;
     realtime.callbacks.onSettlementChange = normalCb;
 
-    await realtime.start('fake-token', 'tenant-1', null);
+    await realtime.start('tenant-1', null);
     expect(normalCb).toHaveBeenCalledTimes(1);
     expect(errorCb).toHaveBeenCalledTimes(1);
   });

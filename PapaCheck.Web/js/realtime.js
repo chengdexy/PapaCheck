@@ -1,4 +1,4 @@
-﻿/**
+/**
  * realtime.js - 实时数据同步模块
  * 使用轮询方式获取数据更新，替代 CloudBase watch()
  */
@@ -26,7 +26,7 @@ export class RealtimeManager {
     };
   }
 
-  async start(jwtToken, tenantId, childId) {
+  async start(tenantId, childId) {
     sessionStorage.setItem('papacheck_tenant_id', tenantId);
     if (childId) {
       sessionStorage.setItem('papacheck_child_id', childId);
