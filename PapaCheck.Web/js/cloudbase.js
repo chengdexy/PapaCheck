@@ -8,17 +8,17 @@ let authInstance = null;
 export function initCloudBase() {
   if (!appInstance) {
     appInstance = cloudbase.init({ env: ENV_ID });
-    dbInstance = appInstance.rdb();
+    dbInstance = appInstance.database();
     authInstance = appInstance.auth({ persistence: 'session' });
   }
   return appInstance;
 }
 
-export async function signInWithJwt(jwtToken) {
+export async function signInAnonymously() {
   if (!authInstance) {
     initCloudBase();
   }
-  await authInstance.signInWithJwt(jwtToken);
+  await authInstance.signInAnonymously();
 }
 
 export function getDb() {

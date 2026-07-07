@@ -6,24 +6,16 @@
 
 ## [Unreleased]
 
-### Added
-- 迁移到腾讯云 CloudBase（云函数 + PG + 静态托管 + 网关）
-- 前端实时数据同步（CloudBase PG 实时监听，替代 5s 轮询）
-- RLS 行级安全策略（14 张业务表 tenant/child 隔离）
-- Release 控制台新增 `fn` 和 `all` 子命令（tcb CLI 部署）
-
 ### Changed
-- API 路径前缀从 `/api/*` 改为 `/papacheck/api/*`
-- 前端路径前缀从 `/app/` 改为 `/papacheck/app/`
-- Android 默认地址改为 `chengdexy.cn/papacheck/app/`
-- 部署方式从 ECS + systemd + Nginx 改为 CloudBase
+- **RealtimeManager 从 CloudBase watch() 改为轮询**：`@cloudbase/js-sdk` v3 的数据库 API（`rdb()`→`database()`、`table()`→`collection()`、`signInWithJwt()`→`signInAnonymously()`）存在多处不兼容，改为每 30 秒轮询触发回调消费端刷新数据，不再依赖 CloudBase SDK 运行时
+
+### Fixed
+- **修复 RealtimeManager 启动失败：`@cloudbase/js-sdk` 裸模块标识符无法解析**：在 `admin.html`/`index.html` 中添加 `importmap`，将 `@cloudbase/js-sdk` 映射到 esm.sh CDN
+- **修复 favicon 404**：`admin.html` favicon 路径从 `/favicon.png` 改为 `/papacheck/app/favicon.png`
+- **修复 site-publish.ts tcb CLI 参数兼容性**：`--path` 改为位置参数，`--envId` 改为 `--env-id`
 
 ### Removed
-- 离线模式（Service Worker / localforage / CRDT / Android 写队列）
-- 邮件同步功能（IMAP + AI 解析 + 附件下载）
-- 运维调度器（OpsScheduler / 备份 / 监控 / 告警）
-- Swagger API 文档
-- ECS 服务器（阿里云释放，切换后 1 周）
+- 移除 RealtimeManager 对 CloudBase SDK 的运行时依赖（cloudbase.js 中的 signInAnonymously/getDb 仍保留但不再被 realtime.js 引用）
 
 ## [1.4.2] - 2026-06-25
 

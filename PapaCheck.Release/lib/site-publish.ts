@@ -12,14 +12,14 @@ export async function publishSite(): Promise<void> {
   const siteDir = join(ROOT, 'PapaCheck.Site');
   await execFileAsync('npm', ['run', 'build'], { cwd: siteDir });
   await execFileAsync('tcb', [
-    'hosting', 'deploy', 'dist/', '--path', '/papacheck/',
-    '--envId', ENV_ID,
+    'hosting', 'deploy', 'dist/', 'papacheck',
+    '--env-id', ENV_ID,
   ], { cwd: siteDir });
 }
 
 export async function publishWebApp(): Promise<void> {
   await execFileAsync('tcb', [
-    'hosting', 'deploy', '.', '--path', '/papacheck/app/',
-    '--envId', ENV_ID,
+    'hosting', 'deploy', '.', 'papacheck/app',
+    '--env-id', ENV_ID,
   ], { cwd: join(ROOT, 'PapaCheck.Web') });
 }

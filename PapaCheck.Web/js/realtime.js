@@ -1,25 +1,13 @@
-import { initCloudBase, signInWithJwt, getDb, getCurrentTenantId, getCurrentChildId } from './cloudbase.js';
+﻿/**
+ * realtime.js - 实时数据同步模块
+ * 使用轮询方式获取数据更新，替代 CloudBase watch()
+ */
 
-const SUBSCRIBED_TABLES = [
-  'homeworks',
-  'daily_settlement',
-  'points',
-  'points_history',
-  'shop_items',
-  'redemptions',
-  'reward_box',
-  'bounty_tasks',
-  'bounty_submissions',
-  'bounty_completions',
-  'active_buffs',
-  'efficiency_history',
-  'free_time_tasks',
-  'notifications',
-];
+const POLL_INTERVAL_MS = 30000;
 
 export class RealtimeManager {
   constructor() {
-    this.subscriptions = new Map();
+    this.pollTimer = null;
     this.callbacks = {
       onHomeworksChange: () => {},
       onSettlementChange: () => {},
@@ -39,39 +27,31 @@ export class RealtimeManager {
   }
 
   async start(jwtToken, tenantId, childId) {
-    initCloudBase();
-    await signInWithJwt(jwtToken);
-
     sessionStorage.setItem('papacheck_tenant_id', tenantId);
     if (childId) {
       sessionStorage.setItem('papacheck_child_id', childId);
     }
+    this.triggerAll();
+    this.pollTimer = setInterval(() => this.triggerAll(), POLL_INTERVAL_MS);
+  }
 
-    for (const table of SUBSCRIBED_TABLES) {
-      this.subscribe(table);
+  triggerAll() {
+    for (const key of Object.keys(this.callbacks)) {
+      try {
+        this.callbacks[key]();
+      } catch (e) {
+        // ignore
+      }
     }
   }
 
-  subscribe(tableName) {
-    const db = getDb();
-    const callbackName = `on${tableName.charAt(0).toUpperCase() + tableName.slice(1).replace(/_([a-z])/g, (_, c) => c.toUpperCase())}Change`;
-    const callback = this.callbacks[callbackName] || (() => {});
-
-    const unsubscribe = db.table(tableName)
-      .where('tenant_id', 'eq', getCurrentTenantId())
-      .watch(callback);
-
-    this.subscriptions.set(tableName, unsubscribe);
-  }
-
   stop() {
-    this.subscriptions.forEach((unsub) => {
-      if (typeof unsub === 'function') unsub();
-    });
-    this.subscriptions.clear();
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
   }
 
-  // 回调方法（由 app.js 设置具体逻辑）
   onHomeworksChange(change) {}
   onSettlementChange(change) {}
   onPointsChange(change) {}
