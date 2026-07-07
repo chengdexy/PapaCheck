@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-07-07（CloudBase 迁移文档更新，v2.0.0 开发中）
+> 最后更新：2026-07-07（修复 RealtimeManager 启动失败，改用轮询）
 
 ## 当前版本
 
-**v2.0.0**（开发中）— 迁移到腾讯云 CloudBase（云函数 + PG + 静态托管 + 网关），实时数据同步替代轮询
+**v2.0.0**（开发中）— 迁移到腾讯云 CloudBase（云函数 + PG + 静态托管 + 网关），轮询替代 CloudBase watch() 实时监听
 
 ## 部署状态
 
@@ -42,7 +42,7 @@
 
 - [x] API 云函数 `papacheck-api`（SCF + Fastify + PG，从 ECS 服务迁移）
 - [x] RLS 行级安全策略（14 张业务表 tenant/child 隔离）
-- [x] 前端实时数据同步（CloudBase PG 实时监听，替代 5s 轮询）
+- [x] 前端实时数据同步（轮询每 30 秒刷新，CloudBase watch() 因 SDK v3 API 不兼容改为轮询）
 - [x] 前端路径前缀改为 `/papacheck/`（app/api/login 全部更新）
 - [x] Release 控制台改造（`fn`/`all` 子命令，tcb CLI 部署，移除 SSH）
 - [x] Android 端改造（ConfigService/UpdateService URL 改为 `/papacheck/`，删除离线模块）
@@ -108,6 +108,7 @@ _无未解决项。_
 
 | 日期 | 变更 |
 |------|------|
+| 2026-07-07 | **修复 RealtimeManager 启动失败**：`@cloudbase/js-sdk` v3 API 多重不兼容（importmap 裸模块标识符、`signInWithJwt` → `signInAnonymously`、`rdb()` → `database()`、`table()` → `collection()`），最终将 RealtimeManager 从 CloudBase watch() 改为每 30 秒轮询触发刷新。修复 favicon 404、site-publish.ts CLI 参数兼容性 |
 | 2026-07-07 | **CloudBase 迁移（v2.0.0）**：子计划 1-5 代码完成 — ① API 云函数 `papacheck-api`（SCF + Fastify + PG）；② RLS 行级安全策略 SQL + 数据迁移脚本；③ 前端实时监听改造（cloudbase.js/realtime.js/api.js/app.js/admin.js/HTML，路径前缀 `/papacheck/`）；④ Release 控制台改造（fn-deploy/cloud-publish/site-publish，tcb CLI 部署）；⑤ Android 端改造（ConfigService/UpdateService URL + 删除离线模块）。移除离线模式/邮件同步/运维调度器/Swagger。更新全部项目文档。待网关切换 + 数据迁移 + ECS 下线 |
 | 2026-07-06 | **build-apk --publish 一键构建发布**：新增 `-p/--publish` 参数，构建后自动上传 CloudBase + 更新 ECS 版本号 + 重启服务。控制台前端添加「构建后发布」复选框。`/api/download` 改为直连 CloudBase CDN 绕过 ECS 带宽限制。v1.5.2 |
 | 2026-07-06 | **APK 发布迁移到腾讯云 CloudBase**：APK 上传不再使用 SCP 到 ECS 本地，改为上传到 CloudBase PG 存储 `dist` 桶。`/api/download` 改为 302 重定向到 CloudBase CDN，`/api/version` 改为从环境变量 `PAPACHECK_CLIENT_VERSION` 读取。`cloud-publish.ts` 新增 CloudBase 上传 + ECS 环境变量更新步骤。Nginx 新增 `/download/` 位置代理到 CloudBase CDN。版本号 v1.4.2→v1.5.0。609 测试通过 |

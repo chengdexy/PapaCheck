@@ -1,41 +1,58 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-vi.mock('../js/cloudbase.js', () => ({
-  initCloudBase: vi.fn(),
-  signInWithJwt: vi.fn().mockResolvedValue(true),
-  getDb: vi.fn(() => ({
-    table: vi.fn(() => ({
-      where: vi.fn(() => ({
-        watch: vi.fn((callback) => {
-          return () => { /* unsubscribe */ };
-        }),
-      })),
-    })),
-  })),
-  getCurrentTenantId: vi.fn(() => 'tenant-1'),
-  getCurrentChildId: vi.fn(() => 'child-1'),
-}));
-
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RealtimeManager } from '../js/realtime.js';
 
 describe('RealtimeManager', () => {
   let realtime;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     realtime = new RealtimeManager();
   });
 
-  it('start 后建立 14 张表订阅', async () => {
-    const subscribeSpy = vi.spyOn(realtime, 'subscribe');
-    await realtime.start('fake-token', 'tenant-1', 'child-1');
-    expect(subscribeSpy).toHaveBeenCalledTimes(14);
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it('stop 取消所有订阅', async () => {
+  it('start 后触发回调并启动轮询', async () => {
+    const callback = vi.fn();
+    realtime.callbacks.onHomeworksChange = callback;
+
     await realtime.start('fake-token', 'tenant-1', 'child-1');
-    expect(realtime.subscriptions.size).toBe(14);
+
+    // start 时立即触发一次回调
+    expect(callback).toHaveBeenCalledTimes(1);
+
+    // 模拟轮询间隔
+    vi.advanceTimersByTime(30000);
+    expect(callback).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(30000);
+    expect(callback).toHaveBeenCalledTimes(3);
+  });
+
+  it('stop 清除轮询', async () => {
+    const callback = vi.fn();
+    realtime.callbacks.onHomeworksChange = callback;
+
+    await realtime.start('fake-token', 'tenant-1', 'child-1');
+    expect(callback).toHaveBeenCalledTimes(1);
+
     realtime.stop();
-    expect(realtime.subscriptions.size).toBe(0);
+
+    vi.advanceTimersByTime(60000);
+    // stop 后轮询停止，回调不再触发
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it('回调异常不影响其他回调', async () => {
+    const errorCb = vi.fn(() => { throw new Error('test error'); });
+    const normalCb = vi.fn();
+    realtime.callbacks.onHomeworksChange = errorCb;
+    realtime.callbacks.onSettlementChange = normalCb;
+
+    await realtime.start('fake-token', 'tenant-1', null);
+    expect(normalCb).toHaveBeenCalledTimes(1);
+    expect(errorCb).toHaveBeenCalledTimes(1);
   });
 
   it('onHomeworksChange 回调可被调用', () => {

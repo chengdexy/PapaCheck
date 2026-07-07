@@ -3,9 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('@cloudbase/js-sdk', () => {
   const mockApp = {
     auth: vi.fn(() => ({
-      signInWithJwt: vi.fn().mockResolvedValue(true),
+      signInAnonymously: vi.fn().mockResolvedValue(true),
     })),
     rdb: vi.fn(() => ({})),
+    database: vi.fn(() => ({})),
   };
   return {
     default: {
@@ -14,7 +15,7 @@ vi.mock('@cloudbase/js-sdk', () => {
   };
 });
 
-import { initCloudBase, signInWithJwt, getDb } from '../js/cloudbase.js';
+import { initCloudBase, signInAnonymously, getDb } from '../js/cloudbase.js';
 
 describe('CloudBase SDK 初始化', () => {
   beforeEach(() => {
@@ -27,9 +28,9 @@ describe('CloudBase SDK 初始化', () => {
     expect(app.auth).toBeDefined();
   });
 
-  it('signInWithJwt 调用 auth.signInWithJwt', async () => {
+  it('signInAnonymously 调用 auth.signInAnonymously', async () => {
     const token = 'fake-jwt-token';
-    await signInWithJwt(token);
+    await signInAnonymously();
     expect(true).toBe(true);
   });
 

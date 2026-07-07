@@ -8,7 +8,7 @@
 |------|-----------|----------|
 | **云函数（生产）** | Node.js 20.19（CloudBase SCF） | Fastify 5.x、PostgreSQL（CloudBase PG）、TypeScript 5.x |
 | **本地开发服务器** | Node.js 22+ | Fastify 5.x、PostgreSQL 16、TypeScript 5.x |
-| **Web 前端** | 原生 HTML/CSS/JS | `@cloudbase/js-sdk`（实时监听）、SVG 图表 |
+| **Web 前端** | 原生 HTML/CSS/JS | `@cloudbase/js-sdk`（importmap CDN）、30 秒轮询刷新 |
 | **Site（落地页+管理面板）** | Vite 5, React 18, TypeScript 5, Tailwind CSS 3 | Lucide Icons、Tailwind preset、React Router（可选） |
 | **Android 端** | Dart/Flutter | `webview_flutter`、`path_provider` |
 | **测试** | Vitest, Flutter test | Vitest 3.x、Flutter test |
@@ -42,16 +42,16 @@
                                                  26 张表 + RLS 行级安全策略
 
    ┌─────────────────────────────────────────────────────────┐
-   │  前端 ←→ CloudBase PG 实时监听 (app.rdb() / LISTEN)      │
-   │  前端订阅 homeworks/settlement/points/notifications 变更  │
-   │  弃用: pollServer 轮询 / SW / localforage / CRDT / 写队列 │
+   │  前端 ←→ CloudBase REST API (fetch /pollServer 30s)     │
+   │  前端每 30 秒拉取全量数据刷新                           │
+   │  弃用: CloudBase watch() / SW / localforage / CRDT / 队列│
    └─────────────────────────────────────────────────────────┘
 ```
 
 ### 核心设计原则
 
 1. **CloudBase 优先**：全部服务迁移到 CloudBase（SCF + PG + 静态托管 + 网关），ECS 已弃用
-2. **实时数据同步**：前端通过 `@cloudbase/js-sdk` 的 `app.rdb()` 订阅 PG 表变更，秒级推送（替代 5s 轮询）
+2. **轮询数据同步**：前端通过 RealtimeManager 每 30 秒触发一次全量数据刷新（替代 CloudBase watch()，因其 SDK v3 API 不兼容）
 3. **RLS 行级安全**：14 张业务表配置 PostgreSQL Row Level Security，前端实时订阅只能看到自己 `tenant_id` + `child_id` 的数据
 4. **多租户隔离**：JWT 认证 + tenant_id 层，孩子数据按租户/家长隔离
 
@@ -91,7 +91,7 @@ PapaCheck/
 │   ├── index.html             # 孩子端大屏界面
 │   ├── admin.html             # 管理端界面
 │   ├── css/                   # 样式
-│   ├── js/                    # 逻辑（app/admin/api/cloudbase/realtime）
+│   ├── js/                    # 逻辑（app/admin/api/cloudbase/realtime 轮询）
 │   └── （sw.js/db.js/sync.js 已移除，CloudBase 实时监听替代）
 │
 ├── PapaCheck.Site/            # [v1.4 整合] 落地页 + 管理面板（Vite 5 MPA）
@@ -179,7 +179,7 @@ CloudBase 迁移后，14 张业务表配置 PostgreSQL Row Level Security（RLS�
 - **启用 RLS 的表**：`homeworks`、`daily_settlement`、`points`、`points_history`、`shop_items`、`redemptions`、`reward_box`、`bounty_tasks`、`bounty_submissions`、`bounty_completions`、`active_buffs`、`efficiency_history`、`free_time_tasks`、`notifications`
 - **策略规则**：前端通过 CloudBase SDK 实时订阅时，只能 `SELECT` 到自己 `tenant_id` + `child_id` 匹配的行
 - **后端绕过**：API 云函数 `papacheck-api` 使用 service role 连接 PG，绕过 RLS 执行全量 CRUD
-- **目的**：前端实时监听 `app.rdb()` 直接订阅 PG 表变更，RLS 确保数据隔离安全
+- **目的**：前端实时同步每 30 秒轮询刷新数据，RLS 确保数据隔离安全
 
 ---
 
@@ -193,7 +193,7 @@ CloudBase 迁移后，14 张业务表配置 PostgreSQL Row Level Security（RLS�
 | 前端框架 | 原生 HTML/CSS/JS | 轻量、无构建步骤 |
 | 管理面板 | React 18（Vite MPA） | 复杂状态管理需求，独立入口不干扰孩子端 |
 | Android 方案 | Flutter WebView 混合 | 复用 Web 前端，原生提供 APK 更新 |
-| 数据同步 | CloudBase PG 实时监听（`app.rdb()`） | 秒级推送数据变更，替代 5s 轮询，无需离线缓存 |
+| 数据同步 | 30 秒轮询（RealtimeManager 触发 refreshAllData） | 替代 CloudBase watch() 实时监听，无需离线缓存 |
 | 数据安全 | RLS 行级安全策略 | 14 张业务表 tenant/child 隔离，前端订阅只能看到自己的数据 |
 | 多孩子隔离 | child_id 层 + RLS 策略 | 同一租户下每个孩子可见性隔离 |
 | 接入码配对 | 一次性的 8 字符接入码 | 简化设备绑定流程，无账户注册 |
