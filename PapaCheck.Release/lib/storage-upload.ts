@@ -18,8 +18,8 @@ export interface UploadOptions {
  */
 export async function uploadApk(options: UploadOptions): Promise<void> {
   const { envId, localPath, cloudPath } = options;
-  // staticstore 是 CloudBase 静态托管的默认存储桶
-  const bucketId = 'staticstore';
+  // dist 是 PG 环境下公有读的存储桶（100MB 限制），用于存放 APK 安装包
+  const bucketId = 'dist';
   await execFileAsync('tcb', [
     'storage', 'objects', 'upload', localPath, cloudPath,
     '--env-id', envId,
