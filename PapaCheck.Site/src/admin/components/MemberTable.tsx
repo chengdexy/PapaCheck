@@ -52,7 +52,7 @@ export default function MemberTable({ refreshKey }: { refreshKey: number }) {
   async function handleRegenerate(id: string) {
     if (!confirm('确定重新生成访问码？旧访问码将立即失效。')) return;
     try {
-      const result = await apiFetch(`/api/admin/members/${id}/regenerate`, { method: 'POST' });
+      const result = await apiFetch(`${import.meta.env.BASE_URL}api/admin/members/${id}/regenerate`, { method: 'POST' });
       showToast('success', `新访问码：${result.access_code}`);
       loadMembers();
     } catch {
@@ -63,7 +63,7 @@ export default function MemberTable({ refreshKey }: { refreshKey: number }) {
   async function handleRemove(id: string) {
     if (!confirm('确定移除此访问码？此操作不可撤销。')) return;
     try {
-      await apiFetch(`/api/admin/members/${id}`, { method: 'DELETE' });
+      await apiFetch(`${import.meta.env.BASE_URL}api/admin/members/${id}`, { method: 'DELETE' });
       showToast('success', '已移除');
       loadMembers();
     } catch {

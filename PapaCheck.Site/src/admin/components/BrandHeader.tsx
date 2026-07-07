@@ -21,7 +21,7 @@ export default function BrandHeader({ title, subtitle, role, onLogout }: BrandHe
             className="flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl bg-white shadow-md shadow-orange-100 overflow-hidden ring-1 ring-orange-100"
             aria-hidden="true"
           >
-            <img src="/favicon.png" alt="" className="w-full h-full object-cover" />
+            <img src={`${import.meta.env.BASE_URL}favicon.png`} alt="" className="w-full h-full object-cover" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -55,7 +55,7 @@ export default function BrandHeader({ title, subtitle, role, onLogout }: BrandHe
             客户端
           </a>
           <a
-            href="/"
+            href={import.meta.env.BASE_URL}
             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[var(--color-ink-600)] hover:bg-[var(--color-ink-100)] rounded-md transition-colors"
           >
             <ArrowLeft size={12} />

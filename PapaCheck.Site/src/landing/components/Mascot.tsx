@@ -17,7 +17,7 @@ type MascotProps = {
  * - 1x / 2x 资源自动切换
  */
 export default function Mascot({ name, alt, className, size, priority = false }: MascotProps) {
-  const base = `/imgs/mascot/mascot-${name}`;
+  const base = `${import.meta.env.BASE_URL}imgs/mascot/mascot-${name}`;
   const loading = priority ? 'eager' : 'lazy';
   return (
     <picture>
