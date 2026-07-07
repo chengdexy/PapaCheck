@@ -512,10 +512,11 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         : baseUrl;
 
     if (role == DeviceRole.parent) {
-      // 走 /login → login.html（访问码登录），而非 /parent（会 301 到 React 管理面板）
-      return '$base/login';
+      // 家长端打开 /login.html（访问码登录）
+      return '$base/login.html';
     }
-    return '$base/child';
+    // 孩子端打开首页 /index.html
+    return '$base/index.html';
   }
 
   void _applyOrientation(DeviceRole role) {
