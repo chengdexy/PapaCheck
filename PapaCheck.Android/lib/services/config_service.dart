@@ -7,6 +7,11 @@ const String _keyAuthToken = 'auth_token';
 const String _keyAuthRole = 'auth_role';
 const String _keyAuthChildName = 'auth_child_name';
 
+/// CloudBase 默认 URL 常量
+const String defaultServerUrl = 'https://chengdexy.cn/papacheck/app/';
+const String defaultVersionUrl = 'https://chengdexy.cn/papacheck/api/version';
+const String defaultDownloadUrl = 'https://chengdexy.cn/papacheck/api/download';
+
 enum DeviceRole { child, parent }
 
 class ConfigService {
