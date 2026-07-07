@@ -1,4 +1,4 @@
-export const API_BASE = '/papacheck/api';
+﻿const API_BASE = '/papacheck/api';
 
 function getAuthHeaders() {
   try {
