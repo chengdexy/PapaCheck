@@ -49,13 +49,13 @@ const __dirname = dirname(__filename);
 export class PostgresAdapter extends DatabaseAdapter {
   pool: PoolType;
 
-  private constructor(connectionString: string) {
+  private constructor(connectionString: string, poolConfig?: { max?: number; idleTimeoutMillis?: number }) {
     super();
-    this.pool = new Pool({ connectionString });
+    this.pool = new Pool({ connectionString, ...poolConfig });
   }
 
-  static async create(connectionString: string): Promise<PostgresAdapter> {
-    const instance = new PostgresAdapter(connectionString);
+  static async create(connectionString: string, poolConfig?: { max?: number; idleTimeoutMillis?: number }): Promise<PostgresAdapter> {
+    const instance = new PostgresAdapter(connectionString, poolConfig);
     await instance._initSchema();
     return instance;
   }
