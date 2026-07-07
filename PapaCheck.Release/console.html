@@ -16,7 +16,7 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
 .env-tag.ok{color:var(--green);border-color:var(--green)}
 .env-tag.missing{color:var(--red);border-color:var(--red)}
 .container{max-width:1100px;margin:0 auto;padding:24px}
-.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:24px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;transition:transform .15s,box-shadow .15s}
 .card:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,.3)}
 .card h3{font-size:16px;margin-bottom:4px}
@@ -32,6 +32,8 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
 .btn-apk{background:var(--blue)}
 .btn-cloud{background:#7c3aed}
 .btn-site{background:#059669}
+.btn-web{background:#ea580c}
+.btn-all{background:#dc2626}
 .section-title{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;padding-top:8px;border-top:1px solid var(--border)}
 .execution{display:none;margin-bottom:24px}
 .execution.visible{display:block}
@@ -70,8 +72,7 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
 <div class="header">
   <h1>PapaCheck 发布控制台</h1>
   <div class="info">
-    <span class="env-tag" id="envIp">IP: --</span>
-    <span class="env-tag" id="envUser">User: --</span>
+    <span class="env-tag" id="envCloud">Env: --</span>
     <span class="version" id="version">v--</span>
   </div>
 </div>
@@ -95,14 +96,24 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,
       </div>
     </div>
     <div class="card">
-      <h3>同步云端</h3>
-      <p>测试 → 编译 → 打包 → 上传 → 远程部署</p>
-      <button class="btn-cloud" onclick="startRelease('cloud')">开始同步</button>
+      <h3>部署云函数</h3>
+      <p>编译 → tcb fn deploy 部署到 CloudBase</p>
+      <button class="btn-cloud" onclick="startRelease('fn')">部署函数</button>
     </div>
     <div class="card">
       <h3>部署 Site</h3>
-      <p>Vite 构建 → 落地页 + 管理面板 → 服务器</p>
+      <p>Vite 构建 → tcb hosting deploy</p>
       <button class="btn-site" onclick="startRelease('site')">开始部署</button>
+    </div>
+    <div class="card">
+      <h3>部署 Web</h3>
+      <p>tcb hosting deploy 部署 PapaCheck.Web</p>
+      <button class="btn-web" onclick="startRelease('web')">开始部署</button>
+    </div>
+    <div class="card">
+      <h3>全部部署</h3>
+      <p>云函数 + Site + Web 一键部署</p>
+      <button class="btn-all" onclick="startRelease('all')">全部部署</button>
     </div>
   </div>
 
@@ -139,21 +150,13 @@ async function init() {
   } catch {}
   try {
     const env = await (await fetch('/api/release/env')).json();
-    const ipEl = document.getElementById('envIp');
-    const userEl = document.getElementById('envUser');
-    if (env.PAPACHECK_CLOUD_IP) {
-      ipEl.textContent = 'IP: ' + env.PAPACHECK_CLOUD_IP;
-      ipEl.classList.add('ok');
+    const envEl = document.getElementById('envCloud');
+    if (env.CLOUDBASE_ENV_ID) {
+      envEl.textContent = 'Env: ' + env.CLOUDBASE_ENV_ID;
+      envEl.classList.add('ok');
     } else {
-      ipEl.textContent = 'IP: 未设置';
-      ipEl.classList.add('missing');
-    }
-    if (env.PAPACHECK_SSH_USER) {
-      userEl.textContent = 'User: ' + env.PAPACHECK_SSH_USER;
-      userEl.classList.add('ok');
-    } else {
-      userEl.textContent = 'User: 未设置';
-      userEl.classList.add('missing');
+      envEl.textContent = 'Env: 未设置';
+      envEl.classList.add('missing');
     }
   } catch {}
   try {
@@ -265,7 +268,7 @@ function startRelease(type) {
   document.getElementById('steps').innerHTML = '';
   document.getElementById('logBody').innerHTML = '';
   document.getElementById('execution').classList.add('visible');
-  document.getElementById('taskTitle').textContent = { 'build-apk':'构建 APK', 'cloud':'同步云端', 'site':'部署 Site' }[type] || type;
+  document.getElementById('taskTitle').textContent = { 'build-apk':'构建 APK', 'fn':'部署云函数', 'site':'部署 Site', 'web':'部署 Web', 'all':'全部部署' }[type] || type;
   document.getElementById('taskTime').textContent = new Date().toLocaleString();
   const opts = { method:'POST' };
   if (type === 'build-apk') {
