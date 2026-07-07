@@ -147,7 +147,7 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
     steps.push({
       id: String(idx++), desc: `更新云函数环境变量 APK_VERSION=${newVer}`,
       shell: true,
-      cmd: `tcb fn deploy papacheck-api --env-id ${CLOUDBASE_ENV} --force --yes --config-file ${rcFile} && del /f ${rcFile}`,
+      cmd: `tcb fn deploy papacheck-api --env-id ${CLOUDBASE_ENV} --force --yes --dir ${join(ROOT, 'PapaCheck.CloudFunc', 'papacheck-api', 'dist')} --config-file ${rcFile} && del /f ${rcFile}`,
       timeout: 60,
     });
   }
