@@ -24,5 +24,6 @@ export async function uploadApk(options: UploadOptions): Promise<void> {
     'storage', 'objects', 'upload', localPath, cloudPath,
     '--env-id', envId,
     '--bucket', bucketId,
+    '--upsert',
   ]);
 }
