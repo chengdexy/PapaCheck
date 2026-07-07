@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
@@ -129,7 +129,9 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
       cmd: `tcb storage objects upload ${apkPath} PapaCheck-${newVer}.apk --bucket dist --env-id ${CLOUDBASE_ENV} --upsert`,
       timeout: 120,
     });
-    const rcFile = join(tmpdir(), `papacheck-rc-${newVer}.json`);
+    const rcDir = join(tmpdir(), `papacheck-rc-${newVer}`);
+    mkdirSync(rcDir, { recursive: true });
+    const rcFile = join(rcDir, 'cloudbaserc.json');
     const rcContent = JSON.stringify({
       envId: CLOUDBASE_ENV,
       version: '2.0',
@@ -147,7 +149,8 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
     steps.push({
       id: String(idx++), desc: `更新云函数环境变量 APK_VERSION=${newVer}`,
       shell: true,
-      cmd: `tcb fn deploy papacheck-api --env-id ${CLOUDBASE_ENV} --force --yes --dir ${join(ROOT, 'PapaCheck.CloudFunc', 'papacheck-api', 'dist')} --config-file ${rcFile} && del /f ${rcFile}`,
+      cwd: rcDir,
+      cmd: `tcb config update fn papacheck-api --env-id ${CLOUDBASE_ENV} --json`,
       timeout: 60,
     });
   }

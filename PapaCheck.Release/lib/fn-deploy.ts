@@ -1,5 +1,5 @@
 import { execFile } from 'child_process';
-import { writeFileSync, unlinkSync } from 'fs';
+import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { randomUUID } from 'crypto';
@@ -29,16 +29,18 @@ export async function deployFunction(
 }
 
 /**
- * 更新云函数环境变量
- * tcb CLI 无直接 env update 命令，通过临时 cloudbaserc.json 配合 tcb fn deploy 实现
+ * 更新云函数环境变量（仅更新配置，不重新部署代码）
+ * 通过临时 cloudbaserc.json + tcb config update fn 实现
  */
 export async function updateFunctionEnv(
   functionName: string,
   envVars: Record<string, string>,
   options: DeployOptions
 ): Promise<void> {
-  // 写临时 cloudbaserc.json，利用 deploy 读取 envVariables 的能力
-  const tmpFile = join(tmpdir(), `cloudbaserc-${randomUUID()}.json`);
+  const rcDir = join(tmpdir(), `papacheck-env-${randomUUID()}`);
+  mkdirSync(rcDir, { recursive: true });
+  const rcFile = join(rcDir, 'cloudbaserc.json');
+
   const rc = {
     envId: options.envId,
     version: '2.0',
@@ -51,17 +53,15 @@ export async function updateFunctionEnv(
       },
     ],
   };
-  writeFileSync(tmpFile, JSON.stringify(rc, null, 2), 'utf-8');
+  writeFileSync(rcFile, JSON.stringify(rc, null, 2), 'utf-8');
 
   try {
-    // --config-file 指定 rc 文件，--force 跳过确认，--yes 自动确认
     await run('tcb', [
-      'fn', 'deploy', functionName,
+      'config', 'update', 'fn', functionName,
       '--env-id', options.envId,
-      '--force', '--yes',
-      '--config-file', tmpFile,
-    ], options.cwd);
+      '--json',
+    ], rcDir);
   } finally {
-    try { unlinkSync(tmpFile); } catch {}
+    // 清理（best-effort）
   }
 }
