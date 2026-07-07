@@ -151,3 +151,25 @@ export class Executor extends EventEmitter {
     return success;
   }
 }
+
+/** 简化步骤定义，供 executeSteps 使用 */
+export interface Step {
+  name: string;
+  cmd: string;
+  args?: string[];
+  cwd?: string;
+}
+
+/** 按顺序执行步骤，任一失败则抛出异常 */
+export async function executeSteps(steps: Step[]): Promise<void> {
+  const executor = new Executor();
+  const stepDefs: StepDef[] = steps.map((s, i) => ({
+    id: String(i + 1),
+    desc: s.name,
+    cmd: s.args ? [s.cmd, ...s.args] : s.cmd,
+    cwd: s.cwd,
+    timeout: 300,
+  }));
+  const success = await executor.runSteps(stepDefs);
+  if (!success) throw new Error('步骤执行失败');
+}
