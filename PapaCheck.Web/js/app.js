@@ -9,23 +9,23 @@
     const token = sessionStorage.getItem('papacheck_token');
     const role = sessionStorage.getItem('papacheck_role');
     if (!token) {
-      window.location.href = '/login.html';
+      window.location.href = '/papacheck/app/login.html';
       return;
     }
     // 家长角色不应留在孩子端，跳转到管理页
     if (role === 'parent') {
-      window.location.href = '/admin.html';
+      window.location.href = '/papacheck/app/admin.html';
       return;
     }
     // 通过 API 验证 token 是否仍有效（未被删除/吊销）
-    fetch('/api/auth/me', {
+    fetch('/papacheck/api/auth/me', {
       headers: { 'Authorization': 'Bearer ' + token }
     }).then(function (resp) {
       if (resp.status === 401) {
         sessionStorage.removeItem('papacheck_token');
         sessionStorage.removeItem('papacheck_role');
         sessionStorage.removeItem('papacheck_child_name');
-        window.location.href = '/login.html';
+        window.location.href = '/papacheck/app/login.html';
       }
     }).catch(function () { });
   } catch (e) {
@@ -42,7 +42,6 @@ let screenSaverTimer = null;
 let isScreenSaverActive = false;
 let tickInterval = null;
 let clockInterval = null;
-let pollInterval = null;
 let _lastBuffs = null;
 let _lastRewardBox = null;
 let _lastShopItems = null;
@@ -211,10 +210,6 @@ function isAnyTaskActive() {
 
 async function requestDeferHomework(hwId) {
   if (_requestingDefer) return;
-  if (ConnectionManager.getMode() === 'reconnecting') {
-    showToast('网络正在恢复，请稍候…');
-    return;
-  }
   const hw = homeworks.find(h => h.id === hwId);
   if (!hw || hw.status !== 'pending' || hw.deferRequest) return;
 
@@ -834,373 +829,19 @@ async function submitForRating() {
   }
 }
 
-// ========== Server Polling ==========
-let pollServer = null;
-
-function startPoll(intervalMs) {
-  stopPoll();
-  pollServer = async () => {
-    var mode = ConnectionManager.getMode();
-    if (mode === 'offline' || mode === 'reconnecting') return;
-
-    try {
-      // BUG FIX: 拉取服务端数据前先推送待同步 CRDT 操作，
-      // 防止 PATCH 因网络短暂抖动失败后，服务端数据过时而 pollServer 覆盖本地变更
-      try {
-        if (typeof CRDTLog !== 'undefined') {
-          var pendingOps = await CRDTLog.getPending();
-          if (pendingOps.length > 0 && typeof SyncEngine !== 'undefined') {
-            await SyncEngine.crdtPush();
-          }
-        }
-      } catch (_crdtErr) {
-        console.warn('[pollServer] CRDT 推送失败，继续拉取数据:', _crdtErr);
-      }
-
-      var _prevSettlement = cachedData?.dailySettlement?.[Util.dateKey(currentDate)];
-      cachedData = await API.getData();
-
-      // [诊断] pollServer 替换 cachedData 时记录结算数据变化
-      var _newSettlement = cachedData?.dailySettlement?.[Util.dateKey(currentDate)];
-      if (JSON.stringify(_prevSettlement) !== JSON.stringify(_newSettlement)) {
-        console.log('[Settlement] pollServer 替换 cachedData, 结算数据变化:', {
-          prev: JSON.stringify(_prevSettlement),
-          next: JSON.stringify(_newSettlement),
-          window_settlement: JSON.stringify(window._settlement),
-        });
-      }
-
-      API.migrateBountyCompletionsToTotal(cachedData);
-      const key = Util.dateKey(currentDate);
-
-      const buffs = cachedData.activeBuffs || [];
-      const now_ = new Date();
-      const remaining = [];
-      let buffsChanged = false;
-      for (const b of buffs) {
-        const unit = b.unit || 'days';
-        if (unit === 'minutes') {
-          const startTime = b.startDate ? new Date(b.startDate) : new Date();
-          const endTime = new Date(startTime.getTime() + (b.duration || 0) * 60000);
-          if (endTime <= now_) {
-            buffsChanged = true;
-          } else {
-            remaining.push(b);
-          }
-        } else {
-          const end = new Date(b.startDate);
-          end.setDate(end.getDate() + (b.duration || 1));
-          if (end <= now_) {
-            buffsChanged = true;
-          } else {
-            remaining.push(b);
-          }
-        }
-      }
-      if (buffsChanged) {
-        for (var i = 0; i < remaining.length; i++) {
-          await API.putBuff(remaining[i].id, remaining[i]);
-        }
-        cachedData.activeBuffs = remaining;
-        needsFullRender = true;
-      }
-
-      if (_lastBuffs !== null && JSON.stringify(cachedData.activeBuffs || []) !== JSON.stringify(_lastBuffs)) {
-        const prevBuffs = _lastBuffs || [];
-        const newBuffs = cachedData.activeBuffs || [];
-        const added = newBuffs.filter(b => !prevBuffs.some(p => p.name === b.name && p.startDate === b.startDate));
-        _lastBuffs = newBuffs;
-        needsFullRender = true;
-      }
-      if (_lastBuffs === null) {
-        _lastBuffs = cachedData.activeBuffs || [];
-      }
-
-      const shopItems = cachedData.shopItems || [];
-      const prevShop = _lastShopItems || [];
-      if (_lastShopItems !== null && JSON.stringify(shopItems) !== JSON.stringify(prevShop)) {
-        _lastShopItems = shopItems.concat();
-      }
-      if (_lastShopItems === null) {
-        _lastShopItems = shopItems.concat();
-      }
-
-      // 积分变化检测
-      const points = cachedData.points || {};
-      const prevPoints = _lastPoints || {};
-      if (_lastPoints !== null && JSON.stringify(points) !== JSON.stringify(prevPoints)) {
-        _lastPoints = Object.assign({}, points);
-        needsFullRender = true;
-      }
-      if (_lastPoints === null) {
-        _lastPoints = Object.assign({}, points);
-      }
-
-      const rb = cachedData.rewardBox || [];
-      const prevRb = _lastRewardBox || [];
-      if (_lastRewardBox !== null && JSON.stringify(rb) !== JSON.stringify(prevRb)) {
-        const addedRb = rb.filter(r => !prevRb.some(p => p.name === r.name) || (r.quantity || 0) > (prevRb.find(p => p.name === r.name)?.quantity || 0));
-        if (addedRb.length > 0) {
-          addedRb.forEach(r => window._recentNewRewardIds.add(r.id));
-          Voice.speak('奖励箱有新奖励，快去看看吧');
-        }
-        _lastRewardBox = rb.concat();
-      }
-      if (_lastRewardBox === null) {
-        _lastRewardBox = rb.concat();
-      }
-
-      const newHw = cachedData.homeworks?.[key] || [];
-      const oldHwJson = JSON.stringify(homeworks);
-      const newHwJson = JSON.stringify(newHw);
-      if (oldHwJson !== newHwJson) {
-        if (!_completingHomework && !_startingHomework) {
-          // 捕获旧 active homework 的 in-memory paused 状态
-          // 防止 pollServer 在 pauseActiveTask 的 async PATCH 完成前覆写 paused 标记
-          var _oldActive = getActiveHomework();
-          var _wasPaused = _oldActive && _oldActive.paused;
-
-          homeworks = newHw;
-
-          // BUG FIX: 重新应用本地待推送的 CRDT 操作，
-          // 防止 CRDT 推送失败后 pollServer 用过期服务端数据覆盖本地变更
-          // 覆盖所有可能被 cachedData 替换覆盖的表
-          try {
-            if (typeof CRDTLog !== 'undefined') {
-              var _pendingOps = await CRDTLog.getPending();
-              // table → cachedData 属性名映射（snake_case → camelCase）
-              var _tableMap = {
-                homeworks: null,             // 直接写 local homeworks
-                free_time_tasks: null,       // 直接写 local freeTimeTasks
-                daily_settlement: 'dailySettlement',
-                efficiency_history: 'efficiencyHistory',
-                bounty_submissions: 'bountySubmissions',
-                bounty_completions: 'bountyCompletions',
-                shop_items: 'shopItems',
-                redemptions: 'redemptions',
-                reward_box: 'rewardBox',
-                active_buffs: 'activeBuffs',
-                bounty_tasks: 'bountyTasks',
-                points: 'points',
-                settings: 'settings',
-              };
-              var _dateKey = Util.dateKey(currentDate);
-              for (var _po = 0; _po < _pendingOps.length; _po++) {
-                var _op = _pendingOps[_po];
-                if (_op.type !== 'update' || !_op.value) continue;
-                var _tbl = _op.table;
-                // 处理本地变量
-                if (_tbl === 'homeworks') {
-                  var _targetHw = homeworks.find(function (_h) { return _h.id === _op.resourceId || _h.uuid === _op.resourceId; });
-                  if (_targetHw) Object.assign(_targetHw, _op.value);
-                } else if (_tbl === 'free_time_tasks') {
-                  var _targetFt = freeTimeTasks.find(function (_f) { return _f.id === _op.resourceId || _f.uuid === _op.resourceId; });
-                  if (_targetFt) Object.assign(_targetFt, _op.value);
-                } else {
-                  // 处理 cachedData 中的表
-                  var _cdProp = _tableMap[_tbl];
-                  if (_cdProp && cachedData && cachedData[_cdProp]) {
-                    var _cdVal = cachedData[_cdProp];
-                    if (Array.isArray(_cdVal)) {
-                      // 扁平数组：shopItems, redemptions, rewardBox, activeBuffs, bountyTasks
-                      var _target = _cdVal.find(function (_i) { return _i && (_i.id === _op.resourceId || _i.uuid === _op.resourceId); });
-                      if (_target) Object.assign(_target, _op.value);
-                    } else if (typeof _cdVal === 'object') {
-                      // 日期键对象或单行对象
-                      if (_tbl === 'daily_settlement' || _tbl === 'efficiency_history' || _tbl === 'bounty_completions') {
-                        // 按 dateKey 查找
-                        var _dkEntry = _cdVal[_op.resourceId] || _cdVal[_dateKey];
-                        if (_dkEntry) Object.assign(_dkEntry, _op.value);
-                      } else {
-                        // 单行对象：settings, points
-                        Object.assign(_cdVal, _op.value);
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          } catch (_reapplyErr) {
-            console.warn('[pollServer] 重新应用 CRDT 操作失败:', _reapplyErr);
-          }
-
-          // 恢复本地暂停状态（服务端数据可能尚未包含 paused:true）
-          if (_wasPaused) {
-            var _newActive = getActiveHomework();
-            if (_newActive && _newActive.id === _oldActive.id) {
-              if (!_newActive.paused) {
-                _newActive.paused = true;
-                _newActive.wasPaused = true;
-              }
-              if (_oldActive._pausedElapsed !== undefined) {
-                _newActive._pausedElapsed = _oldActive._pausedElapsed;
-              }
-            }
-          }
-
-          needsFullRender = true;
-          const allDone = newHw.length > 0 && newHw.every(h => h.status === 'done');
-          const settlement = getSettlementData();
-          if (settlement && !settlement.rating && !settlement.submittedAt) {
-            if (!allDone) {
-              cachedData._settlement = null;
-              window._settlement = null;
-              if (cachedData.dailySettlement) delete cachedData.dailySettlement[key];
-            }
-          }
-          // BUG FIX: 作业列表变化后全部已完成时（如最后一项被延后审批通过），自动触发结算
-          if (allDone) {
-            calculateSettlement();
-          }
-        }
-      }
-
-      const newFreeTime = cachedData.freeTimeTasks?.[key] || [];
-      const oldFtJson = JSON.stringify(freeTimeTasks);
-      const newFtJson = JSON.stringify(newFreeTime);
-      if (oldFtJson !== newFtJson) {
-        var _fts = function (s) { return s === 'done' ? 2 : s === 'doing' ? 1 : 0; };
-        var hasActiveFt = freeTimeTasks.some(function (ft) {
-          if (ft.status === 'pending') return false;
-          var sft = newFreeTime.find(function (t) { return t.id === ft.id; });
-          return sft && _fts(ft.status) > _fts(sft.status);
-        });
-        if (!hasActiveFt) {
-          freeTimeTasks = newFreeTime;
-          needsFullRender = true;
-        }
-      }
-
-      const hasActive = getActiveHomework() || getActiveFreeTime();
-      const isPaused = isAnyTaskPaused();
-      if (hasActive && !isPaused && !tickInterval) startTickTimer();
-      if ((!hasActive || isPaused) && tickInterval) stopTickTimer();
-
-      const newSettlement = cachedData.dailySettlement?.[key] || null;
-      let ratingChanged = false;
-      if (newSettlement) {
-        const prevRating = _lastRatingInfo;
-        if (newSettlement.rating && (!prevRating || prevRating.key !== key || prevRating.rating !== newSettlement.rating)) {
-          ratingChanged = true;
-          _lastRatingInfo = { key, rating: newSettlement.rating, finalPoints: newSettlement.finalPoints };
-        }
-        cachedData._settlement = newSettlement;
-        needsFullRender = true;
-      } else {
-        const old = getSettlementData();
-        if (old && (old.submittedAt || old.rating)) {
-          cachedData._settlement = null;
-          window._settlement = null;
-          _lastRatingInfo = null;
-          needsFullRender = true;
-        }
-      }
-
-      // 独立结算清理检查：无已完成作业时清除未评级结算
-      // 不依赖 homework 数据是否变化，确保每次 pollServer 都执行
-      const _hasDoneHw = homeworks.some(function (h) { return h.status === 'done'; });
-      const _unratedS = getSettlementData();
-      if (_unratedS && !_unratedS.rating && !_hasDoneHw) {
-        console.warn('[Settlement] pollServer 清理未评级结算 (无已完成作业):', {
-          hasDoneHw: _hasDoneHw,
-          unratedS: JSON.stringify(_unratedS),
-          hwCount: homeworks.length,
-        });
-        cachedData._settlement = null;
-        window._settlement = null;
-        if (cachedData.dailySettlement) delete cachedData.dailySettlement[key];
-        _lastRatingInfo = null;
-        needsFullRender = true;
-      }
-
-      const settings = cachedData?.settings || {};
-      if (_lastSettings !== null && JSON.stringify(settings) !== JSON.stringify(_lastSettings)) {
-        needsFullRender = true;
-      }
-
-      _lastSettings = settings;
-
-      const newBountySubs = (cachedData.bountySubmissions?.[key] || []).filter(s => !s.isDeleted);
-      const prevBountySubs = _lastBountySubmissions?.[key] || [];
-      const newBountyComps = cachedData.bountyCompletions?._total || {};
-      const prevBountyComps = _lastBountyCompletions?._total || {};
-      if (_lastBountySubmissions !== null) {
-        for (const [tid, newVal] of Object.entries(newBountyComps)) {
-          const prevVal = prevBountyComps[tid];
-          const nv = typeof newVal === 'number' ? newVal : (newVal ? 1 : 0);
-          const pv = typeof prevVal === 'number' ? prevVal : (prevVal ? 1 : 0);
-          if (nv > pv) {
-            needsFullRender = true;
-            if (typeof backToMain === 'function') backToMain();
-            break;
-          }
-        }
-        for (const prevSub of prevBountySubs) {
-          if (prevSub.status === 'submitted' && !newBountySubs.some(s => s.taskId === prevSub.taskId)) {
-            needsFullRender = true;
-          }
-        }
-        for (const newSub of newBountySubs) {
-          const prevSub = prevBountySubs.find(s => s.taskId === newSub.taskId);
-          if (prevSub && prevSub.status === 'submitted' && newSub.status === 'doing') {
-            needsFullRender = true;
-          }
-        }
-      }
-      _lastBountyCompletions = {};
-      if (cachedData.bountyCompletions?._total) {
-        _lastBountyCompletions._total = { ...cachedData.bountyCompletions._total };
-      }
-      _lastBountySubmissions = {};
-      for (const dk of Object.keys(cachedData.bountySubmissions || {})) {
-        _lastBountySubmissions[dk] = (cachedData.bountySubmissions[dk] || []).map(s => ({ ...s }));
-      }
-
-      // 统一消费通知（延迟一轮：首轮只播不删，第二轮才删）
-      try {
-        const result = await API.getPendingNotifications();
-        const items = result.items || [];
-        const currentIds = new Set(items.map(i => i.id));
-        // "收到新作业"通知去重：多条同文本只保留最后一条播报
-        const playItems = dedupNewHomeworkNotifications(items);
-        for (const item of playItems) {
-          // 只在通知首次出现时播报，后续轮次跳过（延迟消费期间不再重复播报）
-          if (!_lastNotifIds || !_lastNotifIds.has(item.id)) {
-            Voice.speak(item.text);
-          }
-        }
-        // 消费"上一轮就在"的通知（Voice 有一整轮时间播报）
-        // 本轮有 items 时取交集（两轮都在的才算"持久"），本轮无 items 时全部消费（已播完已消失）
-        if (_lastNotifIds && _lastNotifIds.size > 0) {
-          let staleIds = [..._lastNotifIds];
-          if (items.length > 0) {
-            staleIds = staleIds.filter(id => currentIds.has(id));
-          }
-          if (staleIds.length > 0) {
-            await API.consumeNotifications(staleIds);
-            // 已消费的 ID 从 currentIds 中移除，防止 _lastNotifIds 保留导致下轮重复消费
-            staleIds.forEach(function (id) { currentIds.delete(id); });
-          }
-        }
-        _lastNotifIds = currentIds;
-      } catch (e) { /* 非致命 */ }
-
-      if (needsFullRender) {
-        updateBigScreen();
-      }
-    } catch (e) {
-      console.error('[PollServer] 轮询异常:', e);
-    } finally {
-      if (pollInterval !== null) pollInterval = setTimeout(pollServer, intervalMs);
-    }
-  };
-  pollInterval = setTimeout(pollServer, intervalMs);
-}
-
-function stopPoll() {
-  if (pollInterval) {
-    clearTimeout(pollInterval);
-    pollInterval = null;
+// ========== Realtime Refresh ==========
+/** 拉取最新数据并刷新大屏（由 RealtimeManager 回调触发） */
+async function refreshFromServer() {
+  try {
+    cachedData = await API.getData();
+    API.migrateBountyCompletionsToTotal(cachedData);
+    const key = Util.dateKey(currentDate);
+    homeworks = cachedData.homeworks?.[key] || [];
+    freeTimeTasks = cachedData.freeTimeTasks?.[key] || [];
+    needsFullRender = true;
+    updateBigScreen();
+  } catch (e) {
+    console.error('[refreshFromServer] 刷新数据失败:', e);
   }
 }
 
@@ -1216,145 +857,38 @@ function showScreenSaver() {
   isScreenSaverActive = true;
   const saver = document.getElementById('screenSaver');
   saver.classList.add('active');
-  startPoll(5000);
+  refreshFromServer();
 }
 
 function wakeUp() {
   isScreenSaverActive = false;
   document.getElementById('screenSaver').classList.remove('active');
   startScreenSaverTimer();
-  stopPoll();
-  // 如果 CM 尚未切回 online，短延迟重试，避免 pollServer 入口被直接跳过
-  var mode = ConnectionManager.getMode();
-  if (mode === 'offline' || mode === 'reconnecting') {
-    var retryCount = 0;
-    var maxRetries = 5; // 最多重试 5 次（间隔 1s，共 5s）
-    // 先清理可能存在的旧重试 timer，防止重复唤醒导致 interval 泄漏
-    if (window._wakeUpRetry) clearInterval(window._wakeUpRetry);
-    var retryId = setInterval(function () {
-      retryCount++;
-      var m = ConnectionManager.getMode();
-      if (m === 'online') {
-        clearInterval(retryId);
-        window._wakeUpRetry = null;
-        pollServer();
-        startPoll(5000);
-      } else if (retryCount >= maxRetries) {
-        clearInterval(retryId);
-        window._wakeUpRetry = null;
-        startPoll(5000);
-      }
-    }, 1000);
-    window._wakeUpRetry = retryId;
-  } else {
-    pollServer();
-    startPoll(5000);
-  }
+  refreshFromServer();
   Voice.speak('屏幕已唤醒');
 }
 
 // ========== Init ==========
 async function init() {
+  const token = sessionStorage.getItem('papacheck_token');
+  if (!token) {
+    window.location.href = '/papacheck/app/login.html';
+    return;
+  }
+
   showTransitionMask('正在加载数据…');
 
-  // 先启动 ConnectionManager 检测连接状态（与 admin.js 保持一致）
-  await ConnectionManager.start();
-
-  var mode = ConnectionManager.getMode();
-
-  if (mode === 'online') {
-    try {
-      cachedData = await API.getData();
-      isServerMode = true;
-      hideTransitionMask();
-      // 立即缓存到本地 DB，确保离线时可用（与 admin.js 的 refreshAllData 保持一致）
-      // 深拷贝后传给 cacheFullData，防止 ensureSyncFields 原地修改 lastModified/uuid 污染 cachedData
-      try { await DB.cacheFullData(JSON.parse(JSON.stringify(cachedData))); } catch (e) { console.warn('[app] 初始缓存失败:', e); }
-    } catch (e) {
-      // CM 检测到在线，但实际请求时网络已断，降级到本地 DB
-      try {
-        var localData = await DB.getFullData();
-        if (localData && Object.keys(localData).length > 0) {
-          isServerMode = false;
-          cachedData = localData;
-          cachedData._loadedOffline = true;
-          showToast('网络不稳定，已切换到离线模式');
-          hideTransitionMask();
-        } else {
-          hideTransitionMask();
-          showToast('未连接服务器，请检查网络');
-          isServerMode = false;
-          cachedData = { homeworks: {}, freeTimeTasks: {}, dailySettlement: {}, points: { balance: 0 }, shopItems: [], rewardBox: [], activeBuffs: [], bountyTasks: [], bountySubmissions: {}, bountyCompletions: {}, settings: {} };
-          if (window._recoveryInterval) clearInterval(window._recoveryInterval);
-          window._recoveryInterval = setInterval(async function () {
-            if (ConnectionManager.getMode() === 'online') {
-              clearInterval(window._recoveryInterval);
-              // 不再整页刷新：通过 API 获取最新数据并更新 UI，保留用户操作状态
-              try {
-                cachedData = await API.getData();
-                isServerMode = true;
-                try { await DB.cacheFullData(JSON.parse(JSON.stringify(cachedData))); } catch (e) { console.warn('[app] 恢复缓存失败:', e); }
-                updateBigScreen();
-                startPoll(5000);
-                showToast('已连接服务器，数据已恢复');
-              } catch (recoveryErr) {
-                console.error('[Init] 恢复数据失败:', recoveryErr);
-                showToast('数据恢复失败，请刷新页面');
-              }
-            }
-          }, 2000);
-        }
-      } catch (dbErr) {
-        hideTransitionMask();
-        showToast('未连接服务器，请检查网络');
-        isServerMode = false;
-        cachedData = { homeworks: {}, freeTimeTasks: {}, dailySettlement: {}, points: { balance: 0 }, shopItems: [], rewardBox: [], activeBuffs: [], bountyTasks: [], bountySubmissions: {}, bountyCompletions: {}, settings: {} };
-        if (window._recoveryInterval) clearInterval(window._recoveryInterval);
-        window._recoveryInterval = setInterval(function () {
-          if (ConnectionManager.getMode() === 'online') {
-            clearInterval(window._recoveryInterval);
-            location.reload();
-          }
-        }, 2000);
-      }
-    }
-  } else {
-    try {
-      var localData = await DB.getFullData();
-      if (localData && Object.keys(localData).length > 0) {
-        isServerMode = false;
-        cachedData = localData;
-        cachedData._loadedOffline = true;
-        showToast('已进入离线模式，数据将在连接后自动同步');
-        hideTransitionMask();
-      } else {
-        hideTransitionMask();
-        showToast('未连接服务器，请检查网络');
-        isServerMode = false;
-        cachedData = { homeworks: {}, freeTimeTasks: {}, dailySettlement: {}, points: { balance: 0 }, shopItems: [], rewardBox: [], activeBuffs: [], bountyTasks: [], bountySubmissions: {}, bountyCompletions: {}, settings: {} };
-        // 定时检查网络恢复后自动重载页面
-        if (window._recoveryInterval) clearInterval(window._recoveryInterval);
-        window._recoveryInterval = setInterval(function () {
-          if (ConnectionManager.getMode() === 'online') {
-            clearInterval(window._recoveryInterval);
-            location.reload();
-          }
-        }, 2000);
-      }
-    } catch (dbErr) {
-      hideTransitionMask();
-      showToast('未连接服务器，请检查网络');
-      isServerMode = false;
-      cachedData = { homeworks: {}, freeTimeTasks: {}, dailySettlement: {}, points: { balance: 0 }, shopItems: [], rewardBox: [], activeBuffs: [], bountyTasks: [], bountySubmissions: {}, bountyCompletions: {}, settings: {} };
-      if (window._recoveryInterval) clearInterval(window._recoveryInterval);
-      window._recoveryInterval = setInterval(function () {
-        if (ConnectionManager.getMode() === 'online') {
-          clearInterval(window._recoveryInterval);
-          location.reload();
-        }
-      }, 2000);
-    }
+  try {
+    cachedData = await API.getData();
+    isServerMode = true;
+  } catch (e) {
+    hideTransitionMask();
+    showToast('加载数据失败，请检查网络');
+    console.error('[Init] 加载数据失败:', e);
+    return;
   }
+  hideTransitionMask();
+
   API.migrateBountyCompletionsToTotal(cachedData);
   const key = Util.dateKey(currentDate);
 
@@ -1377,9 +911,73 @@ async function init() {
   document.addEventListener('click', startScreenSaverTimer);
   document.addEventListener('touchstart', startScreenSaverTimer);
 
-  startPoll(5000);
+  // 集成 RealtimeManager：实时监听数据变化
+  try {
+    const { RealtimeManager } = await import('./realtime.js');
+    const realtime = new RealtimeManager();
 
-  updateConnStatus();
+    // 作业变化：刷新数据并重新渲染
+    realtime.callbacks.onHomeworksChange = () => {
+      refreshFromServer();
+    };
+    // 通知变化：播报新通知
+    realtime.callbacks.onNotificationsChange = (change) => {
+      if (change.new && !change.old) {
+        Voice.speak(change.new.text);
+      }
+    };
+    // 自由时间任务变化
+    realtime.callbacks.onFreeTimeTasksChange = () => {
+      refreshFromServer();
+    };
+    // 结算变化
+    realtime.callbacks.onSettlementChange = () => {
+      refreshFromServer();
+    };
+    // 积分变化
+    realtime.callbacks.onPointsChange = () => {
+      refreshFromServer();
+    };
+    // 奖励箱变化
+    realtime.callbacks.onRewardBoxChange = () => {
+      refreshFromServer();
+    };
+    // 商店变化
+    realtime.callbacks.onShopItemsChange = () => {
+      refreshFromServer();
+    };
+    // 兑换变化
+    realtime.callbacks.onRedemptionsChange = () => {
+      refreshFromServer();
+    };
+    // 赏金任务变化
+    realtime.callbacks.onBountyTasksChange = () => {
+      refreshFromServer();
+    };
+    // 赏金提交变化
+    realtime.callbacks.onBountySubmissionsChange = () => {
+      refreshFromServer();
+    };
+    // 赏金完成变化
+    realtime.callbacks.onBountyCompletionsChange = () => {
+      refreshFromServer();
+    };
+    // Buff 变化
+    realtime.callbacks.onActiveBuffsChange = () => {
+      refreshFromServer();
+    };
+    // 效率历史变化
+    realtime.callbacks.onEfficiencyHistoryChange = () => {
+      refreshFromServer();
+    };
+
+    await realtime.start(token, cachedData.tenant_id, cachedData.child_id);
+    window._realtimeManager = realtime;
+  } catch (e) {
+    console.warn('[Init] RealtimeManager 启动失败，回退到手动刷新:', e);
+  }
+
+  updateChildTitle();
 }
 
 init();
