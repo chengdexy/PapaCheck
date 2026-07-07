@@ -1,10 +1,10 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-07-06（build-apk --publish 一键构建发布，609 测试通过）
+> 最后更新：2026-07-07（CloudBase 迁移文档更新，v2.0.0 开发中）
 
 ## 当前版本
 
-**v1.5.2**（build-apk --publish 一键构建发布，37 Flutter 测试 + 609 Vitest 测试 + 15 Release 测试通过）
+**v2.0.0**（开发中）— 迁移到腾讯云 CloudBase（云函数 + PG + 静态托管 + 网关），实时数据同步替代轮询
 
 ## 部署状态
 
@@ -13,6 +13,7 @@
 - [x] **Phase 5d 完成** — PostgreSQL 自动备份 + 健康监控 + 邮件告警
 - [x] **APK 发布迁移到 CloudBase** — 从 ECS 本地 `apk/` 目录切换到腾讯云 CloudBase PG 存储，`/api/download` 重定向到 CloudBase CDN
 - [x] **build-apk --publish 一键构建发布** — `build-apk` 支持 `--publish` 参数，构建后自动上传 CloudBase + 更新 ECS 版本号 + 重启服务
+- [~] **CloudBase 迁移进行中（v2.0.0）** — 子计划 1-5 代码完成（API 云函数 / RLS 策略 / 前端实时监听 / Release 控制台 / Android 端），待网关切换 + 数据迁移 + ECS 下线
 
 ---
 
@@ -34,8 +35,22 @@
 
 - [x] Web 孩子端（大屏界面）
 - [x] Web 管理端（管理界面 + 数据统计图表）
-- [x] Android APP（Flutter WebView + 离线快照 + APK 自动更新 + 更新后自动清缓存）
+- [x] Android APP（Flutter WebView + APK 自动更新 + 更新后自动清缓存）
 - [x] ~~Windows 桌面端（系统托盘 + 开机自启 + 凭据安全存储）~~ **已移除（弃用）**
+
+### CloudBase 迁移（v2.0.0）
+
+- [x] API 云函数 `papacheck-api`（SCF + Fastify + PG，从 ECS 服务迁移）
+- [x] RLS 行级安全策略（14 张业务表 tenant/child 隔离）
+- [x] 前端实时数据同步（CloudBase PG 实时监听，替代 5s 轮询）
+- [x] 前端路径前缀改为 `/papacheck/`（app/api/login 全部更新）
+- [x] Release 控制台改造（`fn`/`all` 子命令，tcb CLI 部署，移除 SSH）
+- [x] Android 端改造（ConfigService/UpdateService URL 改为 `/papacheck/`，删除离线模块）
+- [x] ~~离线模式（Service Worker / localforage / CRDT / Android 写队列）~~ **已移除（CloudBase 迁移）**
+- [x] ~~邮件同步功能（IMAP + AI 解析 + 附件下载）~~ **已移除（CloudBase 迁移）**
+- [x] ~~运维调度器（OpsScheduler / 备份 / 监控 / 告警）~~ **已移除（CloudBase PG 自带备份 + 腾讯云监控）**
+- [~] 网关切换 + 生产数据迁移（待执行）
+- [~] ECS 服务器下线（切换后 1 周释放）
 
 ### 基础设施
 
@@ -44,17 +59,17 @@
 - [x] **JWT 多租户认证系统** — Hash 码预授权 + token_version 吊销 + 租户行级隔离（Phase 5c）
 - [x] **认证体系重构（Phase 5f）**：分离账号与访问码，`users` 表合并 `tenants` 表，新增 `access_codes` 表。角色简化为 `admin`/`user`（账号）和 `parent`/`child`（访问码）。统一登录入口，超级管理员首次登录强制修改凭证
 - [x] **PostgreSQL 迁移** — `migrate-to-pg.ts` 逐表迁移 + 行数校验，SQLite 数据完整迁移，26 张表
-- [x] **部署：systemd + Nginx + Let's Encrypt** — 移除 Docker，Nginx 反向代理 + HTTPS 自动续期
+- [x] ~~**部署：systemd + Nginx + Let's Encrypt**~~ — **ECS 下线后废弃，改为 CloudBase**
 - [x] **多孩子支持（Phase 1+2）** — children 表 + 12 张表 child_id 列 + partial unique index，数据行级隔离
-- [x] **离线同步重构（Phase 0~4）** — CRDT 模型简化、SQLite 退役、Android 原生写队列
-- [x] **Phase 5d 运维增强**：PostgreSQL 自动备份（每日 03:00，保留 3 份）、健康监控（磁盘/PG/备份状态，每 5 分钟）、邮件告警（状态机去重，SMTP 配置面板）、超管面板系统健康页面
-- [x] TTS 语音提醒（tts-svc 独立服务，Python FastAPI + edge-tts，[设计文档](../tts-svc/docs/2026-06-30-tts-svc-design.md)）
-- [x] 邮件同步（IMAP + AI 解析）
-- [x] 附件下载
-- [x] 离线支持（Service Worker + localforage）
-- [x] 增量同步（pull/push）
-- [x] **Release Console 发布控制台** — `PapaCheck.Release/` CLI 四子命令 + Web 控制台（SSE 实时日志），替代 release.py
-- [x] OpenAPI 自动文档（Swagger UI）
+- [x] ~~**离线同步重构（Phase 0~4）**~~ — **已移除（CloudBase 迁移，实时监听替代）**
+- [x] ~~**Phase 5d 运维增强**~~ — **已移除（CloudBase PG 自带备份 + 腾讯云监控）**
+- [x] TTS 语音提醒（tts-svc 云函数，Python FastAPI + edge-tts）
+- [x] ~~邮件同步（IMAP + AI 解析）~~ **已移除（CloudBase 迁移）**
+- [x] ~~附件下载~~ **已移除（CloudBase 迁移）**
+- [x] ~~离线支持（Service Worker + localforage）~~ **已移除（CloudBase 迁移）**
+- [x] ~~增量同步（pull/push）~~ **已移除（CloudBase 实时监听替代）**
+- [x] **Release Console 发布控制台** — `PapaCheck.Release/` CLI 子命令 + Web 控制台（SSE 实时日志），支持 `fn`/`all` tcb CLI 部署
+- [x] ~~OpenAPI 自动文档（Swagger UI）~~ **已移除（CloudBase 迁移）**
 - [x] 单 EXE 构建（Node.js SEA）
 - [x] 测试框架（Vitest + Flutter test）
 - [x] JS/TS 代码覆盖率 85.22%（Stmts）| 71.89%（Branch）| 90.94%（Funcs）| 87.06%（Lines）
@@ -93,6 +108,7 @@ _无未解决项。_
 
 | 日期 | 变更 |
 |------|------|
+| 2026-07-07 | **CloudBase 迁移（v2.0.0）**：子计划 1-5 代码完成 — ① API 云函数 `papacheck-api`（SCF + Fastify + PG）；② RLS 行级安全策略 SQL + 数据迁移脚本；③ 前端实时监听改造（cloudbase.js/realtime.js/api.js/app.js/admin.js/HTML，路径前缀 `/papacheck/`）；④ Release 控制台改造（fn-deploy/cloud-publish/site-publish，tcb CLI 部署）；⑤ Android 端改造（ConfigService/UpdateService URL + 删除离线模块）。移除离线模式/邮件同步/运维调度器/Swagger。更新全部项目文档。待网关切换 + 数据迁移 + ECS 下线 |
 | 2026-07-06 | **build-apk --publish 一键构建发布**：新增 `-p/--publish` 参数，构建后自动上传 CloudBase + 更新 ECS 版本号 + 重启服务。控制台前端添加「构建后发布」复选框。`/api/download` 改为直连 CloudBase CDN 绕过 ECS 带宽限制。v1.5.2 |
 | 2026-07-06 | **APK 发布迁移到腾讯云 CloudBase**：APK 上传不再使用 SCP 到 ECS 本地，改为上传到 CloudBase PG 存储 `dist` 桶。`/api/download` 改为 302 重定向到 CloudBase CDN，`/api/version` 改为从环境变量 `PAPACHECK_CLIENT_VERSION` 读取。`cloud-publish.ts` 新增 CloudBase 上传 + ECS 环境变量更新步骤。Nginx 新增 `/download/` 位置代理到 CloudBase CDN。版本号 v1.4.2→v1.5.0。609 测试通过 |
 | 2026-06-30 | **TTS 桥接抽离为独立 tts-svc 服务**：删除 `src/tts/index.ts`（TTSBridge 401 行）和 `scripts/tts_bridge.py`（Python 子进程桥接）。`/api/speak` 和 `/api/pregen-speech` 改为转发到 tts-svc（Python FastAPI + edge-tts，监听 127.0.0.1:8500）。移除了 `--tts-python` CLI 参数。全量 608 测试通过（-35 因 tts.test.ts 删除）。[设计文档](../tts-svc/docs/2026-06-30-tts-svc-design.md) |

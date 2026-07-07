@@ -2,9 +2,9 @@
 
 ![PapaCheck Banner](./docs/imgs/_banner.jpg)
 
-> **v1.5.2** — build-apk --publish 一键构建发布，37 Flutter 测试 + 609 Vitest 测试（0 跳过）通过，15 Release 测试
+> **v2.0.0** — 迁移到腾讯云 CloudBase（云函数 + PG + 静态托管 + 网关），实时数据同步替代轮询，37 Flutter 测试 + 609 Vitest 测试（0 跳过）通过，15 Release 测试
 
-PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和跟踪孩子的作业完成情况。支持通过转发微信群中老师布置的作业到邮件，AI 自动解析并添加到清单；孩子可以自主开始/暂停/完成作业并获得积分；家长远程评级并管理积分商店。
+PapaCheck 是一个面向家庭的家长辅助工具，帮助管理和跟踪孩子的作业完成情况。孩子可以自主开始/暂停/完成作业并获得积分；家长远程评级并管理积分商店。部署在腾讯云 CloudBase，支持随时随地访问。
 
 ## ✨ 核心功能
 
@@ -16,12 +16,8 @@ PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和�
 - **🏪 积分商店**：孩子用积分兑换游戏时间或奖励物品，支持 Buff 系统（双倍积分等）
 - **🎁 奖励箱**：家长发放奖励，孩子自主兑换
 - **💰 赏金任务**：家长发布任务（如"帮妈妈洗碗"），孩子提交完成证明获取积分
-- **📧 邮件同步**：转发老师作业邮件到指定邮箱，AI 自动解析并发布
-- **📎 附件下载**：邮件中的图片、文件自动下载保存
 - **📱 多端支持**：Web 大屏（孩子端 + 管理端）、Android APP
-- **🔌 离线可用**：断网时核心功能正常，联网后自动同步
-- **💾 自动备份**：每日凌晨 PostgreSQL 自动备份，超管面板可下载
-- **📊 健康监控**：磁盘/PG/备份状态实时监控，异常邮件告警
+- **⚡ 实时数据同步**：CloudBase PG 实时监听，数据变更秒级推送到所有客户端（替代轮询）
 - **🎨 品牌落地页**：`PapaCheck.Site` 提供产品介绍 + 下载 + 注册入口，含五态吉祥物插画（wave/point/ok/thumbs/bye）
 - **🛠 统一管理面板**：`PapaCheck.Site/admin` 提供家庭成员/作业/积分商店的远程管理（与落地页同一 Vite + React + TS + Tailwind 技术栈）
 - **🚀 发布控制台**：`PapaCheck.Release` 提供 Web 界面一键构建 APK / 同步云端 / 部署 Site（Node.js + Fastify + SSE 实时日志）
@@ -30,16 +26,16 @@ PapaCheck 是一个面向家庭局域网的家长辅助工具，帮助管理和�
 
 ### 0. 云部署（免局域网，随时随地访问）
 
-项目已部署到阿里云 ECS，访问 [https://papacheck.chengdexy.cn/app/](https://papacheck.chengdexy.cn/app/)：
+项目已部署到腾讯云 CloudBase，访问 [https://chengdexy.cn/papacheck/app/](https://chengdexy.cn/papacheck/app/)：
 
-- **孩子端**：`https://papacheck.chengdexy.cn/app/`
-- **管理端**：`https://papacheck.chengdexy.cn/app/admin/`
+- **孩子端**：`https://chengdexy.cn/papacheck/app/`
+- **管理端**：`https://chengdexy.cn/papacheck/app/admin/`
 
-> 服务器配置：2核2G / 3M带宽 / Ubuntu 24.04 / systemd + Nginx + PostgreSQL
+> 部署架构：CloudBase SCF 云函数 + PostgreSQL + 静态托管 + 网关（chengdexy.cn）
 
 ### 1. 本地启动服务器
 
-**Node.js 服务器（推荐）**
+**Node.js 服务器（本地开发）**
 
 ```bash
 cd PapaCheck.Server
@@ -62,17 +58,15 @@ npm run dev -- --port 8080
 
 访问 `http://192.x.x.x:8080/api/download` 下载并安装最新 APK。
 
-### 3. 邮件同步（可选）
-
-在菜单栏选择 **服务配置**，填写 IMAP 邮箱信息、接收作业的邮箱地址和 API Key（用于解析邮件内容）。点击 **邮件作业同步** 按钮，AI 会自动拉取邮件、解析作业并发布。
-
 ## 🏗 项目结构
 
 ```
 PapaCheck/
-├── PapaCheck.Server/        # 服务端（Node.js + Fastify + PostgreSQL）
+├── PapaCheck.Server/        # 服务端（Node.js + Fastify + PostgreSQL，本地开发用）
 │   ├── src/db/              # 数据库抽象层（IDatabase + PostgresAdapter）
 │   └── scripts/             # 迁移脚本 + PostgreSQL DDL
+├── PapaCheck.CloudFunc/     # CloudBase 云函数（生产部署）
+│   └── papacheck-api/       # API 云函数（SCF + Fastify + PG，从 Server 迁移）
 ├── PapaCheck.Web/           # Web 前端（孩子大屏 & 管理端 admin.html）
 ├── PapaCheck.Android/       # Android 端（Flutter WebView 混合应用）
 ├── PapaCheck.Site/          # 落地页 + React 管理面板（Vite + Tailwind）
@@ -85,12 +79,14 @@ PapaCheck/
 
 | 模块              | 技术                                                    |
 | ----------------- | ------------------------------------------------------- |
-| **Server**        | Node.js, Fastify, pg (PostgreSQL), tts-svc (独立 TTS 服务) |
-| **Web 前端**      | 原生 HTML/CSS/JS, SVG 图表, Service Worker              |
+| **云函数（生产）** | CloudBase SCF（Node.js 20.19）、Fastify、PostgreSQL     |
+| **本地开发服务器** | Node.js, Fastify, pg (PostgreSQL), tts-svc (独立 TTS 服务) |
+| **Web 前端**      | 原生 HTML/CSS/JS, SVG 图表, CloudBase JS SDK（实时监听） |
 | **Site（落地页+管理面板）** | Vite 5, React 18, TypeScript 5, Tailwind CSS 3, Lucide Icons |
 | **Android 端**    | Flutter, `webview_flutter`                              |
+| **基础设施**      | CloudBase PG / SCF / 网关 / 静态托管                     |
 | **测试**          | Vitest（643 单元 + PG 集成）                              |
-| **构建发布**      | PapaCheck.Release                                         |
+| **构建发布**      | PapaCheck.Release（tcb CLI 部署）                         |
 
 ## 🔧 开发
 
