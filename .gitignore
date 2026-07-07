@@ -93,6 +93,7 @@ htmlcov/
 
 # 运行时数据（JWT 密钥、管理员凭据等）
 PapaCheck.Server/data/
+PapaCheck.CloudFunc/data/
 PapaCheck.CloudFunc/papacheck-api/data/
 
 # cloudbaserc.json (每个环境不同，不入版本控制)
