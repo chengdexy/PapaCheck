@@ -4,12 +4,13 @@ import { fileURLToPath } from 'url';
 import { readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { Executor } from './lib/executor.js';
 import { buildApk, readApkVersion } from './lib/build-apk.js';
-import { cloudPublish } from './lib/cloud-publish.js';
-import { sitePublish } from './lib/site-publish.js';
+import { deployCloudFunction } from './lib/cloud-publish.js';
+import { publishSite, publishWebApp } from './lib/site-publish.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HTML_PATH = join(__dirname, 'console.html');
 const LOG_DIR = join(__dirname, 'log');
+const CLOUDBASE_ENV = 'child-teacher-parent-d9aef9d2208';
 
 export async function startServer(port = 3456) {
   const executor = new Executor();
@@ -38,8 +39,7 @@ export async function startServer(port = 3456) {
   app.get('/api/version', async () => ({ apk: readApkVersion() }));
 
   app.get('/api/release/env', async () => ({
-    PAPACHECK_CLOUD_IP: process.env.PAPACHECK_CLOUD_IP || null,
-    PAPACHECK_SSH_USER: process.env.PAPACHECK_SSH_USER || null,
+    CLOUDBASE_ENV_ID: CLOUDBASE_ENV,
   }));
 
   app.get('/api/release/history', async () => executor.history);
@@ -70,18 +70,27 @@ export async function startServer(port = 3456) {
     return { ok: true, message: '构建已启动' };
   });
 
-  app.post('/api/release/cloud', async () => {
-    cloudPublish(executor).catch((err) => {
-      console.error(err);
-    });
-    return { ok: true, message: '云同步已启动' };
+  app.post('/api/release/fn', async () => {
+    deployCloudFunction().catch((err) => console.error(err));
+    return { ok: true, message: '云函数部署已启动' };
   });
 
   app.post('/api/release/site', async () => {
-    sitePublish(executor).catch((err) => {
-      console.error(err);
-    });
+    publishSite().catch((err) => console.error(err));
     return { ok: true, message: 'Site 部署已启动' };
+  });
+
+  app.post('/api/release/web', async () => {
+    publishWebApp().catch((err) => console.error(err));
+    return { ok: true, message: 'Web 部署已启动' };
+  });
+
+  app.post('/api/release/all', async () => {
+    deployCloudFunction()
+      .then(() => publishSite())
+      .then(() => publishWebApp())
+      .catch((err) => console.error(err));
+    return { ok: true, message: '全部部署已启动' };
   });
 
   app.post('/api/release/save-log', async (request) => {

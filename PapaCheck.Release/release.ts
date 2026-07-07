@@ -22,8 +22,8 @@ if (existsSync(envPath)) {
 import { Command } from 'commander';
 import { startServer } from './console-server.js';
 import { buildApk } from './lib/build-apk.js';
-import { cloudPublish } from './lib/cloud-publish.js';
-import { sitePublish } from './lib/site-publish.js';
+import { deployCloudFunction, updateApkVersion } from './lib/cloud-publish.js';
+import { publishSite, publishWebApp } from './lib/site-publish.js';
 import { Executor } from './lib/executor.js';
 
 const program = new Command();
@@ -57,21 +57,65 @@ program
   });
 
 program
-  .command('cloud')
-  .description('同步到云端')
+  .command('fn')
+  .description('部署云函数到 CloudBase (tcb fn deploy)')
   .action(async () => {
-    const executor = new Executor();
-    const success = await cloudPublish(executor);
-    process.exit(success ? 0 : 1);
+    try {
+      await deployCloudFunction();
+      process.exit(0);
+    } catch {
+      process.exit(1);
+    }
   });
 
 program
   .command('site')
-  .description('部署 PapaCheck.Site')
+  .description('部署 PapaCheck.Site 到 CloudBase Hosting')
   .action(async () => {
-    const executor = new Executor();
-    const success = await sitePublish(executor);
-    process.exit(success ? 0 : 1);
+    try {
+      await publishSite();
+      process.exit(0);
+    } catch {
+      process.exit(1);
+    }
+  });
+
+program
+  .command('web')
+  .description('部署 PapaCheck.Web 到 CloudBase Hosting')
+  .action(async () => {
+    try {
+      await publishWebApp();
+      process.exit(0);
+    } catch {
+      process.exit(1);
+    }
+  });
+
+program
+  .command('all')
+  .description('部署全部（云函数 + Site + Web）')
+  .action(async () => {
+    try {
+      await deployCloudFunction();
+      await publishSite();
+      await publishWebApp();
+      process.exit(0);
+    } catch {
+      process.exit(1);
+    }
+  });
+
+program
+  .command('update-version <version>')
+  .description('更新云函数环境变量 APK_VERSION')
+  .action(async (version: string) => {
+    try {
+      await updateApkVersion(version);
+      process.exit(0);
+    } catch {
+      process.exit(1);
+    }
   });
 
 program.parse(process.argv);
