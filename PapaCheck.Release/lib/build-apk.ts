@@ -124,7 +124,7 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
     steps.push({
       id: String(idx++), desc: `上传 APK 到 CloudBase 云存储 (PapaCheck-${newVer}.apk)`,
       shell: true,
-      cmd: `tcb storage objects upload ${apkPath} dist/PapaCheck-${newVer}.apk --bucket staticstore --env-id ${CLOUDBASE_ENV}`,
+      cmd: `tcb storage objects upload ${apkPath} dist/PapaCheck-${newVer}.apk --bucket dist --env-id ${CLOUDBASE_ENV}`,
       timeout: 120,
     });
     steps.push({
