@@ -95,6 +95,13 @@ htmlcov/
 PapaCheck.Server/data/
 PapaCheck.CloudFunc/papacheck-api/data/
 
+# cloudbaserc.json (每个环境不同，不入版本控制)
+cloudbaserc.json
+**/cloudbaserc.json
+
+# 部署输出目录
+deploy-papacheck/
+
 # Release 控制台保存的日志
 PapaCheck.Release/log/
 
