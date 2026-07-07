@@ -79,33 +79,6 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// ==================== Service Worker ====================
-// Android WebView 跳过 SW 注册（WebView 生命周期与浏览器不同，SW 缓存可能导致意外行为）
-if ('serviceWorker' in navigator && !/Android.*wv/i.test(navigator.userAgent)) {
-  window.addEventListener('load', function () {
-    navigator.serviceWorker.register('/sw.js').then(function (reg) {
-      console.log('[common] SW registered:', reg.scope);
-    }).catch(function (err) {
-      console.log('[common] SW registration failed:', err);
-    });
+// ==================== Service Worker (已移除) ====================
+// CloudBase 迁移后不再使用 Service Worker
 
-    // 监听 SW 发来的强制刷新消息
-    navigator.serviceWorker.addEventListener('message', function (event) {
-      if (event.data && event.data.type === 'FORCE_REFRESH') {
-        sessionStorage.setItem('sw_updated', 'true');
-        showTransitionMask('检测到新版本，正在刷新页面...');
-        window.location.reload();
-      }
-    });
-  });
-}
-
-// 页面加载时检测是否为刷新后
-if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('sw_updated') === 'true') {
-  sessionStorage.removeItem('sw_updated');
-  setTimeout(function () {
-    if (typeof showToast === 'function') {
-      showToast('已更新到最新版本');
-    }
-  }, 500);
-}
