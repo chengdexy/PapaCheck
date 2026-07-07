@@ -163,7 +163,7 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
       steps.push({
         id: String(idx++), desc: `部署云函数 ${newVer}`,
         shell: true,
-        cmd: `tcb fn deploy papacheck-api --env-id ${CLOUDBASE_ENV} --force --yes`,
+        cmd: `tcb fn deploy papacheck-api --env-id ${CLOUDBASE_ENV} --force --yes --dir .`,
         cwd: cfDist,
         timeout: 60,
       });
