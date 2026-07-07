@@ -1,6 +1,6 @@
 {
   "name": "papacheck-api",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "description": "PapaCheck API 云函数（CloudBase SCF）",
   "main": "dist/index.js",
   "scripts": {
