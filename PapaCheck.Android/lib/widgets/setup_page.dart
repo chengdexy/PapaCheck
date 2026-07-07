@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/config_service.dart';
+import '../services/config_service.dart' show DeviceRole, defaultServerUrl;
 
 class SetupResult {
   final String url;
@@ -48,7 +48,7 @@ class _SetupPageState extends State<SetupPage> {
 
   void _confirm() {
     Navigator.of(context).pop(SetupResult(
-      url: ConfigService.defaultServerUrl,
+      url: defaultServerUrl,
       role: _role,
     ));
   }
