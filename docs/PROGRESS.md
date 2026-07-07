@@ -108,6 +108,7 @@ _无未解决项。_
 
 | 日期 | 变更 |
 |------|------|
+| 2026-07-07 | **修复 RealtimeManager 启动时 14 个并发请求 + TTS 语音 404 + API 云函数 TTS 转发 localhost 无效**：`triggerAll()` 遍历 14 个回调各自触发 `refreshFromServer()`，改为统一 `onRefresh`；`Voice._playNext()` 硬编码 `/api/speak` 缺 `/papacheck` 前缀；`papacheck-api` `/api/speak` 路由在 SCF 中无法通过 localhost 访问 `tts-svc`，改为 `callFunction` 跨函数调用。新增 `@cloudbase/node-sdk` 依赖。重新部署前端 + API 云函数 |
 | 2026-07-07 | **修复 RealtimeManager 启动失败**：`@cloudbase/js-sdk` v3 API 多重不兼容（importmap 裸模块标识符、`signInWithJwt` → `signInAnonymously`、`rdb()` → `database()`、`table()` → `collection()`），最终将 RealtimeManager 从 CloudBase watch() 改为每 30 秒轮询触发刷新。修复 favicon 404、site-publish.ts CLI 参数兼容性 |
 | 2026-07-07 | **CloudBase 迁移（v2.0.0）**：子计划 1-5 代码完成 — ① API 云函数 `papacheck-api`（SCF + Fastify + PG）；② RLS 行级安全策略 SQL + 数据迁移脚本；③ 前端实时监听改造（cloudbase.js/realtime.js/api.js/app.js/admin.js/HTML，路径前缀 `/papacheck/`）；④ Release 控制台改造（fn-deploy/cloud-publish/site-publish，tcb CLI 部署）；⑤ Android 端改造（ConfigService/UpdateService URL + 删除离线模块）。移除离线模式/邮件同步/运维调度器/Swagger。更新全部项目文档。待网关切换 + 数据迁移 + ECS 下线 |
 | 2026-07-06 | **build-apk --publish 一键构建发布**：新增 `-p/--publish` 参数，构建后自动上传 CloudBase + 更新 ECS 版本号 + 重启服务。控制台前端添加「构建后发布」复选框。`/api/download` 改为直连 CloudBase CDN 绕过 ECS 带宽限制。v1.5.2 |

@@ -13,13 +13,13 @@ describe('RealtimeManager', () => {
     vi.useRealTimers();
   });
 
-  it('start 后触发回调并启动轮询', async () => {
+  it('start 后触发 onRefresh 回调并启动轮询', async () => {
     const callback = vi.fn();
-    realtime.callbacks.onHomeworksChange = callback;
+    realtime.callbacks.onRefresh = callback;
 
     await realtime.start('tenant-1', 'child-1');
 
-    // start 时立即触发一次回调
+    // start 时立即触发一次 onRefresh
     expect(callback).toHaveBeenCalledTimes(1);
 
     // 模拟轮询间隔
@@ -32,7 +32,7 @@ describe('RealtimeManager', () => {
 
   it('stop 清除轮询', async () => {
     const callback = vi.fn();
-    realtime.callbacks.onHomeworksChange = callback;
+    realtime.callbacks.onRefresh = callback;
 
     await realtime.start('tenant-1', 'child-1');
     expect(callback).toHaveBeenCalledTimes(1);
@@ -44,19 +44,32 @@ describe('RealtimeManager', () => {
     expect(callback).toHaveBeenCalledTimes(1);
   });
 
-  it('回调异常不影响其他回调', async () => {
-    const errorCb = vi.fn(() => { throw new Error('test error'); });
-    const normalCb = vi.fn();
-    realtime.callbacks.onHomeworksChange = errorCb;
-    realtime.callbacks.onSettlementChange = normalCb;
+  it('triggerAll 仅触发 onRefresh 回调', async () => {
+    const refreshCb = vi.fn();
+    const otherCb = vi.fn();
+    realtime.callbacks.onRefresh = refreshCb;
+    realtime.callbacks.onHomeworksChange = otherCb;
+    realtime.callbacks.onSettlementChange = otherCb;
 
-    await realtime.start('tenant-1', null);
-    expect(normalCb).toHaveBeenCalledTimes(1);
-    expect(errorCb).toHaveBeenCalledTimes(1);
+    realtime.triggerAll();
+
+    // 仅 onRefresh 被调用，细粒度回调不被触发（轮询模式不需要逐个触发）
+    expect(refreshCb).toHaveBeenCalledTimes(1);
+    expect(otherCb).toHaveBeenCalledTimes(0);
   });
 
-  it('onHomeworksChange 回调可被调用', () => {
+  it('onRefresh 异常被吞没不影响后续轮询', async () => {
+    const errCb = vi.fn(() => { throw new Error('test error'); });
+    realtime.callbacks.onRefresh = errCb;
+
+    // triggerAll 应吞没异常
+    expect(() => realtime.triggerAll()).not.toThrow();
+    expect(errCb).toHaveBeenCalledTimes(1);
+  });
+
+  it('细粒度回调仍可被直接调用', () => {
     const change = { new: { id: 1, name: '作业1' }, old: null };
     expect(() => realtime.onHomeworksChange(change)).not.toThrow();
+    expect(() => realtime.onNotificationsChange(change)).not.toThrow();
   });
 });

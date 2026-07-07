@@ -6,7 +6,7 @@
 
 | 模块 | 语言/框架 | 关键依赖 |
 |------|-----------|----------|
-| **云函数（生产）** | Node.js 20.19（CloudBase SCF） | Fastify 5.x、PostgreSQL（CloudBase PG）、TypeScript 5.x |
+| **云函数（生产）** | Node.js 20.19（CloudBase SCF） | Fastify 5.x、PostgreSQL（CloudBase PG）、TypeScript 5.x、`@cloudbase/node-sdk`（SCF 间 callFunction） |
 | **本地开发服务器** | Node.js 22+ | Fastify 5.x、PostgreSQL 16、TypeScript 5.x |
 | **Web 前端** | 原生 HTML/CSS/JS | `@cloudbase/js-sdk`（importmap CDN）、30 秒轮询刷新 |
 | **Site（落地页+管理面板）** | Vite 5, React 18, TypeScript 5, Tailwind CSS 3 | Lucide Icons、Tailwind preset、React Router（可选） |
