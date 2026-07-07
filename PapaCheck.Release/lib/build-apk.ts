@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { Executor, type StepDef } from './executor.js';
+import { CDN_BASE_URL } from './storage-upload.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -56,7 +57,7 @@ function _updatePubspecVersion(newVer: string): void {
   writeFileSync(PUBSPEC, content);
 }
 
-export async function buildApk(executor: Executor, args: { ver?: string; bump?: string; noBump?: boolean; publish?: boolean } = {}): Promise<boolean> {
+export async function buildApk(executor: Executor, args: { ver?: string; bump?: string; noBump?: boolean; publish?: boolean; publishOnBuild?: boolean } = {}): Promise<boolean> {
   const currentVer = readApkVersion();
   const newVer = resolveVersion(currentVer, args);
   const steps: StepDef[] = [];
@@ -114,6 +115,24 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
         timeout: 60,
       });
     }
+  }
+
+  // --publishOnBuild：构建后上传云存储 + 更新云函数环境变量
+  if (args.publishOnBuild) {
+    const apkPath = join(APK_ARCHIVE_DIR, `PapaCheck-${newVer}.apk`);
+    const cdnUrl = `${CDN_BASE_URL}/dist/PapaCheck-${newVer}.apk`;
+    steps.push({
+      id: String(idx++), desc: `上传 APK 到 CloudBase 云存储 (PapaCheck-${newVer}.apk)`,
+      shell: true,
+      cmd: `tcb storage upload "${apkPath}" "dist/PapaCheck-${newVer}.apk" --envId ${CLOUDBASE_ENV}`,
+      timeout: 120,
+    });
+    steps.push({
+      id: String(idx++), desc: `更新云函数环境变量 APK_VERSION=${newVer}`,
+      shell: true,
+      cmd: `tcb fn update papacheck-api --envId ${CLOUDBASE_ENV} --env APK_VERSION=${newVer} --env APK_CDN_URL=${cdnUrl}`,
+      timeout: 30,
+    });
   }
 
   return executor.runAndReport('构建 APK', steps);

@@ -276,7 +276,7 @@ function startRelease(type) {
     const publish = document.getElementById('publishCheck').checked;
     const body = {};
     if (bump) body.bump = bump;
-    if (publish) body.publish = true;
+    if (publish) body.publishOnBuild = true;
     if (Object.keys(body).length) {
       opts.headers = { 'Content-Type': 'application/json' };
       opts.body = JSON.stringify(body);
