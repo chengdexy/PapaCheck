@@ -127,17 +127,26 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
       cmd: `tcb storage objects upload ${apkPath} PapaCheck-${newVer}.apk --bucket dist --env-id ${CLOUDBASE_ENV} --upsert`,
       timeout: 120,
     });
-    // 同步云函数 package.json 版本号（下次部署云函数时生效）
-    const cfPkgPath = join(ROOT, 'PapaCheck.CloudFunc', 'papacheck-api', 'package.json');
+    // 同步云函数 package.json 版本号，并自动构建+部署云函数
+    const cfDir = join(ROOT, 'PapaCheck.CloudFunc', 'papacheck-api');
+    const cfPkgPath = join(cfDir, 'package.json');
     if (existsSync(cfPkgPath)) {
       const cfPkg = JSON.parse(readFileSync(cfPkgPath, 'utf-8'));
       cfPkg.version = newVer;
       writeFileSync(cfPkgPath, JSON.stringify(cfPkg, null, 2) + '\n', 'utf-8');
       steps.push({
-        id: String(idx++), desc: `同步云函数 package.json 版本号 → ${newVer}`,
+        id: String(idx++), desc: `构建云函数 (v${newVer})`,
         shell: true,
-        cmd: `echo 版号 ${newVer} 已写入 package.json，下次部署云函数时生效`,
-        timeout: 5,
+        cmd: `npm run build`,
+        cwd: cfDir,
+        timeout: 30,
+      });
+      steps.push({
+        id: String(idx++), desc: `部署云函数 ${newVer}`,
+        shell: true,
+        cmd: `tcb fn deploy papacheck-api --env-id ${CLOUDBASE_ENV} --force --yes`,
+        cwd: join(cfDir, 'dist'),
+        timeout: 60,
       });
     }
   }
