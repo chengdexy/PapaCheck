@@ -104,7 +104,7 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
       steps.push({
         id: String(idx++), desc: `上传 APK 到 CloudBase (PapaCheck-${newVer}.apk)`,
         shell: true,
-        cmd: `tcb storage objects upload ${apkPath} PapaCheck-${newVer}.apk -b dist -e ${CLOUDBASE_ENV} --content-type application/vnd.android.package-archive --use-put --json`,
+        cmd: `tcb storage objects upload ${apkPath} PapaCheck-${newVer}.apk --bucket staticstore --env-id ${CLOUDBASE_ENV} --content-type application/vnd.android.package-archive --use-put --json`,
         timeout: 120,
       });
 
@@ -124,13 +124,13 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
     steps.push({
       id: String(idx++), desc: `上传 APK 到 CloudBase 云存储 (PapaCheck-${newVer}.apk)`,
       shell: true,
-      cmd: `tcb storage upload "${apkPath}" "dist/PapaCheck-${newVer}.apk" --envId ${CLOUDBASE_ENV}`,
+      cmd: `tcb storage objects upload "${apkPath}" "dist/PapaCheck-${newVer}.apk" --bucket staticstore --env-id ${CLOUDBASE_ENV}`,
       timeout: 120,
     });
     steps.push({
       id: String(idx++), desc: `更新云函数环境变量 APK_VERSION=${newVer}`,
       shell: true,
-      cmd: `tcb fn update papacheck-api --envId ${CLOUDBASE_ENV} --env APK_VERSION=${newVer} --env APK_CDN_URL=${cdnUrl}`,
+      cmd: `tcb fn update papacheck-api --env-id ${CLOUDBASE_ENV} --env APK_VERSION=${newVer} --env APK_CDN_URL=${cdnUrl}`,
       timeout: 30,
     });
   }
