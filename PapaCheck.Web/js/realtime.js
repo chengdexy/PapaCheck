@@ -9,6 +9,9 @@ export class RealtimeManager {
   constructor() {
     this.pollTimer = null;
     this.callbacks = {
+      /** 轮询模式统一刷新回调（替代逐个触发） */
+      onRefresh: () => {},
+      /** 以下为细粒度回调，供 watch() 模式使用 */
       onHomeworksChange: () => {},
       onSettlementChange: () => {},
       onPointsChange: () => {},
@@ -35,13 +38,12 @@ export class RealtimeManager {
     this.pollTimer = setInterval(() => this.triggerAll(), POLL_INTERVAL_MS);
   }
 
+  /** 轮询触发：只调用一次统一刷新回调，避免重复请求 */
   triggerAll() {
-    for (const key of Object.keys(this.callbacks)) {
-      try {
-        this.callbacks[key]();
-      } catch (e) {
-        // ignore
-      }
+    try {
+      this.callbacks.onRefresh();
+    } catch (e) {
+      // ignore
     }
   }
 

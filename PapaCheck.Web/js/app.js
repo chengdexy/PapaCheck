@@ -115,7 +115,7 @@ const Voice = {
         console.log('[Voice] cache hit:', text);
         audio = new Audio(this._cache.get(text));
       } else {
-        const url = '/api/speak?' + new URLSearchParams({ text });
+        const url = '/papacheck/api/speak?' + new URLSearchParams({ text });
         // /api/speak 已改为需鉴权（2026-06-18），需携带 JWT
         // 复用 api.js 的 getAuthHeaders()：自带 try-catch 保护隐私模式下 localStorage 禁用场景
         const resp = await fetch(url, { headers: getAuthHeaders() });
@@ -911,71 +911,21 @@ async function init() {
   document.addEventListener('click', startScreenSaverTimer);
   document.addEventListener('touchstart', startScreenSaverTimer);
 
-  // 集成 RealtimeManager：实时监听数据变化
-  try {
-    const { RealtimeManager } = await import('./realtime.js');
-    const realtime = new RealtimeManager();
+  // 集成 RealtimeManager：轮询监听数据变化
+    try {
+      const { RealtimeManager } = await import('./realtime.js');
+      const realtime = new RealtimeManager();
 
-    // 作业变化：刷新数据并重新渲染
-    realtime.callbacks.onHomeworksChange = () => {
-      refreshFromServer();
-    };
-    // 通知变化：播报新通知
-    realtime.callbacks.onNotificationsChange = (change) => {
-      if (change.new && !change.old) {
-        Voice.speak(change.new.text);
-      }
-    };
-    // 自由时间任务变化
-    realtime.callbacks.onFreeTimeTasksChange = () => {
-      refreshFromServer();
-    };
-    // 结算变化
-    realtime.callbacks.onSettlementChange = () => {
-      refreshFromServer();
-    };
-    // 积分变化
-    realtime.callbacks.onPointsChange = () => {
-      refreshFromServer();
-    };
-    // 奖励箱变化
-    realtime.callbacks.onRewardBoxChange = () => {
-      refreshFromServer();
-    };
-    // 商店变化
-    realtime.callbacks.onShopItemsChange = () => {
-      refreshFromServer();
-    };
-    // 兑换变化
-    realtime.callbacks.onRedemptionsChange = () => {
-      refreshFromServer();
-    };
-    // 赏金任务变化
-    realtime.callbacks.onBountyTasksChange = () => {
-      refreshFromServer();
-    };
-    // 赏金提交变化
-    realtime.callbacks.onBountySubmissionsChange = () => {
-      refreshFromServer();
-    };
-    // 赏金完成变化
-    realtime.callbacks.onBountyCompletionsChange = () => {
-      refreshFromServer();
-    };
-    // Buff 变化
-    realtime.callbacks.onActiveBuffsChange = () => {
-      refreshFromServer();
-    };
-    // 效率历史变化
-    realtime.callbacks.onEfficiencyHistoryChange = () => {
-      refreshFromServer();
-    };
+      // 轮询模式：统一刷新回调，仅触发一次数据拉取
+      realtime.callbacks.onRefresh = () => {
+        refreshFromServer();
+      };
 
-    await realtime.start(cachedData.tenant_id, cachedData.child_id);
-    window._realtimeManager = realtime;
-  } catch (e) {
-    console.warn('[Init] RealtimeManager 启动失败，回退到手动刷新:', e);
-  }
+      await realtime.start(cachedData.tenant_id, cachedData.child_id);
+      window._realtimeManager = realtime;
+    } catch (e) {
+      console.warn('[Init] RealtimeManager 启动失败，回退到手动刷新:', e);
+    }
 
   updateChildTitle();
 }

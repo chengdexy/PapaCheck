@@ -64,8 +64,7 @@ PapaCheck 正在从阿里云 ECS 迁移到腾讯云 CloudBase。迁移后对外�
 | `https://chengdexy.cn/papacheck/` | 落地页（静态托管） |
 | `https://chengdexy.cn/papacheck/app/` | 孩子端（静态托管） |
 | `https://chengdexy.cn/papacheck/app/admin/` | 管理面板（静态托管） |
-| `https://chengdexy.cn/papacheck/api/...` | REST API（SCF 云函数 `papacheck-api`） |
-| `https://chengdexy.cn/papacheck/api/speak` | TTS 语音（SCF 云函数 `tts-svc`） |
+| `https://chengdexy.cn/papacheck/api/...` | REST API（SCF 云函数 `papacheck-api`，含 `/api/speak` TTS 转发到 `tts-svc`） |
 
 ### ECS（迁移前，切换后失效）
 

@@ -186,14 +186,14 @@ async function initAdmin() {
   try { var savedTab = localStorage.getItem('adminTab'); } catch (e) { /* 非致命 */ }
   switchTab(savedTab && ['homework', 'shop', 'rewardBox', 'bounty', 'redeem', 'stats', 'settings'].indexOf(savedTab) !== -1 ? savedTab : 'homework');
 
-  // 集成 RealtimeManager：实时监听数据变化，替代轮询
+  // 集成 RealtimeManager：轮询监听数据变化
   try {
     const token = sessionStorage.getItem('papacheck_token');
     if (token && cachedData) {
       const { RealtimeManager } = await import('./realtime.js');
       const realtime = new RealtimeManager();
 
-      const onAnyChange = () => {
+      realtime.callbacks.onRefresh = () => {
         refreshAllData().then(() => {
           updateSettingsTabState();
           updateTitle();
@@ -202,19 +202,6 @@ async function initAdmin() {
           renderCurrentTab();
         });
       };
-
-      realtime.callbacks.onHomeworksChange = onAnyChange;
-      realtime.callbacks.onSettlementChange = onAnyChange;
-      realtime.callbacks.onPointsChange = onAnyChange;
-      realtime.callbacks.onShopItemsChange = onAnyChange;
-      realtime.callbacks.onRedemptionsChange = onAnyChange;
-      realtime.callbacks.onRewardBoxChange = onAnyChange;
-      realtime.callbacks.onBountyTasksChange = onAnyChange;
-      realtime.callbacks.onBountySubmissionsChange = onAnyChange;
-      realtime.callbacks.onBountyCompletionsChange = onAnyChange;
-      realtime.callbacks.onActiveBuffsChange = onAnyChange;
-      realtime.callbacks.onFreeTimeTasksChange = onAnyChange;
-      realtime.callbacks.onEfficiencyHistoryChange = onAnyChange;
 
       await realtime.start(cachedData.tenant_id, cachedData.child_id);
       window._realtimeManager = realtime;

@@ -409,55 +409,39 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { changes, serverTime: new Date().toISOString() });
   });
 
-  // 17. GET /api/speak - TTS 语音合成（转发到 tts-svc）
+  // 17. GET /api/speak - TTS 语音合成（通过 CloudBase callFunction 调用 tts-svc 云函数）
   app.get('/api/speak', async (request, reply) => {
     const { text } = request.query as { text?: string };
     if (!text || !text.trim()) {
       return reply.status(400).send({ error: 'Missing text' });
     }
 
-    const ttsResponse = await fetch('http://127.0.0.1:8500/speak', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text.trim(), timeout: 8, cache: true }),
-    });
-
-    if (!ttsResponse.ok) {
-      const errBody = await ttsResponse.json().catch(() => ({}));
-      return reply.status(ttsResponse.status).send(errBody);
+    // 通过 CloudBase callFunction 调用 tts-svc 云函数
+    let ttsResult;
+    try {
+      const { getCloudBaseApp } = await import('./cloudbase-ctx.js');
+      const tcbApp = getCloudBaseApp();
+      if (!tcbApp) {
+        return reply.status(502).send({ error: 'CloudBase SDK not initialized' });
+      }
+      ttsResult = await tcbApp.callFunction({
+        name: 'tts-svc',
+        data: { text: text.trim(), timeout: 8 },
+      });
+    } catch (err) {
+      console.error('[TTS] callFunction error:', err);
+      return reply.status(502).send({ error: 'TTS service unavailable' });
     }
 
-    // Stream the response back to the client
-    const contentType = ttsResponse.headers.get('content-type') || 'audio/mpeg';
-    const contentLength = ttsResponse.headers.get('content-length');
-
-    reply.raw.writeHead(200, {
-      'Content-Type': contentType,
-      ...(contentLength ? { 'Content-Length': contentLength } : {}),
-    });
-
-    const reader = ttsResponse.body?.getReader();
-    if (reader) {
-      const pump = async () => {
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              reply.raw.end();
-              break;
-            }
-            reply.raw.write(value);
-          }
-        } catch (err) {
-          reply.raw.destroy(err as Error);
-        }
-      };
-      pump();
-    } else {
-      reply.raw.end();
+    const { ok, audio, error, content_type } = ttsResult?.result || {};
+    if (!ok || !audio) {
+      return reply.status(502).send({ error: error || 'TTS synthesis failed' });
     }
 
-    return reply.hijack();
+    // 将 base64 音频解码为二进制返回
+    const audioBuffer = Buffer.from(audio as string, 'base64');
+    reply.header('Content-Type', (content_type as string) || 'audio/mpeg');
+    reply.send(audioBuffer);
   });
 
   // ==================== POST Endpoints ====================

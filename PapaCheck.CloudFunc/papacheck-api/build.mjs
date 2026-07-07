@@ -24,6 +24,7 @@ await build({
   },
   // 不打包 node_modules 中的依赖（运行时安装）
   external: [
+    '@cloudbase/node-sdk',
     '@fastify/cookie',
     '@fastify/rate-limit',
     'bcryptjs',
