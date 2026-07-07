@@ -17,7 +17,7 @@ export default function AddMemberForm({ onAdded }: Props) {
     e.preventDefault();
     setLoading(true);
     try {
-      const result = await apiFetch('/api/admin/members', {
+      const result = await apiFetch(`${import.meta.env.BASE_URL}api/admin/members`, {
         method: 'POST',
         body: JSON.stringify({ name }),
       });

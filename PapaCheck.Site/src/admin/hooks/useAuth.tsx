@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     dispatch({ type: 'LOADING' });
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(`${import.meta.env.BASE_URL}api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -125,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(async (email: string, password: string, familyName: string) => {
     dispatch({ type: 'LOADING' });
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch(`${import.meta.env.BASE_URL}api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, family_name: familyName }),
@@ -153,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateCredentials = useCallback(async (email: string, password: string, currentPassword?: string) => {
     dispatch({ type: 'LOADING' });
     try {
-      const res = await fetch('/api/auth/credentials', {
+      const res = await fetch(`${import.meta.env.BASE_URL}api/auth/credentials`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

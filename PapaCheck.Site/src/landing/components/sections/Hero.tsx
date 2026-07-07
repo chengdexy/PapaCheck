@@ -29,7 +29,7 @@ export default function Hero() {
             </p>
 
             <div className="hero-title-in hero-title-in-delay-4 mt-10 flex flex-wrap items-center gap-3">
-              <a href="/api/download" className="cta-primary">
+              <a href={`${import.meta.env.BASE_URL}api/download`} className="cta-primary">
                 <Download className="w-5 h-5" />
                 免费下载 Android
               </a>

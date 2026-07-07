@@ -40,7 +40,7 @@ export default function TenantTable() {
     const action = isActive ? '启用' : '禁用';
     if (!confirm(`确定${action}该家庭？`)) return;
     try {
-      await apiFetch(`/api/admin/super/tenants/${tenantId}`, {
+      await apiFetch(`${import.meta.env.BASE_URL}api/admin/super/tenants/${tenantId}`, {
         method: 'PATCH',
         body: JSON.stringify({ is_active: isActive }),
       });
