@@ -28,7 +28,7 @@ export default function MemberTable({ refreshKey }: { refreshKey: number }) {
   const loadMembers = useCallback(async () => {
     setLoadState('loading');
     try {
-      const data = await apiFetch('/api/admin/members');
+      const data = await apiFetch(`${import.meta.env.BASE_URL}api/admin/members`);
       setMembers(data);
       setLoadState(data.length === 0 ? 'empty' : 'loaded');
     } catch {
