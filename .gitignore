@@ -74,6 +74,7 @@ node_modules/
 
 # Node.js 构建产物
 PapaCheck.Server/dist/
+PapaCheck.CloudFunc/papacheck-api/dist/
 
 # TypeScript 增量编译缓存
 *.tsbuildinfo
