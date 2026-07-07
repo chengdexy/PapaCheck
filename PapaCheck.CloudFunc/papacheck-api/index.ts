@@ -12,6 +12,14 @@ type InjectMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTI
 
 let appInstance: FastifyInstance | null = null;
 
+// 初始化 CloudBase SDK 实例（模块级单例），供路由使用（如调用 tts-svc 云函数）
+try {
+  const tcbApp = cloudbase.init({});
+  setCloudBaseApp(tcbApp);
+} catch (err) {
+  console.warn('[SCF] Failed to init CloudBase SDK:', err);
+}
+
 async function getApp(): Promise<FastifyInstance> {
   if (!appInstance) {
     appInstance = await buildApp({
@@ -29,14 +37,6 @@ export async function main(event: ScfEvent, context: any): Promise<{
   body: string;
   isBase64Encoded?: boolean;
 }> {
-  // 初始化 CloudBase SDK 实例，供路由使用（如调用 tts-svc 云函数）
-  try {
-    const tcbApp = cloudbase.init({});
-    setCloudBaseApp(tcbApp);
-  } catch (err) {
-    console.warn('[SCF] Failed to init CloudBase SDK:', err);
-  }
-
   const app = await getApp();
   const { method, path, headers, query, body } = parseGatewayEvent(event);
 
