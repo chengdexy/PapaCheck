@@ -13,12 +13,16 @@ export interface UploadOptions {
 
 /**
  * 使用 tcb CLI 上传 APK 到 CloudBase 云存储
- * tcb storage upload <本地路径> <云存储路径> --envId <环境ID>
+ * tcb storage objects upload <localPath> <key> --bucket <bucketId>
+ * --env-id 指定环境 ID，--bucket 指定存储桶
  */
 export async function uploadApk(options: UploadOptions): Promise<void> {
   const { envId, localPath, cloudPath } = options;
+  // staticstore 是 CloudBase 静态托管的默认存储桶
+  const bucketId = 'staticstore';
   await execFileAsync('tcb', [
-    'storage', 'upload', localPath, cloudPath,
-    '--envId', envId,
+    'storage', 'objects', 'upload', localPath, cloudPath,
+    '--env-id', envId,
+    '--bucket', bucketId,
   ]);
 }
