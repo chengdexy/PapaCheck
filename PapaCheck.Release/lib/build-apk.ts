@@ -126,7 +126,7 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
       id: String(idx++), desc: `上传 APK 到 CloudBase 云存储 (PapaCheck-${newVer}.apk)`,
       shell: true,
       // cloudPath 不带 dist/ 前缀，tcb CLI 自动加 bucket 前缀
-      cmd: `tcb storage objects upload ${apkPath} PapaCheck-${newVer}.apk --bucket dist --env-id ${CLOUDBASE_ENV}`,
+      cmd: `tcb storage objects upload ${apkPath} PapaCheck-${newVer}.apk --bucket dist --env-id ${CLOUDBASE_ENV} --upsert`,
       timeout: 120,
     });
     const rcFile = join(tmpdir(), `papacheck-rc-${newVer}.json`);
