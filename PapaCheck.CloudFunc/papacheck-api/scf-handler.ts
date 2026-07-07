@@ -40,9 +40,19 @@ export function parseGatewayEvent(event: ScfEvent): ParsedRequest {
     }
   }
 
+  // 剥离 /papacheck 前缀（CloudBase 网关透传完整路径，Fastify 路由不含前缀）
+  let path = event.path;
+  const URL_PREFIX = '/papacheck';
+  if (path.startsWith(URL_PREFIX)) {
+    path = path.substring(URL_PREFIX.length);
+    if (!path.startsWith('/')) {
+      path = '/' + path;
+    }
+  }
+
   return {
     method: event.httpMethod,
-    path: event.path,
+    path,
     headers,
     query: event.queryStringParameters || {},
     body,
