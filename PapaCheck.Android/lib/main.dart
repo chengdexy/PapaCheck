@@ -10,16 +10,10 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:battery_plus/battery_plus.dart';
 
-import 'package:path_provider/path_provider.dart';
-
-import 'services/cache_clear_helper.dart';
 import 'services/config_service.dart';
-import 'services/offline_snapshot_service.dart';
 import 'services/update_service.dart';
 import 'widgets/connect_failed_dialog.dart';
 import 'widgets/setup_page.dart';
-
-const _queueChannel = MethodChannel('com.chengdexy.papacheck/queue');
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -185,7 +179,6 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
           _role = result.role;
         });
         _initController(fullUrl);
-        _trySaveOfflineSnapshot(fullUrl);
       }
       return;
     }
@@ -195,29 +188,12 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     _applyOrientation(storedRole);
     final fullUrl = _buildFullUrl(storedUrl, storedRole);
 
-    // 版本检测与缓存清理
+    // 记录版本号（首次安装）
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion =
           '${packageInfo.version}+${packageInfo.buildNumber}';
-      if (await shouldClearCache(currentVersion)) {
-        // 清理 WebView HTTP 缓存：删除应用缓存目录下 webview 子目录
-        try {
-          final cacheDir = await getTemporaryDirectory();
-          final webviewCacheDir = Directory('${cacheDir.path}/webview');
-          if (await webviewCacheDir.exists()) {
-            await webviewCacheDir.delete(recursive: true);
-          }
-        } catch (_) {
-          // 非致命：清理 WebView 缓存失败不影响启动
-        }
-        // 清理离线快照
-        await OfflineSnapshotService.clearAll();
-        // 记录新版本号
-        await ConfigService.setLastVersion(currentVersion);
-      } else if (await ConfigService.getLastVersion() == null) {
-        // 首次安装后启动（已有配置表明是从 SetupPage 回来的）
-        // 只记录版本号，不清理缓存
+      if (await ConfigService.getLastVersion() == null) {
         await ConfigService.setLastVersion(currentVersion);
       }
     } catch (_) {
@@ -228,26 +204,11 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     if (reachable && mounted) {
       setState(() => _url = fullUrl);
       _initController(fullUrl);
-      _trySaveOfflineSnapshot(fullUrl);
-      if (mounted) _checkVersion(storedUrl);
+      if (mounted) _checkVersion();
       return;
     }
 
-    // 服务器不可达，尝试从离线缓存加载
-    if (mounted) {
-      String? html = await OfflineSnapshotService.load(fullUrl);
-      if (html != null && mounted) {
-        setState(() {
-          _url = fullUrl;
-          _isPageReady = true;
-        });
-        await _initControllerOffline(fullUrl, html);
-        _startBatteryMonitor();
-        return;
-      }
-    }
-
-    // 无缓存，回到配置页面
+    // 服务器不可达，提示用户重试或重新配置
     if (!mounted) return;
     final action = await ConnectFailedDialog.show(context, url: storedUrl);
     if (!mounted) return;
@@ -269,85 +230,8 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
           _role = result.role;
         });
         _initController(fullUrl);
-        _trySaveOfflineSnapshot(fullUrl);
       }
     }
-  }
-
-  Future<void> _trySaveOfflineSnapshot(String fullUrl) async {
-    final client = HttpClient();
-    client.connectionTimeout = const Duration(seconds: 5);
-    try {
-      final request = await client.getUrl(Uri.parse(fullUrl));
-      final response = await request.close().timeout(
-            const Duration(seconds: 5),
-          );
-      if (response.statusCode >= 500) return;
-
-      var html = await response.transform(utf8.decoder).join();
-
-      // 内联 CSS/JS 资源，确保离线时样式和脚本可用
-      final baseUrl = _getBaseUrl(fullUrl);
-
-      // 内联 <link rel="stylesheet" href="...">
-      final cssPattern = RegExp(
-        r'<link[^>]*rel="stylesheet"[^>]*href="([^"]+)"[^>]*>',
-        caseSensitive: false,
-      );
-      html = await _inlineResources(
-        html,
-        cssPattern,
-        (css) => '  <style>$css</style>\n',
-        baseUrl,
-        client,
-      );
-
-      // 内联 <script src="...">
-      final jsPattern = RegExp(
-        r'<script[^>]*src="([^"]+)"[^>]*>\s*</script>',
-        caseSensitive: false,
-      );
-      html = await _inlineResources(
-        html,
-        jsPattern,
-        (js) => '  <script>$js</script>\n',
-        baseUrl,
-        client,
-      );
-
-      await OfflineSnapshotService.save(fullUrl, html);
-    } catch (_) {
-      // 非致命：快照保存失败不影响主流程
-    } finally {
-      client.close();
-    }
-  }
-
-  Future<String> _inlineResources(
-    String html,
-    RegExp pattern,
-    String Function(String content) wrap,
-    String baseUrl,
-    HttpClient client,
-  ) async {
-    var result = html;
-    for (final match in pattern.allMatches(html)) {
-      final href = match.group(1);
-      if (href == null) continue;
-      try {
-        final url = href.startsWith('http')
-            ? href
-            : '$baseUrl/${href.startsWith('/') ? href.substring(1) : href}';
-        final req = await client.getUrl(Uri.parse(url));
-        final res = await req.close().timeout(const Duration(seconds: 5));
-        if (res.statusCode >= 500) continue;
-        final content = await res.transform(utf8.decoder).join();
-        result = result.replaceFirst(match.group(0)!, wrap(content));
-      } catch (_) {
-        // 单个资源失败不影响其他资源
-      }
-    }
-    return result;
   }
 
   Future<void> _initController(String url) async {
@@ -430,43 +314,11 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
             role: role ?? '',
             childName: childName ?? '',
           );
-          _queueChannel.invokeMethod('setAuth', {
-            'token': token,
-            'baseUrl': baseUrl,
-            'tenantId': role ?? '',
-          });
-        }
-      } else if (type == 'enqueue') {
-        final operation = data['operation'] as String?;
-        if (operation != null) {
-          _queueChannel.invokeMethod('enqueue', {
-            'operation': operation,
-          });
         }
       }
     } catch (_) {
       // 非致命：桥接消息解析失败静默忽略
     }
-  }
-
-  Future<void> _initControllerOffline(String baseUrl, String html) async {
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.white)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onWebResourceError: (error) {
-            // 离线视图中的资源错误不处理，静默降级
-          },
-        ),
-      );
-
-    if (_controller!.platform is AndroidWebViewController) {
-      (_controller!.platform as AndroidWebViewController)
-          .setMediaPlaybackRequiresUserGesture(false);
-    }
-
-    await _controller!.loadHtmlString(html, baseUrl: baseUrl);
   }
 
   void _waitForPageReady() {
@@ -490,7 +342,6 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
             if (mounted) {
               setState(() => _isPageReady = true);
               _startBatteryMonitor();
-              _checkFailedOperations();
             }
           }
         } catch (_) {
@@ -498,34 +349,15 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
             _readyCheckTimer?.cancel();
             setState(() => _isPageReady = true);
             _startBatteryMonitor();
-            _checkFailedOperations();
           }
         }
       },
     );
   }
 
-  Future<void> _checkFailedOperations() async {
-    try {
-      final result = await _queueChannel.invokeMethod('getFailedOperations');
-      if (result is List && result.isNotEmpty) {
-        _controller?.runJavaScript(
-          "if (typeof showToast === 'function') showToast('同步失败，部分操作未保存，请重试');"
-        );
-      }
-    } catch (_) {}
-  }
-
   void _handlePageLoadError(String url) async {
     if (!mounted) return;
-
-    // 先尝试离线缓存
-    String? html = await OfflineSnapshotService.load(url);
-    if (html != null && mounted) {
-      await _initControllerOffline(url, html);
-    } else if (mounted) {
-      await _showConnectFailedDialog(url);
-    }
+    await _showConnectFailedDialog(url);
   }
 
   Future<void> _showConnectFailedDialog(String url) async {
@@ -576,11 +408,11 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     }
   }
 
-  Future<Map<String, dynamic>?> _fetchServerVersion(String baseUrl) async {
+  Future<Map<String, dynamic>?> _fetchServerVersion() async {
     final client = HttpClient();
     client.connectionTimeout = const Duration(seconds: 5);
     try {
-      final request = await client.getUrl(Uri.parse('$baseUrl/api/version'));
+      final request = await client.getUrl(Uri.parse(versionUrl));
       final response =
           await request.close().timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
@@ -594,8 +426,8 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     return null;
   }
 
-  Future<void> _checkVersion(String baseUrl) async {
-    final result = await _fetchServerVersion(baseUrl);
+  Future<void> _checkVersion() async {
+    final result = await _fetchServerVersion();
     if (result == null) return;
 
     final serverVersion = result['clientVersion'] ?? '?';
@@ -629,7 +461,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     );
 
     if (action != 'update' || !mounted) return;
-    await _downloadAndInstall('$baseUrl/api/download');
+    await _downloadAndInstall(downloadUrl);
   }
 
   Future<void> _downloadAndInstall(String url) async {
