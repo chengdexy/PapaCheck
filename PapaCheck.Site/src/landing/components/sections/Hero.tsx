@@ -1,4 +1,4 @@
-import { Download, UserPlus, Smartphone, Tablet, Globe, WifiOff, ShieldCheck } from 'lucide-react';
+import { Download, UserPlus, Smartphone, Tablet, Globe, ShieldCheck } from 'lucide-react';
 import Mascot from '../Mascot';
 
 export default function Hero() {
@@ -16,14 +16,14 @@ export default function Hero() {
             </div>
 
             <h1 className="hero-title-in hero-title-in-delay-2 text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.05] tracking-tight text-ink-900">
-              写作业
+              孩子主动
               <br />
-              <span className="hl-stroke">不用催</span>
-              了
+              <span className="hl-stroke">写作业</span>
+              ，家长不用催
             </h1>
 
             <p className="hero-title-in hero-title-in-delay-3 mt-6 text-lg sm:text-xl text-ink-600 leading-relaxed max-w-xl">
-              AI 评优 + 积分商城，孩子想要什么自己挣。
+              家长评优 + 积分商城 + 实时同步，孩子想要什么自己挣。
               <br className="hidden sm:block" />
               家长少操心，孩子多主动。
             </p>
@@ -33,7 +33,7 @@ export default function Hero() {
                 <Download className="w-5 h-5" />
                 免费下载 Android
               </a>
-              <a href="https://papacheck.chengdexy.cn/admin/?tab=register" className="cta-secondary">
+              <a href={`${import.meta.env.BASE_URL}admin/?tab=register`} className="cta-secondary">
                 <UserPlus className="w-5 h-5" />
                 注册家庭账号
               </a>
@@ -53,12 +53,8 @@ export default function Hero() {
                 Web
               </div>
               <div className="trust-chip">
-                <WifiOff className="w-3.5 h-3.5 text-emerald-500" />
-                完全离线可用
-              </div>
-              <div className="trust-chip">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                不强制注册
+                接入码登录 · 无需注册
               </div>
             </div>
           </div>

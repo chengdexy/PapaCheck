@@ -2,7 +2,7 @@
 
 ![PapaCheck Banner](./docs/imgs/_banner.jpg)
 
-> **v2.0.0** — 迁移到腾讯云 CloudBase（云函数 + PG + 静态托管 + 网关），30 秒轮询数据同步，37 Flutter 测试 + 10 Vitest 测试（2 跳过）通过，15 Release 测试
+> **v2.0.0** — 迁移到腾讯云 CloudBase（云函数 + PG + 静态托管 + 网关），30 秒轮询数据同步，643+ Vitest 测试通过
 
 PapaCheck 是一个面向家庭的家长辅助工具，帮助管理和跟踪孩子的作业完成情况。孩子可以自主开始/暂停/完成作业并获得积分；家长远程评级并管理积分商店。部署在腾讯云 CloudBase，支持随时随地访问。
 

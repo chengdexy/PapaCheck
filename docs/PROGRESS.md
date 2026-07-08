@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-07-08（修复 Android SetupPage 引导页重复出现 + 移除无效加载遮罩和 connStatus 死代码）
+> 最后更新：2026-07-08（文档审计修复 + 清理过期 spec 文档）
 
 ## 当前版本
 
@@ -13,7 +13,7 @@
 - [x] **Phase 5d 完成** — PostgreSQL 自动备份 + 健康监控 + 邮件告警
 - [x] **APK 发布迁移到 CloudBase** — 从 ECS 本地 `apk/` 目录切换到腾讯云 CloudBase PG 存储，`/api/download` 重定向到 CloudBase CDN
 - [x] **build-apk --publish 一键构建发布** — `build-apk` 支持 `--publish` 参数，构建后自动上传 CloudBase + 更新 ECS 版本号 + 重启服务
-- [~] **CloudBase 迁移进行中（v2.0.0）** — 子计划 1-5 代码完成（API 云函数 / RLS 策略 / 前端实时监听 / Release 控制台 / Android 端），待网关切换 + 数据迁移 + ECS 下线
+- [x] **CloudBase 迁移完成（v2.0.0）** — 子计划 1-5 全部完成（API 云函数 / RLS 策略 / 前端实时监听 / Release 控制台 / Android 端），网关已切换，ECS 已下线
 
 ---
 
@@ -49,8 +49,8 @@
 - [x] ~~离线模式（Service Worker / localforage / CRDT / Android 写队列）~~ **已移除（CloudBase 迁移）**
 - [x] ~~邮件同步功能（IMAP + AI 解析 + 附件下载）~~ **已移除（CloudBase 迁移）**
 - [x] ~~运维调度器（OpsScheduler / 备份 / 监控 / 告警）~~ **已移除（CloudBase PG 自带备份 + 腾讯云监控）**
-- [~] 网关切换 + 生产数据迁移（待执行）
-- [~] ECS 服务器下线（切换后 1 周释放）
+- [~] 网关切换 + 生产数据迁移（已完成）
+- [~] ECS 服务器下线（已完成）
 
 ### 基础设施
 
@@ -108,7 +108,8 @@ _无未解决项。_
 
 | 日期 | 变更 |
 |------|------|
-| 2026-07-08 | **修复 Android v1.6.4 引导页（SetupPage）每次启动都出现**：首次安装路径中 `ConfigService.setUrl()`/`setRole()` 缺失，URL 和角色未保存到 SharedPreferences，导致每次启动都显示欢迎页。新增 2 行保存调用。**移除 WebView 加载遮罩（15 秒转圈）**：`_waitForPageReady()` 定期检查已移除的离线模块 `connStatus` className，永远不满足条件，必须等 15 秒超时。整体移除 `_isPageReady`/`_readyCheckTimer`/`_waitForPageReady`/遮罩 Container，改为 WebView 加载完毕直接启动电池监控。**移除 Web 端连接状态圆点 connStatus**：该元素及其 CSS 样式是离线模块遗留的死代码，无人更新状态。涉及 6 个文件 |
+| 2026-07-08 | **文档审计修复**：落地页文案修正（"AI 评优"→"家长评优"、"拍照录入作业"→"添加作业"、去除 5 处"离线可用"虚假宣传、ECS 链接改为 CloudBase 路径、Footer v3.0→v1.6.6）。HANDOVER 标记 CloudBase 迁移完成/ECS 已下线，删除 3 节 ECS 配置信息。PROGRESS/PRD/README 同步更新迁移状态和版本号。清理 10 份过期 spec 文档 |
+| 2026-07-08 | **修复 Android SetupPage 引导页每次启动都出现**：首次安装路径中 `ConfigService.setUrl()`/`setRole()` 缺失，URL 和角色未保存到 SharedPreferences；新增 2 行保存调用后下次启动直接跳过引导页
 | 2026-07-07 | **修复 RealtimeManager 启动时 14 个并发请求 + TTS 语音 404 + API 云函数 TTS 转发 localhost 无效**：`triggerAll()` 遍历 14 个回调各自触发 `refreshFromServer()`，改为统一 `onRefresh`；`Voice._playNext()` 硬编码 `/api/speak` 缺 `/papacheck` 前缀；`papacheck-api` `/api/speak` 路由在 SCF 中无法通过 localhost 访问 `tts-svc`，改为 `callFunction` 跨函数调用。新增 `@cloudbase/node-sdk` 依赖。重新部署前端 + API 云函数 |
 | 2026-07-07 | **修复 RealtimeManager 启动失败**：`@cloudbase/js-sdk` v3 API 多重不兼容（importmap 裸模块标识符、`signInWithJwt` → `signInAnonymously`、`rdb()` → `database()`、`table()` → `collection()`），最终将 RealtimeManager 从 CloudBase watch() 改为每 30 秒轮询触发刷新。修复 favicon 404、site-publish.ts CLI 参数兼容性 |
 | 2026-07-07 | **CloudBase 迁移（v2.0.0）**：子计划 1-5 代码完成 — ① API 云函数 `papacheck-api`（SCF + Fastify + PG）；② RLS 行级安全策略 SQL + 数据迁移脚本；③ 前端实时监听改造（cloudbase.js/realtime.js/api.js/app.js/admin.js/HTML，路径前缀 `/papacheck/`）；④ Release 控制台改造（fn-deploy/cloud-publish/site-publish，tcb CLI 部署）；⑤ Android 端改造（ConfigService/UpdateService URL + 删除离线模块）。移除离线模式/邮件同步/运维调度器/Swagger。更新全部项目文档。待网关切换 + 数据迁移 + ECS 下线 |

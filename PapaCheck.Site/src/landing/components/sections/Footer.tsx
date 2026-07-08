@@ -27,7 +27,7 @@ export default function Footer() {
               GitHub
             </a>
             <span className="text-ink-400">·</span>
-            <span className="text-ink-500">v3.0 · 100% 免费 · 离线可用</span>
+            <span className="text-ink-500">v1.6.6 · 100% 免费 · 云端同步</span>
           </div>
         </div>
 

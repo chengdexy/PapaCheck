@@ -109,6 +109,9 @@ PapaCheck.Release/log/
 # Release 控制台本地环境变量配置
 PapaCheck.Release/.env
 
+# Web 部署临时目录
+_web_deploy/
+
 # 临时构建产物
 .publish.tar.gz
 

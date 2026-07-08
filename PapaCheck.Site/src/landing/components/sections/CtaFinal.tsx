@@ -28,7 +28,7 @@ export default function CtaFinal() {
                   <Download className="w-5 h-5" />
                   免费下载 Android
                 </a>
-                <a href="https://papacheck.chengdexy.cn/admin/?tab=register" className="cta-secondary">
+                <a href={`${import.meta.env.BASE_URL}admin/?tab=register`} className="cta-secondary">
                   <UserPlus className="w-5 h-5" />
                   注册家庭账号
                 </a>
@@ -49,7 +49,7 @@ export default function CtaFinal() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Check className="w-3.5 h-3.5 text-emerald-500" />
-                  离线可用
+                  云端实时同步
                 </div>
               </div>
             </div>
