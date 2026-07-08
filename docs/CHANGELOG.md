@@ -6,20 +6,13 @@
 
 ## [Unreleased]
 
-### Changed
-- **RealtimeManager 从 CloudBase watch() 改为轮询**：`@cloudbase/js-sdk` v3 的数据库 API（`rdb()`→`database()`、`table()`→`collection()`、`signInWithJwt()`→`signInAnonymously()`）存在多处不兼容，改为每 30 秒轮询触发回调消费端刷新数据，不再依赖 CloudBase SDK 运行时
-
 ### Fixed
+- **修复 Android SetupPage 引导页每次启动都出现**：首次安装路径中 `ConfigService.setUrl()`/`setRole()` 缺失，URL 和角色未保存到 SharedPreferences；新增 2 行保存调用后下次启动直接跳过引导页
 - **修复 RealtimeManager 启动失败：`@cloudbase/js-sdk` 裸模块标识符无法解析**：在 `admin.html`/`index.html` 中添加 `importmap`，将 `@cloudbase/js-sdk` 映射到 esm.sh CDN
-- **修复 favicon 404**：`admin.html` favicon 路径从 `/favicon.png` 改为 `/papacheck/app/favicon.png`
-- **修复 site-publish.ts tcb CLI 参数兼容性**：`--path` 改为位置参数，`--envId` 改为 `--env-id`
-- **修复 RealtimeManager 启动时 14 个并发请求**：`triggerAll()` 遍历所有回调各自触发 `refreshFromServer()` → `API.getData()`，改为统一 `onRefresh` 回调只触发一次
-- **修复孩子端 TTS 语音 404**：`app.js Voice._playNext()` 硬编码 `/api/speak`，缺少 `/papacheck` 前缀，改为 `/papacheck/api/speak`
-- **修复 API 云函数 TTS 转发到 `127.0.0.1:8500` 无效**：`papacheck-api` 云函数 `/api/speak` 路由在 SCF 环境中无法通过 localhost 访问 `tts-svc`，改为使用 `@cloudbase/node-sdk` 的 `callFunction` 调用 `tts-svc` 云函数。注意：`callFunction` 参数为 `data` 而非 `params`
-- **修复孩子端 favicon 404**：`index.html` 的 favicon 路径从 `/favicon.png` 改为 `/papacheck/app/favicon.png`
 
 ### Removed
-- 移除 RealtimeManager 对 CloudBase SDK 的运行时依赖（cloudbase.js 中的 signInAnonymously/getDb 仍保留但不再被 realtime.js 引用）
+- **移除 Flutter WebView 加载遮罩（15 秒转圈）**：`_waitForPageReady()` 定期检查已移除的离线模块 `connStatus` className，永远不满足条件，必须等 15 秒超时。移除 `_isPageReady`/`_readyCheckTimer`/`_waitForPageReady`/遮罩 Container，改为 WebView 加载完毕直接启动电池监控
+- **移除 Web 端连接状态圆点 connStatus 及 CSS 样式**：离线模块移除后该元素无人维护状态，在 `admin.html`/`index.html`/`style.css`/`admin.css` 中删除
 
 ## [1.4.2] - 2026-06-25
 

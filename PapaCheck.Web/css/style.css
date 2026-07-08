@@ -41,22 +41,6 @@ body {
   user-select: none;
 }
 
-.conn-status {
-  font-size: 12px;
-  line-height: 1;
-  padding: 4px;
-  border-radius: 50%;
-  cursor: default;
-}
-
-.conn-status.online {
-  color: #4ade80;
-}
-
-.conn-status.offline {
-  color: #fbbf24;
-}
-
 /* ========== Big Screen Mode ========== */
 .big-screen-mode {
   display: none;

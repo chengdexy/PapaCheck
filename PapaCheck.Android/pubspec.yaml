@@ -2,7 +2,7 @@ name: papacheck
 description: "PapaCheck 孩子端 Android 应用"
 publish_to: 'none'
 
-version: 1.6.4+0
+version: 1.6.6+0
 
 environment:
   sdk: ^3.5.4

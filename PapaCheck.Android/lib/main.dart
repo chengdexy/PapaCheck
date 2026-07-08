@@ -138,8 +138,6 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
   String? _url;
   DeviceRole? _role;
   WebViewController? _controller;
-  bool _isPageReady = false;
-  Timer? _readyCheckTimer;
   BatteryMonitor? _batteryMonitor;
 
   @override
@@ -150,7 +148,6 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
 
   @override
   void dispose() {
-    _readyCheckTimer?.cancel();
     _batteryMonitor?.stop();
     super.dispose();
   }
@@ -164,6 +161,10 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
       if (!mounted) return;
       final result = await SetupPage.show(context);
       if (result != null && mounted) {
+        // 首次安装：保存 URL 和角色，确保下次启动不再次显示引导页
+        await ConfigService.setUrl(result.url);
+        await ConfigService.setRole(result.role);
+
         // 首次安装记录版本号
         try {
           final packageInfo = await PackageInfo.fromPlatform();
@@ -268,7 +269,7 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
       _controller!.loadRequest(Uri.parse(url));
     }
 
-    _waitForPageReady();
+    _startBatteryMonitor();
   }
 
   /// 加载中间 HTML 页面，将持久化的认证信息写入 WebView 的 sessionStorage，
@@ -319,40 +320,6 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
     } catch (_) {
       // 非致命：桥接消息解析失败静默忽略
     }
-  }
-
-  void _waitForPageReady() {
-    _readyCheckTimer?.cancel();
-    var ticks = 0;
-    _readyCheckTimer = Timer.periodic(
-      const Duration(milliseconds: 500),
-      (_) async {
-        ticks++;
-        if (_controller == null || !mounted) return;
-        try {
-          final result = await _controller!.runJavaScriptReturningResult(
-            "document.getElementById('connStatus') ? document.getElementById('connStatus').className : 'missing'",
-          );
-          final className = result.toString();
-          final isReady =
-              className.contains('online') || className.contains('offline');
-          final isTimedOut = ticks >= 30;
-          if (isReady || isTimedOut) {
-            _readyCheckTimer?.cancel();
-            if (mounted) {
-              setState(() => _isPageReady = true);
-              _startBatteryMonitor();
-            }
-          }
-        } catch (_) {
-          if (ticks >= 30 && mounted) {
-            _readyCheckTimer?.cancel();
-            setState(() => _isPageReady = true);
-            _startBatteryMonitor();
-          }
-        }
-      },
-    );
   }
 
   void _handlePageLoadError(String url) async {
@@ -556,20 +523,9 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
       );
     }
 
-    return Stack(
-      children: [
-        BrowserPage(
-          controller: _controller!,
-          onConfigRequested: _openConfig,
-        ),
-        if (!_isPageReady)
-          Container(
-            color: Colors.black54,
-            child: const Center(
-              child: CircularProgressIndicator(color: Colors.white),
-            ),
-          ),
-      ],
+    return BrowserPage(
+      controller: _controller!,
+      onConfigRequested: _openConfig,
     );
   }
 }
