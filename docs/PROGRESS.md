@@ -1,6 +1,6 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-07-07（修复 CloudBase 网关路由 + Android 重定向路径 + 重新部署 Web）
+> 最后更新：2026-07-08（修复 Android SetupPage 引导页重复出现 + 移除无效加载遮罩和 connStatus 死代码）
 
 ## 当前版本
 
@@ -108,7 +108,7 @@ _无未解决项。_
 
 | 日期 | 变更 |
 |------|------|
-| 2026-07-07 | **修复 Android APK v1.6.3 启动后"invalid path"报错**：CloudBase 网关缺少 `/papacheck/app/` 路由，`EnablePathTransmission: false` 导致 HTML 子路径无法正确转发。修复：① `login.html` 家长重定向 `/papacheck/admin.html` → `/papacheck/app/admin.html`；② `admin.js` 切孩子跳转 `/login.html` → `/papacheck/app/login.html`；③ Flutter `_loadWithSessionRestore` 恢复 URL 缺 `/papacheck/app/` 前缀修复。重新部署 PapaCheck.Web 7944 个文件。网关路由需手动在 CloudBase 控制台修复 |
+| 2026-07-08 | **修复 Android v1.6.4 引导页（SetupPage）每次启动都出现**：首次安装路径中 `ConfigService.setUrl()`/`setRole()` 缺失，URL 和角色未保存到 SharedPreferences，导致每次启动都显示欢迎页。新增 2 行保存调用。**移除 WebView 加载遮罩（15 秒转圈）**：`_waitForPageReady()` 定期检查已移除的离线模块 `connStatus` className，永远不满足条件，必须等 15 秒超时。整体移除 `_isPageReady`/`_readyCheckTimer`/`_waitForPageReady`/遮罩 Container，改为 WebView 加载完毕直接启动电池监控。**移除 Web 端连接状态圆点 connStatus**：该元素及其 CSS 样式是离线模块遗留的死代码，无人更新状态。涉及 6 个文件 |
 | 2026-07-07 | **修复 RealtimeManager 启动时 14 个并发请求 + TTS 语音 404 + API 云函数 TTS 转发 localhost 无效**：`triggerAll()` 遍历 14 个回调各自触发 `refreshFromServer()`，改为统一 `onRefresh`；`Voice._playNext()` 硬编码 `/api/speak` 缺 `/papacheck` 前缀；`papacheck-api` `/api/speak` 路由在 SCF 中无法通过 localhost 访问 `tts-svc`，改为 `callFunction` 跨函数调用。新增 `@cloudbase/node-sdk` 依赖。重新部署前端 + API 云函数 |
 | 2026-07-07 | **修复 RealtimeManager 启动失败**：`@cloudbase/js-sdk` v3 API 多重不兼容（importmap 裸模块标识符、`signInWithJwt` → `signInAnonymously`、`rdb()` → `database()`、`table()` → `collection()`），最终将 RealtimeManager 从 CloudBase watch() 改为每 30 秒轮询触发刷新。修复 favicon 404、site-publish.ts CLI 参数兼容性 |
 | 2026-07-07 | **CloudBase 迁移（v2.0.0）**：子计划 1-5 代码完成 — ① API 云函数 `papacheck-api`（SCF + Fastify + PG）；② RLS 行级安全策略 SQL + 数据迁移脚本；③ 前端实时监听改造（cloudbase.js/realtime.js/api.js/app.js/admin.js/HTML，路径前缀 `/papacheck/`）；④ Release 控制台改造（fn-deploy/cloud-publish/site-publish，tcb CLI 部署）；⑤ Android 端改造（ConfigService/UpdateService URL + 删除离线模块）。移除离线模式/邮件同步/运维调度器/Swagger。更新全部项目文档。待网关切换 + 数据迁移 + ECS 下线 |

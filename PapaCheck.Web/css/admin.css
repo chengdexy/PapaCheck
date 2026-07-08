@@ -87,23 +87,6 @@ body {
   margin-right: 16px;
 }
 
-.conn-status {
-  font-size: 14px;
-  line-height: 1;
-  padding: 4px;
-  border-radius: 50%;
-  cursor: default;
-  margin-right: 10px;
-}
-
-.conn-status.online {
-  color: #4ade80;
-}
-
-.conn-status.offline {
-  color: #fbbf24;
-}
-
 .admin-date {
   font-size: 14px;
   color: var(--text-secondary);
