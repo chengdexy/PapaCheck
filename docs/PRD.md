@@ -1,6 +1,6 @@
 # PapaCheck 产品需求文档（PRD）
 
-> 最后更新：2026-07-07 | 版本：2.0.0（CloudBase 迁移）
+> 最后更新：2026-07-08 | 版本：2.0.0（CloudBase 迁移完成）
 
 ## 一、产品概述
 
@@ -25,7 +25,7 @@ PapaCheck（爸~检查！）
 
 ### 运行环境
 
-- **部署模式**：腾讯云 CloudBase（SCF 云函数 + PostgreSQL + 静态托管 + 网关），随时随地访问
+- **部署模式**：腾讯云 CloudBase（SCF 云函数 + PostgreSQL + 静态托管 + 网关），ECS 已下线，随时随地访问
 - **客户端**：Web 浏览器（孩子端大屏 + 管理端）、Android APP
 
 ---

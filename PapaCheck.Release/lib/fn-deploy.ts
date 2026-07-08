@@ -1,31 +1,27 @@
-import { execFile } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { randomUUID } from 'crypto';
+
+const execAsync = promisify(exec);
 
 export interface DeployOptions {
   envId: string;
   cwd?: string;
 }
 
-function run(cmd: string, args: string[], cwd?: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const callback = (err: Error | null) => (err ? reject(err) : resolve());
-    if (cwd) {
-      execFile(cmd, args, { cwd }, callback);
-    } else {
-      execFile(cmd, args, callback);
-    }
-  });
+function run(cmd: string, cwd?: string): Promise<void> {
+  const opts = cwd ? { cwd } : {};
+  return execAsync(cmd, opts) as unknown as Promise<void>;
 }
 
 export async function deployFunction(
   functionName: string,
   options: DeployOptions
 ): Promise<void> {
-  const args = ['fn', 'deploy', functionName, '--env-id', options.envId];
-  await run('tcb', args, options.cwd);
+  await run(`tcb fn deploy ${functionName} --env-id ${options.envId}`, options.cwd);
 }
 
 /**
@@ -56,11 +52,7 @@ export async function updateFunctionEnv(
   writeFileSync(rcFile, JSON.stringify(rc, null, 2), 'utf-8');
 
   try {
-    await run('tcb', [
-      'config', 'update', 'fn', functionName,
-      '--env-id', options.envId,
-      '--json',
-    ], rcDir);
+    await run(`tcb config update fn ${functionName} --env-id ${options.envId} --json`, rcDir);
   } finally {
     // 清理（best-effort）
   }

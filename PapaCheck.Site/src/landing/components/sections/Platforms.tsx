@@ -1,4 +1,4 @@
-import { Tablet, Smartphone, Globe, Cloud, Wifi, Check } from 'lucide-react';
+import { Tablet, Smartphone, Globe, Cloud, Check } from 'lucide-react';
 
 const platforms = [
   {
@@ -75,15 +75,11 @@ export default function Platforms() {
         <div className="mt-12 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-ink-600">
           <div className="flex items-center gap-2">
             <Check className="w-4 h-4 text-emerald-500" />
-            数据本地优先
+            云端实时同步
           </div>
           <div className="flex items-center gap-2">
             <Cloud className="w-4 h-4 text-sky-500" />
             登录自动同步
-          </div>
-          <div className="flex items-center gap-2">
-            <Wifi className="w-4 h-4 text-amber-500" />
-            离线完全可用
           </div>
         </div>
       </div>

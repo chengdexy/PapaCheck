@@ -158,16 +158,24 @@ export interface Step {
   cmd: string;
   args?: string[];
   cwd?: string;
+  /** 是否使用 shell（Windows 上默认 true 以正确解析 .cmd 包装脚本） */
+  shell?: boolean;
 }
 
 /** 按顺序执行步骤，任一失败则抛出异常 */
 export async function executeSteps(steps: Step[]): Promise<void> {
   const executor = new Executor();
+  const useShell = process.platform === 'win32';
   const stepDefs: StepDef[] = steps.map((s, i) => ({
     id: String(i + 1),
     desc: s.name,
-    cmd: s.args ? [s.cmd, ...s.args] : s.cmd,
+    cmd: s.args
+      ? (s.shell ?? useShell)
+        ? `${s.cmd} ${s.args.join(' ')}`
+        : [s.cmd, ...s.args]
+      : s.cmd,
     cwd: s.cwd,
+    shell: s.shell ?? useShell,
     timeout: 300,
   }));
   const success = await executor.runSteps(stepDefs);
