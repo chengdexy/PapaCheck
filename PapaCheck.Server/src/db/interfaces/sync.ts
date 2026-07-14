@@ -10,6 +10,12 @@ export interface ISyncStore {
   getPendingNotifications(tenantId?: string): Promise<NotificationItem[]>;
   consumeNotifications(ids: string[], tenantId?: string): Promise<void>;
   getModifiedSince(timestamp: string, tenantId?: string, childId?: string): Promise<ModifiedEntry[]>;
+  /**
+   * 轻量数据版本戳：返回租户维度 last_modified 的 MAX 时间戳与行数组合。
+   * 用于前端条件短轮询，只有版本变化时才触发全量拉取。
+   * 无任何记录时返回 null。
+   */
+  getDataVersion(tenantId?: string): Promise<string | null>;
   pushMerge(changes: ModifiedEntry[], tenantId?: string, childId?: string): Promise<{ ok: boolean }>;
   recordModification(tableName: string, recordKey: string, timestamp: string, tenantId?: string): Promise<void>;
   saveCRDTOperation(op: CRDTOperation, tenantId?: string): Promise<void>;

@@ -1,6 +1,6 @@
 # PapaCheck 产品需求文档（PRD）
 
-> 最后更新：2026-07-08 | 版本：2.0.0（CloudBase 迁移完成）
+> 最后更新：2026-07-14 | 版本：1.6.6（Android APK）/ Server 1.2.0 / Web 1.5.2（CloudBase 已上线）
 
 ## 一、产品概述
 
@@ -105,7 +105,7 @@ PapaCheck（爸~检查！）
 | Web 孩子端 | 大屏展示，适合平板/电脑 | P0 |
 | Web 管理端 | 家长管理界面 | P0 |
 | Android APP | Flutter WebView 混合应用 | P1 |
-| 实时数据同步 | CloudBase PG 实时监听，数据变更秒级推送到所有客户端 | P0 |
+| 实时数据同步 | 轻量版本戳短轮询（默认 3 秒，变更才拉全量，写后 burst 提速），两端数据变更秒级感知 | P0 |
 | 发布控制台 | APK 构建、云函数部署、静态托管发布 | P1 |
 | APK 自动更新 | 检测服务器版本，提示下载安装 | P2 |
 
@@ -122,8 +122,8 @@ PapaCheck（爸~检查！）
 | 需求 | 描述 |
 |------|------|
 | 云部署 | 腾讯云 CloudBase（SCF + PG + 静态托管 + 网关），Serverless 免运维 |
-| 实时同步 | CloudBase PG 实时监听，数据变更秒级推送 |
-| 数据安全 | RLS 行级安全策略，14 张业务表 tenant/child 隔离 |
+| 实时同步 | 轻量版本戳短轮询（默认 3 秒，变更才拉全量），数据变更秒级感知 |
+| 数据安全 | 多租户隔离由应用层 SQL（WHERE tenant_id / child_id）实现；`cloudbase-rls.sql` 为早期 RLS 设计脚本，当前未在生产代码路径激活 |
 | 开源 | GNU AGPL v3.0 |
 
 ---

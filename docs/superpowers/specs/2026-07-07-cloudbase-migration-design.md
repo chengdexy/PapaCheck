@@ -4,6 +4,10 @@
 > **状态**：设计已确认，待编写实施计划
 > **决策来源**：brainstorming 会话（用户与 AI 共同确认）
 
+> ⚠️ **实施方式已变更（2026-07-14 注记）**：本文档中的部分设计在实施阶段被推翻——实际落地为：① 数据同步采用**轻量版本戳短轮询**（默认 3 秒，变更才拉全量），而非 CloudBase PG 实时监听（watch() SDK v3 不兼容）；② 多租户隔离由**应用层 SQL**（WHERE tenant_id/child_id）实现，`cloudbase-rls.sql` 的 RLS 策略未在生产代码路径激活；③ tts-svc 为独立仓库维护的云函数，不在本仓库。以下正文保留原始设计意图，仅供历史参考。
+
+---
+
 ---
 
 ## 一、迁移目标与动机
@@ -32,7 +36,7 @@
 | 项 | 决策 |
 |----|------|
 | 迁移策略 | ECS 彻底弃用，所有功能迁移或弃用 |
-| 数据库 | CloudBase PG（保留 26 张表结构不变） |
+| 数据库 | CloudBase PG（保留 27 张表结构不变，以 init-pg-schema.sql 为准） |
 | API | 单一 `papacheck-api` 云函数（Nodejs20.19）处理所有 `/papacheck/api/*` |
 | 前端路径 | `chengdexy.cn/papacheck/` 子路径 |
 | 认证 | 保留现有 JWT，spec 注明后续微信扫码登录（迁移后做） |
@@ -71,7 +75,7 @@
             ▼                                                 ▼
    /papacheck/api/speak (SCF)                    CloudBase PostgreSQL
    /papacheck/api/pregen-speech                  postgres-9pagpv9i
-   → tts-svc 云函数 (Python3.10)                 26 张表 (迁移自 ECS PG)
+   → tts-svc 云函数 (Python3.10)                 27 张表 (迁移自 ECS PG)
                                                  + RLS 行级安全策略
             │
             ▼
@@ -102,7 +106,7 @@
 
 ### 不变的部分
 
-- 数据库 schema：26 张表结构完全不变
+- 数据库 schema：27 张表结构完全不变
 - 业务逻辑：作业/积分/商店/赏金/奖励箱/Buff/通知的所有业务规则不变
 - 认证模型：JWT + access_codes + token_version + 超管，代码基本平移
 - Android Flutter 主体：仅改默认连接地址和移除离线快照/写队列
@@ -365,7 +369,7 @@ PapaCheck.CloudFunc/        ← 新目录（云函数源码）
 
 ### Schema 迁移策略
 
-**完全复用现有 `init-pg-schema.sql`**：26 张表结构不变，包括多租户、业务表、CRDT 表、审计表。
+**完全复用现有 `init-pg-schema.sql`**：27 张表结构不变，包括多租户、业务表、CRDT 表、审计表。
 
 **执行步骤**：
 1. 初始化 CloudBase PG 上下文（`managePgDatabase(action=init)`）
@@ -996,16 +1000,15 @@ pg_restore -d "<CloudBase PG 连接串>" --no-owner --no-acl --clean --if-exists
 
 ```bash
 cd PapaCheck.CloudFunc/papacheck-api
-npm install && npm run build
-tcb fn deploy papacheck-api --envId child-teacher-parent-d9aef9d2208
-tcb fn update papacheck-api \
-  --env DATABASE_URL=<CloudBase PG 连接串> \
-  --env JWT_SECRET=<新密钥> \
-  --env JWT_EXPIRES_IN=30d \
-  --env ENCRYPTION_KEY=<密钥> \
-  --env APK_VERSION=1.5.2 \
-  --env APK_CDN_URL=https://6368-child-teacher-parent-d9aef9d2208-1253991009.tcb.qcloud.la/dist/PapaCheck-1.5.2.apk
+node build.mjs
+# ⚠️ 必须 --dir dist（编译产物目录），不是 --dir .（函数根目录），否则入口找不到
+tcb fn deploy papacheck-api --dir dist --force --env-id child-teacher-parent-d9aef9d2208
 ```
+
+> **⚠️ 实际部署注意事项（2026-07-14 验证，原命令有坑）**
+> - 部署命令必须带 `--dir dist`：CloudBase 在指定目录根找 `index.js` 入口，编译产物在 `dist/index.js`，用 `--dir .` 会持续 `FUNCTION_INVOCATION_FAILED`。
+> - **JWT 密钥不要依赖 CLI 注入**：`tcb fn deploy` 只首次创建时应用 envVariables，`tcb config update fn` 报成功但 `JWT_SECRET` 等不落盘。生产改用随包 `dist/jwt.secret` 文件（`build.mjs` 生成，`jwt.ts` 优先读取），密钥跨冷启动稳定。
+> - **SCF 的 `/data` 为只读文件系统**：模块加载期禁止 `writeFileSync('/data/...')`，否则 `EROFS` 使入口 `exports.main` 未赋值而崩溃。
 
 **步骤1.5：静态托管部署**
 
@@ -1174,7 +1177,7 @@ tcb fn update papacheck-api --env APK_VERSION=1.5.2
 - [ ] 所有 API 端点在 `chengdexy.cn/papacheck/api/*` 可访问
 - [ ] 实时监听生效，前端无需轮询
 - [ ] Android APK 通过 CloudBase 下载更新
-- [ ] CloudBase PG 数据完整（26 张表行数与 ECS 一致）
+- [ ] CloudBase PG 数据完整（27 张表行数与 ECS 一致）
 - [ ] RLS 策略生效（用户隔离正确）
 - [ ] 测试覆盖率达标（总体 ≥ 85%）
 - [ ] 全量测试通过（Vitest + Flutter test）

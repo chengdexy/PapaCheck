@@ -11,9 +11,11 @@ describe('Auth Middleware', () => {
 
   beforeAll(async () => {
     app = Fastify();
-    // 创建一个模拟 db，只实现 queryUserTokenVersion
+    // 创建一个模拟 db，实现 token 吊销校验所需的两种方法
+    // （parent/child 走 access_codes 表，admin/user 走 users 表）
     db = {
       queryUserTokenVersion: async (_userId: string) => 1,
+      getAccessCodeById: async (_id: string) => ({ token_version: 1 }),
     } as any as IDatabase;
 
     // 直接调用 authMiddleware（而非 app.register），确保 hook 作用于全局

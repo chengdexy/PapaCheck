@@ -328,7 +328,7 @@ function renderBuffBar() {
   }
   buffBar.style.display = 'flex';
   buffBar.innerHTML = buffs.map(b => {
-    return `<span style="font-size:16px;font-weight:600;color:var(--accent);">✨ ${b.name}</span>`;
+    return `<span style="font-size:16px;font-weight:600;color:var(--accent);">✨ ${escapeHtml(b.name)}</span>`;
   }).join('');
 }
 

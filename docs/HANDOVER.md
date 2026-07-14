@@ -1,7 +1,7 @@
 # PapaCheck 上云交接文档（HANDOVER）
 
-> 最后更新：2026-07-08（CloudBase 迁移完成，v2.0.0）
-> 状态：v2.0.0 — CloudBase 迁移全部完成。ECS 已下线，所有服务通过 CloudBase（SCF 云函数 + 静态托管 + 网关 + PG）运行
+> 最后更新：2026-07-14（文档事实修正：版本号 / 表数 / RLS / 轮询机制）
+> 状态：CloudBase 迁移已完成，ECS 已下线，所有服务通过 CloudBase（SCF 云函数 + 静态托管 + 网关 + PG）运行。当前版本：Android APK 1.6.6 / Server 1.2.0 / Web 1.5.2（文档曾误标 v2.0.0）
 
 ## 概述
 
@@ -20,7 +20,7 @@ PapaCheck 已从阿里云 ECS 迁移到腾讯云 CloudBase。迁移后对外提�
 | 云存储 | CDN `6368-...tcb.qcloud.la`（APK 已用） |
 | 网关自定义域名 | `chengdexy.cn`（certId `YvG6ZmNq`，HTTP+HTTPS） |
 | API 云函数 | `papacheck-api`（Nodejs20.19，SCF + Fastify + PG） |
-| TTS 云函数 | `tts-svc`（Python3.10，已迁移） |
+| TTS 云函数 | `tts-svc`（Python3.10，独立仓库维护，不在本仓库；`/api/speak`、`/api/pregen-speech` 经网关转发） |
 | 已有路由 | `chengdexy.cn/dictations`（另一个项目，共存） |
 
 ### CloudBase 云函数环境变量

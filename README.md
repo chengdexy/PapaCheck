@@ -2,7 +2,7 @@
 
 ![PapaCheck Banner](./docs/imgs/_banner.jpg)
 
-> **v2.0.0** — 迁移到腾讯云 CloudBase（云函数 + PG + 静态托管 + 网关），30 秒轮询数据同步，643+ Vitest 测试通过
+> **v1.6.6**（Android APK）/ Server 1.2.0 / Web 1.5.2 — 部署在腾讯云 CloudBase（云函数 + PG + 静态托管 + 网关），轻量版本戳短轮询（默认 3 秒）数据同步，643+ Vitest 测试通过
 
 PapaCheck 是一个面向家庭的家长辅助工具，帮助管理和跟踪孩子的作业完成情况。孩子可以自主开始/暂停/完成作业并获得积分；家长远程评级并管理积分商店。部署在腾讯云 CloudBase，支持随时随地访问。
 
@@ -17,7 +17,7 @@ PapaCheck 是一个面向家庭的家长辅助工具，帮助管理和跟踪孩�
 - **🎁 奖励箱**：家长发放奖励，孩子自主兑换
 - **💰 赏金任务**：家长发布任务（如"帮妈妈洗碗"），孩子提交完成证明获取积分
 - **📱 多端支持**：Web 大屏（孩子端 + 管理端）、Android APP
-- **⚡ 数据同步**：每 30 秒轮询刷新数据，循环数据变更自动同步
+- **⚡ 数据同步**：前端 `RealtimeManager` 默认每 3 秒轮询轻量版本戳，变更才拉取全量；写操作后自动提速（burst），两端数据变更秒级感知
 - **🎨 品牌落地页**：`PapaCheck.Site` 提供产品介绍 + 下载 + 注册入口，含五态吉祥物插画（wave/point/ok/thumbs/bye）
 - **🛠 统一管理面板**：`PapaCheck.Site/admin` 提供家庭成员/作业/积分商店的远程管理（与落地页同一 Vite + React + TS + Tailwind 技术栈）
 - **🚀 发布控制台**：`PapaCheck.Release` 提供 Web 界面一键构建 APK / 同步云端 / 部署 Site（Node.js + Fastify + SSE 实时日志）
@@ -80,8 +80,8 @@ PapaCheck/
 | 模块              | 技术                                                    |
 | ----------------- | ------------------------------------------------------- |
 | **云函数（生产）** | CloudBase SCF（Node.js 20.19）、Fastify、PostgreSQL     |
-| **本地开发服务器** | Node.js, Fastify, pg (PostgreSQL), tts-svc (独立 TTS 服务) |
-| **Web 前端**      | 原生 HTML/CSS/JS, SVG 图表, CloudBase JS SDK（实时监听） |
+| **本地开发服务器** | Node.js, Fastify, pg (PostgreSQL)；TTS 由独立云函数 `tts-svc` 提供（仓库外维护） |
+| **Web 前端**      | 原生 HTML/CSS/JS, SVG 图表, 轻量版本戳短轮询（默认 3 秒）同步 |
 | **Site（落地页+管理面板）** | Vite 5, React 18, TypeScript 5, Tailwind CSS 3, Lucide Icons |
 | **Android 端**    | Flutter, `webview_flutter`                              |
 | **基础设施**      | CloudBase PG / SCF / 网关 / 静态托管                     |
@@ -102,9 +102,10 @@ npx vitest run
 | -------------------------------------- | ---------- |
 | [PRD](docs/PRD.md)                     | 产品需求文档 |
 | [ARCHITECTURE](docs/ARCHITECTURE.md)   | 技术架构文档 |
-| [API](docs/API.md)                     | API 接口文档 |
 | [CHANGELOG](docs/CHANGELOG.md)         | 变更日志    |
 | [PROGRESS](docs/PROGRESS.md)           | 进度记录    |
+
+> **注意**：独立的 `docs/API.md` 当前不存在，REST API 以 `PapaCheck.Server/src/app.ts` 与 `PapaCheck.CloudFunc/papacheck-api/app.ts` 中的路由为准。
 
 ### 测试驱动开发
 

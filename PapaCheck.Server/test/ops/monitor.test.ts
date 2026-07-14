@@ -46,7 +46,7 @@ describe('monitor module', () => {
         const db = {
             getLatestBackupRecord: async () => null,
             getOpsConfig: async () => null,
-            getPointsBalance: async () => 0,
+            ping: async () => {},
         } as any as IDatabase;
         const snapshot = await collectHealth(db);
         expect(snapshot).toHaveProperty('timestamp');
@@ -64,7 +64,7 @@ describe('monitor module', () => {
         const db = {
             getLatestBackupRecord: async () => null,
             getOpsConfig: async () => null,
-            getPointsBalance: async () => { throw new Error('connection refused'); },
+            ping: async () => { throw new Error('connection refused'); },
         } as any as IDatabase;
         const snapshot = await collectHealth(db);
         expect(snapshot.postgres.alive).toBe(false);
@@ -81,7 +81,7 @@ describe('monitor module', () => {
                 size_bytes: 100, error_message: null, checksum: null,
             }),
             getOpsConfig: async () => null,
-            getPointsBalance: async () => 0,
+            ping: async () => {},
         } as any as IDatabase;
         const snapshot = await collectHealth(db);
         const backupAlert = snapshot.alerts.find(a => a.alertKey === 'backup_stale');

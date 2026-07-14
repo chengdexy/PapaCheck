@@ -28,8 +28,12 @@ describe('GET /api/speak 鉴权', () => {
     app = Fastify({ logger: false });
 
     // 注册 authMiddleware（与生产环境一致）
+    // parent/child 角色的 token_version 来自 access_codes 表，需提供 getAccessCodeById
     await authMiddleware(app, {
-      db: { queryUserTokenVersion: async () => 1 } as any,
+      db: {
+        queryUserTokenVersion: async () => 1,
+        getAccessCodeById: async () => ({ token_version: 1 }),
+      } as any,
     });
 
     // 注册 /api/speak 路由（mock TTS 返回假 MP3）

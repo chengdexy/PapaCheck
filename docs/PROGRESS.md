@@ -1,10 +1,12 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-07-08（文档审计修复 + 清理过期 spec 文档）
+> 最后更新：2026-07-14（文档事实修正：版本号 / 表数 / RLS / 轮询机制）
 
 ## 当前版本
 
-**v2.0.0**（开发中）— 迁移到腾讯云 CloudBase（云函数 + PG + 静态托管 + 网关），轮询替代 CloudBase watch() 实时监听
+**Android APK 1.6.6** / **Server 1.2.0** / **Web 1.5.2** — 已迁移到腾讯云 CloudBase（云函数 + PG + 静态托管 + 网关），前端采用轻量版本戳短轮询（默认 3 秒，变更才拉全量）替代 CloudBase watch() 实时监听。
+
+> ⚠️ 本文档与 README/ARCHITECTURE/PRD/HANDOVER 曾误将版本标为 `v2.0.0`，实际最新版本号为上面三个（以 `package.json` / `pubspec.yaml` 为准）。
 
 ## 部署状态
 
@@ -13,7 +15,7 @@
 - [x] **Phase 5d 完成** — PostgreSQL 自动备份 + 健康监控 + 邮件告警
 - [x] **APK 发布迁移到 CloudBase** — 从 ECS 本地 `apk/` 目录切换到腾讯云 CloudBase PG 存储，`/api/download` 重定向到 CloudBase CDN
 - [x] **build-apk --publish 一键构建发布** — `build-apk` 支持 `--publish` 参数，构建后自动上传 CloudBase + 更新 ECS 版本号 + 重启服务
-- [x] **CloudBase 迁移完成（v2.0.0）** — 子计划 1-5 全部完成（API 云函数 / RLS 策略 / 前端实时监听 / Release 控制台 / Android 端），网关已切换，ECS 已下线
+- [x] **CloudBase 迁移完成** — 子计划 1-5 全部完成（API 云函数 / 多租户隔离 / 前端版本戳短轮询 / Release 控制台 / Android 端），网关已切换，ECS 已下线（注：原设计稿中的 RLS 策略与实时监听未在生产代码路径落地，改为应用层 SQL 隔离 + 短轮询）
 
 ---
 
@@ -38,11 +40,11 @@
 - [x] Android APP（Flutter WebView + APK 自动更新 + 更新后自动清缓存）
 - [x] ~~Windows 桌面端（系统托盘 + 开机自启 + 凭据安全存储）~~ **已移除（弃用）**
 
-### CloudBase 迁移（v2.0.0）
+### CloudBase 迁移（已完成）
 
 - [x] API 云函数 `papacheck-api`（SCF + Fastify + PG，从 ECS 服务迁移）
-- [x] RLS 行级安全策略（14 张业务表 tenant/child 隔离）
-- [x] 前端实时数据同步（轮询每 30 秒刷新，CloudBase watch() 因 SDK v3 API 不兼容改为轮询）
+- [x] 多租户隔离（应用层 SQL：`WHERE tenant_id` + 必要时 `child_id`，后端单一 pg 连接）。`cloudbase-rls.sql` 为早期 RLS 设计脚本，当前未激活
+- [x] 前端数据同步（轻量版本戳短轮询，默认 3 秒轮询 `/api/data-version`，变更才拉全量；写后 burst 提速到 1 秒；CloudBase watch() 因 SDK v3 API 不兼容未采用）
 - [x] 前端路径前缀改为 `/papacheck/`（app/api/login 全部更新）
 - [x] Release 控制台改造（`fn`/`all` 子命令，tcb CLI 部署，移除 SSH）
 - [x] Android 端改造（ConfigService/UpdateService URL 改为 `/papacheck/`，删除离线模块）
@@ -58,16 +60,16 @@
 - [x] **数据库抽象层重构** — `IDatabase` 接口 + `PostgresAdapter`（Phase 5a，SQLite 已退役）
 - [x] **JWT 多租户认证系统** — Hash 码预授权 + token_version 吊销 + 租户行级隔离（Phase 5c）
 - [x] **认证体系重构（Phase 5f）**：分离账号与访问码，`users` 表合并 `tenants` 表，新增 `access_codes` 表。角色简化为 `admin`/`user`（账号）和 `parent`/`child`（访问码）。统一登录入口，超级管理员首次登录强制修改凭证
-- [x] **PostgreSQL 迁移** — `migrate-to-pg.ts` 逐表迁移 + 行数校验，SQLite 数据完整迁移，26 张表
+- [x] **PostgreSQL 迁移** — `migrate-to-pg.ts` 逐表迁移 + 行数校验，SQLite 数据完整迁移，27 张表（以 `init-pg-schema.sql` 为准）
 - [x] ~~**部署：systemd + Nginx + Let's Encrypt**~~ — **ECS 下线后废弃，改为 CloudBase**
 - [x] **多孩子支持（Phase 1+2）** — children 表 + 12 张表 child_id 列 + partial unique index，数据行级隔离
-- [x] ~~**离线同步重构（Phase 0~4）**~~ — **已移除（CloudBase 迁移，实时监听替代）**
+- [x] ~~**离线同步重构（Phase 0~4）**~~ — **已移除（CloudBase 迁移，轻量版本戳短轮询替代）**
 - [x] ~~**Phase 5d 运维增强**~~ — **已移除（CloudBase PG 自带备份 + 腾讯云监控）**
 - [x] TTS 语音提醒（tts-svc 云函数，Python FastAPI + edge-tts）
 - [x] ~~邮件同步（IMAP + AI 解析）~~ **已移除（CloudBase 迁移）**
 - [x] ~~附件下载~~ **已移除（CloudBase 迁移）**
 - [x] ~~离线支持（Service Worker + localforage）~~ **已移除（CloudBase 迁移）**
-- [x] ~~增量同步（pull/push）~~ **已移除（CloudBase 实时监听替代）**
+- [x] ~~增量同步（pull/push）~~ **已移除（CloudBase 轻量版本戳短轮询替代）**
 - [x] **Release Console 发布控制台** — `PapaCheck.Release/` CLI 子命令 + Web 控制台（SSE 实时日志），支持 `fn`/`all` tcb CLI 部署
 - [x] ~~OpenAPI 自动文档（Swagger UI）~~ **已移除（CloudBase 迁移）**
 - [x] 单 EXE 构建（Node.js SEA）

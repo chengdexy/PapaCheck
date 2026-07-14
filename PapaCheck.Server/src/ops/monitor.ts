@@ -44,7 +44,7 @@ export async function collectHealth(db: IDatabase): Promise<HealthSnapshot> {
     let pgLatency = 0;
     try {
         const pgStart = Date.now();
-        await db.getPointsBalance();
+        await db.ping();
         pgLatency = Date.now() - pgStart;
     } catch {
         pgAlive = false;

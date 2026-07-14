@@ -89,7 +89,7 @@ export async function startServer(port = 3456) {
 
   app.post('/api/release/web', async () => {
     const steps: StepDef[] = [
-      { id: '1', desc: '清空远端旧文件', cmd: `tcb hosting delete papacheck/app --dir --env-id ${CLOUDBASE_ENV}`, shell: true, timeout: 30 },
+      { id: '1', desc: '清空远端旧文件', cmd: `tcb hosting delete papacheck/app --dir --env-id ${CLOUDBASE_ENV}`, cwd: join(ROOT, 'PapaCheck.Web'), shell: true, timeout: 30 },
       { id: '2', desc: '部署 Web 前端到 CloudBase', cmd: `deploy.bat ${CLOUDBASE_ENV}`, cwd: join(ROOT, 'PapaCheck.Web'), shell: true, timeout: 120 },
     ];
     executor.runAndReport('Web 部署', steps).catch((err) => console.error(err));
@@ -109,7 +109,7 @@ export async function startServer(port = 3456) {
       ]);
       if (!siteOk) return;
       await executor.runAndReport('Web 部署', [
-          { id: '1', desc: '清空远端旧文件', cmd: `tcb hosting delete papacheck/app --dir --env-id ${CLOUDBASE_ENV}`, shell: true, timeout: 30 },
+          { id: '1', desc: '清空远端旧文件', cmd: `tcb hosting delete papacheck/app --dir --env-id ${CLOUDBASE_ENV}`, cwd: join(ROOT, 'PapaCheck.Web'), shell: true, timeout: 30 },
           { id: '2', desc: '部署 Web 前端到 CloudBase', cmd: `deploy.bat ${CLOUDBASE_ENV}`, cwd: join(ROOT, 'PapaCheck.Web'), shell: true, timeout: 120 },
         ]);
     })().catch((err) => console.error(err));
