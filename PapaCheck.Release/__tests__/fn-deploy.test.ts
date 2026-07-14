@@ -2,12 +2,18 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('child_process', () => ({
-  execFile: vi.fn((cmd, args, opts, callback) => {
-    if (typeof opts === 'function') callback = opts;
-    callback(null, { stdout: '', stderr: '' });
-  }),
-}));
+// fn-deploy.ts 已改为使用 spawn（参数数组，无 shell）以消除命令注入，
+// 此处 mock child_process.spawn，并断言调用参数正确。
+vi.mock('child_process', () => {
+  const spawn = vi.fn((_cmd: string, _args: string[], _opts: any) => ({
+    stdout: { on: vi.fn() },
+    stderr: { on: vi.fn() },
+    on: (event: string, cb: (code?: number) => void) => {
+      if (event === 'close') cb(0);
+    },
+  }));
+  return { spawn };
+});
 
 import { deployFunction, updateFunctionEnv } from '../lib/fn-deploy.js';
 
@@ -20,11 +26,11 @@ describe('云函数部署', () => {
     await deployFunction('papacheck-api', {
       envId: 'child-teacher-parent-d9aef9d2208',
     });
-    const { execFile } = await import('child_process');
-    expect(execFile).toHaveBeenCalledWith(
+    const { spawn } = await import('child_process');
+    expect(spawn).toHaveBeenCalledWith(
       'tcb',
       expect.arrayContaining(['fn', 'deploy', 'papacheck-api']),
-      expect.any(Function)
+      expect.any(Object)
     );
   });
 
@@ -32,9 +38,9 @@ describe('云函数部署', () => {
     await updateFunctionEnv('papacheck-api', { APK_VERSION: '1.6.0' }, {
       envId: 'child-teacher-parent-d9aef9d2208',
     });
-    const { execFile } = await import('child_process');
-    expect(execFile).toHaveBeenCalled();
-    const call = (execFile as any).mock.calls[0];
+    const { spawn } = await import('child_process');
+    expect(spawn).toHaveBeenCalled();
+    const call = (spawn as any).mock.calls[0];
     expect(call[0]).toBe('tcb');
     expect(call[1]).toEqual(expect.arrayContaining(['config', 'update', 'fn', 'papacheck-api']));
   });

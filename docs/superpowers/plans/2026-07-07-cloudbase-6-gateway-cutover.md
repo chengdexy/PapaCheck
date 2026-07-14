@@ -2,6 +2,14 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> ⚠️ **文档状态：迁移子计划稿，实施方式已变更（2026-07-14 注记）**
+> 本文档是 CloudBase 迁移的**子计划稿（预期方案）**，实际落地已与本文多处不符，阅读时以代码与现状文档（README / ARCHITECTURE / PROGRESS）为准：
+> - **实时同步**：本文档描述的 CloudBase PG 实时监听（`watch()`）/ RLS 订阅**未落地**；生产实际为前端 `RealtimeManager` 轻量版本戳短轮询（默认 3 秒轮询 `/api/data-version`，变更才拉全量；写后 burst 提速到 1 秒）。
+> - **多租户隔离**：本文档依赖的 **RLS（`cloudbase-rls.sql`）未激活**——后端 `postgres-adapter.ts` 用普通 `pg` 连接，不注入 `request.jwt.claims`；隔离实际由应用层 SQL（`WHERE tenant_id=$1 [AND child_id=$2]`）实现。
+> - **TTS**：`tts-svc` 由独立仓库维护，**不在本仓库**（仅 `/api/speak`、`/api/pregen-speech` 经网关转发）；本文档「任务 1 配置 tts-svc 路由」指的是已部署的独立云函数，并非仓库内源码。
+> - **版本号**：本文档出现的 `v2.0.0` 为设计预期，实际为 Server 1.2.0 / Web 1.5.2 / Android 1.6.6。
+> - **表数量**：迁移设计稿原写 26 张表，实际 `init-pg-schema.sql` 建 **27 张表**。
+
 **Goal:** 配置 CloudBase 网关路由（`/papacheck/*` → SCF + 静态托管），执行最终数据迁移与切换，提供回滚预案。
 
 **Architecture:** 通过 CloudBase MCP `manageGateway` 配置路由规则。5 阶段切换：准备 → 验证 → 切换 → 观察 → ECS 下线。回滚通过删除网关路由 + 恢复 ECS 服务实现（< 5 分钟）。

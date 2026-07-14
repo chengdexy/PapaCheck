@@ -81,7 +81,7 @@ describe.runIf(runPg)('PostgresAdapter', () => {
   });
 
   it('should handle pushMerge', async () => {
-    const result = await adapter.pushMerge([]);
+    const result = await adapter.pushMerge([], TEST_TENANT_ID);
     expect(result).toEqual({ ok: true });
   });
 
@@ -90,5 +90,29 @@ describe.runIf(runPg)('PostgresAdapter', () => {
     await adapter.recordModification('homeworks', '2026-06-09', now, TEST_TENANT_ID);
     const modified = await adapter.getModifiedSince('2000-01-01', TEST_TENANT_ID);
     expect(modified.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('getDataVersion 返回非空版本戳，且写操作后会变化', async () => {
+    await adapter.recordModification('homeworks', '2026-06-09', new Date().toISOString(), TEST_TENANT_ID);
+    const v1 = await adapter.getDataVersion(TEST_TENANT_ID);
+    expect(typeof v1).toBe('string');
+    expect(v1).not.toBeNull();
+
+    // 新增一条修改记录（新 record_key）→ 版本戳应变化（COUNT 变化）
+    await adapter.recordModification('homeworks', '2026-06-10', new Date(Date.now() + 1000).toISOString(), TEST_TENANT_ID);
+    const v2 = await adapter.getDataVersion(TEST_TENANT_ID);
+    expect(v2).not.toBe(v1);
+
+    // 更新已有记录到更晚的时间戳 → 版本戳应变化（MAX 变化）
+    await adapter.recordModification('homeworks', '2026-06-09', new Date(Date.now() + 5000).toISOString(), TEST_TENANT_ID);
+    const v3 = await adapter.getDataVersion(TEST_TENANT_ID);
+    expect(v3).not.toBe(v2);
+  });
+
+  it('getDataVersion 对无数据的租户返回 null', async () => {
+    const emptyTenant = '00000000-0000-0000-0000-0000000000ff';
+    await adapter.pool.query('DELETE FROM last_modified WHERE tenant_id = $1', [emptyTenant]);
+    const v = await adapter.getDataVersion(emptyTenant);
+    expect(v).toBeNull();
   });
 });

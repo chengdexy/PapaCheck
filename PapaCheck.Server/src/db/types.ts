@@ -249,6 +249,8 @@ export interface SmtpConfig {
 
 export interface IDatabase {
   close(): Promise<void>;
+  /** 系统级存活探测（ops/监控用），不要求 tenantId，永不因缺 tenantId 抛错。 */
+  ping(): Promise<void>;
   getFullData(tenantId?: string, childId?: string): Promise<FullDataSnapshot>;
   importFullData(data: any, tenantId?: string, childId?: string): Promise<void>;
   addNotification(text: string, createdAt?: number, tenantId?: string): Promise<string>;
@@ -260,6 +262,7 @@ export interface IDatabase {
   getHomeworks(dateKey: string, tenantId?: string, childId?: string): Promise<any[]>;
   saveHomeworks(dateKey: string, items: any[], tenantId?: string, childId?: string): Promise<void>;
   moveHomework(fromDate: string, toDate: string, hwId: string, tenantId?: string, childId?: string): Promise<any | null>;
+  approveDeferHomework(date: string, hwId: string, tenantId?: string, childId?: string): Promise<{ ok: boolean; homework?: any }>;
   getHomeworkById(id: string, tenantId?: string, childId?: string): Promise<any | null>;
   putHomework(id: string, data: any, tenantId?: string, childId?: string): Promise<void>;
   patchHomework(id: string, fields: any, tenantId?: string, childId?: string): Promise<void>;
@@ -309,6 +312,8 @@ export interface IDatabase {
   getEmailConfig(tenantId?: string): Promise<any | null>;
   saveEmailConfig(config: any, tenantId?: string): Promise<void>;
   getModifiedSince(timestamp: string, tenantId?: string, childId?: string): Promise<ModifiedEntry[]>;
+  /** 轻量数据版本戳（租户级 MAX(last_modified)+行数），用于前端条件短轮询。无记录返回 null。 */
+  getDataVersion(tenantId?: string): Promise<string | null>;
   pushMerge(changes: any[], tenantId?: string, childId?: string): Promise<{ ok: boolean }>;
   recordModification(tableName: string, recordKey: string, timestamp: string, tenantId?: string): Promise<void>;
   resetDate(dateKey: string, tenantId?: string, childId?: string): Promise<void>;

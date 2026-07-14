@@ -1,65 +1,20 @@
-import { buildApp } from './app.js';
-import { parseGatewayEvent, type ScfEvent } from './scf-handler.js';
-import type { FastifyInstance } from 'fastify';
-import { setCloudBaseApp } from './cloudbase-ctx.js';
-import cloudbase from '@cloudbase/node-sdk';
-
-/**
- * light-my-request 的 InjectOptions.method 类型（与 fastify HTTPMethods 略有差异，
- * 不含 SEARCH）。SCF 网关只会发送标准 HTTP 方法，此处用字面量联合保证类型兼容。
- */
-type InjectMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
-
-let appInstance: FastifyInstance | null = null;
-
-// 初始化 CloudBase SDK 实例（模块级单例），供路由使用（如调用 tts-svc 云函数）
-try {
-  const tcbApp = cloudbase.init({});
-  setCloudBaseApp(tcbApp);
-} catch (err) {
-  console.warn('[SCF] Failed to init CloudBase SDK:', err);
-}
-
-async function getApp(): Promise<FastifyInstance> {
-  if (!appInstance) {
-    appInstance = await buildApp({
-      enableAuth: true,
-      rateLimit: { max: 100, timeWindow: '1 minute' },
-    });
-    await appInstance.ready();
+// 轻量入口 wrapper：先确保 module.exports.main 直接赋值生效，
+// 再懒加载真实逻辑（handler-body.js）。这样即使 handler-body 在云端初始化抛错，
+// 也能被此处 try/catch 捕获并以 500 JSON 返回真实错误栈，而非 SCF 的 writeRuntimeFile(undefined)。
+exports.main = async function (event: any, context: any) {
+  try {
+    const { run } = require('./handler-body.js');
+    return await run(event, context);
+  } catch (err: any) {
+    return {
+      statusCode: 500,
+      headers: { 'content-type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({
+        ok: false,
+        error: 'INTERNAL_ERROR',
+        message: err?.message ? String(err.message) : String(err),
+        stack: err?.stack ? String(err.stack) : undefined,
+      }),
+    };
   }
-  return appInstance;
-}
-
-export async function main(event: ScfEvent, context: any): Promise<{
-  statusCode: number;
-  headers: Record<string, string>;
-  body: string;
-  isBase64Encoded?: boolean;
-}> {
-  const app = await getApp();
-  const { method, path, headers, query, body } = parseGatewayEvent(event);
-
-  const response = await app.inject({
-    method: method.toUpperCase() as InjectMethod,
-    url: path,
-    headers,
-    query,
-    payload: body !== null ? JSON.stringify(body) : undefined,
-  });
-
-  // 检测是否为二进制响应（如 TTS 音频）
-  const contentType = (response.headers['content-type'] as string) || '';
-  const isBinary = contentType.startsWith('audio/') || contentType.startsWith('image/') || contentType.startsWith('video/');
-
-  return {
-    statusCode: response.statusCode,
-    headers: Object.fromEntries(
-      Object.entries(response.headers).map(([k, v]) => [k, String(v)])
-    ),
-    body: isBinary
-      ? response.rawPayload.toString('base64')
-      : response.payload,
-    ...(isBinary ? { isBase64Encoded: true } : {}),
-  };
-}
+};

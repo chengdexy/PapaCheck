@@ -1,3 +1,9 @@
+/**
+ * ⚠️ 安全红线：本文件严禁写入任何真实密钥 / 密码 / 内网地址。
+ * DATABASE_URL、JWT_SECRET、ENCRYPTION_KEY、PAPACHECK_CLOUD_IP 等敏感信息
+ * 必须通过环境变量或密钥管理服务（如 CloudBase / CI Secret）注入，
+ * 缺失时（非 development）构建即抛错，禁止退化为内联明文。
+ */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { tmpdir } from 'os';
@@ -76,7 +82,8 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
 
   steps.push({
     id: String(idx++), desc: '构建 APK',
-    cmd: 'flutter build apk --release', cwd: ANDROID_DIR, shell: true, timeout: 300,
+    // 改用 spawn 参数数组（shell:false，默认），避免 shell 拼接带来的命令注入风险
+    cmd: ['flutter', 'build', 'apk', '--release'], cwd: ANDROID_DIR, timeout: 300,
   });
 
   // 归档 APK：构建成功后执行，作为 executor step 避免构建前误归档旧版 APK
@@ -104,8 +111,8 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
     if (existsSync(apkPath)) {
       steps.push({
         id: String(idx++), desc: `上传 APK 到 CloudBase (PapaCheck-${newVer}.apk)`,
-        shell: true,
-        cmd: `tcb storage objects upload ${apkPath} PapaCheck-${newVer}.apk --bucket dist --env-id ${CLOUDBASE_ENV} --content-type application/vnd.android.package-archive --use-put --json`,
+        // 参数数组形式（无 shell），apkPath 作为单个参数传递，杜绝命令注入
+        cmd: ['tcb', 'storage', 'objects', 'upload', apkPath, `PapaCheck-${newVer}.apk`, '--bucket', 'dist', '--env-id', CLOUDBASE_ENV, '--content-type', 'application/vnd.android.package-archive', '--use-put', '--json'],
         timeout: 120,
       });
 
@@ -121,12 +128,12 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
   // --publishOnBuild：构建后上传云存储（版本号已硬编码在云函数代码中，重新部署即可生效）
   if (args.publishOnBuild) {
     const apkPath = join(APK_ARCHIVE_DIR, `PapaCheck-${newVer}.apk`);
-    steps.push({
-      id: String(idx++), desc: `上传 APK 到 CloudBase 云存储 (PapaCheck-${newVer}.apk)`,
-      shell: true,
-      cmd: `tcb storage objects upload ${apkPath} PapaCheck-${newVer}.apk --bucket dist --env-id ${CLOUDBASE_ENV} --upsert`,
-      timeout: 120,
-    });
+      steps.push({
+        id: String(idx++), desc: `上传 APK 到 CloudBase 云存储 (PapaCheck-${newVer}.apk)`,
+        // 参数数组形式（无 shell），杜绝命令注入
+        cmd: ['tcb', 'storage', 'objects', 'upload', apkPath, `PapaCheck-${newVer}.apk`, '--bucket', 'dist', '--env-id', CLOUDBASE_ENV, '--upsert'],
+        timeout: 120,
+      });
     // 同步云函数 package.json 版本号，并自动构建+部署云函数
     const cfDir = join(ROOT, 'PapaCheck.CloudFunc', 'papacheck-api');
     const cfPkgPath = join(cfDir, 'package.json');
@@ -136,11 +143,22 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
       writeFileSync(cfPkgPath, JSON.stringify(cfPkg, null, 2) + '\n', 'utf-8');
       steps.push({
         id: String(idx++), desc: `构建云函数 (v${newVer})`,
-        shell: true,
-        cmd: `npm run build`,
+        // 参数数组形式（无 shell）
+        cmd: ['npm', 'run', 'build'],
         cwd: cfDir,
         timeout: 30,
       });
+      // ⚠️ 密钥严禁入库：DATABASE_URL / JWT_SECRET / ENCRYPTION_KEY 必须从环境变量注入，
+      // 缺失时（非 development 环境）直接抛错，禁止退化为内联明文或空值部署。
+      const DATABASE_URL = process.env['DATABASE_URL'];
+      const JWT_SECRET = process.env['JWT_SECRET'];
+      const ENCRYPTION_KEY = process.env['ENCRYPTION_KEY'];
+      if (process.env['NODE_ENV'] !== 'development' && (!DATABASE_URL || !JWT_SECRET || !ENCRYPTION_KEY)) {
+        throw new Error(
+          '缺少必要的环境变量 DATABASE_URL / JWT_SECRET / ENCRYPTION_KEY，无法生成云函数配置。' +
+          '请通过密钥管理（CloudBase / CI Secret）注入后再部署，切勿将明文密钥写入代码或仓库。'
+        );
+      }
       // 生成 cloudbaserc.json（包含完整环境变量，避免 tcb fn deploy 清空已有变量）
       const cfDist = join(cfDir, 'dist');
       writeFileSync(join(cfDist, 'cloudbaserc.json'), JSON.stringify({
@@ -152,18 +170,18 @@ export async function buildApk(executor: Executor, args: { ver?: string; bump?: 
             timeout: 30,
             runtime: 'Nodejs18.15',
             envVariables: {
-              DATABASE_URL: 'postgresql://chengdexy:XY%40dly%26xjy1314@172.17.0.8:5432/postgres',
-              ENCRYPTION_KEY: '',
+              DATABASE_URL: DATABASE_URL ?? '',
+              ENCRYPTION_KEY: ENCRYPTION_KEY ?? '',
               JWT_EXPIRES_IN: '30d',
-              JWT_SECRET: 'd6f21d968b5c7315c21c2f4ff0deac260103ef09f21332d9dfafc3d342e553a5',
+              JWT_SECRET: JWT_SECRET ?? '',
             },
           },
         }],
       }, null, 2), 'utf-8');
       steps.push({
         id: String(idx++), desc: `部署云函数 ${newVer}`,
-        shell: true,
-        cmd: `tcb fn deploy papacheck-api --env-id ${CLOUDBASE_ENV} --force --yes --dir .`,
+        // 参数数组形式（无 shell），杜绝命令注入
+        cmd: ['tcb', 'fn', 'deploy', 'papacheck-api', '--env-id', CLOUDBASE_ENV, '--force', '--yes', '--dir', '.'],
         cwd: cfDist,
         timeout: 60,
       });

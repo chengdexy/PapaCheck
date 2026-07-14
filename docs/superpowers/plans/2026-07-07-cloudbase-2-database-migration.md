@@ -2,7 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 在 CloudBase PG 上创建 26 张表 schema，配置 RLS 行级安全策略，并从 ECS PostgreSQL 迁移生产数据。
+> ⚠️ **文档状态：迁移子计划稿，实施方式已变更（2026-07-14 注记）**
+> 本文档是 CloudBase 迁移的**子计划稿（预期方案）**，实际落地已与本文多处不符，阅读时以代码与现状文档（README / ARCHITECTURE / PROGRESS）为准：
+> - **实时同步**：本文档描述的 CloudBase PG 实时监听（`watch()`）/ RLS 订阅**未落地**；生产实际为前端 `RealtimeManager` 轻量版本戳短轮询（默认 3 秒轮询 `/api/data-version`，变更才拉全量；写后 burst 提速到 1 秒）。
+> - **多租户隔离**：本文档依赖的 **RLS（`cloudbase-rls.sql`）未激活**——后端 `postgres-adapter.ts` 用普通 `pg` 连接，不注入 `request.jwt.claims`；隔离实际由应用层 SQL（`WHERE tenant_id=$1 [AND child_id=$2]`）实现。
+> - **TTS**：`tts-svc` 由独立仓库维护，**不在本仓库**（仅 `/api/speak`、`/api/pregen-speech` 经网关转发）。
+> - **版本号**：本文档出现的 `v2.0.0` 为设计预期，实际为 Server 1.2.0 / Web 1.5.2 / Android 1.6.6。
+> - **表数量**：迁移设计稿原写 26 张表，实际 `init-pg-schema.sql` 建 **27 张表**（本文正文已同步修正为 27）。
+
+**Goal:** 在 CloudBase PG 上创建 27 张表 schema，配置 RLS 行级安全策略，并从 ECS PostgreSQL 迁移生产数据。
 
 **Architecture:** 复用现有 `init-pg-schema.sql` 建表，通过 CloudBase MCP `managePgDatabase` 执行 DDL。RLS 策略让前端实时订阅按 `tenant_id` + `child_id` 隔离，云函数用 service_role 绕过。数据迁移用 `pg_dump` + `pg_restore`。
 
@@ -75,7 +83,7 @@ $sql = Get-Content PapaCheck.Server/scripts/init-pg-schema.sql -Raw
 ```sql
 SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';
 ```
-Expected: 26
+Expected: 27
 
 调用 `queryPgDatabase(action=sql, sql="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'")`。
 
@@ -449,7 +457,7 @@ git commit -m "test: 新增 RLS 策略验证测试（tenant/child 隔离）"
 ## 完成标准
 
 - [ ] CloudBase PG 上下文已初始化
-- [ ] 26 张表已创建（`SELECT COUNT(*) FROM information_schema.tables` = 26）
+- [ ] 27 张表已创建（`SELECT COUNT(*) FROM information_schema.tables` = 27）
 - [ ] RLS 已在 14 张业务表上启用
 - [ ] 28 条 RLS 策略已创建（14 表 × 2 策略）
 - [ ] 生产数据已从 ECS 迁移到 CloudBase PG

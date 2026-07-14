@@ -4,6 +4,7 @@ export interface IHomeworkStore {
   getHomeworks(dateKey: string, tenantId?: string, childId?: string): Promise<HomeworkDTO[]>;
   saveHomeworks(dateKey: string, items: HomeworkDTO[], tenantId?: string, childId?: string): Promise<void>;
   moveHomework(fromDate: string, toDate: string, hwId: string, tenantId?: string, childId?: string): Promise<HomeworkDTO | null>;
+  approveDeferHomework(date: string, hwId: string, tenantId?: string, childId?: string): Promise<{ ok: boolean; homework?: any }>;
   getHomeworkById(id: string, tenantId?: string, childId?: string): Promise<HomeworkDTO | null>;
   putHomework(id: string, data: HomeworkDTO, tenantId?: string, childId?: string): Promise<void>;
   patchHomework(id: string, fields: Partial<HomeworkDTO>, tenantId?: string, childId?: string): Promise<void>;

@@ -65,9 +65,18 @@ export async function authMiddleware(app: FastifyInstance, opts: { db: IDatabase
       if (payload.token_version < currentTokenVersion) {
         return reply.status(401).send({ error: '认证已过期，请重新登录', code: 'SESSION_EXPIRED' });
       }
-    } catch {
-      console.warn('[auth] 查询 token_version 失败，放行请求');
-      // 数据库查询失败时放行（兼容无 users 表的旧数据库）
+    } catch (err: any) {
+      // 区分「表不存在（旧库兼容）」与「查询异常（安全优先拒绝）」
+      const msg = String(err?.message ?? err ?? '');
+      const isMissingTable = /relation .* does not exist|no such table|undefined_table|42P01/i.test(msg);
+      if (isMissingTable) {
+        // 旧数据库尚未建表，按兼容逻辑放行（仍记录以便排查）
+        console.warn('[auth] users/access_codes 表不存在，按旧库兼容放行 token_version 校验');
+        return;
+      }
+      // fail-closed：任何非预期的查询异常都拒绝请求，避免吊销失效
+      console.error('[auth] 查询 token_version 失败，安全起见拒绝请求:', err);
+      return reply.status(401).send({ error: '认证校验失败，请重新登录', code: 'AUTH_CHECK_FAILED' });
     }
 
     // 注入 payload

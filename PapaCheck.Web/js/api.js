@@ -24,7 +24,7 @@ async function _fetch(url, options) {
   // 自动附加 child_id 到 per-child API
   var childId = (typeof window !== 'undefined') ? window._currentChildId : undefined;
   var sep = url.indexOf('?') === -1 ? '?' : '&';
-  if (childId && !/\/api\/(shop|bounty-tasks|settings|reward-box|notifications|ping|version|pregen-speech|speak|admin\/(members|invite|roles)|auth\/)/.test(url)) {
+  if (childId && !/\/api\/(data-version|shop|bounty-tasks|settings|reward-box|notifications|ping|version|pregen-speech|speak|admin\/(members|invite|roles)|auth\/)/.test(url)) {
     url += sep + 'child_id=' + encodeURIComponent(childId);
   }
   // DELETE 请求没有 body，不设置 Content-Type，避免 Fastify 报空 JSON body 错误
@@ -44,6 +44,14 @@ async function _fetch(url, options) {
     throw new Error('unauthorized');
   }
   if (!resp.ok) throw new Error(resp.statusText);
+  // 写操作成功后触发 burst：本端立即提速轮询，让所有端尽快感知本次变更
+  if (method !== 'GET' && method !== 'HEAD') {
+    try {
+      if (typeof window !== 'undefined' && window._realtimeManager) {
+        window._realtimeManager.bump();
+      }
+    } catch (e) { /* ignore */ }
+  }
   if (resp.status === 204 || resp.status === 205) return null;
   return await resp.json();
 }
@@ -56,6 +64,11 @@ async function getData(childId) {
   isServerMode = true;
   cachedData = result;
   return result;
+}
+
+// 轻量数据版本戳：仅返回 { version }（几十字节），用于条件短轮询
+async function getDataVersion() {
+  return await _fetch(API_BASE + '/data-version');
 }
 
 async function getTasks(dateKey) {
@@ -437,6 +450,7 @@ const API = {
   _childQuery,
   _fetch,
   getData,
+  getDataVersion,
   getTasks,
   getHomeworks,
   saveHomeworks,

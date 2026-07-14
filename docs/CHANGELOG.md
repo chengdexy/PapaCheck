@@ -10,9 +10,12 @@
 - **文档大范围修正与清理**：落地页 5 处"离线可用"改为"云端实时同步"，"AI 评优"改为"家长评优"，"拍照录入作业"改为"添加作业"。ECS 链接全部切换到 CloudBase 路径。Footer 版本号 v3.0→v1.6.6。HANDOVER 标记 CloudBase 迁移完成、ECS 已下线，删除 ECS 配置/切换流程/回滚预案 3 节。PROGRESS/PRD/README 同步更新。清理 10 份已完成功能的过期 spec/plan 文档
 - **Release 控制台 Windows 兼容性修复**：`executor.ts` `executeSteps()` 在 Windows 上默认 `shell: true` 以正确解析 `.cmd` 包装脚本。`site-publish.ts`/`fn-deploy.ts` 改为 `exec()` 避免 `execFile + shell: true` 的 DEP0190 废弃警告。`console-server.ts` 将 site/web/fn 部署改为使用共享 `executor` 实例，SSE 进度正常展示。新增 `PapaCheck.Web/deploy.bat` 实现仅上传必要文件（跳过 node_modules/tts_cache/apk/__tests__），避免 7800+ 垃圾文件上传。`.gitignore` 添加 `_web_deploy/`
 
+- **文档事实审计（第二轮）**：核对全部 Markdown 与代码事实，修正多处硬错误——① 表数量统一为 **27 张**（`PapaCheck.Server/scripts/init-pg-schema.sql` 实际建表数，此前误写 26 或 30；ARCHITECTURE 数据模型表移除不存在的 `tenant_members`/`sync_metadata`/`sessions`/`audit_log`）；② 现状文档（README/ARCHITECTURE/PRD/HANDOVER/PROGRESS）中"实时监听替代轮询"等表述修正为实际采用的轻量版本戳短轮询；③ 6 份 CloudBase 迁移子计划稿与 1 份设计稿顶部统一加「实施方式已变更」警示注记（实时监听/RLS 未落地、tts-svc 独立仓库维护、实际版本 Server 1.2.0 / Web 1.5.2 / Android 1.6.6）
+
 ### Fixed
 - **修复 Android SetupPage 引导页每次启动都出现**：首次安装路径中 `ConfigService.setUrl()`/`setRole()` 缺失，URL 和角色未保存到 SharedPreferences；新增 2 行保存调用后下次启动直接跳过引导页
 - **修复 RealtimeManager 启动失败：`@cloudbase/js-sdk` 裸模块标识符无法解析**：在 `admin.html`/`index.html` 中添加 `importmap`，将 `@cloudbase/js-sdk` 映射到 esm.sh CDN
+- **修复 papacheck-api 云函数持续 `FUNCTION_INVOCATION_FAILED`**：根因为 `src/auth/jwt.ts` 在**模块加载期**向只读的 `/data/.jwt_secret` 写文件触发 `EROFS`，导致入口 `exports.main` 从未赋值；叠加部署入口漏写 `--dir dist`、CLI 环境变量推送不落盘。修复：JWT 密钥改为随包 `dist/jwt.secret` 文件（只读可读）、入口拆双文件（`index.js` wrapper 懒加载 `handler-body.js` 真实逻辑，异常以 500 JSON 返回真实栈）、构建改为自包含 bundle。方案A 轻量版本戳端点 `GET /papacheck/api/data-version` 已正式上线
 
 ### Removed
 - **移除 Flutter WebView 加载遮罩（15 秒转圈）**：`_waitForPageReady()` 定期检查已移除的离线模块 `connStatus` className，永远不满足条件，必须等 15 秒超时。移除 `_isPageReady`/`_readyCheckTimer`/`_waitForPageReady`/遮罩 Container，改为 WebView 加载完毕直接启动电池监控

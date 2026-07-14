@@ -2,6 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> ⚠️ **文档状态：迁移子计划稿，实施方式已变更（2026-07-14 注记）**
+> 本文档是 CloudBase 迁移的**子计划稿（预期方案）**，且**与当前实现完全相反**，阅读时务必以代码与现状文档（README / ARCHITECTURE / PROGRESS）为准：
+> - **本文档核心前提已推翻**：其目标是「前端从轮询改造为 CloudBase PG 实时监听（`app.rdb().table().watch()` 订阅 14 张表）+ JWT 注入触发 RLS」。实际**未采用实时监听**，也未删除离线模块以换取 watch()。
+> - **实际实现**：前端 `RealtimeManager` 采用**轻量版本戳短轮询**（默认 3 秒轮询 `/api/data-version`，版本戳变化才拉全量；写后 burst 提速到 1 秒），离线/SW/localforage/CRDT 等模块仍保留。
+> - **多租户隔离**：依赖的 **RLS（`cloudbase-rls.sql`）未激活**——后端 `postgres-adapter.ts` 用普通 `pg` 连接，不注入 `request.jwt.claims`；隔离实际由应用层 SQL（`WHERE tenant_id=$1 [AND child_id=$2]`）实现。
+> - **TTS**：`tts-svc` 由独立仓库维护，**不在本仓库**。
+> - **版本号**：`v2.0.0` 为设计预期，实际为 Server 1.2.0 / Web 1.5.2 / Android 1.6.6。
+> - **表数量**：迁移设计稿原写 26 张表，实际 `init-pg-schema.sql` 建 **27 张表**。
+
 **Goal:** 将 PapaCheck.Web 前端从轮询机制改造为 CloudBase PG 实时监听，删除离线模式（SW/localforage/CRDT/写队列），引入 `@cloudbase/js-sdk`。
 
 **Architecture:** 前端引入 `@cloudbase/js-sdk`，用 `app.rdb().table().watch()` 订阅 14 张业务表变更。JWT 注入 CloudBase SDK 触发 RLS 隔离。删除 `sw.js`/`db.js`/`sync.js`/`crdt-sync.js`/`connection.js`，改造 `api.js`/`app.js`/`admin.js` 移除轮询。
