@@ -845,6 +845,32 @@ async function refreshFromServer() {
   }
 }
 
+/**
+ * 拉取待处理通知并播报（家长端发布作业/调整积分后触发）。
+ * 通知仅含文本，孩子端按需经 /api/speak 合成语音；播报后标记消费避免重复。
+ */
+async function consumeAndSpeakNotifications() {
+  try {
+    const { items } = await API.getPendingNotifications();
+    if (!items || items.length === 0) return;
+    // 多条"收到新作业，请查看"合并为一条，避免连播
+    const toSpeak = dedupNewHomeworkNotifications(items);
+    for (const n of toSpeak) {
+      Voice.speak(n.text);
+    }
+    const ids = toSpeak.map(n => n.id);
+    if (ids.length > 0) {
+      try {
+        await API.consumeNotifications(ids);
+      } catch (e) {
+        console.warn('[notify] 标记消费失败，下次轮询将重试:', e);
+      }
+    }
+  } catch (e) {
+    console.warn('[notify] 拉取/播报通知失败:', e);
+  }
+}
+
 // ========== Screen Saver ==========
 function startScreenSaverTimer() {
   clearTimeout(screenSaverTimer);
@@ -919,6 +945,7 @@ async function init() {
       // 轮询模式：统一刷新回调，仅触发一次数据拉取
       realtime.callbacks.onRefresh = () => {
         refreshFromServer();
+        consumeAndSpeakNotifications();
       };
 
       await realtime.start(cachedData.tenant_id, cachedData.child_id);

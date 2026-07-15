@@ -688,20 +688,34 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       if (!tcbApp) {
         return reply.status(502).send({ error: 'CloudBase SDK not initialized' });
       }
-      const result = await tcbApp.callFunction({
-        name: 'tts-svc',
-        data: { texts, pregen: true },
-      });
-      const { ok, error } = (result?.result as { ok?: boolean; error?: string }) || {};
-      if (!ok) {
-        console.error('[pregen-speech] tts-svc 返回失败:', error);
-        return reply.status(502).send({ error: error || 'TTS pregen failed' });
+      // tts-svc 每次只接受单条 text（与 /api/speak 一致），逐条预生成以预热 TTS 缓存。
+      // 预生成为 best-effort 优化，个别文本失败不应返回 5xx 阻断管理端流程。
+      let generated = 0;
+      let failed = 0;
+      for (const raw of texts) {
+        const text = (raw || '').trim();
+        if (!text) continue;
+        try {
+          const result = await tcbApp.callFunction({
+            name: 'tts-svc',
+            data: { text, timeout: 8 },
+          });
+          const { ok, error } = (result?.result as { ok?: boolean; error?: string }) || {};
+          if (ok) {
+            generated++;
+          } else {
+            failed++;
+            console.error('[pregen-speech] tts-svc 返回失败:', error);
+          }
+        } catch (err) {
+          failed++;
+          console.error('[pregen-speech] 调用 tts-svc 失败:', err);
+        }
       }
-      return sendJson(reply, { ok: true });
+      return sendJson(reply, { ok: true, generated, failed });
     } catch (err) {
-      // 不再静默吞掉：记录错误并向上返回，便于排查与告警
-      console.error('[pregen-speech] 调用 tts-svc 失败:', err);
-      return reply.status(502).send({ error: 'TTS pregen service unavailable' });
+      console.error('[pregen-speech] 未预期错误:', err);
+      return reply.status(500).send({ error: 'TTS pregen internal error' });
     }
   });
 
