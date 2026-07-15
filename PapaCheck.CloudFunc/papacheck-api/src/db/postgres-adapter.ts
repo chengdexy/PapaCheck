@@ -645,6 +645,8 @@ export class PostgresAdapter extends DatabaseAdapter {
       'INSERT INTO notifications (tenant_id, id, text, created_at) VALUES ($1, $2, $3, $4)',
       [tenantId, id, text, now]
     );
+    // 关键：打版本戳，确保纯发通知也能触发孩子端刷新并播报
+    await this.recordModification('notifications', '1', new Date().toISOString(), tenantId);
     return id;
   }
 
@@ -746,6 +748,9 @@ export class PostgresAdapter extends DatabaseAdapter {
         [tenantId, today, action === 'earn' ? amount : 0, action === 'spend' ? amount : 0, balance, detail]
       );
     }
+
+    // 关键：必须打版本戳，否则孩子端 3s 轮询看不到积分变化而不刷新
+    await this.recordModification('points', '1', new Date().toISOString(), tenantId);
 
     return balance;
   }
