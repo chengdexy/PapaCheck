@@ -420,11 +420,13 @@ async function pauseActiveTask() {
   stopTickTimer();
   Voice.speak('任务已暂停');
   if (task.startedAt && task.status === 'doing') {
-    task._pausedElapsed = Math.floor((new Date() - new Date(task.startedAt)) / 1000);
+    // 记录暂停时刻（后端持久化，使暂停进度在轮询/刷新/多端下不丢）
+    task.pausedAt = new Date().toISOString();
   }
   if (task.subject) await API.patchHomework(task.id, {
     paused: true,
     wasPaused: true,
+    pausedAt: task.pausedAt,
   }, Util.dateKey(currentDate));
   else await API.putFreeTimeTask(task.id, task);
   needsFullRender = true;
@@ -435,14 +437,18 @@ async function resumeActiveTask() {
   const task = getActiveHomework() || getActiveFreeTime();
   if (!task || !task.paused) return;
   task.paused = false;
-  if (task._pausedElapsed) {
-    const pausedSeconds = task._pausedElapsed;
-    task.startedAt = new Date(new Date() - pausedSeconds * 1000).toISOString();
-    delete task._pausedElapsed;
+  // 将 startedAt 回拨暂停时长，使已用时长不含暂停区间（基于后端持久化的 pausedAt 计算）
+  if (task.pausedAt) {
+    const startedAtMs = new Date(task.startedAt).getTime();
+    const pausedAtMs = new Date(task.pausedAt).getTime();
+    const accumulated = pausedAtMs - startedAtMs;
+    task.startedAt = new Date(Date.now() - accumulated).toISOString();
+    delete task.pausedAt;
   }
   if (task.subject) await API.patchHomework(task.id, {
     paused: false,
     startedAt: task.startedAt,
+    pausedAt: null,
   }, Util.dateKey(currentDate));
   else await API.putFreeTimeTask(task.id, task);
   Voice.speak('任务已继续');
@@ -836,8 +842,29 @@ async function refreshFromServer() {
     cachedData = await API.getData();
     API.migrateBountyCompletionsToTotal(cachedData);
     const key = Util.dateKey(currentDate);
+
+    // 保留本地暂停态：替换前捕获 active homework 本地的 paused / pausedAt
+    const oldActiveHw = homeworks.find(h => h.status === 'doing');
+    const wasLocallyPaused = !!(oldActiveHw && oldActiveHw.paused);
+    const localPausedAt = wasLocallyPaused ? oldActiveHw.pausedAt : undefined;
+
     homeworks = cachedData.homeworks?.[key] || [];
     freeTimeTasks = cachedData.freeTimeTasks?.[key] || [];
+
+    // pausedAt 已后端持久化，正常轮询服务端直接带出；此处仅兜住 patch 尚未落库的极短竞态
+    if (wasLocallyPaused && oldActiveHw) {
+      const newActive = homeworks.find(h => h.status === 'doing' && h.id === oldActiveHw.id);
+      if (newActive) {
+        if (!newActive.paused) {
+          newActive.paused = true;
+          newActive.wasPaused = true;
+        }
+        if (localPausedAt !== undefined && newActive.pausedAt === undefined) {
+          newActive.pausedAt = localPausedAt;
+        }
+      }
+    }
+
     needsFullRender = true;
     updateBigScreen();
   } catch (e) {

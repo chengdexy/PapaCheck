@@ -2,7 +2,7 @@
 
 ![PapaCheck Banner](./docs/imgs/_banner.jpg)
 
-> **v1.6.6**（Android APK）/ Server 1.2.0 / Web 1.5.2 — 部署在腾讯云 CloudBase（云函数 + PG + 静态托管 + 网关），轻量版本戳短轮询（默认 3 秒）数据同步，643+ Vitest 测试通过
+> **v1.6.6**（Android APK）/ Server 1.2.0 / Web 1.5.3 — 部署在腾讯云 CloudBase（云函数 + PG + 静态托管 + 网关），轻量版本戳短轮询（默认 3 秒）数据同步，643+ Vitest 测试通过
 
 PapaCheck 是一个面向家庭的家长辅助工具，帮助管理和跟踪孩子的作业完成情况。孩子可以自主开始/暂停/完成作业并获得积分；家长远程评级并管理积分商店。部署在腾讯云 CloudBase，支持随时随地访问。
 

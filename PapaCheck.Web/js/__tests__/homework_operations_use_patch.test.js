@@ -75,7 +75,7 @@ test('RED: 开始作业 PATCH 只含 status/startedAt/mode', async () => {
   assert.ok(callStr.includes("mode:"), '应包含 mode');
 
   // 验证只有这三个显式字段（忽略 dateKey 参数）
-  const fieldCount = (callStr.match(/\b(status|startedAt|mode|paused|wasPaused|_pausedElapsed|completedAt|actualDuration|_animClass|completedInSchool)\s*:/g) || []).length;
+  const fieldCount = (callStr.match(/\b(status|startedAt|mode|paused|wasPaused|pausedAt|_pausedElapsed|completedAt|actualDuration|_animClass|completedInSchool)\s*:/g) || []).length;
   assert.strictEqual(fieldCount, 3, '应只包含 3 个字段，实际包含 ' + fieldCount + ' 个');
 });
 
@@ -98,6 +98,8 @@ test('RED: 暂停作业调用 API.patchHomework 含 paused/wasPaused', async () 
   const callStr = patchCall[0];
   assert.ok(callStr.includes('paused:'), '应包含 paused');
   assert.ok(callStr.includes('wasPaused:'), '应包含 wasPaused');
+  // pausedAt 是后端持久化的暂停时刻字段（合法服务端字段，非 UI 临时字段）
+  assert.ok(callStr.includes('pausedAt:'), '应包含 pausedAt（后端持久化的暂停时刻）');
   // UI 临时字段 _pausedElapsed 不应持久化到服务器
   assert.ok(!callStr.includes('_pausedElapsed:'), '不应包含 _pausedElapsed（UI 临时字段不应持久化）');
 });

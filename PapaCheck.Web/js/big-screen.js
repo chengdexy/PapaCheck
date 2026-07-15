@@ -427,8 +427,8 @@ function updateCurrentTask() {
 function renderActiveHomeworkInCurrentTask(display, hw) {
   const subject = getSubject(hw.subject);
   const now = new Date();
-  const elapsedSeconds = hw.paused && hw._pausedElapsed != null
-    ? hw._pausedElapsed
+  const elapsedSeconds = (hw.paused && hw.pausedAt)
+    ? Math.floor((new Date(hw.pausedAt) - new Date(hw.startedAt)) / 1000)
     : Math.floor((now - new Date(hw.startedAt)) / 1000);
 
   let timerHtml = '';
@@ -487,7 +487,9 @@ function renderActiveHomeworkInCurrentTask(display, hw) {
 function renderActiveFreeTimeInCurrentTask(display, ft) {
   const now = new Date();
   const startedAt = new Date(ft.startedAt);
-  const elapsedSeconds = Math.floor((now - startedAt) / 1000);
+  const elapsedSeconds = (ft.paused && ft.pausedAt)
+    ? Math.floor((new Date(ft.pausedAt) - new Date(ft.startedAt)) / 1000)
+    : Math.floor((now - startedAt) / 1000);
   const totalSeconds = ft.durationMinutes * 60;
   const remainingSeconds = Math.max(0, totalSeconds - elapsedSeconds);
   const progress = Math.min(100, Math.round(elapsedSeconds / totalSeconds * 100));
@@ -628,8 +630,8 @@ function updateHomeworkGrid() {
       statusClassName = 'doing';
 
       const now = new Date();
-      const elapsedSeconds = hw.paused && hw._pausedElapsed != null
-        ? hw._pausedElapsed
+      const elapsedSeconds = (hw.paused && hw.pausedAt)
+        ? Math.floor((new Date(hw.pausedAt) - new Date(hw.startedAt)) / 1000)
         : Math.floor((now - new Date(hw.startedAt)) / 1000);
 
       if (hw.mode === 'challenge') {
