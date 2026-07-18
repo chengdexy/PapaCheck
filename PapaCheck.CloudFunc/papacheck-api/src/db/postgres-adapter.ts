@@ -1946,8 +1946,10 @@ export class PostgresAdapter extends DatabaseAdapter {
   // ==================== Access Codes ====================
 
   async createAccessCode(input: CreateAccessCodeInput): Promise<string> {
+    // 防御性 INSERT：显式补列，规避生产库 access_codes 表 created_at / token_version
+    // 可能为 NOT NULL 且无 DB 默认值导致插入失败（-> 500）。
     await this.pool.query(
-      'INSERT INTO access_codes (id, tenant_id, code_hash, access_code, child_id) VALUES ($1, $2, $3, $4, $5)',
+      'INSERT INTO access_codes (id, tenant_id, code_hash, access_code, child_id, created_at, token_version) VALUES ($1, $2, $3, $4, $5, NOW(), 1)',
       [input.id, input.tenant_id, input.code_hash, input.access_code ?? null, input.child_id]
     );
     return input.id;
@@ -2030,8 +2032,10 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   async createChild(tenantId: string, name: string, accessCodeId?: string): Promise<ChildrenRecord> {
     const id = crypto.randomUUID();
+    // 防御性 INSERT：显式补列，规避生产库 children 表 created_at / is_active / avatar
+    // 可能为 NOT NULL 且无 DB 默认值导致插入失败（-> 500）。
     await this.pool.query(
-      "INSERT INTO children (id, tenant_id, name, access_code_id) VALUES ($1, $2, $3, $4)",
+      "INSERT INTO children (id, tenant_id, name, access_code_id, created_at, is_active, avatar) VALUES ($1, $2, $3, $4, NOW(), true, NULL)",
       [id, tenantId, name, accessCodeId ?? null]
     );
     return { id, tenant_id: tenantId, name, access_code_id: accessCodeId ?? undefined, is_active: true, created_at: new Date().toISOString() };

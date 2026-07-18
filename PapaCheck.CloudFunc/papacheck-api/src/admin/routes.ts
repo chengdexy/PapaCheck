@@ -120,29 +120,36 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
 
   // POST /api/admin/members — 创建孩子 + 访问码
   app.post('/api/admin/members', { schema: addMemberSchema }, async (request: any, reply) => {
-    const payload = request.jwtPayload as JWTPayload;
-    if (!payload || payload.role !== 'user') {
-      return reply.status(403).send({ error: '仅用户账号可管理成员', code: 'FORBIDDEN' });
+    try {
+      const payload = request.jwtPayload as JWTPayload;
+      if (!payload || payload.role !== 'user') {
+        return reply.status(403).send({ error: '仅用户账号可管理成员', code: 'FORBIDDEN' });
+      }
+
+      const { name } = request.body as { name: string };
+
+      const accessCodeId = crypto.randomUUID();
+      const { raw, hashed } = await generateAccessHash();
+
+      // 先创建孩子（createChild 内部生成自己的 id）
+      const child = await db.createChild(payload.sub, name, accessCodeId);
+
+      // 再创建关联的访问码，使用孩子的真实 id
+      await db.createAccessCode({
+        id: accessCodeId,
+        tenant_id: payload.sub,
+        code_hash: hashed,
+        access_code: raw,
+        child_id: child.id,
+      });
+
+      return { child_id: child.id, child_name: name, access_code_id: accessCodeId, access_code: raw };
+    } catch (err) {
+      // 诊断兜底：把真实 DB 错误（如 null value in column "xxx"）暴露到响应体，
+      // 方便二次精确修复，而不是掩盖成无信息 500。
+      console.error('[admin/members] create failed:', err);
+      return reply.status(500).send({ error: (err as Error).message, code: 'CHILD_CREATE_FAILED' });
     }
-
-    const { name } = request.body as { name: string };
-
-    const accessCodeId = crypto.randomUUID();
-    const { raw, hashed } = await generateAccessHash();
-
-    // 先创建孩子（createChild 内部生成自己的 id）
-    const child = await db.createChild(payload.sub, name, accessCodeId);
-
-    // 再创建关联的访问码，使用孩子的真实 id
-    await db.createAccessCode({
-      id: accessCodeId,
-      tenant_id: payload.sub,
-      code_hash: hashed,
-      access_code: raw,
-      child_id: child.id,
-    });
-
-    return { child_id: child.id, child_name: name, access_code_id: accessCodeId, access_code: raw };
   });
 
   // POST /api/admin/members/:id/regenerate — 重新生成访问码
