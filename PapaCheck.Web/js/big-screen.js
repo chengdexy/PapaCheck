@@ -4,7 +4,7 @@
  */
 
 function getSubject(subjectName) {
-  const subs = cachedData?.settings?.subjects || DEFAULT_SUBJECTS;
+  const subs = _appSettings?.subjects || DEFAULT_SUBJECTS;
   const found = subs.find(s => s.id === subjectName);
   return found || { icon: null, color: null };
 }
@@ -32,7 +32,7 @@ function isTomorrowHoliday() {
   tomorrow.setDate(tomorrow.getDate() + 1);
   const day = tomorrow.getDay();
   if (day === 0 || day === 6) return true;
-  const holidays = cachedData?.settings?.customHolidays || [];
+  const holidays = _appSettings?.customHolidays || [];
   const key = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
   return holidays.includes(key);
 }
@@ -250,9 +250,7 @@ function updateBigScreen() {
       console.warn('[Settlement] 全部完成但未显示结算界面, state:', {
         settlement: JSON.stringify(settlement),
         window_settlement: JSON.stringify(window._settlement),
-        cachedData_settlement: cachedData?.dailySettlement?.[key],
-        cachedData_settlement_keys: cachedData?.dailySettlement ? Object.keys(cachedData.dailySettlement) : null,
-        cachedData_has_settlement: cachedData?.dailySettlement ? key in cachedData.dailySettlement : false,
+        app_settlement: JSON.stringify(_appSettlement),
         forceMainPage,
         activeBounty: getActiveBounty() ? 'yes' : 'no',
         currentPage,
@@ -282,22 +280,9 @@ function updateBigScreen() {
 }
 
 function getSettlementData() {
-  if (cachedData && cachedData.dailySettlement) {
-    var serverData = cachedData.dailySettlement[Util.dateKey(currentDate)];
-    if (serverData) {
-      // 防御：serverData 存在但没有 dailyBase（可能为空对象或数据异常），不受理
-      if (serverData.dailyBase !== undefined) return serverData;
-      console.warn('[Settlement] serverData 缺少 dailyBase, 跳过:', JSON.stringify(serverData));
-    }
-  }
-  if (cachedData && cachedData._settlement) {
-    if (cachedData._settlement.dailyBase !== undefined) return cachedData._settlement;
-    console.warn('[Settlement] cachedData._settlement 缺少 dailyBase, 跳过:', JSON.stringify(cachedData._settlement));
-  }
-  if (window._settlement) {
-    if (window._settlement.dailyBase !== undefined) return window._settlement;
-    console.warn('[Settlement] window._settlement 缺少 dailyBase, 跳过:', JSON.stringify(window._settlement));
-  }
+  const serverData = _appSettlement;
+  if (serverData && serverData.dailyBase !== undefined) return serverData;
+  if (window._settlement && window._settlement.dailyBase !== undefined) return window._settlement;
   return null;
 }
 
@@ -321,7 +306,7 @@ function updateMainPage() {
 function renderBuffBar() {
   const buffBar = document.getElementById('buffBar');
   if (!buffBar) return;
-  const buffs = cachedData?.activeBuffs || [];
+  const buffs = _appActiveBuffs || [];
   if (buffs.length === 0) {
     buffBar.style.display = 'none';
     return;
@@ -350,11 +335,11 @@ function updateCurrentTask() {
   {
     const activeBounty = getActiveBounty();
     if (activeBounty) {
-      const bountyTasks = cachedData?.bountyTasks || [];
+      const bountyTasks = _appBountyTasks || [];
       const task = bountyTasks.find(t => t.id === activeBounty.taskId);
       if (task) {
-        const allC = cachedData?.bountyCompletions || {};
-        const totalComps = allC._total || {};
+        const allC = _appBountyCompletions || {};
+        const totalComps = allC || {};
         const v = totalComps[task.id];
         const cCount = typeof v === 'number' ? v : (v ? 1 : 0);
         const cBadge = task.type !== 'once' && cCount > 0 ? ' <span style="font-size:18px;font-weight:700;color:var(--accent);">x' + cCount + '</span>' : '';
@@ -374,10 +359,10 @@ function updateCurrentTask() {
 
   {
     const dateKey = Util.dateKey(currentDate);
-    const submissions = (cachedData?.bountySubmissions?.[dateKey] || []).filter(s => !s.isDeleted);
+    const submissions = (_appBountySubs?.[dateKey] || []).filter(s => !s.isDeleted);
     const submittedBounty = submissions.find(s => s.status === 'submitted');
     if (submittedBounty) {
-      const task = (cachedData?.bountyTasks || []).find(t => t.id === submittedBounty.taskId);
+      const task = (_appBountyTasks || []).find(t => t.id === submittedBounty.taskId);
       if (task) {
         display.innerHTML = `
           <div class="current-task-icon">⏳</div>
@@ -539,12 +524,12 @@ function updateHomeworkGrid() {
   if (pendingHomeworks.length === 0) {
 
     const dateKey = Util.dateKey(currentDate);
-    const bountyTasks = cachedData?.bountyTasks || [];
-    const submissions = (cachedData?.bountySubmissions?.[dateKey] || []).filter(s => !s.isDeleted);
-    const allCompletions = cachedData?.bountyCompletions || {};
+    const bountyTasks = _appBountyTasks || [];
+    const submissions = (_appBountySubs?.[dateKey] || []).filter(s => !s.isDeleted);
+    const allCompletions = _appBountyCompletions || {};
 
     const historyCounts = {};
-    const totalComps = allCompletions._total || {};
+    const totalComps = allCompletions || {};
     for (const tid of Object.keys(totalComps)) {
       const v = totalComps[tid];
       const delta = typeof v === 'number' ? v : (v ? 1 : 0);
@@ -827,9 +812,10 @@ async function startBountyTask(taskId) {
       existingAbandoned.startedAt = new Date().toISOString();
       existingAbandoned.submittedAt = null;
       await API.putBountySubmission(existingAbandoned.id, existingAbandoned);
-      if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
-      cachedData.bountySubmissions[dateKey] = submissions;
-      const task = (cachedData?.bountyTasks || []).find(t => t.id === taskId);
+      if (!_appBountySubs) _appBountySubs = {};
+      _appBountySubs[dateKey] = submissions;
+      Data.day.setBountySubmissions(dateKey, submissions);
+      const task = (_appBountyTasks || []).find(t => t.id === taskId);
       Voice.clear();
       Voice.speak('开始' + (task ? task.name : '') + '！');
       needsFullRender = true;
@@ -841,9 +827,10 @@ async function startBountyTask(taskId) {
     const newSubmission = { id: Util.genId(), taskId, status: 'doing', startedAt: new Date().toISOString(), submittedAt: null };
     submissions.push(newSubmission);
     await API.putBountySubmission(newSubmission.id, newSubmission);
-    if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
-    cachedData.bountySubmissions[dateKey] = submissions;
-    const task = (cachedData?.bountyTasks || []).find(t => t.id === taskId);
+    if (!_appBountySubs) _appBountySubs = {};
+    _appBountySubs[dateKey] = submissions;
+    Data.day.setBountySubmissions(dateKey, submissions);
+    const task = (_appBountyTasks || []).find(t => t.id === taskId);
     Voice.clear();
     Voice.speak('开始' + (task ? task.name : '') + '！');
     needsFullRender = true;
@@ -868,8 +855,9 @@ async function abandonBountyTask(taskId) {
     }
     sub.status = 'abandoned';
     await API.putBountySubmission(sub.id, sub);
-    if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
-    cachedData.bountySubmissions[dateKey] = submissions;
+    if (!_appBountySubs) _appBountySubs = {};
+    _appBountySubs[dateKey] = submissions;
+    Data.day.setBountySubmissions(dateKey, submissions);
     needsFullRender = true;
     updateBigScreen();
   } finally {
@@ -892,8 +880,9 @@ async function submitBountyTask(taskId) {
     sub.status = 'submitted';
     sub.submittedAt = new Date().toISOString();
     await API.putBountySubmission(sub.id, sub);
-    if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
-    cachedData.bountySubmissions[dateKey] = submissions;
+    if (!_appBountySubs) _appBountySubs = {};
+    _appBountySubs[dateKey] = submissions;
+    Data.day.setBountySubmissions(dateKey, submissions);
     Voice.clear();
     Voice.speak('已提交');
     needsFullRender = true;
@@ -1022,8 +1011,8 @@ function showMyRewards() {
   }
   const overlay = document.getElementById('myRewardsOverlay');
   const content = document.getElementById('myRewardsContent');
-  const rewardBox = cachedData?.rewardBox || [];
-  const redemptions = cachedData?.redemptions || [];
+  const rewardBox = _appRewardBox || [];
+  const redemptions = _appRedemptions || [];
   const now = Date.now();
   const sorted = [...rewardBox].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
@@ -1081,14 +1070,14 @@ function hideMyRewards() {
 async function redeemFromRewardBox(itemId) {
   if (_redeemingRewardBox) return;
   if (!guardOnline()) return;
-  const rewardBox = cachedData?.rewardBox || [];
+  const rewardBox = _appRewardBox || [];
   const item = rewardBox.find(i => i.id === itemId);
   if (!item || (item.quantity || 0) <= 0) {
     showToast('已用光');
     return;
   }
 
-  const redemptions = cachedData?.redemptions || [];
+  const redemptions = _appRedemptions || [];
   const alreadyPending = redemptions.find(rd => rd.rewardBoxItemId === itemId && rd.status === 'pending');
   if (alreadyPending) {
     showToast('已提交过，等待确认');
@@ -1113,7 +1102,7 @@ async function redeemFromRewardBox(itemId) {
     redemptions.push(newRedemption);
     await API.putRedemption(newRedemption.id, newRedemption);
 
-    cachedData = await API.getData();
+    await _refreshAppCaches();
     showMyRewards();
     showToast('已提交，等待确认');
     Voice.speak('已提交申请，等待确认');
@@ -1127,7 +1116,7 @@ async function cancelRedemption(redemptionId) {
   if (!guardOnline()) return;
   _redeemingRewardBox = true;
   try {
-    const redemptions = cachedData?.redemptions || [];
+    const redemptions = _appRedemptions || [];
     const r = redemptions.find(r => r.id === redemptionId);
     if (!r || r.status !== 'pending') {
       showToast('无法撤回');
@@ -1138,7 +1127,7 @@ async function cancelRedemption(redemptionId) {
     await API.putRedemption(r.id, r);
 
     if (!r.fromRewardBox) {
-      const shopItems = cachedData?.shopItems || [];
+      const shopItems = _appShopItems || [];
       const shopItem = shopItems.find(si => si.name === r.itemName);
       if (shopItem) {
         shopItem.remainingQuantity = (shopItem.remainingQuantity ?? 0) + 1;
@@ -1148,7 +1137,7 @@ async function cancelRedemption(redemptionId) {
       await API.updatePoints('earn', r.points, '撤回兑换：' + r.itemName);
     }
 
-    cachedData = await API.getData();
+    await _refreshAppCaches();
     showMyRewards();
     showToast('已撤回');
   } finally {
@@ -1174,8 +1163,8 @@ async function updateShopPage() {
   const oldGrid = container.querySelector('.shop-grid');
   const savedScrollTop = oldGrid ? oldGrid.scrollTop : 0;
 
-  const shopItems = cachedData?.shopItems || [];
-  const points = cachedData?.points?.balance ?? cachedData?.points ?? 0;
+  const shopItems = _appShopItems || [];
+  const points = _appBalance ?? 0;
   const sorted = [...shopItems].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   const now = Date.now();
 
@@ -1217,11 +1206,11 @@ async function updateShopPage() {
 async function redeemItem(itemId) {
   if (_redeemingItem) return;
   if (!guardOnline()) return;
-  const items = cachedData?.shopItems || [];
+  const items = _appShopItems || [];
   const item = items.find(i => i.id === itemId);
   if (!item) return;
 
-  const points = cachedData?.points?.balance ?? cachedData?.points ?? 0;
+  const points = _appBalance ?? 0;
   if (points < item.points) {
     showToast('积分不足');
     return;
@@ -1238,7 +1227,7 @@ async function redeemItem(itemId) {
     item.remainingQuantity = remaining - 1;
     await API.putShopItem(item.id, item);
 
-    const rewardBox = cachedData?.rewardBox || [];
+    const rewardBox = _appRewardBox || [];
     const existing = rewardBox.find(rb => rb.name === item.name);
     if (existing) {
       existing.quantity = (existing.quantity || 0) + 1;
@@ -1259,7 +1248,7 @@ async function redeemItem(itemId) {
 
     await API.updatePoints('spend', item.points, '兑换：' + item.name);
 
-    cachedData = await API.getData();
+    await _refreshAppCaches();
     updateShopPage();
     showToast('兑换成功！');
     Voice.speak('兑换成功！');
@@ -1328,7 +1317,7 @@ function confirmStartTask(hwId) {
 }
 
 function confirmStartBounty(taskId) {
-  const bt = cachedData?.bountyTasks || [];
+  const bt = _appBountyTasks || [];
   const task = bt.find(t => t.id === taskId);
   if (!task) return;
 
@@ -1375,6 +1364,6 @@ function updateStats() {
   const completedHw = homeworks.filter(h => h.status === 'done').length;
   document.getElementById('homeworkProgress').textContent = `${completedHw}/${homeworks.length}`;
 
-  const points = cachedData?.points?.balance ?? cachedData?.points ?? 0;
+  const points = _appBalance ?? 0;
   document.getElementById('totalPoints').textContent = points;
 }

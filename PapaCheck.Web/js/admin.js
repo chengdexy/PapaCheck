@@ -11,6 +11,9 @@ let adminRewardBox = [];
 let adminBountyTasks = [];
 let adminBountySubmissions = {};
 let adminBountyCompletions = {};
+let adminBalance = 0;
+let adminSettlement = null;
+let _dataInitialized = false;
 let adminCurrentTab = 'homework';
 let adminEditingId = null;
 let adminSettings = {};
@@ -189,7 +192,7 @@ async function initAdmin() {
   // 集成 RealtimeManager：轮询监听数据变化
   try {
     const token = sessionStorage.getItem('papacheck_token');
-    if (token && cachedData) {
+    if (token && _dataInitialized) {
       const { RealtimeManager } = await import('./realtime.js');
       const realtime = new RealtimeManager();
 
@@ -203,7 +206,8 @@ async function initAdmin() {
         });
       };
 
-      await realtime.start(cachedData.tenant_id, cachedData.child_id);
+      const _auth = _decodeJwtTenantChild();
+      await realtime.start(_auth.tenantId, _auth.childId);
       window._realtimeManager = realtime;
     }
   } catch (e) {
@@ -219,28 +223,78 @@ window.addEventListener('beforeunload', () => {
 
 async function refreshAllData() {
   try {
-    var data = await API.getData();
-    if (data) {
-      cachedData = data;
-      _applyCachedData();
+    if (!_dataInitialized) {
+      Data.setActiveStatsRange(_statsRange);
+      await Data.init();
+      _dataInitialized = true;
     }
+    Data.setActiveDays([AdminUtil.dateKey(adminDate)]);
+    Data.setActiveStatsRange(_statsRange);
+    await Data.refreshActive();
+    await _applyCachedData();
   } catch (e) {
     console.error('[admin] refreshAllData 失败:', e);
   }
 }
 
-function _applyCachedData() {
-  API.migrateBountyCompletionsToTotal(cachedData);
-  adminHomeworks = cachedData.homeworks?.[AdminUtil.dateKey(adminDate)] || [];
-  adminShopItems = cachedData.shopItems || [];
-  adminRedemptions = cachedData.redemptions || [];
-  adminRewardBox = cachedData.rewardBox || [];
-  adminBountyTasks = cachedData.bountyTasks || [];
-  adminBountySubmissions = cachedData.bountySubmissions || {};
-  adminBountyCompletions = cachedData.bountyCompletions || {};
-  adminSettings = cachedData.settings || {};
+async function _applyCachedData() {
+  const dk = AdminUtil.dateKey(adminDate);
+  const [
+    homeworks, shopItems, redemptions, rewardBox, bountyTasks,
+    bountySubmissions, bountyCompletions, settings, balance, settlement,
+  ] = await Promise.all([
+    Data.day.getHomeworks(dk),
+    Data.config.getShopItems(),
+    Data.config.getRedemptions(),
+    Data.config.getRewardBox(),
+    Data.config.getBountyTasks(),
+    Data.day.getBountySubmissions(dk),
+    Data.bounty.getCompletionsTotal(),
+    Data.config.getSettings(),
+    Data.points.getBalance(),
+    Data.day.getSettlement(dk),
+  ]);
+
+  adminHomeworks = homeworks || [];
+  adminShopItems = shopItems || [];
+  adminRedemptions = redemptions || [];
+  adminRewardBox = rewardBox || [];
+  adminBountyTasks = bountyTasks || [];
+  adminBountySubmissions = bountySubmissions || {};
+  adminBountyCompletions = bountyCompletions || {};
+  adminSettings = settings || {};
+  adminBalance = balance || 0;
+  adminSettlement = settlement || null;
+
   if (!adminSettings.subjects || adminSettings.subjects.length === 0) {
     adminSettings.subjects = SETTINGS_DEFAULTS.subjects.map(s => ({ ...s }));
+  }
+}
+
+/**
+ * 从 JWT 解析 tenant_id / child_id（realtime.start 的正确来源）。
+ * 旧逻辑依赖已删除的 cachedData，现改为解码登录 token。
+ */
+function _decodeJwtTenantChild() {
+  const token = sessionStorage.getItem('papacheck_token') || '';
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return { tenantId: null, childId: null };
+    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    const bin = atob(b64);
+    let str = '';
+    for (let i = 0; i < bin.length; i++) {
+      str += '%' + ('00' + bin.charCodeAt(i).toString(16)).slice(-2);
+    }
+    const decoded = JSON.parse(decodeURIComponent(str));
+    return {
+      tenantId: decoded.tenant_id != null ? decoded.tenant_id : null,
+      childId: decoded.child_id != null ? decoded.child_id : null,
+    };
+  } catch (e) {
+    console.warn('[admin] 解析 JWT 失败:', e);
+    return { tenantId: null, childId: null };
   }
 }
 
@@ -299,7 +353,7 @@ function renderHomeworkTab() {
   const container = document.getElementById('adminContent');
 
   const submittedDate = AdminUtil.dateKey(adminDate);
-  const settlement = cachedData?.dailySettlement?.[submittedDate];
+  const settlement = adminSettlement;
   const needsRating = settlement && settlement.submittedAt && !settlement.rating;
 
   const deferPending = adminHomeworks.filter(h => h.deferRequest && h.deferRequest.status === 'pending');
@@ -333,7 +387,7 @@ function renderHomeworkTab() {
       const doingCount = adminHomeworks.filter(h => h.status === 'doing').length;
       if (totalCount > 0) {
         const submittedDate = AdminUtil.dateKey(adminDate);
-        const settlement = cachedData?.dailySettlement?.[submittedDate];
+        const settlement = adminSettlement;
 
         const totalChallengeMinutes = adminHomeworks.reduce((sum, h) => sum + (h.suggestedDuration || 0), 0);
         const hours = Math.floor(totalChallengeMinutes / 60);
@@ -421,7 +475,7 @@ function renderHomeworkTab() {
                   ${deferActions}
                   ${hw.status === 'pending' && !isDeferPending ? `<button class="btn-sm btn-edit" onclick="openHwModal('edit', '${hw.id}')">编辑</button>` : ''}
                   ${hw.status === 'pending' && !isDeferPending ? `<button class="btn-sm btn-delete" onclick="deleteAdminHw('${hw.id}')">删除</button>` : ''}
-                  ${hw.status === 'done' && !hw.rejected && !(cachedData?.dailySettlement?.[submittedDate]?.rating) ? `<button class="btn-sm" style="background:var(--warning);color:var(--bg);" onclick="rejectHomework('${hw.id}')">驳回</button>` : ''}
+                  ${hw.status === 'done' && !hw.rejected && !(adminSettlement?.rating) ? `<button class="btn-sm" style="background:var(--warning);color:var(--bg);" onclick="rejectHomework('${hw.id}')">驳回</button>` : ''}
                   ${hw.status === 'done' ? `<button class="btn-sm btn-delete" onclick="deleteAdminHw('${hw.id}')">删除</button>` : ''}
                 </div>
               </div>`;
@@ -538,7 +592,7 @@ async function rejectHomework(hwId) {
   if (!hw || hw.status !== 'done' || hw.rejected) return;
 
   const dateKey = AdminUtil.dateKey(adminDate);
-  const settlement = cachedData?.dailySettlement?.[dateKey];
+  const settlement = adminSettlement;
   if (settlement && settlement.rating) return;
 
   hw.status = 'pending';
@@ -598,8 +652,8 @@ async function rejectDeferHomework(hwId) {
 
 // ========== Rating Modal ==========
 function openRatingModal(dateKey) {
-  const settlement = cachedData?.dailySettlement?.[dateKey];
-  const hwList = cachedData?.homeworks?.[dateKey] || [];
+  const settlement = adminSettlement;
+  const hwList = adminHomeworks;
   const doneHw = hwList.filter(h => h.status === 'done');
 
   const modal = document.getElementById('adminModalContent');
@@ -646,7 +700,7 @@ function openRatingModal(dateKey) {
 
 async function submitRating(dateKey, rating) {
   if (_submittingAdminRating) return;
-  const settlement = cachedData?.dailySettlement?.[dateKey];
+  const settlement = adminSettlement;
   if (!settlement || settlement.rating) return;
 
   _submittingAdminRating = true;
@@ -1071,7 +1125,7 @@ function renderBountyTab() {
   const sorted = [...adminBountyTasks].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
   const historyCounts = {};
-  const totalComps = (adminBountyCompletions && adminBountyCompletions._total) || {};
+  const totalComps = adminBountyCompletions || {};
   for (const tid of Object.keys(totalComps)) {
     const v = totalComps[tid];
     const delta = typeof v === 'number' ? v : (v ? 1 : 0);
@@ -1231,9 +1285,8 @@ async function approveBountySubmission(dateKey, taskId) {
       await API.putBountySubmission(submissions[i].id, submissions[i]);
     }
 
-    if (!adminBountyCompletions._total) adminBountyCompletions._total = {};
-    adminBountyCompletions._total[taskId] = (adminBountyCompletions._total[taskId] || 0) + 1;
-    await API.putBountyCompletion('_total', adminBountyCompletions._total);
+    adminBountyCompletions[taskId] = (adminBountyCompletions[taskId] || 0) + 1;
+    await API.putBountyCompletion('_total', adminBountyCompletions);
 
     const task = adminBountyTasks.find(t => t.id === taskId);
     if (task && task.points > 0) {
@@ -1772,64 +1825,31 @@ function aggregateCompletionData(data, groupMode) {
   });
 }
 
-function renderStatsTab() {
+async function renderStatsTab() {
   const container = document.getElementById('adminContent');
 
-  const allDates = Object.keys(cachedData?.dailySettlement || {}).sort();
-  const maxDays = _statsRange === 'month' ? 30 : _statsRange === 'week' ? 7 : 9999;
-  const dateRange = maxDays >= 9999 ? allDates : allDates.slice(-maxDays);
-  const groupMode = getGroupMode(dateRange.length);
+  // 消费「按需获取」后端聚合结果（StatsResult），字段语义与旧渲染器一致（设计 §C.2 / 后端 stats.ts 1:1 移植）
+  Data.setActiveStatsRange(_statsRange);
+  const stats = await Data.stats.get(_statsRange);
 
-  const totalMinData = [];
-  const effRatioData = [];
-  const dailyPointsData = [];
+  const groupMode = stats.groupMode;
+  const totalMinutes = stats.totalMinutes;
+  const efficiencyRatios = stats.efficiencyRatios;
+  const dailyPoints = stats.dailyPoints;
+  const ratingCounts = stats.ratingCounts;
+  const ratingTotal = stats.ratingTotal;
+  const ratingsList = stats.ratingsList;
+  const barData = stats.completedInSchool;
+  const avgTotalMin = stats.avgTotalMin;
+  const avgEffVal = stats.avgEffVal;
+  const totalPoints = stats.totalPoints;
+  const streak = stats.streak;
 
-  dateRange.forEach(date => {
-    const hwList = cachedData?.homeworks?.[date] || [];
-    const doneHw = hwList.filter(h => h.status === 'done' && !h.rejected);
-    const totalMin = doneHw.reduce((sum, h) => sum + (h.actualDuration || 0), 0);
-    totalMinData.push({ date, value: totalMin });
-
-    const effHw = doneHw.filter(h => h.suggestedDuration > 0 && h.actualDuration !== null);
-    const ratios = effHw.map(h => h.suggestedDuration / h.actualDuration);
-    const avgRatio = ratios.length > 0 ? Math.round(ratios.reduce((a, b) => a + b, 0) / ratios.length * 100) : 0;
-    effRatioData.push({ date, value: avgRatio });
-
-    const settlement = cachedData?.dailySettlement?.[date];
-    dailyPointsData.push({ date, value: settlement?.finalPoints ?? 0 });
-  });
-
-  const totalMinutes = aggregateDaily(totalMinData, groupMode, 'mean');
-  const efficiencyRatios = aggregateDaily(effRatioData, groupMode, 'mean');
-  const dailyPoints = aggregateDaily(dailyPointsData, groupMode);
-
-  const ratingsList = dateRange.filter(d => cachedData?.dailySettlement?.[d]?.rating).reverse();
-  const ratingCounts = {};
   const ratingColors = { '优': 'var(--success)', '良': 'var(--accent)', '可': 'var(--warning)', '差': 'var(--danger)' };
-  ratingsList.forEach(d => {
-    const r = cachedData?.dailySettlement?.[d]?.rating;
-    if (r) ratingCounts[r] = (ratingCounts[r] || 0) + 1;
-  });
   const ratingPieData = Object.entries(ratingCounts).map(([rating, count]) => ({ rating, count }));
-  const ratingTotal = ratingPieData.reduce((s, d) => s + d.count, 0);
-
-  // 在校提前完成比例
-  const completedInSchoolBarData = [];
-  dateRange.forEach(date => {
-    const hwList = cachedData?.homeworks?.[date] || [];
-    const doneHw = hwList.filter(h => h.status === 'done' && !h.rejected);
-    const inSchool = doneHw.filter(h => h.completedInSchool).length;
-    const atHome = doneHw.length - inSchool;
-    completedInSchoolBarData.push({ date, inSchool, atHome });
-  });
-  const barData = aggregateCompletionData(completedInSchoolBarData, groupMode);
 
   const shownRatings = ratingsList.slice(0, _ratingShowCount);
   const hasMoreRatings = ratingsList.length > _ratingShowCount;
-
-  const avgTotalMin = totalMinutes.length > 0 ? Math.round(totalMinutes.reduce((a, b) => a + b.value, 0) / totalMinutes.length) : 0;
-  const avgEff = efficiencyRatios.filter(e => e.value > 0);
-  const avgEffVal = avgEff.length > 0 ? Math.round(avgEff.reduce((a, b) => a + b.value, 0) / avgEff.length) : 0;
 
   const rangeOptions = [
     { key: 'week', label: '周' },
@@ -1837,8 +1857,8 @@ function renderStatsTab() {
     { key: 'all', label: '总计' },
   ];
 
-  const dateCount = dateRange.length;
   const groupLabels = { day: '每日', week: '每周', month: '每月' };
+  const rangeLabel = _statsRange === 'all' ? '总计' : _statsRange === 'month' ? '近30天' : '近7天';
 
   const makeRangeBtn = (opt) =>
     `<button class="mode-option${_statsRange === opt.key ? ' selected' : ''}" onclick="setStatsRange('${opt.key}')">${opt.label}</button>`;
@@ -1854,18 +1874,18 @@ function renderStatsTab() {
         <div class="stat-card-label">平均效率比</div>
       </div>
       <div class="stat-card">
-        <div class="stat-card-value">${dailyPoints.reduce((a, b) => a + b.value, 0)}</div>
+        <div class="stat-card-value">${totalPoints}</div>
         <div class="stat-card-label">获得积分</div>
       </div>
       <div class="stat-card">
-        <div class="stat-card-value">${calcStreak(allDates)}</div>
+        <div class="stat-card-value">${streak}</div>
         <div class="stat-card-label">连续全勤天数</div>
       </div>
     </div>
 
     <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
       ${rangeOptions.map(makeRangeBtn).join('')}
-      <span style="font-size:12px;color:var(--text-secondary);margin-left:auto;">${dateCount} 天${groupMode !== 'day' ? ' · 按' + groupLabels[groupMode] + '聚合' : ''}</span>
+      <span style="font-size:12px;color:var(--text-secondary);margin-left:auto;">${rangeLabel}${groupMode !== 'day' ? ' · 按' + groupLabels[groupMode] + '聚合' : ''}</span>
     </div>
 
     <div class="chart-container">
@@ -1908,11 +1928,10 @@ function renderStatsTab() {
       ${ratingsList.length === 0
       ? '<div style="text-align:center;color:var(--text-secondary);padding:12px;font-size:14px;">暂无评级记录</div>'
       : shownRatings.map(d => {
-        const s = cachedData?.dailySettlement?.[d];
         return `<div class="rating-history-item">
-              <span>${d}</span>
-              <span>${s.totalBeforeRating}×${s.multiplier}=${s.finalPoints}分</span>
-              <span class="rating-grade ${s.rating}">${s.rating}</span>
+              <span>${d.date}</span>
+              <span>${d.totalBeforeRating}×${d.multiplier}=${d.finalPoints}分</span>
+              <span class="rating-grade ${d.rating}">${d.rating}</span>
             </div>`;
       }).join('')}
       ${hasMoreRatings || _ratingShowCount > 5 ? `<div style="text-align:center;padding:12px;display:flex;gap:8px;justify-content:center;">
@@ -1925,34 +1944,13 @@ function renderStatsTab() {
     </div>`;
 }
 
-function calcStreak(allDates) {
-  if (allDates.length === 0) return 0;
-
-  // 按有 settlement 记录的日期（最新→最旧）迭代，跳过日历缺口
-  const sorted = [...allDates].sort().reverse();
-  let streak = 0;
-  let started = false;
-
-  for (const dk of sorted) {
-    const s = cachedData?.dailySettlement?.[dk];
-    if (s?.rating && s.rating !== '差') {
-      streak++;
-      started = true;
-    } else if (started) {
-      // 已经开始计数后遇到无效评级（未评级或'差'），中断
-      break;
-    }
-    // 未开始计数时遇到无评级日期，跳过（如今日尚未评级）
-  }
-
-  return streak;
-}
+// 注：连续全勤天数（streak）已由后端 StatsResult.streak 提供，renderStatsTab 直接消费，前端不再需要 calcStreak。
 
 // ========== Tab 6: Settings ==========
-function renderSettingsTab() {
+async function renderSettingsTab() {
   const container = document.getElementById('adminContent');
 
-  const balance = cachedData?.points?.balance ?? cachedData?.points ?? 0;
+  const balance = adminBalance;
 
   if (_calendarYear === null) {
     const base = _selectedCalendarDate || AdminUtil.dateKey(adminDate);
@@ -1964,7 +1962,7 @@ function renderSettingsTab() {
     _selectedCalendarDate = AdminUtil.dateKey(adminDate);
   }
 
-  const calHtml = buildMiniCalendar();
+  const calHtml = await buildMiniCalendar();
 
   container.innerHTML = `
     <div class="settings-grid">
@@ -2277,7 +2275,7 @@ async function changeAdminDate(delta) {
   renderCurrentTab();
 }
 
-function buildMiniCalendar() {
+async function buildMiniCalendar() {
   const year = _calendarYear;
   const month = _calendarMonth;
   const today = new Date();
@@ -2285,6 +2283,19 @@ function buildMiniCalendar() {
 
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // 按月按需拉取每日 settlement / homeworks（替代旧 cachedData 全量快照）
+  const monthKeys = [];
+  for (let day = 1; day <= daysInMonth; day++) {
+    monthKeys.push(AdminUtil.dateKey(new Date(year, month, day)));
+  }
+  const [settlementArr, homeworkArr] = await Promise.all([
+    Promise.all(monthKeys.map(k => Data.day.getSettlement(k).then(s => s || null))),
+    Promise.all(monthKeys.map(k => Data.day.getHomeworks(k).then(h => h || []))),
+  ]);
+  const settlementByKey = {};
+  const homeworksByKey = {};
+  monthKeys.forEach((k, i) => { settlementByKey[k] = settlementArr[i]; homeworksByKey[k] = homeworkArr[i]; });
 
   const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
   const dayHeaders = ['日', '一', '二', '三', '四', '五', '六'];
@@ -2308,9 +2319,9 @@ function buildMiniCalendar() {
     const d = new Date(year, month, day);
     const key = AdminUtil.dateKey(d);
     const isSelected = _selectedCalendarDate && key === _selectedCalendarDate;
-    const hasSettlement = cachedData?.dailySettlement?.[key];
+    const hasSettlement = settlementByKey[key];
     const hasRating = hasSettlement?.rating;
-    const hasHomeworks = (cachedData?.homeworks?.[key] || []).length > 0;
+    const hasHomeworks = (homeworksByKey[key] || []).length > 0;
     const holidays = adminSettings.customHolidays || [];
 
     let className = 'mini-cal-day';
@@ -2375,7 +2386,7 @@ async function confirmAdjustPoints() {
   if (_adjustingPoints) return;
   _adjustingPoints = true;
   try {
-    const oldBalance = cachedData?.points?.balance ?? cachedData?.points ?? 0;
+    const oldBalance = adminBalance;
     const diff = newBalance - oldBalance;
     if (diff !== 0) {
       const action = diff > 0 ? 'earn' : 'spend';

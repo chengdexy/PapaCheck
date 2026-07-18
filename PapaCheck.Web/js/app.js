@@ -38,6 +38,79 @@ let currentDate = new Date();
 let homeworks = [];
 let freeTimeTasks = [];
 
+// ========== 按需数据层共享缓存（app.js 加载，big-screen.js 共享读取） ==========
+let _appSettings = null;
+let _appActiveBuffs = [];
+let _appBountyTasks = [];
+let _appBountySubs = {};
+let _appBountyCompletions = {};
+let _appRewardBox = [];
+let _appRedemptions = [];
+let _appShopItems = [];
+let _appBalance = 0;
+let _appSettlement = null;
+
+/** 从 Data 层拉取并填充共享缓存（使用缓存，不强制重拉）。app.js 与 big-screen.js 共用同一全局作用域。 */
+async function _syncSharedCaches() {
+  const dateKey = Util.dateKey(currentDate);
+  const [
+    settings, activeBuffs, bountyTasks, bountySubs, bountyCompletions,
+    rewardBox, redemptions, shopItems, balance, settlement,
+  ] = await Promise.all([
+    Data.config.getSettings(),
+    Data.config.getActiveBuffs(),
+    Data.config.getBountyTasks(),
+    Data.day.getBountySubmissions(dateKey),
+    Data.bounty.getCompletionsTotal(),
+    Data.config.getRewardBox(),
+    Data.config.getRedemptions(),
+    Data.config.getShopItems(),
+    Data.points.getBalance(),
+    Data.day.getSettlement(dateKey),
+  ]);
+  _appSettings = settings || {};
+  _appActiveBuffs = activeBuffs || [];
+  _appBountyTasks = bountyTasks || [];
+  _appBountySubs = { [dateKey]: bountySubs || [] };
+  _appBountyCompletions = bountyCompletions || {};
+  _appRewardBox = rewardBox || [];
+  _appRedemptions = redemptions || [];
+  _appShopItems = shopItems || [];
+  _appBalance = balance || 0;
+  _appSettlement = settlement || null;
+}
+
+/** 强制重拉配置与积分（用户写操作后用，等价于旧 cachedData = await API.getData() 的「看到最新」语义）。 */
+async function _refreshAppCaches() {
+  Data.config.invalidate();
+  Data.points.invalidate();
+  await _syncSharedCaches();
+}
+
+/** 从 JWT 解析 tenant_id / child_id（realtime.start 的正确来源，替代已删除的 cachedData）。 */
+function _decodeJwtTenantChild() {
+  const token = sessionStorage.getItem('papacheck_token') || '';
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return { tenantId: null, childId: null };
+    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    const bin = atob(b64);
+    let str = '';
+    for (let i = 0; i < bin.length; i++) {
+      str += '%' + ('00' + bin.charCodeAt(i).toString(16)).slice(-2);
+    }
+    const decoded = JSON.parse(decodeURIComponent(str));
+    return {
+      tenantId: decoded.tenant_id != null ? decoded.tenant_id : null,
+      childId: decoded.child_id != null ? decoded.child_id : null,
+    };
+  } catch (e) {
+    console.warn('[app] 解析 JWT 失败:', e);
+    return { tenantId: null, childId: null };
+  }
+}
+
 let screenSaverTimer = null;
 let isScreenSaverActive = false;
 let tickInterval = null;
@@ -198,9 +271,8 @@ function getActiveFreeTime() {
 }
 
 function getActiveBounty() {
-  if (!cachedData) return null;
   const dateKey = Util.dateKey(currentDate);
-  const submissions = cachedData.bountySubmissions?.[dateKey] || [];
+  const submissions = _appBountySubs[dateKey] || [];
   return submissions.find(s => s.status === 'doing') || null;
 }
 
@@ -217,8 +289,7 @@ async function requestDeferHomework(hwId) {
   try {
     const dateKey = Util.dateKey(currentDate);
     await API.deferHomework(dateKey, hwId, 'request', new Date().toISOString());
-    cachedData = await API.getData();
-    homeworks = cachedData.homeworks?.[dateKey] || [];
+    homeworks = await Data.day.getHomeworks(dateKey);
     Voice.speak('已申请延后，等待审核');
     needsFullRender = true;
     updateBigScreen();
@@ -648,25 +719,25 @@ async function calculateSettlement() {
   _calculatingSettlement = true;
   try {
     const dateKey = Util.dateKey(currentDate);
+    const settings = await Data.config.getSettings();
+    const existingSettlement = await Data.day.getSettlement(dateKey);
+
     console.log('[Settlement] calculateSettlement run', {
       dateKey,
       hwCount: homeworks.length,
       doneCount: homeworks.filter(h => h.status === 'done').length,
-      existingSettlement: cachedData?.dailySettlement?.[dateKey] ? JSON.stringify(cachedData.dailySettlement[dateKey]) : null,
+      existingSettlement: existingSettlement ? JSON.stringify(existingSettlement) : null,
     });
 
     const doneHw = homeworks.filter(h => h.status === 'done');
     const challengeSuccess = doneHw.filter(h => h.mode === 'challenge' && !h.rejected);
     const efficiencyHw = doneHw.filter(h => !h.rejected);
 
-    // 检查当天是否已有 settlement 并已评级
-    const existingSettlement = cachedData?.dailySettlement?.[dateKey];
-
     if (existingSettlement && (existingSettlement.rating || existingSettlement.submittedAt)) {
       const prevHomeworkBonus = existingSettlement.homeworkBonus || 0;
 
       const currentHomeworkBonus = challengeSuccess.reduce(
-        (sum, h) => sum + (h.basePoints ?? cachedData?.settings?.homeworkBonusPerTask ?? 10), 0
+        (sum, h) => sum + (h.basePoints ?? settings.homeworkBonusPerTask ?? 10), 0
       );
 
       const newHomeworkBonus = currentHomeworkBonus - prevHomeworkBonus;
@@ -688,9 +759,8 @@ async function calculateSettlement() {
 
           window._settlement = updatedSettlement;
           await _putSettlementIdempotent(dateKey, updatedSettlement);
-
-          if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
-          cachedData.dailySettlement[dateKey] = updatedSettlement;
+          Data.day.setSettlement(dateKey, updatedSettlement);
+          _appSettlement = updatedSettlement;
 
           if (additionalPoints > 0) {
             await API.updatePoints('earn', additionalPoints,
@@ -704,8 +774,8 @@ async function calculateSettlement() {
           };
           window._settlement = updatedSettlement;
           await _putSettlementIdempotent(dateKey, updatedSettlement);
-          if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
-          cachedData.dailySettlement[dateKey] = updatedSettlement;
+          Data.day.setSettlement(dateKey, updatedSettlement);
+          _appSettlement = updatedSettlement;
         }
       } else if (existingSettlement.submittedAt) {
         // 已提交等待评级：只更新 homeworkBonus/totalBeforeRating，不加分（尚未评级，无倍率）
@@ -718,8 +788,8 @@ async function calculateSettlement() {
           };
           window._settlement = updatedSettlement;
           await _putSettlementIdempotent(dateKey, updatedSettlement);
-          if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
-          cachedData.dailySettlement[dateKey] = updatedSettlement;
+          Data.day.setSettlement(dateKey, updatedSettlement);
+          _appSettlement = updatedSettlement;
         } else {
           const updatedSettlement = {
             ...existingSettlement,
@@ -727,8 +797,8 @@ async function calculateSettlement() {
           };
           window._settlement = updatedSettlement;
           await _putSettlementIdempotent(dateKey, updatedSettlement);
-          if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
-          cachedData.dailySettlement[dateKey] = updatedSettlement;
+          Data.day.setSettlement(dateKey, updatedSettlement);
+          _appSettlement = updatedSettlement;
         }
       }
 
@@ -741,9 +811,9 @@ async function calculateSettlement() {
     }
 
     // 当天未评级：正常计算结算
-    const dailyBase = cachedData?.settings?.dailyBasePoints ?? 50;
+    const dailyBase = settings.dailyBasePoints ?? 50;
     const homeworkBonus = challengeSuccess.reduce(
-      (sum, h) => sum + (h.basePoints ?? cachedData?.settings?.homeworkBonusPerTask ?? 10), 0
+      (sum, h) => sum + (h.basePoints ?? settings.homeworkBonusPerTask ?? 10), 0
     );
 
     const settlementData = {
@@ -764,15 +834,14 @@ async function calculateSettlement() {
       ratedAt: null,
     };
     await _putSettlementIdempotent(dateKey, settlementToSave);
+    Data.day.setSettlement(dateKey, settlementToSave);
+    _appSettlement = settlementToSave;
 
-    if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
-    cachedData.dailySettlement[dateKey] = settlementToSave;
-
-    // [诊断] 记录设置後的结算数据
+    // [诊断] 记录设置后的结算数据
     console.log('[Settlement] 新结算已设置:', {
       dateKey,
       window_settlement: JSON.stringify(window._settlement),
-      cachedData_settlement: JSON.stringify(cachedData.dailySettlement[dateKey]),
+      cachedData_settlement: JSON.stringify(_appSettlement),
     });
 
     await calculateAndSaveEfficiency(efficiencyHw, dateKey);
@@ -814,9 +883,8 @@ async function submitForRating() {
     };
 
     await API.putSettlement(dateKey, settlementData);
-
-    if (!cachedData.dailySettlement) cachedData.dailySettlement = {};
-    cachedData.dailySettlement[dateKey] = settlementData;
+    Data.day.setSettlement(dateKey, settlementData);
+    _appSettlement = settlementData;
 
     homeworks.forEach(hw => {
       if (hw.status === 'done') {
@@ -839,8 +907,8 @@ async function submitForRating() {
 /** 拉取最新数据并刷新大屏（由 RealtimeManager 回调触发） */
 async function refreshFromServer() {
   try {
-    cachedData = await API.getData();
-    API.migrateBountyCompletionsToTotal(cachedData);
+    await Data.refreshActive();
+    await _syncSharedCaches();
     const key = Util.dateKey(currentDate);
 
     // 保留本地暂停态：替换前捕获 active homework 本地的 paused / pausedAt
@@ -848,8 +916,8 @@ async function refreshFromServer() {
     const wasLocallyPaused = !!(oldActiveHw && oldActiveHw.paused);
     const localPausedAt = wasLocallyPaused ? oldActiveHw.pausedAt : undefined;
 
-    homeworks = cachedData.homeworks?.[key] || [];
-    freeTimeTasks = cachedData.freeTimeTasks?.[key] || [];
+    homeworks = await Data.day.getHomeworks(key);
+    freeTimeTasks = await Data.day.getFreeTime(key);
 
     // pausedAt 已后端持久化，正常轮询服务端直接带出；此处仅兜住 patch 尚未落库的极短竞态
     if (wasLocallyPaused && oldActiveHw) {
@@ -932,24 +1000,23 @@ async function init() {
   showTransitionMask('正在加载数据…');
 
   try {
-    cachedData = await API.getData();
-    isServerMode = true;
+    await Data.init();
   } catch (e) {
     hideTransitionMask();
     showToast('加载数据失败，请检查网络');
     console.error('[Init] 加载数据失败:', e);
     return;
   }
+  await _syncSharedCaches();
   hideTransitionMask();
 
-  API.migrateBountyCompletionsToTotal(cachedData);
   const key = Util.dateKey(currentDate);
 
-  homeworks = cachedData.homeworks?.[key] || [];
-  freeTimeTasks = cachedData.freeTimeTasks?.[key] || [];
+  homeworks = await Data.day.getHomeworks(key);
+  freeTimeTasks = await Data.day.getFreeTime(key);
 
   if (homeworks.length > 0 && homeworks.every(h => h.status === 'done')) {
-    const existing = cachedData.dailySettlement?.[key];
+    const existing = _appSettlement;
     if (!existing || (!existing.submittedAt && !existing.rating)) {
       await calculateSettlement();
     }
@@ -975,7 +1042,8 @@ async function init() {
         consumeAndSpeakNotifications();
       };
 
-      await realtime.start(cachedData.tenant_id, cachedData.child_id);
+      const _auth = _decodeJwtTenantChild();
+      await realtime.start(_auth.tenantId, _auth.childId);
       window._realtimeManager = realtime;
     } catch (e) {
       console.warn('[Init] RealtimeManager 启动失败，回退到手动刷新:', e);
