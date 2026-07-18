@@ -217,7 +217,7 @@ describe('/api/speak 鉴权请求', () => {
     const appJsSrc = fs.readFileSync(appJsPath, 'utf-8');
     // 提取 "/api/speak" 段附近的 token 读取 + headers 构造 + fetch 调用片段
     // 模式匹配"const url = '/api/speak..." 到 "await fetch(url" 之间
-    const snippet = appJsSrc.match(/const url = '\/api\/spea[^]*?await fetch\(url[^;]*;/);
+    const snippet = appJsSrc.match(/const url = '[^']*\/api\/spea[^]*?await fetch\(url[^;]*;/);
     if (!snippet) {
       throw new Error('无法在 app.js 中定位 /api/speak fetch 片段，请检查源码结构');
     }

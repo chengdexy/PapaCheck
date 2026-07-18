@@ -89,13 +89,13 @@ test('RED: resumeActiveTask 在自由时间分支调用 API.putFreeTimeTask', as
     'else 分支应调用 API.putFreeTimeTask，当前: ' + elseBranch[0]);
 });
 
-test('RED: pollServer 保护进行中的自由时间', async () => {
+test('RED: refreshFromServer 从服务端权威拉取自由时间（不被过期数据覆盖）', async () => {
   var appCode = fs.readFileSync(
     path.join(__dirname, '..', 'app.js'),
     'utf8'
   );
-  var pollArea = appCode.match(/const newFtJson[\s\S]{0,600}?freeTimeTasks\s*=\s*newFreeTime/);
-  assert.ok(pollArea, '应找到 freeTimeTasks 替换逻辑');
-  var hasGuard = pollArea[0].includes('hasActiveFt') || pollArea[0].includes('_ftScore');
-  assert.ok(hasGuard, '替换逻辑前应有保护检查');
+  // T04 后轮询改为 refreshFromServer：自由时间始终从服务端 Data.day.getFreeTime 权威拉取，
+  // 取代旧版 newFtJson / hasActiveFt 客户端合并，天然避免被过期数据覆盖。
+  var assignArea = appCode.match(/freeTimeTasks\s*=\s*await\s+Data\.day\.getFreeTime\([^)]*\)/);
+  assert.ok(assignArea, 'refreshFromServer 应从服务端 Data.day.getFreeTime 权威拉取自由时间');
 });

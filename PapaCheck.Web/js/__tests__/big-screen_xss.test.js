@@ -98,9 +98,10 @@ function createBigScreenXssContext(options = {}) {
       addEventListener: () => {},
     },
     navigator: { serviceWorker: { register: async () => ({ scope: '' }) } },
-    // big-screen.js 依赖
-    cachedData: options.cachedData || {
-      settings: { subjects: [{ id: '语文', icon: '📖', color: '#f87171' }] },
+    // big-screen.js 依赖（T04 后改用 _appSettings 全局，cachedData 已废弃）
+    _appSettings: options._appSettings || {
+      subjects: [{ id: '语文', icon: '📖', color: '#f87171' }],
+      customHolidays: [],
     },
     homeworks: options.homeworks || [],
     // big-screen.js 中用到的全局函数

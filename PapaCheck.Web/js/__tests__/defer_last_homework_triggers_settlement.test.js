@@ -37,25 +37,11 @@ const APP_JS = path.join(__dirname, '..', 'app.js');
 
 function extractPollHwChangeBlock() {
   const code = fs.readFileSync(APP_JS, 'utf8');
-  // 找到 "if (oldHwJson !== newHwJson)" 所在行号
-  const lines = code.split('\n');
-  const startIdx = lines.findIndex(l => l.includes('if (oldHwJson !== newHwJson)'));
-  if (startIdx === -1) return null;
-
-  // 从该行开始，找到对应的闭合 }（假设不使用 switch/嵌套）
-  let braceDepth = 0;
-  let inBlock = false;
-  let blockLines = [];
-  for (let i = startIdx; i < lines.length; i++) {
-    const line = lines[i];
-    blockLines.push(line);
-    for (const ch of line) {
-      if (ch === '{') { braceDepth++; inBlock = true; }
-      if (ch === '}') { braceDepth--; }
-    }
-    if (inBlock && braceDepth === 0) break;
-  }
-  return blockLines.join('\n');
+  // T04 后将“作业列表变化后全部完成则自动结算”重构为 checkAllDone()，
+  // 原内联的 if (oldHwJson !== newHwJson) 块已不存在，改为抽取该函数的函数体做校验。
+  const m = code.match(/async function checkAllDone\(\)\s*\{[\s\S]*?\n\}/);
+  if (!m) return null;
+  return m[0];
 }
 
 // ========== 测试 ==========
