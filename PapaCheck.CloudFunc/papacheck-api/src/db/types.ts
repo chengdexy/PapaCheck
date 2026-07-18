@@ -396,6 +396,7 @@ export interface IDatabase {
 
   // ==================== Children Methods ====================
   createChild(tenantId: string, name: string, accessCodeId?: string): Promise<ChildrenRecord>;
+  bindAccessCodeToChild(childId: string, accessCodeId: string, tenantId: string): Promise<void>;
   getChildById(id: string, tenantId: string): Promise<ChildrenRecord | null>;
   getChildrenByTenant(tenantId: string, activeOnly?: boolean): Promise<ChildrenRecord[]>;
   updateChild(id: string, tenantId: string, fields: { name?: string; is_active?: boolean; access_code_id?: string | null }): Promise<void>;

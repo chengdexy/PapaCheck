@@ -2041,6 +2041,13 @@ export class PostgresAdapter extends DatabaseAdapter {
     return { id, tenant_id: tenantId, name, access_code_id: accessCodeId ?? undefined, is_active: true, created_at: new Date().toISOString() };
   }
 
+  async bindAccessCodeToChild(childId: string, accessCodeId: string, tenantId: string): Promise<void> {
+    await this.pool.query(
+      'UPDATE children SET access_code_id = $1 WHERE id = $2 AND tenant_id = $3',
+      [accessCodeId, childId, tenantId]
+    );
+  }
+
   async getChildById(id: string, tenantId: string): Promise<ChildrenRecord | null> {
     const result = await this.pool.query(
       'SELECT * FROM children WHERE id = $1 AND tenant_id = $2',

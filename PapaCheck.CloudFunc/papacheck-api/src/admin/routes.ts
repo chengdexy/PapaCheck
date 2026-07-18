@@ -131,10 +131,10 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
       const accessCodeId = crypto.randomUUID();
       const { raw, hashed } = await generateAccessHash();
 
-      // 先创建孩子（createChild 内部生成自己的 id）
-      const child = await db.createChild(payload.sub, name, accessCodeId);
+      // ① 先建 child，access_code_id 留空（children.access_code_id 可空，合法）
+      const child = await db.createChild(payload.sub, name);
 
-      // 再创建关联的访问码，使用孩子的真实 id
+      // ② 再建 access_code，child_id 指向刚建的 child（access_codes.child_id 非空 FK 此刻满足）
       await db.createAccessCode({
         id: accessCodeId,
         tenant_id: payload.sub,
@@ -142,6 +142,9 @@ export async function adminRoutes(app: FastifyInstance, db: IDatabase): Promise<
         access_code: raw,
         child_id: child.id,
       });
+
+      // ③ 回填 children.access_code_id（此时 access_code 已存在，FK 满足）
+      await db.bindAccessCodeToChild(child.id, accessCodeId, payload.sub);
 
       return { child_id: child.id, child_name: name, access_code_id: accessCodeId, access_code: raw };
     } catch (err) {
