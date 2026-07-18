@@ -19,10 +19,10 @@ export interface PointsHistoryEntry {
 }
 
 export interface FullDataSnapshot {
-  points: { balance: number; history: PointsHistoryEntry[] };
-  badges: Record<string, unknown>[];
-  history: Record<string, EfficiencyDTO>;
-  tasks: Record<string, unknown>;
+  // 注意：已按「按需获取」重构停止返回以下废弃字段（前端零消费，见 design-data-on-demand §B.4）：
+  //   points.history / efficiencyHistory / badges / history / tasks
+  // 其中 points.history 在导入（importFullData）路径仍可能从旧快照还原，故保留为可选。
+  points: { balance: number; history?: PointsHistoryEntry[] };
   homeworks: Record<string, HomeworkDTO[]>;
   dailySettlement: Record<string, SettlementDTO>;
   shopItems: ShopItemDTO[];
@@ -30,11 +30,58 @@ export interface FullDataSnapshot {
   rewardBox: RewardBoxItemDTO[];
   settings: SettingsDTO;
   activeBuffs: BuffDTO[];
-  efficiencyHistory: Record<string, EfficiencyDTO>;
   freeTimeTasks: Record<string, FreeTimeTaskDTO[]>;
   bountyTasks: BountyTaskDTO[];
   bountySubmissions: Record<string, BountySubmissionDTO[]>;
   bountyCompletions: Record<string, BountyCompletionDTO>;
+}
+
+// ==================== Stats（聚合资源，对应 GET /api/stats） ====================
+
+export type StatsRange = 'week' | 'month' | 'all';
+export type StatsGroupMode = 'day' | 'week' | 'month';
+
+/** 区间输入：可直接传 'week'|'month'|'all'，或带 from/to 覆盖区间。 */
+export interface StatsRangeInput {
+  range?: StatsRange;
+  from?: string;
+  to?: string;
+}
+
+export interface StatsPoint {
+  label: string;
+  value: number;
+}
+
+export interface StatsCompletionPoint {
+  label: string;
+  inSchool: number;
+  atHome: number;
+}
+
+export interface RatingHistoryItem {
+  date: string;
+  rating: string;
+  totalBeforeRating: number;
+  multiplier: number;
+  finalPoints: number;
+}
+
+/** 服务端跨天聚合结果（字段语义与旧前端 admin.js 渲染器消费完全一致，见 design §C.3）。 */
+export interface StatsResult {
+  range: StatsRange;
+  groupMode: StatsGroupMode;
+  totalMinutes: StatsPoint[];
+  efficiencyRatios: StatsPoint[];
+  dailyPoints: StatsPoint[];
+  ratingCounts: Record<string, number>;
+  ratingTotal: number;
+  ratingsList: RatingHistoryItem[];
+  completedInSchool: StatsCompletionPoint[];
+  streak: number;
+  avgTotalMin: number;
+  avgEffVal: number;
+  totalPoints: number;
 }
 
 export interface ModifiedEntry {
@@ -252,6 +299,10 @@ export interface IDatabase {
   /** 系统级存活探测（ops/监控用），不要求 tenantId，永不因缺 tenantId 抛错。 */
   ping(): Promise<void>;
   getFullData(tenantId?: string, childId?: string): Promise<FullDataSnapshot>;
+  /** 跨天聚合统计（对应 GET /api/stats）。tenantId 缺失抛错（FR-8/AC-6）。 */
+  getStats(range: StatsRangeInput, tenantId?: string, childId?: string): Promise<StatsResult>;
+  /** 赏金完成聚合（对应 GET /api/bounty-completions/total）。tenantId 缺失抛错。 */
+  getBountyCompletionsTotal(tenantId?: string, childId?: string): Promise<Record<string, number>>;
   importFullData(data: any, tenantId?: string, childId?: string): Promise<void>;
   addNotification(text: string, createdAt?: number, tenantId?: string): Promise<string>;
   getPendingNotifications(tenantId?: string): Promise<NotificationItem[]>;
