@@ -27,6 +27,7 @@ Thumbs.db
 !RELEASE_USAGE.md
 !PapaCheck.WeChat/skill.md
 !docs/*.md
+!deliverables/**/*.md
 
 # 测试环境变量（本地测试数据库配置）
 .env.test
