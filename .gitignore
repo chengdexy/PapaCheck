@@ -26,6 +26,7 @@ Thumbs.db
 !README.md
 !RELEASE_USAGE.md
 !PapaCheck.WeChat/skill.md
+!docs/*.md
 
 # 测试环境变量（本地测试数据库配置）
 .env.test
@@ -104,3 +105,13 @@ PapaCheck.Release/.env
 
 # 临时调试文件
 .tmp_*
+
+# 部署缓存目录（静态文件 staging）
+deploy-papacheck/
+
+# CloudFunc 本地配置（含密钥，仅随 --dir dist 部署生效）
+PapaCheck.CloudFunc/cloudbaserc.json
+PapaCheck.CloudFunc/data/
+PapaCheck.CloudFunc/papacheck-api/cloudbaserc.json
+PapaCheck.CloudFunc/papacheck-api/data/
+PapaCheck.CloudFunc/papacheck-api/dist/

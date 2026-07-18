@@ -13,6 +13,21 @@
 - **`/api/download` 直连 CloudBase CDN**：重定向目标从相对路径 `/download/...`（经 ECS 代理）改为直接指向 CloudBase CDN URL，绕过 ECS 3M 带宽限制
 - **构建 APK 流程同步更新版本号**：`build-apk --publish` 执行后自动执行 `systemctl daemon-reload && systemctl restart papacheck`，确保 `/api/version` 立即返回新版本号
 
+### Added
+- **数据按需获取（Server + Web + CloudFunc）**：新增 `GET /api/stats` 服务端聚合统计端点（week/month/all 三种 range，13 字段 StatsResult），返回体积与孩子历史使用天数解耦（week 视图 1823B vs 旧 79806B，降为 1/44）。新增 `GET /api/points/balance`、`GET /api/bounty-completions/total`。前端新增 `window.Data` 模块化数据层（`PapaCheck.Web/js/data-layer.js`），admin/app/big-screen 三端迁移到按需拉取，版本戳变化后只刷新当前视图资源（FR-6/AC-4）。CloudFunc 生产同步部署完成。详见 `docs/design-data-on-demand.md`
+- **真实 access_code 端到端验证**：用生产 access_code 经 `/api/auth/exchange` 换 JWT，验证全部按需端点 200 + 结构正确（13 字段 / balance / bounty-completions / /api/data 瘦身确认）
+- **生产验证脚本**：`PapaCheck.CloudFunc/papacheck-api/scripts/verify-data-on-demand.mjs` 可独立运行验证按需端点
+- **AI 作业 API 文档**：`docs/ai-homework-api.md`，供可信 AI 助手调用的 API 说明（认证 + 字段 + curl 示例）
+- **实时刷新回归清单**：`docs/regression-realtime-checklist.md`
+
+### Fixed
+- **CloudFunc TZ 代码级固化**：`getWeekStart`/`formatWeekLabel` 改用 Date.UTC + getUTC* 显式按 Shanghai 日历日计算，结果与进程 TZ 环境变量无关。实际部署不再依赖 `cloudbaserc.json` 的 `TZ=Asia/Shanghai`
+- **生产 Bug：创建孩子 500**：`POST /api/admin/members` 因生产库 `children`/`access_codes` 表 NOT NULL 无默认值列未填 + 外键插入顺序反转（child 先填了不存在的 access_code id）导致 500。两轮修复：防御性补全 INSERT 列（`created_at`/`is_active`/`token_version`）+ 改为 child-first → access_code → 回填的正确顺序。用户实机验证创建孩子成功
+- **过期 Web 单测清理**：T01-T04 前端迁移遗留的 8 个过期测试文件已清理（删除 4 个整文件 + 修正 4 个文件），`js/__tests__/` 全量 31 文件 / 210 用例通过
+
+### Changed
+- **`/api/data` 瘦身并标 deprecated**：不再返回 `points.history` / `efficiencyHistory` / `badges` / `history` / `tasks` 5 个字段，保留 `bountyCompletions`。客户端后续应按新端点按需拉取，`/api/data` 暂时保留作回退
+
 ## [1.4.2] - 2026-06-25
 
 ### Changed
