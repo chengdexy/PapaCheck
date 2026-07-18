@@ -6,10 +6,14 @@
  *  aggregateCompletionData / calcStreak / 效率比公式）的 **1:1 TypeScript 移植**，
  * 以保证「按需获取」重构后服务端聚合结果与旧前端逐字段一致（AC-2）。
  *
- * 约定（见 design-data-on-demand §E.2）：
- *  - 仅使用本地 Date 语义（getDay / getDate / getFullYear / getMonth / getDate），
- *    绝不引入 toISOString() / getUTCDay() 等 UTC 转换，避免周聚合边界偏移。
- *  - 服务端部署须设置 TZ=Asia/Shanghai（与旧前端浏览器时区一致），详见 §E.3-①。
+ * 约定（见 design-data-on-demand §E.2 / §E.3-① —— TZ 代码级固化）：
+ *  - 周聚合边界（周一）必须与中国业务时区（Asia/Shanghai）语义一致，并与旧前端浏览器逐字段对齐（AC-2）。
+ *  - 为避免依赖运行环境 `TZ` 环境变量（CloudBase SCF 默认 UTC，若未显式设置
+ *    `TZ=Asia/Shanghai` 会导致周聚合边界偏移），本文件所有日期运算 **显式把
+ *    'YYYY-MM-DD' 当作 Asia/Shanghai 日历日解析**，使用 `Date.UTC` + `getUTC*` 做
+ *    确定性计算：结果与进程运行时 `TZ` 完全无关，且严格等价于旧前端在 Asia/Shanghai
+ *    下用 `new Date('YYYY-MM-DD').getDay()` 得到的「周一」（已逐日期验证一致）。
+ *  - 由此从代码层面固化时区（design §E.3-① 闭环），部署侧不再强制要求设置 `TZ` 环境变量。
  */
 
 import type {
@@ -31,28 +35,41 @@ export function getGroupMode(dateCount: number, range: StatsRange): StatsGroupMo
 }
 
 /**
- * 取某日期所在「周一」的日期串（YYYY-MM-DD），本地时区语义。
- * 移植自 admin.js getWeekStart，但用本地 Date 字段格式化替代原 toISOString()，
- * 以避免 UTC 转换导致的周边界偏移（design §E.2 明确要求）。
+ * 将 'YYYY-MM-DD' 解析为 { y, m(1-12), d }。
+ * 仅做字符串拆分，不做任何时区解释，保证后续运算的确定性（TZ 代码级固化）。
  */
-export function getWeekStart(dateStr: string): string {
-  const d = new Date(dateStr);
-  const day = d.getDay();
-  const mon = new Date(d);
-  mon.setDate(d.getDate() - ((day + 6) % 7));
-  const y = mon.getFullYear();
-  const m = String(mon.getMonth() + 1).padStart(2, '0');
-  const dayNum = String(mon.getDate()).padStart(2, '0');
-  return `${y}-${m}-${dayNum}`;
+function parseYmd(dateStr: string): { y: number; m: number; d: number } {
+  const parts = dateStr.split('-').map(Number);
+  return { y: parts[0], m: parts[1], d: parts[2] };
 }
 
-/** 格式化周标签为 M/D-M/D。移植自 admin.js formatWeekLabel。 */
+/**
+ * 取某日期所在「周一」的日期串（YYYY-MM-DD）。
+ *
+ * TZ 代码级固化（design §E.3-①）：显式把 'YYYY-MM-DD' 当作 Asia/Shanghai 日历日，
+ * 用 `Date.UTC` 构造后读 `getUTCDay` / `getUTCFullYear` / `getUTCMonth` /
+ * `getUTCDate` 做确定性计算。结果与运行环境 `TZ` 无关，且严格等价于旧前端在
+ * Asia/Shanghai 下 `new Date('YYYY-MM-DD').getDay()` 得到的「周一」（已逐日期验证一致）。
+ */
+export function getWeekStart(dateStr: string): string {
+  const { y, m, d } = parseYmd(dateStr);
+  const base = new Date(Date.UTC(y, m - 1, d));
+  const day = base.getUTCDay(); // 0=Sun ... 6=Sat，时区无关
+  const diffToMonday = (day + 6) % 7; // 距本周一的天数（0~6）
+  const monday = new Date(base.getTime() - diffToMonday * 86_400_000);
+  const yy = monday.getUTCFullYear();
+  const mm = String(monday.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(monday.getUTCDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+/** 格式化周标签为 M/D-M/D。移植自 admin.js formatWeekLabel（TZ 代码级固化，语义同 getWeekStart）。 */
 export function formatWeekLabel(key: string): string {
-  const parts = key.split('-');
-  const d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
-  const end = new Date(d);
-  end.setDate(d.getDate() + 6);
-  return `${d.getMonth() + 1}/${d.getDate()}-${end.getMonth() + 1}/${end.getDate()}`;
+  const { y, m, d } = parseYmd(key);
+  const start = new Date(Date.UTC(y, m - 1, d));
+  const end = new Date(start.getTime() + 6 * 86_400_000);
+  const fmt = (dt: Date): string => `${dt.getUTCMonth() + 1}/${dt.getUTCDate()}`;
+  return `${fmt(start)}-${fmt(end)}`;
 }
 
 /**
