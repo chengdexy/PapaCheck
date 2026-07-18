@@ -239,6 +239,24 @@ async function saveBountyCompletions(dateKey, completions) {
   return true;
 }
 
+// ---- 按需获取（客户端数据按需获取重构）----
+
+// 跨天聚合统计：GET /api/stats?range=week|month|all
+async function getStats(range) {
+  return await _fetch(API_BASE + '/stats?range=' + encodeURIComponent(range || 'all'));
+}
+
+// 积分余额：GET /api/points/balance
+async function getPointsBalance() {
+  return await _fetch(API_BASE + '/points/balance');
+}
+
+// 赏金完成汇总：GET /api/bounty-completions/total
+// 替代旧 migrateBountyCompletionsToTotal（该汇总已改为服务端聚合，见设计 §C.1.2）。
+async function getBountyCompletionsTotal() {
+  return await _fetch(API_BASE + '/bounty-completions/total');
+}
+
 async function resetDate(date) {
   return await _fetch(API_BASE + '/reset-date', {
     method: 'POST',
@@ -406,29 +424,6 @@ async function putBountyCompletion(id, data) {
   return true;
 }
 
-function migrateBountyCompletionsToTotal(data) {
-  if (!data || !data.bountyCompletions) return data;
-  var comps = data.bountyCompletions;
-  if (comps._total) return data;
-  var total = {};
-  for (var dk of Object.keys(comps)) {
-    var entry = comps[dk];
-    if (entry && typeof entry === 'object') {
-      for (var tid of Object.keys(entry)) {
-        if (tid === 'uuid' || tid === 'lastModified' || tid === 'isDeleted' || tid === '_table' || tid === 'date') continue;
-        var v = entry[tid];
-        var delta = typeof v === 'number' ? v : (v ? 1 : 0);
-        total[tid] = (total[tid] || 0) + delta;
-      }
-    }
-  }
-  comps._total = total;
-  if (Object.keys(total).length > 0) {
-    saveBountyCompletions('_total', total).catch(function () { });
-  }
-  return data;
-}
-
 // ---- 通知 (notifications) ----
 
 async function announce(text) {
@@ -504,7 +499,6 @@ const API = {
   headBountyTask,
   putBountySubmission,
   putBountyCompletion,
-  migrateBountyCompletionsToTotal,
   announce,
   getPendingNotifications,
   consumeNotifications,
