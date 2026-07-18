@@ -377,11 +377,30 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   // 3. GET /api/data - 完整数据
+  /**
+   * @deprecated 兼容 / 回退通道（design §B.6）。
+   * 「客户端数据按需获取」重构后，前端应改用按天 / 聚合 / 配置端点。
+   * 此处仍返回瘦身快照（已剔除 points.history / efficiencyHistory / badges / history / tasks，
+   * 仅保留 bountyCompletions），逻辑不变，仅用于灰度回退。
+   */
   app.get('/api/data', { schema: dataSchema }, async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
     const childId = await requireChild(request, reply);
     if (childId === null) return;
     return sendJson(reply, await db.getFullData(tenantId, childId));
+  });
+
+  // 3a. GET /api/stats - 跨天聚合统计（服务端聚合，对应「按需获取」重构 N1）
+  // query: range=week|month|all（可选 from/to ISO 日期覆盖 range）。走 requireChild + tenant+child WHERE。
+  app.get<{ Querystring: { range?: string; from?: string; to?: string } }>('/api/stats', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    const childId = await requireChild(request, reply);
+    if (childId === null) return;
+    const q = request.query as { range?: string; from?: string; to?: string };
+    const range = q.range || 'all';
+    // from/to 同时提供时覆盖 range 解析出的区间
+    const statsInput = (q.from && q.to) ? { range, from: q.from, to: q.to } : range;
+    return sendJson(reply, await db.getStats(statsInput as any, tenantId, childId));
   });
 
   // 3b. GET /api/data-version - 轻量数据版本戳（条件短轮询用，仅返回几十字节）
@@ -481,6 +500,15 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     const childId = await requireChild(request, reply);
     if (childId === null) return;
     return sendJson(reply, await db.getBountyCompletions(request.params.date, tenantId, childId));
+  });
+
+  // 15b. GET /api/bounty-completions/total - 赏金完成聚合（对应「按需获取」重构 N3）
+  // 复刻前端 migrateBountyCompletionsToTotal 的汇总逻辑，改为服务端聚合。
+  app.get('/api/bounty-completions/total', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    const childId = await requireChild(request, reply);
+    if (childId === null) return;
+    return sendJson(reply, await db.getBountyCompletionsTotal(tenantId, childId));
   });
 
   // 16. GET /api/sync/pull - 同步拉取
@@ -618,6 +646,15 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     // 增量更新风格（原 PATCH /api/points）
     const balance = await db.patchPoints(body, tenantId, childId);
     return sendJson(reply, { ok: true, balance });
+  });
+
+  // 21b. GET /api/points/balance - 仅返回积分余额（对应「按需获取」重构 N2）
+  // 替代前端 cachedData.points.balance 的读取；复用 getPointsBalance。
+  app.get('/api/points/balance', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    const childId = await requireChild(request, reply);
+    if (childId === null) return;
+    return sendJson(reply, { balance: await db.getPointsBalance(tenantId, childId) });
   });
 
   // 22. PUT /api/shop

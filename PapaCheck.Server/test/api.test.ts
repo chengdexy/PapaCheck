@@ -60,7 +60,7 @@ describe('GET /api/version', () => {
 });
 
 describe('GET /api/data', () => {
-  it('返回完整数据结构', async () => {
+  it('返回完整数据结构（已按需瘦身，不再含废弃字段）', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/data' });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
@@ -72,11 +72,18 @@ describe('GET /api/data', () => {
     expect(body).toHaveProperty('rewardBox');
     expect(body).toHaveProperty('settings');
     expect(body).toHaveProperty('activeBuffs');
-    expect(body).toHaveProperty('efficiencyHistory');
     expect(body).toHaveProperty('freeTimeTasks');
     expect(body).toHaveProperty('bountyTasks');
     expect(body).toHaveProperty('bountySubmissions');
     expect(body).toHaveProperty('bountyCompletions');
+    // 「按需获取」T02：以下前端零消费字段已从响应体剔除
+    expect(body).not.toHaveProperty('efficiencyHistory');
+    expect(body).not.toHaveProperty('badges');
+    expect(body).not.toHaveProperty('history');
+    expect(body).not.toHaveProperty('tasks');
+    // points 仅保留 balance（history 已停止返回）
+    expect(body.points).toHaveProperty('balance');
+    expect(body.points).not.toHaveProperty('history');
   });
 });
 

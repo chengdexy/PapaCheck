@@ -6,9 +6,10 @@ import { Pool } from 'pg';
 import type { Pool as PoolType, QueryResult, PoolClient } from 'pg';
 import bcrypt from 'bcryptjs';
 import { DatabaseAdapter } from './adapter.js';
-import type { FullDataSnapshot, PointsHistoryEntry, ModifiedEntry, NotificationItem, TenantListItem, ChildrenRecord, AccessCodeRecord, CreateAccessCodeInput, AdminUser, BackupRecord, HealthRecord, AlertState, OpsConfig } from './types.js';
+import type { FullDataSnapshot, PointsHistoryEntry, ModifiedEntry, NotificationItem, TenantListItem, ChildrenRecord, AccessCodeRecord, CreateAccessCodeInput, AdminUser, BackupRecord, HealthRecord, AlertState, OpsConfig, StatsResult, StatsRangeInput, StatsRange } from './types.js';
 import type { HomeworkDTO, SettlementDTO, EfficiencyDTO, ShopItemDTO, RedemptionDTO, RewardBoxItemDTO, BuffDTO, FreeTimeTaskDTO, BountyTaskDTO, BountySubmissionDTO, BountyCompletionDTO, SettingsDTO, EmailConfigDTO } from './dto.js';
 import type { CRDTOperation } from '../crdt/types.js';
+import { buildStatsFromData } from './stats.js';
 
 /** date_key 表：以日期为主键，存储 JSON 数据 */
 const DATE_KEY_TABLES = new Set([
@@ -393,28 +394,12 @@ export class PostgresAdapter extends DatabaseAdapter {
     }
     const pointsResult = await this.pool.query(pointsQuery, pointsParams);
 
-    let historyQuery: string;
-    let historyParams: any[];
-    if (tenantId && childId) {
-      historyQuery = "SELECT * FROM points_history WHERE tenant_id = $1 AND child_id = $2 ORDER BY id ASC";
-      historyParams = [tenantId, childId];
-    } else if (tenantId) {
-      historyQuery = "SELECT * FROM points_history WHERE tenant_id = $1 ORDER BY id ASC";
-      historyParams = [tenantId];
-    } else {
-      historyQuery = "SELECT * FROM points_history ORDER BY id ASC";
-      historyParams = [];
-    }
-    const historyResult = await this.pool.query(historyQuery, historyParams);
-
+    // 注意（design §B.4）：已停止返回 points.history（前端仅用 balance，零消费）。
+    // 其余废弃字段 badges / history / tasks / efficiencyHistory 同样不再返回（前端零消费，grep 确认）。
     const data: FullDataSnapshot = {
       points: {
         balance: pointsResult.rows[0]?.balance ?? 0,
-        history: historyResult.rows as PointsHistoryEntry[],
       },
-      badges: (await this._getJson('badges', tenantId, childId)) ?? [],
-      history: {},
-      tasks: {},
       homeworks: {},
       dailySettlement: {},
       shopItems: this._filterDeleted((await this._getJson('shop_items', tenantId))) ?? [],
@@ -422,7 +407,6 @@ export class PostgresAdapter extends DatabaseAdapter {
       rewardBox: this._filterDeleted((await this._getJson('reward_box', tenantId, childId))) ?? [],
       settings: (await this._getJson('settings', tenantId)) ?? {},
       activeBuffs: this._filterDeleted((await this._getJson('active_buffs', tenantId, childId))) ?? [],
-      efficiencyHistory: {},
       freeTimeTasks: {},
       bountyTasks: this._filterDeleted((await this._getJson('bounty_tasks', tenantId))) ?? [],
       bountySubmissions: {},
@@ -468,27 +452,6 @@ export class PostgresAdapter extends DatabaseAdapter {
       const val = this._safeJsonParse(row.data);
       if (val !== undefined) {
         data.dailySettlement[row.date_key] = val;
-      }
-    }
-
-    // efficiencyHistory
-    let ehQuery: string;
-    let ehParams: any[];
-    if (tenantId && childId) {
-      ehQuery = "SELECT date_key, data FROM efficiency_history WHERE tenant_id = $1 AND child_id = $2";
-      ehParams = [tenantId, childId];
-    } else if (tenantId) {
-      ehQuery = "SELECT date_key, data FROM efficiency_history WHERE tenant_id = $1";
-      ehParams = [tenantId];
-    } else {
-      ehQuery = "SELECT date_key, data FROM efficiency_history";
-      ehParams = [];
-    }
-    const ehResult = await this.pool.query(ehQuery, ehParams);
-    for (const row of ehResult.rows) {
-      const val = this._safeJsonParse(row.data);
-      if (val !== undefined) {
-        data.efficiencyHistory[row.date_key] = val;
       }
     }
 
@@ -589,7 +552,8 @@ export class PostgresAdapter extends DatabaseAdapter {
       }
     }
 
-    await this._setJson('badges', data.badges ?? [], tenantId, childId);
+    // 注意：badges 已从全量快照契约中移除（前端零消费），但旧快照导入时仍可能携带，故按可选字段兼容读取。
+    await this._setJson('badges', (data as Record<string, any>).badges ?? [], tenantId, childId);
 
     // date_key 表
     const dateKeySetters: Array<{ table: string; sourceKey: string; defaultValue: any }> = [
@@ -704,6 +668,92 @@ export class PostgresAdapter extends DatabaseAdapter {
     }
     const result = await this.pool.query(query, params);
     return result.rows[0]?.balance ?? 0;
+  }
+
+  // ==================== Stats（跨天聚合，对应 GET /api/stats） ====================
+
+  async getStats(range: StatsRangeInput, tenantId?: string, childId?: string): Promise<StatsResult> {
+    // 快速失败：租户级聚合，缺失 tenantId 时禁止静默退化为跨租户扫描。
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
+
+    let rangeMode: StatsRange = 'all';
+    let fromOverride: string | undefined;
+    let toOverride: string | undefined;
+    if (range && typeof range === 'object') {
+      rangeMode = range.range || 'all';
+      fromOverride = range.from;
+      toOverride = range.to;
+    } else if (typeof range === 'string') {
+      rangeMode = (range as StatsRange) || 'all';
+    }
+
+    // 全量 settlement（体积小，用于 allDates / streak / ratingsList / finalPoints）
+    const dsQuery = 'SELECT date_key, data FROM daily_settlement WHERE tenant_id = $1 AND child_id = $2';
+    const dsResult = await this.pool.query(dsQuery, [tenantId, childId]);
+    const settlementByDate: Record<string, any> = {};
+    const allDates: string[] = [];
+    for (const row of dsResult.rows) {
+      const val = this._safeJsonParse(row.data);
+      if (val !== undefined) {
+        settlementByDate[row.date_key] = val;
+        allDates.push(row.date_key);
+      }
+    }
+    allDates.sort();
+
+    // 解析区间（week=末7、month=末30、all=全量；from/to 覆盖）
+    let dateRange: string[];
+    if (fromOverride && toOverride) {
+      dateRange = allDates.filter((d) => d >= fromOverride! && d <= toOverride!);
+    } else {
+      const maxDays = rangeMode === 'month' ? 30 : rangeMode === 'week' ? 7 : 9999;
+      dateRange = maxDays >= 9999 ? allDates : allDates.slice(-maxDays);
+    }
+
+    // 区间 homeworks（带日期范围过滤，避免全量下载 —— AC-1）
+    const homeworksByDate: Record<string, any[]> = {};
+    if (dateRange.length > 0) {
+      const from = dateRange[0];
+      const to = dateRange[dateRange.length - 1];
+      const hwQuery = 'SELECT date_key, data FROM homeworks WHERE tenant_id = $1 AND child_id = $2 AND date_key >= $3 AND date_key <= $4';
+      const hwResult = await this.pool.query(hwQuery, [tenantId, childId, from, to]);
+      for (const row of hwResult.rows) {
+        const items = this._safeJsonParse(row.data);
+        if (Array.isArray(items)) {
+          homeworksByDate[row.date_key] = items.filter((h: any) => !h.isDeleted);
+        }
+      }
+    }
+
+    return buildStatsFromData({ settlementByDate, homeworksByDate, dateRange, allDates, range: rangeMode });
+  }
+
+  // ==================== Bounty Completions Total（对应 GET /api/bounty-completions/total） ====================
+
+  async getBountyCompletionsTotal(tenantId?: string, childId?: string): Promise<Record<string, number>> {
+    // 快速失败：缺失 tenantId 时禁止静默退化为跨租户扫描。
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
+    const query = 'SELECT date_key, data FROM bounty_completions WHERE tenant_id = $1 AND child_id = $2';
+    const result = await this.pool.query(query, [tenantId, childId]);
+    const total: Record<string, number> = {};
+    // 跳过元数据键（与 admin.js migrateBountyCompletionsToTotal 一致）
+    const SKIP_KEYS = new Set(['uuid', 'lastModified', 'isDeleted', '_table', 'date']);
+    for (const row of result.rows) {
+      const entry = this._safeJsonParse(row.data);
+      if (entry && typeof entry === 'object') {
+        for (const tid of Object.keys(entry)) {
+          if (SKIP_KEYS.has(tid)) continue;
+          const v = (entry as Record<string, any>)[tid];
+          const delta = typeof v === 'number' ? v : (v ? 1 : 0);
+          total[tid] = (total[tid] || 0) + delta;
+        }
+      }
+    }
+    return total;
   }
 
   async updatePoints(action: 'earn' | 'spend', amount: number, detail: string, tenantId?: string, childId?: string): Promise<number> {
