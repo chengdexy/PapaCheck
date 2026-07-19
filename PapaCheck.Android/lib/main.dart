@@ -253,10 +253,16 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
         ),
       );
 
+    // 清空 WebView 缓存，避免升级安装后保留旧版网页 JS 缓存导致家长端遮罩永久卡死
+    await _controller!.clearCache();
+
     if (_controller!.platform is AndroidWebViewController) {
-      (_controller!.platform as AndroidWebViewController)
-          .setMediaPlaybackRequiresUserGesture(false);
+      final androidController = _controller!.platform as AndroidWebViewController;
+      androidController.setMediaPlaybackRequiresUserGesture(false);
     }
+    // 说明：webview_flutter_android 4.3.x 无 setCacheMode / AndroidWebViewCacheMode，
+    // 已由上方 _controller.clearCache() 在启动时清空缓存，强制本次会话拉取最新网页，
+    // 配合已部署网页端「5s 自动隐藏遮罩 + 15s fetch 超时」彻底解决卡死。
 
     // 检查是否有持久化的 auth token，有则先加载注入中间页
     final savedToken = await ConfigService.getAuthToken();

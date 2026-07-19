@@ -231,7 +231,7 @@ async function exchange(code, role) {
     var existing = sessionStorage.getItem('papacheck_token');
     var role = sessionStorage.getItem('papacheck_role');
     if (existing && role) {
-      window.location.href = role === 'parent' ? '/papacheck/admin.html' : '/papacheck/app/';
+      window.location.href = role === 'parent' ? '/papacheck/app/admin.html' : '/papacheck/app/';
       return;
     }
   } catch (e) {}

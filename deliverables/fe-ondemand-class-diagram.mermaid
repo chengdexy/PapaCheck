@@ -1,0 +1,64 @@
+classDiagram
+  class Data {
+    +_entry: string
+    +_statsCache: object
+    +_degraded: boolean
+    +_TIMEOUT_MS: number
+    +bootstrap(entry, opts) Promise~void~
+    +loadChildDay(dateKey) Promise~void~
+    +loadAdminDay(dateKey) Promise~void~
+    +loadAdminStats(range) Promise~StatsResult~
+    +getStats(range) StatsResult
+    +loadBountyCompletionsTotal() Promise~void~
+    +loadConfig() Promise~void~
+    +refreshCurrentView() Promise~void~
+    +fallbackToFullCachedData() Promise~void~
+    +getSnapshot() object
+  }
+  class StatsResult {
+    +range: string
+    +totalMinutes: Array~date,value~
+    +efficiencyRatios: Array~date,value~
+    +dailyPoints: Array~date,value~
+    +completedInSchool: Array~date,inSchool,atHome~
+    +ratingsList: Array~date,rating,...~
+    +ratingCounts: object
+    +ratingTotal: number
+    +streak: number
+  }
+  class CachedData {
+    +tenant_id: string
+    +child_id: string
+    +homeworks: map~dateKey,[]~
+    +dailySettlement: map~dateKey,obj~
+    +freeTimeTasks: map~dateKey,[]~
+    +bountySubmissions: map~dateKey,[]~
+    +bountyCompletions: _total~map~
+    +shopItems: []~
+    +redemptions: []~
+    +rewardBox: []~
+    +bountyTasks: []~
+    +activeBuffs: []~
+    +settings: obj~
+    +points: balance~number~
+  }
+  class API {
+    +_fetch(url, opts) Promise~json~
+    +getHomeworks(d) Promise
+    +getSettlement(d) Promise
+    +getFreeTime(d) Promise
+    +getBountySubmissions(d) Promise
+    +getStats(range) Promise
+    +getPointsBalance() Promise
+    +getData() Promise
+    +migrateBountyCompletionsToTotal(d) obj
+  }
+  class RealtimeManager {
+    +start(tenant, child) Promise
+    +callbacks.onRefresh: fn
+  }
+  Data ..> API : 调用_fetch/各getX
+  Data ..> CachedData : 按需填充
+  Data ..> StatsResult : loadAdminStats返回
+  RealtimeManager ..> Data : onRefresh→refreshCurrentView
+  note for Data "单日/聚合/配置三层 + 兼容降级层"

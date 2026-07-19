@@ -32,6 +32,7 @@ Thumbs.db
 # 测试环境变量（本地测试数据库配置）
 .env.test
 .env
+.build-secret
 
 # 日志
 *.log
@@ -42,6 +43,7 @@ PapaCheck.Android/.flutter-plugins
 PapaCheck.Android/.flutter-plugins-dependencies
 PapaCheck.Android/build/
 PapaCheck.Android/.idea/
+PapaCheck.Android/android/app/local.properties
 
 # 聊天素材（非项目文件）
 _chat/

@@ -17,7 +17,9 @@ const __dirname = dirname(__filename);
 const PKG = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf-8'));
 const CLIENT_VERSION = PKG.version || '1.5.2';
 
-// CDN 基础地址固定
+// CDN 基础地址：CloudBase 云存储 dist 桶的公开镜像读取入口（6368 总桶下的 dist/）。
+// APK 由 tcb CLI 写入 pgstore 的 dist 桶（tcb storage objects upload ... --bucket dist），
+// 经此镜像地址公开读取；写入走 pgstore dist 桶，不写 6368 总桶、不写 web 托管。
 const CDN_BASE = 'https://6368-child-teacher-parent-d9aef9d2208-1253991009.tcb.qcloud.la';
 
 export interface AppOptions {

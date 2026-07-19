@@ -1,0 +1,55 @@
+sequenceDiagram
+  participant U as 用户
+  participant App as app.js/admin.js
+  participant Data as Data层
+  participant API as API(api.js)
+  participant S as 服务端按需端点
+
+  %% 路径1：孩子端首屏
+  Note over U,App: 路径1 孩子端首屏 (app.js init)
+  U->>App: 打开应用
+  App->>Data: bootstrap('child',{childId,tenantId})
+  Data->>API: getHomeworks/Settlement/FreeTime/BountySubmissions(today)
+  API->>S: /api/homeworks/:d 等4个
+  S-->>API: 单日数据
+  Data->>API: getShopItems/Settings/.../points/balance
+  API->>S: /api/shop 等6个（配置）
+  S-->>API: 配置
+  Data->>App: cachedData 已填充(单日+配置)
+  App->>App: homeworks=cachedData.homeworks[key]; render
+
+  %% 路径2：家长端统计页
+  Note over U,App: 路径2 家长端统计页
+  U->>App: 切到 stats tab / 切 range
+  App->>Data: loadAdminStats(range)
+  Data->>API: getStats(range)
+  API->>S: /api/stats?range=
+  S-->>API: StatsResult(每日数组+streak)
+  Data-->>App: _statsCache[range]
+  App->>App: collectStatsData→renderStatsTab(用stats聚合)
+  Note over App: 若降级_statsCache空→legacy分支读cachedData全量
+
+  %% 路径3：大屏
+  Note over U,App: 路径3 大屏(兑换/奖励操作后)
+  U->>App: 兑换/领奖
+  App->>API: putRedemption/putShopItem...
+  App->>Data: loadConfig()
+  Data->>API: 6个配置端点
+  API->>S: /api/shop 等
+  S-->>API: 配置
+  Data->>App: cachedData 配置更新
+  App->>App: showMyRewards() 重渲染
+
+  %% 路径4：实时刷新
+  Note over U,App: 路径4 实时刷新(RealtimeManager轮询)
+  S-->>API: /api/data-version 变化
+  API->>App: realtime.onRefresh()
+  App->>Data: refreshCurrentView()
+  alt 降级态
+    Data->>API: getData() 全量
+    API->>S: /api/data
+  else 正常
+    Data->>API: 按entry+当前视图最小集
+  end
+  Data->>App: cachedData 刷新
+  App->>App: renderCurrentTab()/updateBigScreen()

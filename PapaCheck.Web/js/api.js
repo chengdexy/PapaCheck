@@ -37,7 +37,32 @@ async function _fetch(url, options) {
   // 注入 Bearer token
   if (!fetchOptions.headers) fetchOptions.headers = {};
   Object.assign(fetchOptions.headers, getAuthHeaders());
-  var resp = await fetch(url, fetchOptions);
+
+  // 超时保护：Android WebView 在弱网/异常时 fetch 可能永不 settle，
+  // 导致上层 await 永久挂起、过渡遮罩卡死。用 AbortController 兜底中断（默认 15s）。
+  var _ac = null;
+  var _timer = null;
+  var _timeoutMs = (typeof FETCH_TIMEOUT_MS !== 'undefined' && FETCH_TIMEOUT_MS > 0) ? FETCH_TIMEOUT_MS : 15000;
+  if (typeof AbortController !== 'undefined') {
+    _ac = new AbortController();
+    _timer = setTimeout(function () { try { _ac.abort(); } catch (e) {} }, _timeoutMs);
+    fetchOptions.signal = _ac.signal;
+  }
+
+  var resp;
+  try {
+    resp = await fetch(url, fetchOptions);
+  } catch (e) {
+    if (_timer) clearTimeout(_timer);
+    if (e && e.name === 'AbortError') {
+      var terr = new Error('request timeout after ' + _timeoutMs + 'ms: ' + method + ' ' + url);
+      terr.code = 'TIMEOUT';
+      throw terr;
+    }
+    throw e;
+  }
+  if (_timer) clearTimeout(_timer);
+
   // 未认证，跳转到登录页
   if (resp.status === 401) {
     window.location.href = '/papacheck/app/login.html?redirect=' + encodeURIComponent(window.location.pathname);
