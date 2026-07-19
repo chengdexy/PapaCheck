@@ -288,6 +288,10 @@ class LocalPlus8Date {
   getHours() { return new Date(this._t + TZ_OFFSET_MS).getUTCHours(); }
   getMinutes() { return new Date(this._t + TZ_OFFSET_MS).getUTCMinutes(); }
   getSeconds() { return new Date(this._t + TZ_OFFSET_MS).getUTCSeconds(); }
+  getUTCFullYear() { return new Date(this._t).getUTCFullYear(); }
+  getUTCMonth() { return new Date(this._t).getUTCMonth(); }
+  getUTCDate() { return new Date(this._t).getUTCDate(); }
+  getUTCDay() { return new Date(this._t).getUTCDay(); }
   getTime() { return this._t; }
   setDate(n) {
     const l = new Date(this._t + TZ_OFFSET_MS);
@@ -297,6 +301,7 @@ class LocalPlus8Date {
   }
   toISOString() { return new Date(this._t).toISOString(); }
   static now() { return Date.now(); }
+  static UTC(...args) { return Date.UTC(...args); }
 }
 
 // ============ Fixture 生成（确定性、可复现）============
@@ -560,28 +565,10 @@ describe('静态校验：消费者迁移 & 降级通道约束', () => {
   });
 });
 
-describe('已知隐患：all-range(32-180天) week 分桶时区分歧（确定性验证）', () => {
-  test('LocalPlus8Date 模拟下，data-layer 本地周起点 != 服务端 UTC 周起点（根因确认）', () => {
-    // 直接比对两端周起点函数，证明分歧真实存在（非环境巧合）
-    const serverWS = (s) => serverGetWeekStart(s);
-    const localWS = (s) => {
-      const d = new LocalPlus8Date(s);
-      const day = d.getDay();
-      const mon = new LocalPlus8Date(d);
-      mon.setDate(d.getDate() - ((day + 6) % 7));
-      return mon.toISOString().slice(0, 10);
-    };
-    const samples = ['2026-07-01', '2026-07-06', '2026-01-01', '2026-12-31'];
-    let anyDiff = false;
-    for (const s of samples) {
-      if (serverWS(s) !== localWS(s)) anyDiff = true;
-    }
-    assert.strictEqual(anyDiff, true, '非 UTC(+8) 客户端下，本地周起点应不同于服务端 UTC 周起点');
-  });
-
-  test('all-range ~100天：week 分桶标签分歧，但 streak/ratings/totalPoints 不受时区影响（AC-2 仅图表序列受影响）', async () => {
+describe('时区对齐：all-range(32-180天) week 分桶 client/server 逐项一致（降级路径=T9 验收）', () => {
+  test('+8 本地 Date 注入下，data-layer 降级聚合 week 标签 == 服务端 UTC 聚合 week 标签（无 day 偏移）', async () => {
     const fixture = buildFixture(100, '2026-07-10'); // 32<=100<=180 -> week 粒度
-    // A：data-layer 真实代码，注入浏览器准确的 +8 本地 Date
+    // A：data-layer 真实代码（修复后 _getWeekStart/_formatWeekLabel 为 UTC 版），注入浏览器准确的 +8 本地 Date
     const ctxLocal = loadDataLayer({ cachedData: JSON.parse(JSON.stringify(fixture)) }, LocalPlus8Date);
     const A = ctxLocal.Data.computeStatsFromCachedData('all');
     // B：服务端 UTC 聚合 -> loadAdminStats 归一化
@@ -597,15 +584,37 @@ describe('已知隐患：all-range(32-180天) week 分桶时区分歧（确定�
     assert.deepStrictEqual(A.ratingsList, B.ratingsList, 'ratingsList 须一致');
     assert.strictEqual(A.totalPoints, B.totalPoints, 'totalPoints(逐日求和) 须一致——周分桶只重排不丢日');
 
-    // 2) week 分桶标签须分歧（风险确认）—— 用 JSON 字符串比较，避免依赖 assert.notDeepStrictEqual 是否可用
+    // 2) week 分桶标签逐项一致（修复后时区偏移消失）
     const aLabels = A.totalMinutes.map((x) => x.date);
     const bLabels = B.totalMinutes.map((x) => x.date);
-    const labelsIdentical = JSON.stringify(aLabels) === JSON.stringify(bLabels);
-    assert.strictEqual(labelsIdentical, false, '非 UTC 客户端下 week 分桶标签须出现分歧（已知隐患）');
+    assert.deepStrictEqual(aLabels, bLabels, '非 UTC 客户端下 week 分桶标签须与服务端逐项一致（修复后无 day 偏移）');
+    assert.deepStrictEqual(A.totalMinutes, B.totalMinutes, 'week 聚合 totalMinutes 序列须逐项一致');
+    assert.deepStrictEqual(A.efficiencyRatios, B.efficiencyRatios, 'week 聚合 efficiencyRatios 序列须逐项一致');
+    assert.deepStrictEqual(A.dailyPoints, B.dailyPoints, 'week 聚合 dailyPoints 序列须逐项一致');
+    assert.deepStrictEqual(A.completedInSchool, B.completedInSchool, 'week 聚合 completedInSchool 序列须逐项一致');
 
-    // 3) 结论性：聚合后数值总和守恒（逐日求和跨周分桶不变）
+    // 3) 聚合后数值总和守恒（逐日求和跨周分桶不变）
     const sumA = A.totalMinutes.reduce((s, x) => s + x.value, 0);
     const sumB = B.totalMinutes.reduce((s, x) => s + x.value, 0);
     assert.strictEqual(sumA, sumB, 'week 聚合的逐日总用时之和须守恒');
+  });
+
+  test('根因对照：旧本地时区周起点实现 != 服务端 UTC（历史根因文档化，正则已修复）', () => {
+    // 仅用于记录历史根因：旧实现用本地解析（new Date(str)）+ getDay + toISOString，
+    // 才会在 +8 浏览器下偏移 ≤1 天。修复后的 data-layer 已改用 UTC 口径，不再出现该分歧。
+    const serverWS = (s) => serverGetWeekStart(s);
+    const oldLocalWS = (s) => {
+      const d = new LocalPlus8Date(s);
+      const day = d.getDay();
+      const mon = new LocalPlus8Date(d);
+      mon.setDate(d.getDate() - ((day + 6) % 7));
+      return mon.toISOString().slice(0, 10);
+    };
+    const samples = ['2026-07-01', '2026-07-06', '2026-01-01', '2026-12-31'];
+    let anyDiff = false;
+    for (const s of samples) {
+      if (serverWS(s) !== oldLocalWS(s)) anyDiff = true;
+    }
+    assert.strictEqual(anyDiff, true, '旧本地实现仍会在 +8 下偏离服务端 UTC，证明根因确为本地时区');
   });
 });

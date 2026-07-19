@@ -487,8 +487,9 @@
   }
 
   // ========== 本地聚合（legacy 算法抽取，供 fallback + QA 回归基线） ==========
-  // 以下函数与服务端 buildStatsFromData 逐字节等价（已实测核对 handler-body.js），
-  // 仅 groupMode 的周起始用客户端本地时区（与现状一致）。
+  // 以下函数与服务端 buildStatsFromData 逐字节等价（已实测核对 handler-body.js）。
+  // 周分桶改用 UTC 口径（_getWeekStart/_formatWeekLabel），与服务端完全一致，
+  // 消除降级路径在 range='all' 且历史 32–180 天时因时区差导致的 ≤1 天周标签偏移。
 
   function _getGroupMode(dateCount, range) {
     if (range !== 'all') return 'day';
@@ -497,20 +498,29 @@
     return 'month';
   }
 
+  function _parseYmd(s) {
+    const parts = s.split('-');
+    return { y: +parts[0], m: +parts[1], d: +parts[2] };
+  }
+
   function _getWeekStart(dateStr) {
-    const d = new Date(dateStr);
-    const day = d.getDay();
-    const mon = new Date(d);
-    mon.setDate(d.getDate() - ((day + 6) % 7));
-    return mon.toISOString().slice(0, 10);
+    const { y, m, d } = _parseYmd(dateStr);
+    const base = new Date(Date.UTC(y, m - 1, d));
+    const day = base.getUTCDay();
+    const diffToMonday = (day + 6) % 7;
+    const monday = new Date(base.getTime() - diffToMonday * 864e5);
+    const yy = monday.getUTCFullYear();
+    const mm = String(monday.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(monday.getUTCDate()).padStart(2, '0');
+    return `${yy}-${mm}-${dd}`;
   }
 
   function _formatWeekLabel(key) {
-    const parts = key.split('-');
-    const d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
-    const end = new Date(d);
-    end.setDate(d.getDate() + 6);
-    return (d.getMonth() + 1) + '/' + d.getDate() + '-' + (end.getMonth() + 1) + '/' + end.getDate();
+    const { y, m, d } = _parseYmd(key);
+    const start = new Date(Date.UTC(y, m - 1, d));
+    const end = new Date(start.getTime() + 6 * 864e5);
+    const fmt = (dt) => `${dt.getUTCMonth() + 1}/${dt.getUTCDate()}`;
+    return `${fmt(start)}-${fmt(end)}`;
   }
 
   function _aggregateDaily(data, groupMode, mode) {
