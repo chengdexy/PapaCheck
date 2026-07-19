@@ -9,7 +9,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@cloudbase/node-sdk": "^4.0.3",
+    "@cloudbase/node-sdk": "3.1.0",
     "@fastify/cookie": "^9.4.0",
     "@fastify/rate-limit": "^9.1.0",
     "bcryptjs": "^3.0.3",

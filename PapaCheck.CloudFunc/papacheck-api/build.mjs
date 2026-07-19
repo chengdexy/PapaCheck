@@ -6,11 +6,31 @@ import { dirname, resolve } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// @cloudbase/node-sdk 的 utils/version.js 在模块加载时同步执行
+// loadPackage() = readFileSync(path.join(__dirname, '../../package.json'))。
+// esbuild bundle 后 __dirname 统一为 SCF 工作目录（/var/user），'../../package.json'
+// 解析到不存在的 '/package.json'，导致整个 node-sdk 模块加载抛 ENOENT。
+// 该 version 仅用于 HTTP 请求头 User-Agent / X-SDK-Version，无功能影响，
+// 因此用 onLoad 把 version.js 替换为硬编码版本，彻底绕过运行时文件读取。
+const tcbVersionShim = {
+  name: 'tcb-version-shim',
+  setup(build) {
+    build.onLoad(
+      { filter: /@cloudbase[\\/]node-sdk[\\/]dist[\\/]utils[\\/]version\.js$/ },
+      async () => ({
+        contents: '"use strict"; Object.defineProperty(exports, "__esModule", { value: true }); exports.version = "3.1.0";',
+        loader: 'js',
+      }),
+    );
+  },
+};
+
 const common = {
   bundle: true,
   platform: 'node',
   format: 'cjs',
   target: 'node20',
+  plugins: [tcbVersionShim],
   // 在 CJS 输出中 polyfill import.meta.url（module.filename 为 CJS 原生）
   banner: {
     js: 'const __import_meta_url = require("url").pathToFileURL(module.filename).href;',

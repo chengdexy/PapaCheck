@@ -836,7 +836,11 @@ async function startBountyTask(taskId) {
     }
     // 存在非 abandoned 状态的提交时阻止重复创建（abandoned 已在上面被复用处理）
     if (submissions.some(s => s.taskId === taskId && s.status !== 'abandoned')) return;
-    const newSubmission = { id: Util.genId(), taskId, status: 'doing', startedAt: new Date().toISOString(), submittedAt: null };
+    // dateKey 必须显式传入：后端 putBountySubmission 在缺 dateKey 时回退用
+    // new Date().toISOString().slice(0,10)（UTC 日期），与前端 Util.dateKey（本地日期）
+    // 在凌晨 0-8 点（GMT+8）不一致，导致 PUT 写入的 dateKey 与 GET 请求的 dateKey 错位，
+    // 轮询刷新时 GET 读不到刚 PUT 的记录，任务框"一闪而过"。
+    const newSubmission = { id: Util.genId(), taskId, dateKey, status: 'doing', startedAt: new Date().toISOString(), submittedAt: null };
     submissions.push(newSubmission);
     await API.putBountySubmission(newSubmission.id, newSubmission);
     if (!cachedData.bountySubmissions) cachedData.bountySubmissions = {};
