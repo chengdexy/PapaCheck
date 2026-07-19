@@ -495,8 +495,10 @@ async function saveAdminHw() {
     var dateKey = AdminUtil.dateKey(adminDate);
     await API.patchHomework(adminEditingId, { subject, content, suggestedDuration, basePoints }, dateKey);
   } else {
+    const dateKey = AdminUtil.dateKey(adminDate);
     const newHw = {
       id: Date.now().toString(36) + Math.random().toString(36).substring(2, 7),
+      dateKey,
       subject,
       content,
       mode: 'pending',
@@ -511,8 +513,6 @@ async function saveAdminHw() {
     adminHomeworks.push(newHw);
     // 新增作业：只 PUT 这一条
     await API.putHomework(newHw.id, newHw);
-
-    const dateKey = AdminUtil.dateKey(adminDate);
     // BUG FIX: 不再用空 {} 覆写 settlement，由 app.js 在作业完成时自动初始化
     try { await API.announce('收到新作业，请查看'); } catch (e) { /* 非致命 */ }
   }
@@ -1352,6 +1352,7 @@ async function _handleTimeFulfillment(redemption, durationMinutes) {
   const freeTime = await API.getFreeTime(dateKey);
   const newFt = {
     id: Date.now().toString(36) + Math.random().toString(36).substring(2, 7),
+    dateKey,
     name: redemption.itemName,
     durationMinutes,
     status: 'pending',
