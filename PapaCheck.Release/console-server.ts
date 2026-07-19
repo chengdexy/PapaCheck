@@ -2,14 +2,14 @@ import Fastify from 'fastify';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync, mkdirSync, writeFileSync } from 'fs';
-import { Executor } from './lib/executor.js';
+import { Executor, type StepDef } from './lib/executor.js';
 import { buildApk, readApkVersion } from './lib/build-apk.js';
-import { cloudPublish } from './lib/cloud-publish.js';
-import { sitePublish } from './lib/site-publish.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(__dirname, '..');
 const HTML_PATH = join(__dirname, 'console.html');
 const LOG_DIR = join(__dirname, 'log');
+const CLOUDBASE_ENV = 'child-teacher-parent-d9aef9d2208';
 
 export async function startServer(port = 3456) {
   const executor = new Executor();
@@ -38,8 +38,7 @@ export async function startServer(port = 3456) {
   app.get('/api/version', async () => ({ apk: readApkVersion() }));
 
   app.get('/api/release/env', async () => ({
-    PAPACHECK_CLOUD_IP: process.env.PAPACHECK_CLOUD_IP || null,
-    PAPACHECK_SSH_USER: process.env.PAPACHECK_SSH_USER || null,
+    CLOUDBASE_ENV_ID: CLOUDBASE_ENV,
   }));
 
   app.get('/api/release/history', async () => executor.history);
@@ -64,24 +63,57 @@ export async function startServer(port = 3456) {
 
   app.post('/api/release/build-apk', async (request) => {
     const body = request.body as any || {};
-    buildApk(executor, { ver: body.ver, bump: body.bump, noBump: body.noBump, publish: body.publish }).catch((err) => {
+    buildApk(executor, { ver: body.ver, bump: body.bump, noBump: body.noBump, publish: body.publish, publishOnBuild: body.publishOnBuild }).catch((err) => {
       console.error(err);
     });
     return { ok: true, message: '构建已启动' };
   });
 
-  app.post('/api/release/cloud', async () => {
-    cloudPublish(executor).catch((err) => {
-      console.error(err);
-    });
-    return { ok: true, message: '云同步已启动' };
+  app.post('/api/release/fn', async () => {
+    const steps: StepDef[] = [
+      { id: '1', desc: '编译云函数', cmd: 'npm run build', cwd: join(ROOT, 'PapaCheck.CloudFunc', 'papacheck-api'), shell: true, timeout: 120 },
+      { id: '2', desc: '部署云函数', cmd: `tcb fn deploy papacheck-api --env-id ${CLOUDBASE_ENV}`, cwd: join(ROOT, 'PapaCheck.CloudFunc', 'papacheck-api'), shell: true, timeout: 120 },
+    ];
+    executor.runAndReport('云函数部署', steps).catch((err) => console.error(err));
+    return { ok: true, message: '云函数部署已启动' };
   });
 
   app.post('/api/release/site', async () => {
-    sitePublish(executor).catch((err) => {
-      console.error(err);
-    });
+    const steps: StepDef[] = [
+      { id: '1', desc: '构建站点', cmd: 'npm run build', cwd: join(ROOT, 'PapaCheck.Site'), shell: true, timeout: 120 },
+      { id: '2', desc: '部署到 CloudBase', cmd: `tcb hosting deploy dist/ papacheck --env-id ${CLOUDBASE_ENV}`, cwd: join(ROOT, 'PapaCheck.Site'), shell: true, timeout: 120 },
+    ];
+    executor.runAndReport('Site 部署', steps).catch((err) => console.error(err));
     return { ok: true, message: 'Site 部署已启动' };
+  });
+
+  app.post('/api/release/web', async () => {
+    const steps: StepDef[] = [
+      { id: '1', desc: '清空远端旧文件', cmd: `tcb hosting delete papacheck/app --dir --env-id ${CLOUDBASE_ENV}`, cwd: join(ROOT, 'PapaCheck.Web'), shell: true, timeout: 30 },
+      { id: '2', desc: '部署 Web 前端到 CloudBase', cmd: `deploy.bat ${CLOUDBASE_ENV}`, cwd: join(ROOT, 'PapaCheck.Web'), shell: true, timeout: 120 },
+    ];
+    executor.runAndReport('Web 部署', steps).catch((err) => console.error(err));
+    return { ok: true, message: 'Web 部署已启动' };
+  });
+
+  app.post('/api/release/all', async () => {
+    (async () => {
+      const fnOk = await executor.runAndReport('云函数部署', [
+        { id: '1', desc: '编译云函数', cmd: 'npm run build', cwd: join(ROOT, 'PapaCheck.CloudFunc', 'papacheck-api'), shell: true, timeout: 120 },
+        { id: '2', desc: '部署云函数', cmd: `tcb fn deploy papacheck-api --env-id ${CLOUDBASE_ENV}`, cwd: join(ROOT, 'PapaCheck.CloudFunc', 'papacheck-api'), shell: true, timeout: 120 },
+      ]);
+      if (!fnOk) return;
+      const siteOk = await executor.runAndReport('Site 部署', [
+        { id: '1', desc: '构建站点', cmd: 'npm run build', cwd: join(ROOT, 'PapaCheck.Site'), shell: true, timeout: 120 },
+        { id: '2', desc: '部署到 CloudBase', cmd: `tcb hosting deploy dist/ papacheck --env-id ${CLOUDBASE_ENV}`, cwd: join(ROOT, 'PapaCheck.Site'), shell: true, timeout: 120 },
+      ]);
+      if (!siteOk) return;
+      await executor.runAndReport('Web 部署', [
+          { id: '1', desc: '清空远端旧文件', cmd: `tcb hosting delete papacheck/app --dir --env-id ${CLOUDBASE_ENV}`, cwd: join(ROOT, 'PapaCheck.Web'), shell: true, timeout: 30 },
+          { id: '2', desc: '部署 Web 前端到 CloudBase', cmd: `deploy.bat ${CLOUDBASE_ENV}`, cwd: join(ROOT, 'PapaCheck.Web'), shell: true, timeout: 120 },
+        ]);
+    })().catch((err) => console.error(err));
+    return { ok: true, message: '全部部署已启动' };
   });
 
   app.post('/api/release/save-log', async (request) => {

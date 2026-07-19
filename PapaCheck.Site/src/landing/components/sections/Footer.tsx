@@ -6,7 +6,7 @@ export default function Footer() {
       <div className="hero-container">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <img src="/imgs/favicon.png" alt="PapaCheck" className="w-8 h-8 rounded-lg" />
+            <img src={`${import.meta.env.BASE_URL}imgs/favicon.png`} alt="PapaCheck" className="w-8 h-8 rounded-lg" />
             <div>
               <div className="font-bold text-ink-900">PapaCheck</div>
               <div className="text-xs text-ink-500">爸~检查！让孩子主动写作业</div>
@@ -14,7 +14,7 @@ export default function Footer() {
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-ink-600">
-            <a href="/admin/" className="hover:text-brand-600 transition-colors">
+            <a href={`${import.meta.env.BASE_URL}admin/`} className="hover:text-brand-600 transition-colors">
               管理面板
             </a>
             <a
@@ -27,7 +27,7 @@ export default function Footer() {
               GitHub
             </a>
             <span className="text-ink-400">·</span>
-            <span className="text-ink-500">v3.0 · 100% 免费 · 离线可用</span>
+            <span className="text-ink-500">v1.6.6 · 100% 免费 · 云端同步</span>
           </div>
         </div>
 

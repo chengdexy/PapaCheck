@@ -21,14 +21,9 @@ let _startingBounty = false;
 let _submittingBounty = false;
 
 /**
- * 重连守卫：reconnecting 模式时禁止数据操作
- * 在数据变更 handler 的入口调用，确保转换期间用户无法修改数据
+ * 在线守卫：CloudBase 迁移后始终在线，保留接口兼容
  */
 function guardOnline() {
-  if (ConnectionManager.getMode() === 'reconnecting') {
-    showToast('网络正在恢复，请稍候…');
-    return false;
-  }
   return true;
 }
 
@@ -333,7 +328,7 @@ function renderBuffBar() {
   }
   buffBar.style.display = 'flex';
   buffBar.innerHTML = buffs.map(b => {
-    return `<span style="font-size:16px;font-weight:600;color:var(--accent);">✨ ${b.name}</span>`;
+    return `<span style="font-size:16px;font-weight:600;color:var(--accent);">✨ ${escapeHtml(b.name)}</span>`;
   }).join('');
 }
 

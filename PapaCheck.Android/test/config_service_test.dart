@@ -3,6 +3,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:papacheck/services/config_service.dart';
 
 void main() {
+  // Feature: ConfigService CloudBase 默认 URL
+  //   Scenario: 默认 URL 常量指向 CloudBase /papacheck/ 路径
+  //     Given 应用使用 CloudBase 后端
+  //     When 读取默认 URL 常量
+  //     Then defaultServerUrl 指向 /papacheck/app/
+  //     And defaultVersionUrl 指向 /papacheck/api/version
+  //     And defaultDownloadUrl 指向 /papacheck/api/download
+  test('默认 URL 常量指向 CloudBase /papacheck/ 路径', () {
+    expect(defaultServerUrl, equals('https://chengdexy.cn/papacheck/app/'));
+    expect(defaultVersionUrl, equals('https://chengdexy.cn/papacheck/api/version'));
+    expect(defaultDownloadUrl, equals('https://chengdexy.cn/papacheck/api/download'));
+  });
+
   // Feature: ConfigService 版本号存储
   //   Scenario: 存储版本号后能正确读取
   //     Given 应用已设置版本号 "1.2.9+35"

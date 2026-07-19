@@ -1,0 +1,17 @@
+{
+  "name": "papacheck-web",
+  "version": "1.5.2",
+  "description": "PapaCheck Web 前端（孩子端 + 管理端）",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@cloudbase/js-sdk": "^3.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0",
+    "jsdom": "^29.1.1"
+  }
+}

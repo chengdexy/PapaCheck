@@ -25,7 +25,7 @@ export default function SystemHealth() {
 
     const loadHealth = useCallback(async () => {
         try {
-            const data = await apiFetch<HealthData>('/api/ops/health');
+            const data = await apiFetch<HealthData>(`${import.meta.env.BASE_URL}api/ops/health`);
             setHealth(data);
         } catch {
             // Silent fail on poll
@@ -34,7 +34,7 @@ export default function SystemHealth() {
 
     const loadBackups = useCallback(async () => {
         try {
-            const data = await apiFetch<any[]>('/api/ops/backups');
+            const data = await apiFetch<any[]>(`${import.meta.env.BASE_URL}api/ops/backups`);
             setBackups(data);
         } catch { /* ignore */ }
     }, [apiFetch]);
@@ -48,7 +48,7 @@ export default function SystemHealth() {
 
     async function handleTriggerBackup() {
         try {
-            await apiFetch('/api/ops/backups/trigger', { method: 'POST' });
+            await apiFetch(`${import.meta.env.BASE_URL}api/ops/backups/trigger`, { method: 'POST' });
             showToast('success', '备份已触发');
             loadBackups();
         } catch {
@@ -59,7 +59,7 @@ export default function SystemHealth() {
     async function handleDownload(backupId: string, filename: string) {
         try {
             const token = localStorage.getItem('papacheck_admin_token');
-            const res = await fetch(`/api/ops/backups/${backupId}/download`, {
+            const res = await fetch(`${import.meta.env.BASE_URL}api/ops/backups/${backupId}/download`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 },
@@ -232,7 +232,7 @@ function ConfigModal({ onClose }: { onClose: () => void }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        apiFetch('/api/ops/config')
+        apiFetch(`${import.meta.env.BASE_URL}api/ops/config`)
             .then(setConfig)
             .catch(() => showToast('error', '加载配置失败'))
             .finally(() => setLoading(false));
@@ -240,7 +240,7 @@ function ConfigModal({ onClose }: { onClose: () => void }) {
 
     async function handleSave() {
         try {
-            await apiFetch('/api/ops/config', {
+            await apiFetch(`${import.meta.env.BASE_URL}api/ops/config`, {
                 method: 'PUT',
                 body: JSON.stringify(config),
             });
@@ -253,7 +253,7 @@ function ConfigModal({ onClose }: { onClose: () => void }) {
 
     async function handleTestEmail() {
         try {
-            await apiFetch('/api/ops/config/smtp/test', { method: 'POST' });
+            await apiFetch(`${import.meta.env.BASE_URL}api/ops/config/smtp/test`, { method: 'POST' });
             showToast('success', '测试邮件已发送');
         } catch {
             showToast('error', '发送测试邮件失败');

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
-import type { Pool as PoolType, QueryResult } from 'pg';
+import type { Pool as PoolType, QueryResult, PoolClient } from 'pg';
 import bcrypt from 'bcryptjs';
 import { DatabaseAdapter } from './adapter.js';
 import type { FullDataSnapshot, PointsHistoryEntry, ModifiedEntry, NotificationItem, TenantListItem, ChildrenRecord, AccessCodeRecord, CreateAccessCodeInput, AdminUser, BackupRecord, HealthRecord, AlertState, OpsConfig } from './types.js';
@@ -121,17 +121,20 @@ export class PostgresAdapter extends DatabaseAdapter {
   // ==================== Internal Helpers ====================
 
   private async _getJson(table: string, tenantId?: string, childId?: string, idValue: number = 1): Promise<any> {
+    // 快速失败：tenantId 缺失时禁止静默退化为全表查询，避免跨租户数据泄漏。
+    // 系统级 / 跨租户操作请使用不带 tenantId 的专用方法。
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
     let query: string;
     let params: any[];
     if (tenantId && childId) {
       query = `SELECT data FROM ${table} WHERE tenant_id = $1 AND child_id = $2 AND id = $3`;
       params = [tenantId, childId, idValue];
-    } else if (tenantId) {
+    } else {
+      // tenantId 已确保存在：此处为「仅租户、无 child」维度的查询
       query = `SELECT data FROM ${table} WHERE tenant_id = $1 AND id = $2`;
       params = [tenantId, idValue];
-    } else {
-      query = `SELECT data FROM ${table} WHERE id = $1`;
-      params = [idValue];
     }
     const result = await this.pool.query(query, params);
     if (result.rows.length === 0) return null;
@@ -142,6 +145,10 @@ export class PostgresAdapter extends DatabaseAdapter {
     // 使用 UPDATE + INSERT 策略，而非 INSERT ON CONFLICT DO UPDATE
     // 原因：多孩子迁移后 redemptions/reward_box/active_buffs/badges 的 PK 被替换为
     // 部分唯一索引 (WHERE child_id IS NULL)，INSERT ON CONFLICT 无法指定匹配的冲突目标
+    // 快速失败：tenantId 缺失时禁止静默退化为全表写入（多租户隔离）
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
     let setClause: string;
     let whereClause: string;
     let whereParams: any[];
@@ -157,20 +164,14 @@ export class PostgresAdapter extends DatabaseAdapter {
       insertCols = `(tenant_id, child_id, id, data)`;
       insertValues = `VALUES ($1, $2, $3, $4)`;
       insertParams = [tenantId, childId, idValue, jsonData];
-    } else if (tenantId) {
+    } else {
+      // tenantId 已确保存在：仅租户维度
       setClause = `UPDATE ${table} SET data = $1`;
       whereClause = `WHERE tenant_id = $2 AND id = $3`;
       whereParams = [jsonData, tenantId, idValue];
       insertCols = `(tenant_id, id, data)`;
       insertValues = `VALUES ($1, $2, $3)`;
       insertParams = [tenantId, idValue, jsonData];
-    } else {
-      setClause = `UPDATE ${table} SET data = $1`;
-      whereClause = `WHERE id = $2`;
-      whereParams = [jsonData, idValue];
-      insertCols = `(id, data)`;
-      insertValues = `VALUES ($1, $2)`;
-      insertParams = [idValue, jsonData];
     }
 
     const result = await this.pool.query(
@@ -187,17 +188,19 @@ export class PostgresAdapter extends DatabaseAdapter {
   }
 
   private async _getDateDataRaw(table: string, dateKey: string, tenantId?: string, childId?: string): Promise<any> {
+    // 快速失败：tenantId 缺失时禁止静默退化为全表查询（多租户隔离）
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
     let query: string;
     let params: any[];
     if (tenantId && childId) {
       query = `SELECT data FROM ${table} WHERE tenant_id = $1 AND child_id = $2 AND date_key = $3`;
       params = [tenantId, childId, dateKey];
-    } else if (tenantId) {
+    } else {
+      // tenantId 已确保存在：仅租户维度
       query = `SELECT data FROM ${table} WHERE tenant_id = $1 AND date_key = $2`;
       params = [tenantId, dateKey];
-    } else {
-      query = `SELECT data FROM ${table} WHERE date_key = $1`;
-      params = [dateKey];
     }
     const result = await this.pool.query(query, params);
     if (result.rows.length === 0) return undefined;
@@ -214,19 +217,77 @@ export class PostgresAdapter extends DatabaseAdapter {
   }
 
   private async _setDateData(table: string, dateKey: string, data: any, tenantId?: string, childId?: string): Promise<void> {
+    // 快速失败：tenantId 缺失时禁止写入无租户归属的数据行，避免跨租户数据污染。
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
     let query: string;
     let params: any[];
     if (tenantId && childId) {
       query = `INSERT INTO ${table} (tenant_id, child_id, date_key, data) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, child_id, date_key) DO UPDATE SET data = $4`;
       params = [tenantId, childId, dateKey, JSON.stringify(data)];
-    } else if (tenantId) {
+    } else {
+      // tenantId 已确保存在：此处为「仅租户、无 child」维度的写入
       query = `INSERT INTO ${table} (tenant_id, date_key, data) VALUES ($1, $2, $3) ON CONFLICT (tenant_id, date_key) WHERE child_id IS NULL DO UPDATE SET data = $3`;
       params = [tenantId, dateKey, JSON.stringify(data)];
-    } else {
-      query = `INSERT INTO ${table} (date_key, data) VALUES ($1, $2) ON CONFLICT (date_key) DO UPDATE SET data = $2`;
-      params = [dateKey, JSON.stringify(data)];
     }
     await this.pool.query(query, params);
+  }
+
+  /**
+   * 系统级存活探测（ops/监控使用）。不要求 tenantId，永不因缺 tenantId 而抛错。
+   * 区别于租户级读写方法：仅用于健康检查时判断 Postgres 是否可达。
+   */
+  async ping(): Promise<void> {
+    await this.pool.query('SELECT 1');
+  }
+
+  /**
+   * 在单连接事务中执行回调（BEGIN / COMMIT / ROLLBACK 自动管理）。
+   * 供需要「行锁 + 原子读写」的场景复用（如 defer-homework approve）。
+   */
+  async withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await fn(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {
+        /* 回滚失败不影响已抛出的原错误 */
+      });
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /** 计算下一天（YYYY-MM-DD），校验输入格式 */
+  private _getTomorrow(dateStr: string): string {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      throw new Error(`无效的日期格式: ${dateStr}`);
+    }
+    const d = new Date(dateStr + 'T00:00:00Z');
+    if (isNaN(d.getTime())) {
+      throw new Error(`无效的日期: ${dateStr}`);
+    }
+    d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  /** 在指定连接（事务内）上记录变更戳，保证与业务写入原子提交 */
+  private async _recordModificationOnClient(
+    client: PoolClient,
+    tableName: string,
+    recordKey: string,
+    timestamp: string,
+    tenantId: string,
+  ): Promise<void> {
+    await client.query(
+      'INSERT INTO last_modified (tenant_id, table_name, record_key, last_modified) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, table_name, record_key) DO UPDATE SET last_modified = $4',
+      [tenantId, tableName, recordKey, timestamp],
+    );
   }
 
   private async _resetDailyShopQuantity(tenantId?: string): Promise<void> {
@@ -283,17 +344,19 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   /** 在 date_key 表中按 id 查找记录（跨所有 date_key 搜索） */
   async _findRecordById(table: string, id: string, tenantId?: string, childId?: string): Promise<{ dateKey: string; index: number; item: any } | null> {
+    // 快速失败：tenantId 缺失时禁止静默退化为全表扫描（多租户隔离）
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
     let query: string;
     let params: any[];
     if (tenantId && childId) {
       query = `SELECT date_key, data FROM ${table} WHERE tenant_id = $1 AND child_id = $2`;
       params = [tenantId, childId];
-    } else if (tenantId) {
+    } else {
+      // tenantId 已确保存在：仅租户维度
       query = `SELECT date_key, data FROM ${table} WHERE tenant_id = $1`;
       params = [tenantId];
-    } else {
-      query = `SELECT date_key, data FROM ${table}`;
-      params = [];
     }
     const result = await this.pool.query(query, params);
     for (const row of result.rows) {
@@ -310,6 +373,10 @@ export class PostgresAdapter extends DatabaseAdapter {
   // ==================== Full Data ====================
 
   async getFullData(tenantId?: string, childId?: string): Promise<FullDataSnapshot> {
+    // 快速失败：全量快照为租户级操作，缺失 tenantId 时禁止静默退化为跨租户读取
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
     await this._resetDailyShopQuantity(tenantId);
 
     let pointsQuery: string;
@@ -492,6 +559,10 @@ export class PostgresAdapter extends DatabaseAdapter {
   }
 
   async importFullData(data: FullDataSnapshot, tenantId?: string, childId?: string): Promise<void> {
+    // 快速失败：tenantId 缺失时禁止落库，避免跨租户清空/写入共享行（如 DELETE FROM points_history 无 WHERE）。
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
     const points = data.points ?? {};
     const balance = typeof points === 'number' ? points : (points.balance ?? 0);
 
@@ -501,9 +572,6 @@ export class PostgresAdapter extends DatabaseAdapter {
     } else if (tenantId) {
       await this.pool.query("UPDATE points SET balance = $1 WHERE tenant_id = $2 AND id = 1", [balance, tenantId]);
       await this.pool.query("DELETE FROM points_history WHERE tenant_id = $1", [tenantId]);
-    } else {
-      await this.pool.query("UPDATE points SET balance = $1 WHERE id = 1", [balance]);
-      await this.pool.query("DELETE FROM points_history");
     }
 
     const history = (typeof points === 'object' && points.history) ? points.history : [];
@@ -513,15 +581,10 @@ export class PostgresAdapter extends DatabaseAdapter {
           "INSERT INTO points_history (tenant_id, child_id, date, earned, spent, balance, detail) VALUES ($1, $2, $3, $4, $5, $6, $7)",
           [tenantId, childId, h.date ?? '', h.earned ?? 0, h.spent ?? 0, h.balance ?? 0, h.detail ?? '']
         );
-      } else if (tenantId) {
+      } else {
         await this.pool.query(
           "INSERT INTO points_history (tenant_id, date, earned, spent, balance, detail) VALUES ($1, $2, $3, $4, $5, $6)",
           [tenantId, h.date ?? '', h.earned ?? 0, h.spent ?? 0, h.balance ?? 0, h.detail ?? '']
-        );
-      } else {
-        await this.pool.query(
-          "INSERT INTO points_history (date, earned, spent, balance, detail) VALUES ($1, $2, $3, $4, $5)",
-          [h.date ?? '', h.earned ?? 0, h.spent ?? 0, h.balance ?? 0, h.detail ?? '']
         );
       }
     }
@@ -544,8 +607,6 @@ export class PostgresAdapter extends DatabaseAdapter {
         await this.pool.query(`DELETE FROM ${table} WHERE tenant_id = $1 AND child_id = $2`, [tenantId, childId]);
       } else if (tenantId) {
         await this.pool.query(`DELETE FROM ${table} WHERE tenant_id = $1`, [tenantId]);
-      } else {
-        await this.pool.query(`DELETE FROM ${table}`);
       }
       for (const [dk, v] of Object.entries(source)) {
         if (tenantId && childId) {
@@ -557,11 +618,6 @@ export class PostgresAdapter extends DatabaseAdapter {
           await this.pool.query(
             `INSERT INTO ${table} (tenant_id, date_key, data) VALUES ($1, $2, $3) ON CONFLICT (tenant_id, date_key) WHERE child_id IS NULL DO UPDATE SET data = $3`,
             [tenantId, dk, JSON.stringify(v)]
-          );
-        } else {
-          await this.pool.query(
-            `INSERT INTO ${table} (date_key, data) VALUES ($1, $2) ON CONFLICT (date_key) DO UPDATE SET data = $2`,
-            [dk, JSON.stringify(v)]
           );
         }
       }
@@ -579,40 +635,30 @@ export class PostgresAdapter extends DatabaseAdapter {
   // ==================== Notifications ====================
 
   async addNotification(text: string, createdAt?: number, tenantId?: string): Promise<string> {
+    // 快速失败：通知必须归属到具体租户，禁止落入哨兵 UUID 的共享桶。
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
     const id = crypto.randomUUID();
     const now = createdAt ?? Date.now();
-    if (tenantId) {
-      await this.pool.query(
-        'INSERT INTO notifications (tenant_id, id, text, created_at) VALUES ($1, $2, $3, $4)',
-        [tenantId, id, text, now]
-      );
-    } else {
-      await this.pool.query(
-        'INSERT INTO notifications (tenant_id, id, text, created_at) VALUES ($1, $2, $3, $4)',
-        ['00000000-0000-0000-0000-000000000000', id, text, now]
-      );
-    }
+    await this.pool.query(
+      'INSERT INTO notifications (tenant_id, id, text, created_at) VALUES ($1, $2, $3, $4)',
+      [tenantId, id, text, now]
+    );
     return id;
   }
 
   async getPendingNotifications(tenantId?: string): Promise<NotificationItem[]> {
+    // 快速失败：禁止跨全部租户清理/读取通知。
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
     const cutoff = Date.now() - 3600000;
-    // 先清理过期通知
-    if (tenantId) {
-      await this.pool.query('DELETE FROM notifications WHERE tenant_id = $1 AND created_at < $2', [tenantId, cutoff]);
-    } else {
-      await this.pool.query('DELETE FROM notifications WHERE created_at < $1', [cutoff]);
-    }
+    // 先清理过期通知（限定租户）
+    await this.pool.query('DELETE FROM notifications WHERE tenant_id = $1 AND created_at < $2', [tenantId, cutoff]);
 
-    let query: string;
-    let params: any[];
-    if (tenantId) {
-      query = 'SELECT id, text, created_at FROM notifications WHERE tenant_id = $1 AND created_at >= $2 ORDER BY created_at ASC';
-      params = [tenantId, cutoff];
-    } else {
-      query = 'SELECT id, text, created_at FROM notifications WHERE created_at >= $1 ORDER BY created_at ASC';
-      params = [cutoff];
-    }
+    const query = 'SELECT id, text, created_at FROM notifications WHERE tenant_id = $1 AND created_at >= $2 ORDER BY created_at ASC';
+    const params = [tenantId, cutoff];
     const result = await this.pool.query(query, params);
 
     return result.rows.map(row => ({
@@ -623,56 +669,57 @@ export class PostgresAdapter extends DatabaseAdapter {
   }
 
   async consumeNotifications(ids: string[], tenantId?: string): Promise<void> {
+    // 快速失败：禁止跨全部租户删除通知。
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
     if (ids.length === 0) return;
     const BATCH_SIZE = 500;
     for (let i = 0; i < ids.length; i += BATCH_SIZE) {
       const batch = ids.slice(i, i + BATCH_SIZE);
-      const placeholders = batch.map((_, idx) => `$${idx + 1 + (tenantId ? 1 : 0)}`).join(',');
-      if (tenantId) {
-        await this.pool.query(
-          `DELETE FROM notifications WHERE tenant_id = $1 AND id IN (${placeholders})`,
-          [tenantId, ...batch]
-        );
-      } else {
-        await this.pool.query(
-          `DELETE FROM notifications WHERE id IN (${placeholders})`,
-          batch
-        );
-      }
+      const placeholders = batch.map((_, idx) => `$${idx + 2}`).join(',');
+      await this.pool.query(
+        `DELETE FROM notifications WHERE tenant_id = $1 AND id IN (${placeholders})`,
+        [tenantId, ...batch]
+      );
     }
   }
 
   // ==================== Points ====================
 
   async getPointsBalance(tenantId?: string, childId?: string): Promise<number> {
+    // 快速失败：禁止读取共享 id=1 积分行（跨租户积分泄漏）。
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
     let query: string;
     let params: any[];
     if (tenantId && childId) {
       query = "SELECT balance FROM points WHERE tenant_id = $1 AND child_id = $2 AND id = 1";
       params = [tenantId, childId];
-    } else if (tenantId) {
+    } else {
+      // tenantId 已确保存在：仅租户维度的积分查询
       query = "SELECT balance FROM points WHERE tenant_id = $1 AND id = 1";
       params = [tenantId];
-    } else {
-      query = "SELECT balance FROM points WHERE id = 1";
-      params = [];
     }
     const result = await this.pool.query(query, params);
     return result.rows[0]?.balance ?? 0;
   }
 
   async updatePoints(action: 'earn' | 'spend', amount: number, detail: string, tenantId?: string, childId?: string): Promise<number> {
+    // 快速失败：禁止读写共享 id=1 积分行（跨租户积分泄漏/篡改）。
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
     let query: string;
     let params: any[];
     if (tenantId && childId) {
       query = "SELECT balance FROM points WHERE tenant_id = $1 AND child_id = $2 AND id = 1";
       params = [tenantId, childId];
-    } else if (tenantId) {
+    } else {
+      // tenantId 已确保存在：仅租户维度的积分查询
       query = "SELECT balance FROM points WHERE tenant_id = $1 AND id = 1";
       params = [tenantId];
-    } else {
-      query = "SELECT balance FROM points WHERE id = 1";
-      params = [];
     }
     const result = await this.pool.query(query, params);
     let balance = result.rows[0]?.balance ?? 0;
@@ -690,19 +737,13 @@ export class PostgresAdapter extends DatabaseAdapter {
         "INSERT INTO points_history (tenant_id, child_id, date, earned, spent, balance, detail) VALUES ($1, $2, $3, $4, $5, $6, $7)",
         [tenantId, childId, today, action === 'earn' ? amount : 0, action === 'spend' ? amount : 0, balance, detail]
       );
-    } else if (tenantId) {
+    } else {
+      // tenantId 已确保存在：仅租户维度的写入
       await this.pool.query("UPDATE points SET balance = $1 WHERE tenant_id = $2 AND id = 1", [balance, tenantId]);
       const today = new Date().toISOString().slice(0, 10);
       await this.pool.query(
         "INSERT INTO points_history (tenant_id, date, earned, spent, balance, detail) VALUES ($1, $2, $3, $4, $5, $6)",
         [tenantId, today, action === 'earn' ? amount : 0, action === 'spend' ? amount : 0, balance, detail]
-      );
-    } else {
-      await this.pool.query("UPDATE points SET balance = $1 WHERE id = 1", [balance]);
-      const today = new Date().toISOString().slice(0, 10);
-      await this.pool.query(
-        "INSERT INTO points_history (date, earned, spent, balance, detail) VALUES ($1, $2, $3, $4, $5)",
-        [today, action === 'earn' ? amount : 0, action === 'spend' ? amount : 0, balance, detail]
       );
     }
 
@@ -710,17 +751,19 @@ export class PostgresAdapter extends DatabaseAdapter {
   }
 
   async patchPoints(delta: { earn?: number; spend?: number; detail?: string }, tenantId?: string, childId?: string): Promise<number> {
+    // 快速失败：禁止读写共享 id=1 积分行（跨租户积分泄漏/篡改）。
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
     let query: string;
     let params: any[];
     if (tenantId && childId) {
       query = "SELECT balance FROM points WHERE tenant_id = $1 AND child_id = $2 AND id = 1";
       params = [tenantId, childId];
-    } else if (tenantId) {
+    } else {
+      // tenantId 已确保存在：仅租户维度的积分查询
       query = "SELECT balance FROM points WHERE tenant_id = $1 AND id = 1";
       params = [tenantId];
-    } else {
-      query = "SELECT balance FROM points WHERE id = 1";
-      params = [];
     }
     const result = await this.pool.query(query, params);
     let balance = result.rows[0]?.balance ?? 0;
@@ -737,7 +780,8 @@ export class PostgresAdapter extends DatabaseAdapter {
         [tenantId, childId, today, earned, spent, balance, delta.detail ?? '']
       );
       await this.recordModification('points', '1', new Date().toISOString(), tenantId);
-    } else if (tenantId) {
+    } else {
+      // tenantId 已确保存在：仅租户维度的写入
       await this.pool.query("UPDATE points SET balance = $1 WHERE tenant_id = $2 AND id = 1", [balance, tenantId]);
       const today = new Date().toISOString().slice(0, 10);
       await this.pool.query(
@@ -745,14 +789,6 @@ export class PostgresAdapter extends DatabaseAdapter {
         [tenantId, today, earned, spent, balance, delta.detail ?? '']
       );
       await this.recordModification('points', '1', new Date().toISOString(), tenantId);
-    } else {
-      await this.pool.query("UPDATE points SET balance = $1 WHERE id = 1", [balance]);
-      const today = new Date().toISOString().slice(0, 10);
-      await this.pool.query(
-        "INSERT INTO points_history (date, earned, spent, balance, detail) VALUES ($1, $2, $3, $4, $5)",
-        [today, earned, spent, balance, delta.detail ?? '']
-      );
-      await this.recordModification('points', '1', new Date().toISOString());
     }
 
     return balance;
@@ -788,6 +824,79 @@ export class PostgresAdapter extends DatabaseAdapter {
     await this.recordModification('homeworks', toDate, now, tenantId);
 
     return hw;
+  }
+
+  /**
+   * 原子地批准「延后作业」：将指定作业从 date 移动到次日（approve 路径）。
+   *
+   * 并发安全：在单连接事务内，对当天行与次日行分别执行
+   * `SELECT ... FOR UPDATE` 行锁，使涉及同一 (tenant, child, date) 乃至
+   * (tenant, child, tomorrow) 的并发写串行化，消除原本 read-modify-write
+   * 的 TOCTOU 竞态（后写覆盖先写 / deferRequest 丢失）。
+   *
+   * 适用范围与已知限制（技术债，勿假装已彻底解决）：
+   *   - 仅 Postgres 语义有效；当前 createDatabase 仅返回 PostgresAdapter（无 SQLite 分支），
+   *     故生产路径下由数据库行锁保证跨连接/多实例互斥。
+   *   - 若未来引入 SQLite 兼容模式，行锁不可用，须改用进程内 Mutex 或统一事务层。
+   */
+  async approveDeferHomework(
+    date: string,
+    hwId: string,
+    tenantId?: string,
+    childId?: string,
+  ): Promise<{ ok: boolean; homework?: any }> {
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
+    const tomorrow = this._getTomorrow(date);
+
+    return this.withTransaction(async (client) => {
+      const hasChild = Boolean(tenantId && childId);
+
+      // 确保 source 与 target 两行均存在，以便都能被行锁锁定。
+      // （次日行可能尚不存在；先以空数组 upsert，再 SELECT ... FOR UPDATE 锁住。）
+      const ensureSql = hasChild
+        ? `INSERT INTO homeworks (tenant_id, child_id, date_key, data) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, child_id, date_key) DO NOTHING`
+        : `INSERT INTO homeworks (tenant_id, date_key, data) VALUES ($1, $2, $3) ON CONFLICT (tenant_id, date_key) WHERE child_id IS NULL DO NOTHING`;
+      await client.query(ensureSql, hasChild ? [tenantId, childId, date, '[]'] : [tenantId, date, '[]']);
+      await client.query(ensureSql, hasChild ? [tenantId, childId, tomorrow, '[]'] : [tenantId, tomorrow, '[]']);
+
+      // 行锁：锁住当天与次日两行，事务提交前其它事务对同一行只能等待。
+      const lockSql = hasChild
+        ? `SELECT data FROM homeworks WHERE tenant_id = $1 AND child_id = $2 AND date_key = $3 FOR UPDATE`
+        : `SELECT data FROM homeworks WHERE tenant_id = $1 AND date_key = $2 FOR UPDATE`;
+      const srcParams = hasChild ? [tenantId, childId, date] : [tenantId, date];
+      const tgtParams = hasChild ? [tenantId, childId, tomorrow] : [tenantId, tomorrow];
+
+      const srcRes = await client.query(lockSql, srcParams);
+      const srcList: any[] = srcRes.rows.length > 0 ? this._safeJsonParse(srcRes.rows[0].data) ?? [] : [];
+      const tgtRes = await client.query(lockSql, tgtParams);
+      const tgtList: any[] = tgtRes.rows.length > 0 ? this._safeJsonParse(tgtRes.rows[0].data) ?? [] : [];
+
+      // 取 → 改 → 存
+      const idx = srcList.findIndex((h: any) => h.id === hwId);
+      if (idx === -1) {
+        return { ok: false };
+      }
+      const [hw] = srcList.splice(idx, 1);
+      delete hw.deferRequest;
+      hw.status = 'pending';
+      hw.date = tomorrow;
+      tgtList.push(hw);
+
+      const setSql = hasChild
+        ? `INSERT INTO homeworks (tenant_id, child_id, date_key, data) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, child_id, date_key) DO UPDATE SET data = $4`
+        : `INSERT INTO homeworks (tenant_id, date_key, data) VALUES ($1, $2, $3) ON CONFLICT (tenant_id, date_key) WHERE child_id IS NULL DO UPDATE SET data = $3`;
+      await client.query(setSql, hasChild ? [tenantId, childId, date, JSON.stringify(srcList)] : [tenantId, date, JSON.stringify(srcList)]);
+      await client.query(setSql, hasChild ? [tenantId, childId, tomorrow, JSON.stringify(tgtList)] : [tenantId, tomorrow, JSON.stringify(tgtList)]);
+
+      // 记录变更戳（与 saveHomeworks 行为一致），在事务内完成以保证原子性
+      const now = new Date().toISOString();
+      await this._recordModificationOnClient(client, 'homeworks', date, now, tenantId);
+      await this._recordModificationOnClient(client, 'homeworks', tomorrow, now, tenantId);
+
+      return { ok: true, homework: hw };
+    });
   }
 
   async getHomeworkById(id: string, tenantId?: string, childId?: string): Promise<any | null> {
@@ -1218,18 +1327,14 @@ export class PostgresAdapter extends DatabaseAdapter {
   // ==================== Sync ====================
 
   async getModifiedSince(timestamp: string, tenantId?: string, childId?: string): Promise<ModifiedEntry[]> {
-    let result: QueryResult;
-    if (tenantId) {
-      result = await this.pool.query(
-        'SELECT table_name, record_key, last_modified FROM last_modified WHERE tenant_id = $1 AND last_modified > $2',
-        [tenantId, timestamp]
-      );
-    } else {
-      result = await this.pool.query(
-        'SELECT table_name, record_key, last_modified FROM last_modified WHERE last_modified > $1',
-        [timestamp]
-      );
+    // 快速失败：增量同步为租户级操作，缺失 tenantId 时禁止静默退化为跨租户扫描
+    if (!tenantId) {
+      throw new Error('tenantId required');
     }
+    const result = await this.pool.query(
+      'SELECT table_name, record_key, last_modified FROM last_modified WHERE tenant_id = $1 AND last_modified > $2',
+      [tenantId, timestamp]
+    );
 
     const rows: ModifiedEntry[] = [];
 
@@ -1241,10 +1346,8 @@ export class PostgresAdapter extends DatabaseAdapter {
         let pointsResult: QueryResult;
         if (tenantId && childId) {
           pointsResult = await this.pool.query("SELECT balance FROM points WHERE tenant_id = $1 AND child_id = $2 AND id = 1", [tenantId, childId]);
-        } else if (tenantId) {
-          pointsResult = await this.pool.query("SELECT balance FROM points WHERE tenant_id = $1 AND id = 1", [tenantId]);
         } else {
-          pointsResult = await this.pool.query("SELECT balance FROM points WHERE id = 1");
+          pointsResult = await this.pool.query("SELECT balance FROM points WHERE tenant_id = $1 AND id = 1", [tenantId]);
         }
         if (pointsResult.rows.length > 0) {
           rows.push({
@@ -1280,7 +1383,30 @@ export class PostgresAdapter extends DatabaseAdapter {
     return rows;
   }
 
+  /**
+   * 轻量数据版本戳：MAX(last_modified) 捕获更新，COUNT(*) 捕获新增行。
+   * 两者组合可靠地反映租户维度是否有任何数据变更，仅返回几十字节。
+   * last_modified 表无 child_id 列，故版本戳为租户级（与 getModifiedSince 的粗粒度一致）。
+   */
+  async getDataVersion(tenantId?: string): Promise<string | null> {
+    // 快速失败：数据版本戳为租户级操作，缺失 tenantId 时禁止静默退化为跨租户聚合
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
+    const result = await this.pool.query(
+      'SELECT MAX(last_modified) AS max_ts, COUNT(*)::int AS n FROM last_modified WHERE tenant_id = $1',
+      [tenantId]
+    );
+    const row = result.rows[0];
+    if (!row || !row.n) return null;
+    return `${row.max_ts}|${row.n}`;
+  }
+
   async pushMerge(changes: any[], tenantId?: string, childId?: string): Promise<{ ok: boolean }> {
+    // 快速失败：增量合并为租户级写入，缺失 tenantId 时禁止静默退化为跨租户写入
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
     for (const change of changes) {
       const changeType = change.type as string;
       const uuid = change.uuid as string;
@@ -1300,10 +1426,8 @@ export class PostgresAdapter extends DatabaseAdapter {
         const newBalance = data.balance ?? 0;
         if (tenantId && effectiveChildId) {
           await this.pool.query("UPDATE points SET balance = $1 WHERE tenant_id = $2 AND child_id = $3 AND id = 1", [newBalance, tenantId, effectiveChildId]);
-        } else if (tenantId) {
-          await this.pool.query("UPDATE points SET balance = $1 WHERE tenant_id = $2 AND id = 1", [newBalance, tenantId]);
         } else {
-          await this.pool.query("UPDATE points SET balance = $1 WHERE id = 1", [newBalance]);
+          await this.pool.query("UPDATE points SET balance = $1 WHERE tenant_id = $2 AND id = 1", [newBalance, tenantId]);
         }
         await this.recordModification('points', '1', timestamp, tenantId);
         continue;
@@ -1405,43 +1529,37 @@ export class PostgresAdapter extends DatabaseAdapter {
   // ==================== Sync ====================
 
   async recordModification(tableName: string, recordKey: string, timestamp: string, tenantId?: string): Promise<void> {
-    if (tenantId) {
-      await this.pool.query(
-        'INSERT INTO last_modified (tenant_id, table_name, record_key, last_modified) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, table_name, record_key) DO UPDATE SET last_modified = $4',
-        [tenantId, tableName, recordKey, timestamp]
-      );
-    } else {
-      await this.pool.query(
-        'INSERT INTO last_modified (table_name, record_key, last_modified) VALUES ($1, $2, $3) ON CONFLICT (table_name, record_key) DO UPDATE SET last_modified = $3',
-        [tableName, recordKey, timestamp]
-      );
+    // 快速失败：变更追踪为租户级写入，缺失 tenantId 时禁止写入无租户归属的 last_modified 行
+    if (!tenantId) {
+      throw new Error('tenantId required');
     }
+    await this.pool.query(
+      'INSERT INTO last_modified (tenant_id, table_name, record_key, last_modified) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, table_name, record_key) DO UPDATE SET last_modified = $4',
+      [tenantId, tableName, recordKey, timestamp]
+    );
   }
 
   // ==================== Misc ====================
 
   async resetDate(dateKey: string, tenantId?: string, childId?: string): Promise<void> {
-    if (tenantId && childId) {
+    // 快速失败：按租户重置日期数据为租户级操作，缺失 tenantId 时禁止静默退化为跨租户清空
+    if (!tenantId) {
+      throw new Error('tenantId required');
+    }
+    if (childId) {
       await this.pool.query("DELETE FROM homeworks WHERE tenant_id = $1 AND child_id = $2 AND date_key = $3", [tenantId, childId, dateKey]);
       await this.pool.query("DELETE FROM daily_settlement WHERE tenant_id = $1 AND child_id = $2 AND date_key = $3", [tenantId, childId, dateKey]);
       await this.pool.query("DELETE FROM efficiency_history WHERE tenant_id = $1 AND child_id = $2 AND date_key = $3", [tenantId, childId, dateKey]);
       await this.pool.query("DELETE FROM free_time_tasks WHERE tenant_id = $1 AND child_id = $2 AND date_key = $3", [tenantId, childId, dateKey]);
       await this.pool.query("DELETE FROM bounty_submissions WHERE tenant_id = $1 AND child_id = $2 AND date_key = $3", [tenantId, childId, dateKey]);
       await this.pool.query("DELETE FROM bounty_completions WHERE tenant_id = $1 AND child_id = $2 AND date_key = $3", [tenantId, childId, dateKey]);
-    } else if (tenantId) {
+    } else {
       await this.pool.query("DELETE FROM homeworks WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
       await this.pool.query("DELETE FROM daily_settlement WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
       await this.pool.query("DELETE FROM efficiency_history WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
       await this.pool.query("DELETE FROM free_time_tasks WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
       await this.pool.query("DELETE FROM bounty_submissions WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
       await this.pool.query("DELETE FROM bounty_completions WHERE tenant_id = $1 AND date_key = $2", [tenantId, dateKey]);
-    } else {
-      await this.pool.query("DELETE FROM homeworks WHERE date_key = $1", [dateKey]);
-      await this.pool.query("DELETE FROM daily_settlement WHERE date_key = $1", [dateKey]);
-      await this.pool.query("DELETE FROM efficiency_history WHERE date_key = $1", [dateKey]);
-      await this.pool.query("DELETE FROM free_time_tasks WHERE date_key = $1", [dateKey]);
-      await this.pool.query("DELETE FROM bounty_submissions WHERE date_key = $1", [dateKey]);
-      await this.pool.query("DELETE FROM bounty_completions WHERE date_key = $1", [dateKey]);
     }
 
     // 清理与当日相关的 active_buffs
@@ -1457,51 +1575,37 @@ export class PostgresAdapter extends DatabaseAdapter {
       await this._setJson('active_buffs', filteredBuffs, tenantId, childId);
     }
 
-    if (tenantId) {
-      await this.pool.query("DELETE FROM meta WHERE tenant_id = $1 AND key = 'last_shop_reset'", [tenantId]);
-    } else {
-      await this.pool.query("DELETE FROM meta WHERE tenant_id IS NULL AND key = 'last_shop_reset'");
-    }
+    // tenantId 已确保存在：仅清理该租户的 last_shop_reset 标记
+    await this.pool.query("DELETE FROM meta WHERE tenant_id = $1 AND key = 'last_shop_reset'", [tenantId]);
   }
 
   // ==================== CRDT Operations ====================
 
   async hasCRDTOperation(id: string, tenantId?: string): Promise<boolean> {
-    if (tenantId) {
-      const result = await this.pool.query(
-        'SELECT 1 FROM crdt_operations WHERE tenant_id = $1 AND id = $2',
-        [tenantId, id]
-      );
-      return result.rows.length > 0;
-    } else {
-      const result = await this.pool.query(
-        'SELECT 1 FROM crdt_operations WHERE id = $1',
-        [id]
-      );
-      return result.rows.length > 0;
+    // 快速失败：CRDT 操作为租户级，缺失 tenantId 时禁止静默退化为跨租户查询
+    if (!tenantId) {
+      throw new Error('tenantId required');
     }
+    const result = await this.pool.query(
+      'SELECT 1 FROM crdt_operations WHERE tenant_id = $1 AND id = $2',
+      [tenantId, id]
+    );
+    return result.rows.length > 0;
   }
 
   async saveCRDTOperation(op: CRDTOperation, tenantId?: string): Promise<void> {
-    if (tenantId) {
-      await this.pool.query(
-        `INSERT INTO crdt_operations (tenant_id, id, type, table_name, resource_id, field, value, timestamp, node_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-         ON CONFLICT (tenant_id, id) DO UPDATE SET
-           type = $3, table_name = $4, resource_id = $5, field = $6,
-           value = $7, timestamp = $8, node_id = $9`,
-        [tenantId, op.id, op.type, op.table, op.resourceId, op.field, JSON.stringify(op.value), op.timestamp, op.nodeId]
-      );
-    } else {
-      await this.pool.query(
-        `INSERT INTO crdt_operations (id, type, table_name, resource_id, field, value, timestamp, node_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         ON CONFLICT (id) DO UPDATE SET
-           type = $2, table_name = $3, resource_id = $4, field = $5,
-           value = $6, timestamp = $7, node_id = $8`,
-        [op.id, op.type, op.table, op.resourceId, op.field, JSON.stringify(op.value), op.timestamp, op.nodeId]
-      );
+    // 快速失败：CRDT 操作为租户级写入，缺失 tenantId 时禁止静默退化为无租户归属写入
+    if (!tenantId) {
+      throw new Error('tenantId required');
     }
+    await this.pool.query(
+      `INSERT INTO crdt_operations (tenant_id, id, type, table_name, resource_id, field, value, timestamp, node_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (tenant_id, id) DO UPDATE SET
+         type = $3, table_name = $4, resource_id = $5, field = $6,
+         value = $7, timestamp = $8, node_id = $9`,
+      [tenantId, op.id, op.type, op.table, op.resourceId, op.field, JSON.stringify(op.value), op.timestamp, op.nodeId]
+    );
   }
 
   async applyCRDTOperation(op: CRDTOperation, tenantId?: string): Promise<void> {
@@ -1546,18 +1650,14 @@ export class PostgresAdapter extends DatabaseAdapter {
   }
 
   async getCRDTOperationsSince(timestamp: string, tenantId?: string): Promise<CRDTOperation[]> {
-    let result: QueryResult;
-    if (tenantId) {
-      result = await this.pool.query(
-        'SELECT * FROM crdt_operations WHERE tenant_id = $1 AND timestamp > $2 ORDER BY timestamp ASC',
-        [tenantId, timestamp]
-      );
-    } else {
-      result = await this.pool.query(
-        'SELECT * FROM crdt_operations WHERE timestamp > $1 ORDER BY timestamp ASC',
-        [timestamp]
-      );
+    // 快速失败：CRDT 拉取为租户级，缺失 tenantId 时禁止静默退化为跨租户读取
+    if (!tenantId) {
+      throw new Error('tenantId required');
     }
+    const result = await this.pool.query(
+      'SELECT * FROM crdt_operations WHERE tenant_id = $1 AND timestamp > $2 ORDER BY timestamp ASC',
+      [tenantId, timestamp]
+    );
     return result.rows.map(row => ({
       id: row.id,
       type: row.type,
@@ -1571,17 +1671,14 @@ export class PostgresAdapter extends DatabaseAdapter {
   }
 
   async ackCRDTOperations(timestamp: string, tenantId?: string): Promise<void> {
-    if (tenantId) {
-      await this.pool.query(
-        'DELETE FROM crdt_operations WHERE tenant_id = $1 AND timestamp <= $2',
-        [tenantId, timestamp]
-      );
-    } else {
-      await this.pool.query(
-        'DELETE FROM crdt_operations WHERE timestamp <= $1',
-        [timestamp]
-      );
+    // 快速失败：CRDT 确认为租户级清理，缺失 tenantId 时禁止静默退化为跨租户清空
+    if (!tenantId) {
+      throw new Error('tenantId required');
     }
+    await this.pool.query(
+      'DELETE FROM crdt_operations WHERE tenant_id = $1 AND timestamp <= $2',
+      [tenantId, timestamp]
+    );
   }
 
   // ==================== Auth ====================

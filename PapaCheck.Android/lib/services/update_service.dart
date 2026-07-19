@@ -3,6 +3,16 @@ import 'dart:io';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 
+/// CloudBase 版本检测与 APK 下载 URL
+const String _versionUrl = 'https://chengdexy.cn/papacheck/api/version';
+const String _downloadUrl = 'https://chengdexy.cn/papacheck/api/download';
+
+/// 获取 CloudBase 版本检测 URL
+String get versionUrl => _versionUrl;
+
+/// 获取 CloudBase APK 下载 URL
+String get downloadUrl => _downloadUrl;
+
 /// APK 更新下载服务
 ///
 /// 负责从服务端下载 APK 并触发安装。

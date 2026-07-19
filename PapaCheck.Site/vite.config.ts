@@ -10,9 +10,9 @@ import { copyFile, mkdir, readdir } from 'fs/promises';
 import { join } from 'path';
 
 /**
- * 把 admin 入口的 `/assets/...` 路径重写成 `/admin/assets/...`，
- * 这样 admin 部署到 `/opt/papacheck/PapaCheck.Web/admin/` 时
- * 资源引用正确指向 `/admin/assets/...`。
+ * 把 admin 入口的 `/assets/...` 路径重写成 `/papacheck/admin/assets/...`，
+ * 这样 admin 部署到 `/papacheck/admin/` 时
+ * 资源引用正确指向 `/papacheck/admin/assets/...`。
  */
 function adminBaseRewrite(): Plugin {
   return {
@@ -27,8 +27,8 @@ function adminBaseRewrite(): Plugin {
           || ctx.filename.endsWith('admin.html');
         if (!isAdmin) return html;
         return html
-          .replace(/(href|src)="\/assets\//g, '$1="/admin/assets/')
-          .replace(/url\((\/assets\/[^)]+)\)/g, 'url(/admin$1)');
+          .replace(/(href|src)="\/assets\//g, '$1="/papacheck/admin/assets/')
+          .replace(/url\((\/assets\/[^)]+)\)/g, 'url(/papacheck/admin$1)');
       },
     },
   };
@@ -62,6 +62,7 @@ function copyAdminAssets(): Plugin {
 }
 
 const viteConfig = {
+  base: '/papacheck/',
   plugins: [react(), tailwindcss(), adminBaseRewrite(), copyAdminAssets()],
   server: {
     proxy: {

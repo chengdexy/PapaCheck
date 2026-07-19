@@ -1,8 +1,5 @@
-
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import '../services/config_service.dart';
+import '../services/config_service.dart' show DeviceRole, defaultServerUrl;
 
 class SetupResult {
   final String url;
@@ -37,12 +34,7 @@ class SetupPage extends StatefulWidget {
 }
 
 class _SetupPageState extends State<SetupPage> {
-  late final TextEditingController _ipController;
-  late final TextEditingController _portController;
   late DeviceRole _role;
-  bool _connecting = false;
-  String? _statusMessage;
-  bool? _statusSuccess;
 
   static const Color _accent = Color(0xFF4F6EF7);
   static const Color _accentLight = Color(0xFFEEF1FF);
@@ -52,87 +44,13 @@ class _SetupPageState extends State<SetupPage> {
   void initState() {
     super.initState();
     _role = widget.initialRole ?? DeviceRole.child;
-    if (widget.initialUrl != null) {
-      final uri = Uri.tryParse(widget.initialUrl!);
-      _ipController = TextEditingController(text: uri?.host ?? '');
-      _portController = TextEditingController(
-        text: (uri?.port ?? 8081).toString(),
-      );
-    } else {
-      _ipController = TextEditingController(text: 'papacheck.chengdexy.cn');
-      _portController = TextEditingController(text: '443');
-    }
   }
 
-  @override
-  void dispose() {
-    _ipController.dispose();
-    _portController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _connect() async {
-    final ip = _ipController.text.trim();
-    final port = _portController.text.trim();
-    if (ip.isEmpty || port.isEmpty) return;
-
-    // 尝试 HTTPS 优先，失败则回退 HTTP
-    final urlHttps = 'https://$ip:$port';
-    final urlHttp = 'http://$ip:$port';
-
-    setState(() {
-      _connecting = true;
-      _statusMessage = '\u6b63\u5728\u8fde\u63a5...';
-      _statusSuccess = null;
-    });
-
-    // 先试 HTTPS
-    var ok = await _tryConnect(urlHttps);
-    var finalUrl = urlHttps;
-    if (!ok) {
-      // HTTPS 失败，试 HTTP
-      ok = await _tryConnect(urlHttp);
-      finalUrl = urlHttp;
-    }
-    if (!mounted) return;
-
-    if (ok) {
-      setState(() {
-        _connecting = false;
-        _statusMessage = '\u8fde\u63a5\u6210\u529f';
-        _statusSuccess = true;
-      });
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (!mounted) return;
-      await ConfigService.setUrl(finalUrl);
-      await ConfigService.setRole(_role);
-      if (!mounted) return;
-      Navigator.of(context)
-          .pop(SetupResult(url: finalUrl, role: _role));
-    } else {
-      setState(() {
-        _connecting = false;
-        _statusMessage =
-            '\u8fde\u63a5\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u5730\u5740\u548c\u670d\u52a1\u72b6\u6001';
-        _statusSuccess = false;
-      });
-    }
-  }
-
-  Future<bool> _tryConnect(String url) async {
-    try {
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 5);
-      final request = await client.getUrl(
-          Uri.parse('$url/api/version'));
-      final response = await request.close().timeout(
-            const Duration(seconds: 5),
-          );
-      client.close();
-      return response.statusCode < 500;
-    } catch (_) {
-      return false;
-    }
+  void _confirm() {
+    Navigator.of(context).pop(SetupResult(
+      url: defaultServerUrl,
+      role: _role,
+    ));
   }
 
   @override
@@ -238,26 +156,13 @@ class _SetupPageState extends State<SetupPage> {
                   '\uD83E\uDDED',
                   '\u5bb6\u957f\u7aef',
                   DeviceRole.parent,
-                  '\u7528\u4e8e\u7ba1\u7406\u548c\u76d1\u7763',
+                  '\u7528\u4e8e\u7ba1\u7406\u548c\u76d1\u7767',
                 ),
               ),
             ],
           ),
           const SizedBox(height: 28),
-          _buildSectionTitle('\u670d\u52a1\u5668\u5730\u5740'),
-          const SizedBox(height: 4),
-          const Text(
-            '\u8bf7\u8f93\u5165\u670d\u52a1\u5668 IP\u3001\u57df\u540d\u6216\u8bbf\u95ee\u5730\u5740',
-            style: TextStyle(fontSize: 13, color: Color(0xFF999999)),
-          ),
-          const SizedBox(height: 12),
-          _buildInputRow(),
-          const SizedBox(height: 28),
           _buildConnectButton(),
-          if (_statusMessage != null) ...[
-            const SizedBox(height: 16),
-            _buildStatusBanner(),
-          ],
         ],
       ),
     );
@@ -348,186 +253,28 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  Widget _buildInputRow() {
-    return Row(
-      children: [
-        Expanded(
-          flex: 3,
-          child: TextField(
-            controller: _ipController,
-            keyboardType: TextInputType.url,
-            style: const TextStyle(
-                fontSize: 15, fontWeight: FontWeight.w500),
-            decoration: _inputDecoration(
-                'papacheck.chengdexy.cn'),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text(
-            '\uff1a',
-            style: TextStyle(
-                fontSize: 20, color: Colors.grey.shade400),
-          ),
-        ),
-        Expanded(
-          flex: 1,
-          child: TextField(
-            controller: _portController,
-            keyboardType: TextInputType.number,
-            style: const TextStyle(
-                fontSize: 15, fontWeight: FontWeight.w500),
-            decoration: _inputDecoration('443'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  InputDecoration _inputDecoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: TextStyle(color: Colors.grey.shade300),
-      filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 14,
-        vertical: 14,
-      ),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade200),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade200),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide:
-            const BorderSide(color: _accent, width: 1.5),
-      ),
-    );
-  }
-
   Widget _buildConnectButton() {
     return SizedBox(
       width: double.infinity,
       height: 52,
       child: ElevatedButton(
-        onPressed: _connecting ? null : _connect,
+        onPressed: _confirm,
         style: ElevatedButton.styleFrom(
           backgroundColor: _accent,
           foregroundColor: Colors.white,
-          disabledBackgroundColor: _accent.withAlpha(100),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
           elevation: 0,
           shadowColor: _accent.withAlpha(60),
         ),
-        child: _connecting
-            ? const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  Text(
-                    '\u6b63\u5728\u8fde\u63a5...',
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600),
-                  ),
-                ],
-              )
-            : const Text(
-                '\u8fde\u63a5\u5e76\u5f00\u59cb\u4f7f\u7528',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5),
-              ),
-      ),
-    );
-  }
-
-  Widget _buildStatusBanner() {
-    final isSuccess = _statusSuccess == true;
-    final isError = _statusSuccess == false;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-          horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: isSuccess
-            ? const Color(0xFFF0FFF4)
-            : isError
-                ? const Color(0xFFFFF5F5)
-                : const Color(0xFFF0F5FF),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isSuccess
-              ? const Color(0xFFB7EB8F)
-              : isError
-                  ? const Color(0xFFFFCCC7)
-                  : const Color(0xFFD6E4FF),
-          width: 1,
+        child: const Text(
+          '\u5f00\u59cb\u4f7f\u7528',
+          style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5),
         ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isSuccess
-                  ? const Color(0xFF52C41A)
-                  : isError
-                      ? const Color(0xFFFF4D4F)
-                      : _accent,
-            ),
-            child: Center(
-              child: isSuccess
-                  ? const Icon(Icons.check,
-                      color: Colors.white, size: 14)
-                  : isError
-                      ? const Icon(Icons.close,
-                          color: Colors.white, size: 14)
-                      : const SizedBox(
-                          width: 12,
-                          height: 12,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              _statusMessage ?? '',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: isSuccess
-                    ? const Color(0xFF389E0D)
-                    : isError
-                        ? const Color(0xFFCF1322)
-                        : _accent,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

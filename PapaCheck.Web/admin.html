@@ -3,11 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PapaCheck 爸~检查！管理端</title>
-  <link rel="icon" href="/favicon.png">
-  <link rel="stylesheet" href="/css/admin.css">
+  <link rel="icon" href="/papacheck/app/favicon.png">
+  <link rel="stylesheet" href="/papacheck/app/css/admin.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "@cloudbase/js-sdk": "https://esm.sh/@cloudbase/js-sdk@3.6.2"
+    }
+  }
+  </script>
 </head>
 <body>
   <div class="admin-layout">
@@ -28,7 +35,6 @@
     <!-- Main Area -->
     <div class="main-area">
       <div class="admin-header">
-        <span class="conn-status" id="connStatus" title="数据同步状态">⚪</span>
         <h1>PapaCheck 爸~检查！管理端</h1>
         <span class="admin-date" id="adminDate">--</span>
         <span class="child-name-header" id="childNameDisplay"></span>
@@ -86,13 +92,8 @@
     <div class="transition-text">正在同步数据…</div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
-  <script src="/js/api.js"></script>
-  <script src="/js/db.js"></script>
-  <script src="/js/crdt-sync.js"></script>
-  <script src="/js/connection.js"></script>
-  <script src="/js/sync.js"></script>
-  <script src="/js/common.js"></script>
-  <script src="/js/admin.js"></script>
+  <script src="/papacheck/app/js/api.js"></script>
+  <script src="/papacheck/app/js/common.js"></script>
+  <script src="/papacheck/app/js/admin.js"></script>
 </body>
 </html>

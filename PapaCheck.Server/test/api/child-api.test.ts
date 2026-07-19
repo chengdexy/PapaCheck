@@ -110,4 +110,30 @@ describe.runIf(hasDB)('Child API Isolation (孩子 API 隔离)', () => {
     const res = await app.inject({ method: 'GET', url: '/api/data' });
     expect(res.statusCode).toBe(200);
   });
+
+  it('GET /api/data-version 返回租户级版本戳，无需 child_id', async () => {
+    // 家长角色即使不带 child_id 也能拿到版本戳（版本戳是租户级）
+    _testJwt = { tenant_id: tenantA, sub: tenantA, role: 'parent', token_version: 1 };
+
+    // 先写入一条修改，确保有版本戳
+    await db.recordModification('homeworks', '2026-06-30', new Date().toISOString(), tenantA);
+
+    const res = await app.inject({ method: 'GET', url: '/api/data-version' });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toHaveProperty('version');
+    expect(typeof body.version).toBe('string');
+  });
+
+  it('GET /api/data-version 在数据变更后版本戳发生变化', async () => {
+    _testJwt = { tenant_id: tenantA, sub: tenantA, role: 'parent', token_version: 1 };
+
+    const before = JSON.parse((await app.inject({ method: 'GET', url: '/api/data-version' })).body).version;
+
+    // 触发一次新的数据变更
+    await db.recordModification('homeworks', '2026-07-01', new Date(Date.now() + 2000).toISOString(), tenantA);
+
+    const after = JSON.parse((await app.inject({ method: 'GET', url: '/api/data-version' })).body).version;
+    expect(after).not.toBe(before);
+  });
 });

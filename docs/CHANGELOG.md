@@ -7,11 +7,19 @@
 ## [Unreleased]
 
 ### Changed
-- **TTS 桥接抽离为独立服务 tts-svc**：删除 `src/tts/index.ts`（TTSBridge 401 行）和 `scripts/tts_bridge.py`（Python 子进程桥接）。`/api/speak` 和 `/api/pregen-speech` 端点改为转发到独立的 tts-svc（Python FastAPI + edge-tts），监听 127.0.0.1:8500。前端无感知。移除了 `--tts-python` CLI 参数。详见 [tts-svc 设计文档](../tts-svc/docs/2026-06-30-tts-svc-design.md)
-- **APK 发布迁移到腾讯云 CloudBase 云存储**：`/api/download` 改为 302 重定向到 CloudBase CDN，`/api/version` 改为从环境变量 `PAPACHECK_CLIENT_VERSION` 读取。`cloud-publish.ts` 改为上传 APK 到 CloudBase PG 存储 `dist` 桶，并自动更新 ECS 上的版本号环境变量。Nginx 新增 `/download/` 位置代理到 CloudBase CDN。落地页下载链接保持 `/api/download` 动态跳转
-- **`build-apk --publish` 一键构建+发布**：新增 `-p/--publish` 参数，构建完成后自动将 APK 上传到 CloudBase + 更新 ECS 版本号环境变量 + 重启服务。控制台前端添加「构建后发布」复选框（默认勾选）
-- **`/api/download` 直连 CloudBase CDN**：重定向目标从相对路径 `/download/...`（经 ECS 代理）改为直接指向 CloudBase CDN URL，绕过 ECS 3M 带宽限制
-- **构建 APK 流程同步更新版本号**：`build-apk --publish` 执行后自动执行 `systemctl daemon-reload && systemctl restart papacheck`，确保 `/api/version` 立即返回新版本号
+- **文档大范围修正与清理**：落地页 5 处"离线可用"改为"云端实时同步"，"AI 评优"改为"家长评优"，"拍照录入作业"改为"添加作业"。ECS 链接全部切换到 CloudBase 路径。Footer 版本号 v3.0→v1.6.6。HANDOVER 标记 CloudBase 迁移完成、ECS 已下线，删除 ECS 配置/切换流程/回滚预案 3 节。PROGRESS/PRD/README 同步更新。清理 10 份已完成功能的过期 spec/plan 文档
+- **Release 控制台 Windows 兼容性修复**：`executor.ts` `executeSteps()` 在 Windows 上默认 `shell: true` 以正确解析 `.cmd` 包装脚本。`site-publish.ts`/`fn-deploy.ts` 改为 `exec()` 避免 `execFile + shell: true` 的 DEP0190 废弃警告。`console-server.ts` 将 site/web/fn 部署改为使用共享 `executor` 实例，SSE 进度正常展示。新增 `PapaCheck.Web/deploy.bat` 实现仅上传必要文件（跳过 node_modules/tts_cache/apk/__tests__），避免 7800+ 垃圾文件上传。`.gitignore` 添加 `_web_deploy/`
+
+- **文档事实审计（第二轮）**：核对全部 Markdown 与代码事实，修正多处硬错误——① 表数量统一为 **27 张**（`PapaCheck.Server/scripts/init-pg-schema.sql` 实际建表数，此前误写 26 或 30；ARCHITECTURE 数据模型表移除不存在的 `tenant_members`/`sync_metadata`/`sessions`/`audit_log`）；② 现状文档（README/ARCHITECTURE/PRD/HANDOVER/PROGRESS）中"实时监听替代轮询"等表述修正为实际采用的轻量版本戳短轮询；③ 6 份 CloudBase 迁移子计划稿与 1 份设计稿顶部统一加「实施方式已变更」警示注记（实时监听/RLS 未落地、tts-svc 独立仓库维护、实际版本 Server 1.2.0 / Web 1.5.2 / Android 1.6.6）
+
+### Fixed
+- **修复 Android SetupPage 引导页每次启动都出现**：首次安装路径中 `ConfigService.setUrl()`/`setRole()` 缺失，URL 和角色未保存到 SharedPreferences；新增 2 行保存调用后下次启动直接跳过引导页
+- **修复 RealtimeManager 启动失败：`@cloudbase/js-sdk` 裸模块标识符无法解析**：在 `admin.html`/`index.html` 中添加 `importmap`，将 `@cloudbase/js-sdk` 映射到 esm.sh CDN
+- **修复 papacheck-api 云函数持续 `FUNCTION_INVOCATION_FAILED`**：根因为 `src/auth/jwt.ts` 在**模块加载期**向只读的 `/data/.jwt_secret` 写文件触发 `EROFS`，导致入口 `exports.main` 从未赋值；叠加部署入口漏写 `--dir dist`、CLI 环境变量推送不落盘。修复：JWT 密钥改为随包 `dist/jwt.secret` 文件（只读可读）、入口拆双文件（`index.js` wrapper 懒加载 `handler-body.js` 真实逻辑，异常以 500 JSON 返回真实栈）、构建改为自包含 bundle。方案A 轻量版本戳端点 `GET /papacheck/api/data-version` 已正式上线
+
+### Removed
+- **移除 Flutter WebView 加载遮罩（15 秒转圈）**：`_waitForPageReady()` 定期检查已移除的离线模块 `connStatus` className，永远不满足条件，必须等 15 秒超时。移除 `_isPageReady`/`_readyCheckTimer`/`_waitForPageReady`/遮罩 Container，改为 WebView 加载完毕直接启动电池监控
+- **移除 Web 端连接状态圆点 connStatus 及 CSS 样式**：离线模块移除后该元素无人维护状态，在 `admin.html`/`index.html`/`style.css`/`admin.css` 中删除
 
 ### Added
 - **数据按需获取（Server + Web + CloudFunc）**：新增 `GET /api/stats` 服务端聚合统计端点（week/month/all 三种 range，13 字段 StatsResult），返回体积与孩子历史使用天数解耦（week 视图 1823B vs 旧 79806B，降为 1/44）。新增 `GET /api/points/balance`、`GET /api/bounty-completions/total`。前端新增 `window.Data` 模块化数据层（`PapaCheck.Web/js/data-layer.js`），admin/app/big-screen 三端迁移到按需拉取，版本戳变化后只刷新当前视图资源（FR-6/AC-4）。CloudFunc 生产同步部署完成。详见 `docs/design-data-on-demand.md`

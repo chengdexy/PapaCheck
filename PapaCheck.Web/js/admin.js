@@ -24,7 +24,6 @@ let _ratingShowCount = 5;
 let _selectedCalendarDate = null;
 let _calendarYear = null;
 let _calendarMonth = null;
-let _refreshInterval = null;
 
 
 const SETTINGS_DEFAULTS = {
@@ -127,7 +126,7 @@ function showToast(msg) {
 function pregenSpeech(texts) {
   const unique = [...new Set(texts)].filter(t => t && t.trim());
   if (unique.length === 0) return;
-  fetch('/api/pregen-speech', {
+  fetch('/papacheck/api/pregen-speech', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionStorage.getItem('papacheck_token') },
     body: JSON.stringify({ texts: unique }),
@@ -179,7 +178,6 @@ async function initAdmin() {
     });
   }
 
-  await ConnectionManager.start();
   updateTitle();
   await refreshAllData();
   updateSettingsTabState();
@@ -188,54 +186,46 @@ async function initAdmin() {
   try { var savedTab = localStorage.getItem('adminTab'); } catch (e) { /* 非致命 */ }
   switchTab(savedTab && ['homework', 'shop', 'rewardBox', 'bounty', 'redeem', 'stats', 'settings'].indexOf(savedTab) !== -1 ? savedTab : 'homework');
 
-  startRefreshTimer();
-}
+  // 集成 RealtimeManager：轮询监听数据变化
+  try {
+    const token = sessionStorage.getItem('papacheck_token');
+    if (token && cachedData) {
+      const { RealtimeManager } = await import('./realtime.js');
+      const realtime = new RealtimeManager();
 
-function startRefreshTimer() {
-  stopRefreshTimer();
-  _refreshInterval = setInterval(async () => {
-    await refreshAllData();
-    updateSettingsTabState();
-    updateTitle();
-    const modal = document.getElementById('adminModal');
-    if ((modal && modal.classList.contains('show')) || _editingBalance || _editingSettings) return;
-    renderCurrentTab();
-  }, 5000);
-}
+      realtime.callbacks.onRefresh = () => {
+        refreshAllData().then(() => {
+          updateSettingsTabState();
+          updateTitle();
+          const modal = document.getElementById('adminModal');
+          if ((modal && modal.classList.contains('show')) || _editingBalance || _editingSettings) return;
+          renderCurrentTab();
+        });
+      };
 
-function stopRefreshTimer() {
-  if (_refreshInterval) {
-    clearInterval(_refreshInterval);
-    _refreshInterval = null;
+      await realtime.start(cachedData.tenant_id, cachedData.child_id);
+      window._realtimeManager = realtime;
+    }
+  } catch (e) {
+    console.warn('[admin] RealtimeManager 启动失败:', e);
   }
 }
 
-window.addEventListener('beforeunload', stopRefreshTimer);
+window.addEventListener('beforeunload', () => {
+  if (window._realtimeManager) {
+    window._realtimeManager.stop();
+  }
+});
 
 async function refreshAllData() {
-  var mode = ConnectionManager.getMode();
-  if (mode === 'reconnecting') return;
-
-  if (mode === 'online') {
-    try {
-      var data = await API.getData();
-      if (data) {
-        cachedData = data;
-        try { await DB.cacheFullData(data); } catch (e) { }
-        _applyCachedData();
-      }
-    } catch (e) {
-      // 离线降级
+  try {
+    var data = await API.getData();
+    if (data) {
+      cachedData = data;
+      _applyCachedData();
     }
-  }
-  if (mode === 'offline') {
-    try {
-      var data = await DB.getFullData();
-      if (data) {
-        cachedData = data;
-        _applyCachedData();
-      }
-    } catch (e) { }
+  } catch (e) {
+    console.error('[admin] refreshAllData 失败:', e);
   }
 }
 
@@ -256,10 +246,6 @@ function _applyCachedData() {
 
 // ========== Tab Switching ==========
 function switchTab(tab) {
-  if (tab === 'settings' && ConnectionManager.getMode() === 'offline') {
-    showToast('离线模式无法修改设置');
-    return;
-  }
   adminCurrentTab = tab;
   // 持久化当前标签页，刷新后恢复
   try { localStorage.setItem('adminTab', tab); } catch (e) { /* 非致命 */ }
@@ -270,12 +256,11 @@ function switchTab(tab) {
 }
 
 function updateSettingsTabState() {
-  var isOffline = ConnectionManager.getMode() === 'offline';
   document.querySelectorAll('.tab-btn[data-tab="settings"]').forEach(function (btn) {
     var icon = btn.querySelector('.tab-icon');
     if (icon) {
-      icon.textContent = isOffline ? '🔒' : '⚙️';
-      btn.title = isOffline ? '离线模式无法修改设置' : '';
+      icon.textContent = '⚙️';
+      btn.title = '';
     }
   });
 }
@@ -1334,7 +1319,7 @@ function renderRedeemTab() {
           </div>
         `).join('')}
       ${hasMore || _redeemShowCount > 3 || fulfilled.length > 0 ? `<div style="text-align:center;padding:12px;display:flex;gap:8px;justify-content:center;">
-        ${fulfilled.length > 0 && ConnectionManager.getMode() !== 'offline' ? `<button onclick="clearRedemptionHistory()" style="padding:8px 24px;border:1px solid var(--danger);border-radius:8px;font-size:14px;color:var(--danger);background:transparent;cursor:pointer;">清空记录</button>` : ''}
+        ${fulfilled.length > 0 ? `<button onclick="clearRedemptionHistory()" style="padding:8px 24px;border:1px solid var(--danger);border-radius:8px;font-size:14px;color:var(--danger);background:transparent;cursor:pointer;">清空记录</button>` : ''}
         ${hasMore ? `<button class="btn-cancel" style="border:1px solid var(--text-secondary);padding:8px 24px;border-radius:8px;font-size:14px;"
           onclick="_redeemShowCount += 10; renderRedeemTab();">查看更多 (剩余${fulfilled.length - _redeemShowCount}条)</button>` : ''}
         ${_redeemShowCount > 3 ? `<button class="btn-cancel" style="border:1px solid var(--text-secondary);padding:8px 24px;border-radius:8px;font-size:14px;"
@@ -1967,17 +1952,6 @@ function calcStreak(allDates) {
 function renderSettingsTab() {
   const container = document.getElementById('adminContent');
 
-  // 离线时设置页不可用
-  if (ConnectionManager.getMode() === 'offline') {
-    container.innerHTML = `
-      <div class="admin-card" style="text-align:center;padding:40px 20px;">
-        <div style="font-size:48px;margin-bottom:16px;">🔒</div>
-        <div style="font-size:18px;font-weight:600;color:var(--text-secondary);">离线模式无法修改设置</div>
-        <div style="font-size:14px;color:var(--text-secondary);margin-top:8px;">请连接服务器后重试</div>
-      </div>`;
-    return;
-  }
-
   const balance = cachedData?.points?.balance ?? cachedData?.points ?? 0;
 
   if (_calendarYear === null) {
@@ -2138,10 +2112,6 @@ function selectCalendarDate(year, month, day) {
 }
 
 async function switchToSelectedDate() {
-  if (ConnectionManager.getMode() === 'offline') {
-    showToast('离线模式暂不可用，请连接服务器后操作');
-    return;
-  }
   if (!_selectedCalendarDate) return;
   const parts = _selectedCalendarDate.split('-');
   adminDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
@@ -2437,7 +2407,7 @@ function switchChild() {
     sessionStorage.removeItem('papacheck_token');
     sessionStorage.removeItem('papacheck_role');
     sessionStorage.removeItem('papacheck_child_name');
-    window.location.href = '/login.html';
+    window.location.href = '/papacheck/app/login.html';
   }
 }
 

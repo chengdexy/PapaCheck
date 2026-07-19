@@ -5,9 +5,9 @@ export default function TopNav() {
   return (
     <nav className="sticky top-0 z-50 backdrop-blur-md bg-white/70 border-b border-ink-200/60">
       <div className="hero-container flex items-center justify-between h-16">
-        <a href="/" className="flex items-center gap-2.5 group">
+        <a href={import.meta.env.BASE_URL} className="flex items-center gap-2.5 group">
           <img
-            src="/imgs/favicon.png"
+            src={`${import.meta.env.BASE_URL}imgs/favicon.png`}
             alt="PapaCheck"
             className="w-9 h-9 rounded-xl transition-transform group-hover:rotate-6"
           />
@@ -42,7 +42,7 @@ export default function TopNav() {
         </div>
 
         <a
-          href="/admin/"
+          href={`${import.meta.env.BASE_URL}admin/`}
           className={cn(
             'hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5',
             'text-sm font-semibold text-ink-700 rounded-full',

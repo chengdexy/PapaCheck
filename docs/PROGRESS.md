@@ -1,10 +1,12 @@
 # PapaCheck 进度记录
 
-> 最后更新：2026-07-06（build-apk --publish 一键构建发布，609 测试通过）
+> 最后更新：2026-07-14（文档事实修正：版本号 / 表数 / RLS / 轮询机制）
 
 ## 当前版本
 
-**v1.5.2**（build-apk --publish 一键构建发布，37 Flutter 测试 + 609 Vitest 测试 + 15 Release 测试通过）
+**Android APK 1.6.6** / **Server 1.2.0** / **Web 1.5.2** — 已迁移到腾讯云 CloudBase（云函数 + PG + 静态托管 + 网关），前端采用轻量版本戳短轮询（默认 3 秒，变更才拉全量）替代 CloudBase watch() 实时监听。
+
+> ⚠️ 本文档与 README/ARCHITECTURE/PRD/HANDOVER 曾误将版本标为 `v2.0.0`，实际最新版本号为上面三个（以 `package.json` / `pubspec.yaml` 为准）。
 
 ## 部署状态
 
@@ -13,6 +15,7 @@
 - [x] **Phase 5d 完成** — PostgreSQL 自动备份 + 健康监控 + 邮件告警
 - [x] **APK 发布迁移到 CloudBase** — 从 ECS 本地 `apk/` 目录切换到腾讯云 CloudBase PG 存储，`/api/download` 重定向到 CloudBase CDN
 - [x] **build-apk --publish 一键构建发布** — `build-apk` 支持 `--publish` 参数，构建后自动上传 CloudBase + 更新 ECS 版本号 + 重启服务
+- [x] **CloudBase 迁移完成** — 子计划 1-5 全部完成（API 云函数 / 多租户隔离 / 前端版本戳短轮询 / Release 控制台 / Android 端），网关已切换，ECS 已下线（注：原设计稿中的 RLS 策略与实时监听未在生产代码路径落地，改为应用层 SQL 隔离 + 短轮询）
 
 ---
 
@@ -34,8 +37,22 @@
 
 - [x] Web 孩子端（大屏界面）
 - [x] Web 管理端（管理界面 + 数据统计图表）
-- [x] Android APP（Flutter WebView + 离线快照 + APK 自动更新 + 更新后自动清缓存）
+- [x] Android APP（Flutter WebView + APK 自动更新 + 更新后自动清缓存）
 - [x] ~~Windows 桌面端（系统托盘 + 开机自启 + 凭据安全存储）~~ **已移除（弃用）**
+
+### CloudBase 迁移（已完成）
+
+- [x] API 云函数 `papacheck-api`（SCF + Fastify + PG，从 ECS 服务迁移）
+- [x] 多租户隔离（应用层 SQL：`WHERE tenant_id` + 必要时 `child_id`，后端单一 pg 连接）。`cloudbase-rls.sql` 为早期 RLS 设计脚本，当前未激活
+- [x] 前端数据同步（轻量版本戳短轮询，默认 3 秒轮询 `/api/data-version`，变更才拉全量；写后 burst 提速到 1 秒；CloudBase watch() 因 SDK v3 API 不兼容未采用）
+- [x] 前端路径前缀改为 `/papacheck/`（app/api/login 全部更新）
+- [x] Release 控制台改造（`fn`/`all` 子命令，tcb CLI 部署，移除 SSH）
+- [x] Android 端改造（ConfigService/UpdateService URL 改为 `/papacheck/`，删除离线模块）
+- [x] ~~离线模式（Service Worker / localforage / CRDT / Android 写队列）~~ **已移除（CloudBase 迁移）**
+- [x] ~~邮件同步功能（IMAP + AI 解析 + 附件下载）~~ **已移除（CloudBase 迁移）**
+- [x] ~~运维调度器（OpsScheduler / 备份 / 监控 / 告警）~~ **已移除（CloudBase PG 自带备份 + 腾讯云监控）**
+- [~] 网关切换 + 生产数据迁移（已完成）
+- [~] ECS 服务器下线（已完成）
 
 ### 基础设施
 
@@ -43,18 +60,18 @@
 - [x] **数据库抽象层重构** — `IDatabase` 接口 + `PostgresAdapter`（Phase 5a，SQLite 已退役）
 - [x] **JWT 多租户认证系统** — Hash 码预授权 + token_version 吊销 + 租户行级隔离（Phase 5c）
 - [x] **认证体系重构（Phase 5f）**：分离账号与访问码，`users` 表合并 `tenants` 表，新增 `access_codes` 表。角色简化为 `admin`/`user`（账号）和 `parent`/`child`（访问码）。统一登录入口，超级管理员首次登录强制修改凭证
-- [x] **PostgreSQL 迁移** — `migrate-to-pg.ts` 逐表迁移 + 行数校验，SQLite 数据完整迁移，26 张表
-- [x] **部署：systemd + Nginx + Let's Encrypt** — 移除 Docker，Nginx 反向代理 + HTTPS 自动续期
+- [x] **PostgreSQL 迁移** — `migrate-to-pg.ts` 逐表迁移 + 行数校验，SQLite 数据完整迁移，27 张表（以 `init-pg-schema.sql` 为准）
+- [x] ~~**部署：systemd + Nginx + Let's Encrypt**~~ — **ECS 下线后废弃，改为 CloudBase**
 - [x] **多孩子支持（Phase 1+2）** — children 表 + 12 张表 child_id 列 + partial unique index，数据行级隔离
-- [x] **离线同步重构（Phase 0~4）** — CRDT 模型简化、SQLite 退役、Android 原生写队列
-- [x] **Phase 5d 运维增强**：PostgreSQL 自动备份（每日 03:00，保留 3 份）、健康监控（磁盘/PG/备份状态，每 5 分钟）、邮件告警（状态机去重，SMTP 配置面板）、超管面板系统健康页面
-- [x] TTS 语音提醒（tts-svc 独立服务，Python FastAPI + edge-tts，[设计文档](../tts-svc/docs/2026-06-30-tts-svc-design.md)）
-- [x] 邮件同步（IMAP + AI 解析）
-- [x] 附件下载
-- [x] 离线支持（Service Worker + localforage）
-- [x] 增量同步（pull/push）
-- [x] **Release Console 发布控制台** — `PapaCheck.Release/` CLI 四子命令 + Web 控制台（SSE 实时日志），替代 release.py
-- [x] OpenAPI 自动文档（Swagger UI）
+- [x] ~~**离线同步重构（Phase 0~4）**~~ — **已移除（CloudBase 迁移，轻量版本戳短轮询替代）**
+- [x] ~~**Phase 5d 运维增强**~~ — **已移除（CloudBase PG 自带备份 + 腾讯云监控）**
+- [x] TTS 语音提醒（tts-svc 云函数，Python FastAPI + edge-tts）
+- [x] ~~邮件同步（IMAP + AI 解析）~~ **已移除（CloudBase 迁移）**
+- [x] ~~附件下载~~ **已移除（CloudBase 迁移）**
+- [x] ~~离线支持（Service Worker + localforage）~~ **已移除（CloudBase 迁移）**
+- [x] ~~增量同步（pull/push）~~ **已移除（CloudBase 轻量版本戳短轮询替代）**
+- [x] **Release Console 发布控制台** — `PapaCheck.Release/` CLI 子命令 + Web 控制台（SSE 实时日志），支持 `fn`/`all` tcb CLI 部署
+- [x] ~~OpenAPI 自动文档（Swagger UI）~~ **已移除（CloudBase 迁移）**
 - [x] 单 EXE 构建（Node.js SEA）
 - [x] 测试框架（Vitest + Flutter test）
 - [x] JS/TS 代码覆盖率 85.22%（Stmts）| 71.89%（Branch）| 90.94%（Funcs）| 87.06%（Lines）
@@ -93,6 +110,11 @@ _无未解决项。_
 
 | 日期 | 变更 |
 |------|------|
+| 2026-07-08 | **文档审计修复**：落地页文案修正（"AI 评优"→"家长评优"、"拍照录入作业"→"添加作业"、去除 5 处"离线可用"虚假宣传、ECS 链接改为 CloudBase 路径、Footer v3.0→v1.6.6）。HANDOVER 标记 CloudBase 迁移完成/ECS 已下线，删除 3 节 ECS 配置信息。PROGRESS/PRD/README 同步更新迁移状态和版本号。清理 10 份过期 spec 文档 |
+| 2026-07-08 | **修复 Android SetupPage 引导页每次启动都出现**：首次安装路径中 `ConfigService.setUrl()`/`setRole()` 缺失，URL 和角色未保存到 SharedPreferences；新增 2 行保存调用后下次启动直接跳过引导页
+| 2026-07-07 | **修复 RealtimeManager 启动时 14 个并发请求 + TTS 语音 404 + API 云函数 TTS 转发 localhost 无效**：`triggerAll()` 遍历 14 个回调各自触发 `refreshFromServer()`，改为统一 `onRefresh`；`Voice._playNext()` 硬编码 `/api/speak` 缺 `/papacheck` 前缀；`papacheck-api` `/api/speak` 路由在 SCF 中无法通过 localhost 访问 `tts-svc`，改为 `callFunction` 跨函数调用。新增 `@cloudbase/node-sdk` 依赖。重新部署前端 + API 云函数 |
+| 2026-07-07 | **修复 RealtimeManager 启动失败**：`@cloudbase/js-sdk` v3 API 多重不兼容（importmap 裸模块标识符、`signInWithJwt` → `signInAnonymously`、`rdb()` → `database()`、`table()` → `collection()`），最终将 RealtimeManager 从 CloudBase watch() 改为每 30 秒轮询触发刷新。修复 favicon 404、site-publish.ts CLI 参数兼容性 |
+| 2026-07-07 | **CloudBase 迁移（v2.0.0）**：子计划 1-5 代码完成 — ① API 云函数 `papacheck-api`（SCF + Fastify + PG）；② RLS 行级安全策略 SQL + 数据迁移脚本；③ 前端实时监听改造（cloudbase.js/realtime.js/api.js/app.js/admin.js/HTML，路径前缀 `/papacheck/`）；④ Release 控制台改造（fn-deploy/cloud-publish/site-publish，tcb CLI 部署）；⑤ Android 端改造（ConfigService/UpdateService URL + 删除离线模块）。移除离线模式/邮件同步/运维调度器/Swagger。更新全部项目文档。待网关切换 + 数据迁移 + ECS 下线 |
 | 2026-07-06 | **build-apk --publish 一键构建发布**：新增 `-p/--publish` 参数，构建后自动上传 CloudBase + 更新 ECS 版本号 + 重启服务。控制台前端添加「构建后发布」复选框。`/api/download` 改为直连 CloudBase CDN 绕过 ECS 带宽限制。v1.5.2 |
 | 2026-07-06 | **APK 发布迁移到腾讯云 CloudBase**：APK 上传不再使用 SCP 到 ECS 本地，改为上传到 CloudBase PG 存储 `dist` 桶。`/api/download` 改为 302 重定向到 CloudBase CDN，`/api/version` 改为从环境变量 `PAPACHECK_CLIENT_VERSION` 读取。`cloud-publish.ts` 新增 CloudBase 上传 + ECS 环境变量更新步骤。Nginx 新增 `/download/` 位置代理到 CloudBase CDN。版本号 v1.4.2→v1.5.0。609 测试通过 |
 | 2026-06-30 | **TTS 桥接抽离为独立 tts-svc 服务**：删除 `src/tts/index.ts`（TTSBridge 401 行）和 `scripts/tts_bridge.py`（Python 子进程桥接）。`/api/speak` 和 `/api/pregen-speech` 改为转发到 tts-svc（Python FastAPI + edge-tts，监听 127.0.0.1:8500）。移除了 `--tts-python` CLI 参数。全量 608 测试通过（-35 因 tts.test.ts 删除）。[设计文档](../tts-svc/docs/2026-06-30-tts-svc-design.md) |

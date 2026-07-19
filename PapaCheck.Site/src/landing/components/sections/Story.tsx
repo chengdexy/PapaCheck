@@ -5,21 +5,21 @@ const steps = [
     time: '17:30',
     title: '孩子放学回家',
     body: '打开 PapaCheck 看到今天的作业清单。每一项有清晰的完成度 + 期待奖励，孩子心里有数。',
-    mascot: '/imgs/mascot/mascot-point.png',
+    mascot: 'point',
     mascotAlt: 'PapaCheck 吉祥物指向作业清单',
   },
   {
     time: '19:00',
     title: '家长在手机上随手检查',
     body: '孩子做完一项，爸妈在手机上收到推送。一键评优，积分自动到账。不用守在旁边。',
-    mascot: '/imgs/mascot/mascot-ok.png',
+    mascot: 'ok',
     mascotAlt: 'PapaCheck 吉祥物竖起大拇指',
   },
   {
     time: '20:00',
     title: '孩子主动收尾',
     body: '为了兑换想要的玩具/游戏时间，孩子主动把作业收尾。爸妈不催不喊，关系更轻松。',
-    mascot: '/imgs/mascot/mascot-thumbs.png',
+    mascot: 'thumbs',
     mascotAlt: 'PapaCheck 吉祥物点赞',
   },
 ];
@@ -47,7 +47,7 @@ export default function Story() {
           <div className="space-y-12 md:space-y-16">
             {steps.map((step, i) => {
               const isLeft = i % 2 === 0;
-              const mascotName = step.mascot.split('/').pop()!.replace('mascot-', '').replace('.png', '') as 'point' | 'ok' | 'thumbs';
+              const mascotName = step.mascot as 'point' | 'ok' | 'thumbs';
               return (
                 <div
                   key={i}

@@ -14,7 +14,7 @@ export default function AuthView() {
         {/* 品牌头 */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white shadow-lg shadow-orange-100 mb-4 overflow-hidden ring-1 ring-orange-100">
-            <img src="/favicon.png" alt="PapaCheck" className="w-full h-full object-cover" />
+            <img src={`${import.meta.env.BASE_URL}favicon.png`} alt="PapaCheck" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-2xl font-bold text-[var(--color-ink-900)]">PapaCheck</h1>
           <p className="text-sm text-[var(--color-ink-500)] mt-1">家庭管理面板</p>

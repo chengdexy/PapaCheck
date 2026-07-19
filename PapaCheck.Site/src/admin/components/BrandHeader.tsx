@@ -1,7 +1,7 @@
 import { Key, ArrowLeft, LogOut, ExternalLink } from 'lucide-react';
 
 /** 开发模式下后端地址，生产模式用同源 */
-const APP_BASE = import.meta.env.DEV ? 'http://localhost:8080' : '';
+const APP_BASE = import.meta.env.DEV ? 'http://localhost:8080' : import.meta.env.BASE_URL;
 
 interface BrandHeaderProps {
   title: string;
@@ -21,7 +21,7 @@ export default function BrandHeader({ title, subtitle, role, onLogout }: BrandHe
             className="flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl bg-white shadow-md shadow-orange-100 overflow-hidden ring-1 ring-orange-100"
             aria-hidden="true"
           >
-            <img src="/favicon.png" alt="" className="w-full h-full object-cover" />
+            <img src={`${import.meta.env.BASE_URL}favicon.png`} alt="" className="w-full h-full object-cover" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -46,7 +46,7 @@ export default function BrandHeader({ title, subtitle, role, onLogout }: BrandHe
         {/* 右侧：快捷链接 + 退出 */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <a
-            href={`${APP_BASE}/app/`}
+            href={`${APP_BASE}app/`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-md transition-colors"
@@ -55,7 +55,7 @@ export default function BrandHeader({ title, subtitle, role, onLogout }: BrandHe
             客户端
           </a>
           <a
-            href="/"
+            href={import.meta.env.BASE_URL}
             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[var(--color-ink-600)] hover:bg-[var(--color-ink-100)] rounded-md transition-colors"
           >
             <ArrowLeft size={12} />
