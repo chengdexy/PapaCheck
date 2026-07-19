@@ -179,7 +179,10 @@ async function initAdmin() {
   }
 
   updateTitle();
-  await refreshAllData();
+  // 初始化：按需加载（配置 + 当前视图单日），替代全量 /api/data
+  await Data.bootstrap('admin');
+  await Data.loadBountyCompletionsTotal();
+  _applyCachedData();
   updateSettingsTabState();
   hideTransitionMask();
   // 恢复上次停留的标签页
@@ -219,18 +222,16 @@ window.addEventListener('beforeunload', () => {
 
 async function refreshAllData() {
   try {
-    var data = await API.getData();
-    if (data) {
-      cachedData = data;
-      _applyCachedData();
-    }
+    // 按需最小集刷新（替代全量 /api/data，达成 AC-1/AC-4）
+    await Data.refreshCurrentView();
+    await Data.loadBountyCompletionsTotal();
   } catch (e) {
-    console.error('[admin] refreshAllData 失败:', e);
+    console.error('[admin] refreshCurrentView 失败:', e);
   }
+  _applyCachedData();
 }
 
 function _applyCachedData() {
-  API.migrateBountyCompletionsToTotal(cachedData);
   adminHomeworks = cachedData.homeworks?.[AdminUtil.dateKey(adminDate)] || [];
   adminShopItems = cachedData.shopItems || [];
   adminRedemptions = cachedData.redemptions || [];
@@ -238,6 +239,11 @@ function _applyCachedData() {
   adminBountyTasks = cachedData.bountyTasks || [];
   adminBountySubmissions = cachedData.bountySubmissions || {};
   adminBountyCompletions = cachedData.bountyCompletions || {};
+  // 赏金累计：采用 Data 层按需结果（loadBountyCompletionsTotal 已填充 bountyCompletions._total）
+  const bt = (typeof Data !== 'undefined' && Data && typeof Data.getBountyTotal === 'function')
+    ? Data.getBountyTotal()
+    : (cachedData.bountyCompletions && cachedData.bountyCompletions._total);
+  adminBountyCompletions._total = (bt && typeof bt === 'object') ? Object.assign({}, bt) : {};
   adminSettings = cachedData.settings || {};
   if (!adminSettings.subjects || adminSettings.subjects.length === 0) {
     adminSettings.subjects = SETTINGS_DEFAULTS.subjects.map(s => ({ ...s }));
@@ -1071,7 +1077,9 @@ function renderBountyTab() {
   const sorted = [...adminBountyTasks].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
   const historyCounts = {};
-  const totalComps = (adminBountyCompletions && adminBountyCompletions._total) || {};
+  const totalComps = (typeof Data !== 'undefined' && Data && typeof Data.getBountyTotal === 'function')
+    ? (Data.getBountyTotal() || {})
+    : ((adminBountyCompletions && adminBountyCompletions._total) || {});
   for (const tid of Object.keys(totalComps)) {
     const v = totalComps[tid];
     const delta = typeof v === 'number' ? v : (v ? 1 : 0);
@@ -1772,64 +1780,41 @@ function aggregateCompletionData(data, groupMode) {
   });
 }
 
-function renderStatsTab() {
+async function renderStatsTab() {
   const container = document.getElementById('adminContent');
 
-  const allDates = Object.keys(cachedData?.dailySettlement || {}).sort();
-  const maxDays = _statsRange === 'month' ? 30 : _statsRange === 'week' ? 7 : 9999;
-  const dateRange = maxDays >= 9999 ? allDates : allDates.slice(-maxDays);
-  const groupMode = getGroupMode(dateRange.length);
+  // 统计聚合由 Data 层按需提供（/api/stats 服务端聚合，或降级本地计算），
+  // 不再遍历 cachedData 全量历史（AC-1 解耦、AC-2 跨天正确）。
+  let stats = null;
+  if (typeof Data !== 'undefined' && Data && typeof Data.loadAdminStats === 'function') {
+    try {
+      stats = await Data.loadAdminStats(_statsRange);
+    } catch (e) {
+      console.warn('[renderStatsTab] 统计加载失败，本地估算', e);
+    }
+  }
+  if (!stats && typeof Data !== 'undefined' && Data && typeof Data.computeStatsFromCachedData === 'function') {
+    try { stats = Data.computeStatsFromCachedData(_statsRange); } catch (_) { stats = null; }
+  }
+  if (!stats) stats = _emptyStatsAgg(_statsRange);
 
-  const totalMinData = [];
-  const effRatioData = [];
-  const dailyPointsData = [];
-
-  dateRange.forEach(date => {
-    const hwList = cachedData?.homeworks?.[date] || [];
-    const doneHw = hwList.filter(h => h.status === 'done' && !h.rejected);
-    const totalMin = doneHw.reduce((sum, h) => sum + (h.actualDuration || 0), 0);
-    totalMinData.push({ date, value: totalMin });
-
-    const effHw = doneHw.filter(h => h.suggestedDuration > 0 && h.actualDuration !== null);
-    const ratios = effHw.map(h => h.suggestedDuration / h.actualDuration);
-    const avgRatio = ratios.length > 0 ? Math.round(ratios.reduce((a, b) => a + b, 0) / ratios.length * 100) : 0;
-    effRatioData.push({ date, value: avgRatio });
-
-    const settlement = cachedData?.dailySettlement?.[date];
-    dailyPointsData.push({ date, value: settlement?.finalPoints ?? 0 });
-  });
-
-  const totalMinutes = aggregateDaily(totalMinData, groupMode, 'mean');
-  const efficiencyRatios = aggregateDaily(effRatioData, groupMode, 'mean');
-  const dailyPoints = aggregateDaily(dailyPointsData, groupMode);
-
-  const ratingsList = dateRange.filter(d => cachedData?.dailySettlement?.[d]?.rating).reverse();
-  const ratingCounts = {};
+  const groupMode = stats.groupMode;
+  const totalMinutes = stats.totalMinutes;
+  const efficiencyRatios = stats.efficiencyRatios;
+  const dailyPoints = stats.dailyPoints;
+  const completedInSchoolBarData = stats.completedInSchool;
+  const ratingsList = stats.ratingsList;
+  const ratingCounts = stats.ratingCounts;
   const ratingColors = { '优': 'var(--success)', '良': 'var(--accent)', '可': 'var(--warning)', '差': 'var(--danger)' };
-  ratingsList.forEach(d => {
-    const r = cachedData?.dailySettlement?.[d]?.rating;
-    if (r) ratingCounts[r] = (ratingCounts[r] || 0) + 1;
-  });
   const ratingPieData = Object.entries(ratingCounts).map(([rating, count]) => ({ rating, count }));
-  const ratingTotal = ratingPieData.reduce((s, d) => s + d.count, 0);
-
-  // 在校提前完成比例
-  const completedInSchoolBarData = [];
-  dateRange.forEach(date => {
-    const hwList = cachedData?.homeworks?.[date] || [];
-    const doneHw = hwList.filter(h => h.status === 'done' && !h.rejected);
-    const inSchool = doneHw.filter(h => h.completedInSchool).length;
-    const atHome = doneHw.length - inSchool;
-    completedInSchoolBarData.push({ date, inSchool, atHome });
-  });
-  const barData = aggregateCompletionData(completedInSchoolBarData, groupMode);
+  const ratingTotal = stats.ratingTotal;
 
   const shownRatings = ratingsList.slice(0, _ratingShowCount);
   const hasMoreRatings = ratingsList.length > _ratingShowCount;
 
-  const avgTotalMin = totalMinutes.length > 0 ? Math.round(totalMinutes.reduce((a, b) => a + b.value, 0) / totalMinutes.length) : 0;
+  const avgTotalMin = stats.avgTotalMin;
   const avgEff = efficiencyRatios.filter(e => e.value > 0);
-  const avgEffVal = avgEff.length > 0 ? Math.round(avgEff.reduce((a, b) => a + b.value, 0) / avgEff.length) : 0;
+  const avgEffVal = stats.avgEffVal;
 
   const rangeOptions = [
     { key: 'week', label: '周' },
@@ -1837,7 +1822,7 @@ function renderStatsTab() {
     { key: 'all', label: '总计' },
   ];
 
-  const dateCount = dateRange.length;
+  const dateCount = stats.dateCount;
   const groupLabels = { day: '每日', week: '每周', month: '每月' };
 
   const makeRangeBtn = (opt) =>
@@ -1858,7 +1843,7 @@ function renderStatsTab() {
         <div class="stat-card-label">获得积分</div>
       </div>
       <div class="stat-card">
-        <div class="stat-card-value">${calcStreak(allDates)}</div>
+        <div class="stat-card-value">${stats.streak}</div>
         <div class="stat-card-label">连续全勤天数</div>
       </div>
     </div>
@@ -1872,21 +1857,21 @@ function renderStatsTab() {
       <div class="chart-title">📈 ${groupLabels[groupMode]}总用时（分钟）</div>
       ${totalMinutes.length === 0
       ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'
-      : renderSvgLineChart(totalMinutes, { color: 'var(--success)', medianColor: 'var(--accent)', unit: '分钟', showLOESS: _statsRange === 'month' || _statsRange === 'all' })}
+      : renderSvgLineChart(totalMinutes.map(d => ({ label: d.date, value: d.value })), { color: 'var(--success)', medianColor: 'var(--accent)', unit: '分钟', showLOESS: _statsRange === 'month' || _statsRange === 'all' })}
     </div>
 
     <div class="chart-container">
       <div class="chart-title">📊 ${groupLabels[groupMode]}效率比（参考/实际）</div>
       ${efficiencyRatios.length === 0 || efficiencyRatios.every(d => d.value === 0)
       ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'
-      : renderSvgLineChart(efficiencyRatios, { color: 'var(--warning)', medianColor: 'var(--accent)', unit: '%', showLOESS: _statsRange === 'month' || _statsRange === 'all' })}
+      : renderSvgLineChart(efficiencyRatios.map(d => ({ label: d.date, value: d.value })), { color: 'var(--warning)', medianColor: 'var(--accent)', unit: '%', showLOESS: _statsRange === 'month' || _statsRange === 'all' })}
     </div>
 
     <div class="chart-container">
       <div class="chart-title">🏫 在校提前完成比例</div>
-      ${barData.length === 0
+      ${completedInSchoolBarData.length === 0
       ? '<div style="text-align:center;color:var(--text-secondary);padding:20px;font-size:14px;">暂无数据</div>'
-      : renderStackedBarChart(barData)}
+      : renderStackedBarChart(completedInSchoolBarData.map(d => ({ label: d.date, inSchool: d.inSchool, atHome: d.atHome })))}
     </div>
 
     <div class="chart-container">
@@ -1908,11 +1893,10 @@ function renderStatsTab() {
       ${ratingsList.length === 0
       ? '<div style="text-align:center;color:var(--text-secondary);padding:12px;font-size:14px;">暂无评级记录</div>'
       : shownRatings.map(d => {
-        const s = cachedData?.dailySettlement?.[d];
         return `<div class="rating-history-item">
-              <span>${d}</span>
-              <span>${s.totalBeforeRating}×${s.multiplier}=${s.finalPoints}分</span>
-              <span class="rating-grade ${s.rating}">${s.rating}</span>
+              <span>${d.date}</span>
+              <span>${d.totalBeforeRating}×${d.multiplier}=${d.finalPoints}分</span>
+              <span class="rating-grade ${d.rating}">${d.rating}</span>
             </div>`;
       }).join('')}
       ${hasMoreRatings || _ratingShowCount > 5 ? `<div style="text-align:center;padding:12px;display:flex;gap:8px;justify-content:center;">
@@ -1946,6 +1930,26 @@ function calcStreak(allDates) {
   }
 
   return streak;
+}
+
+// 统计聚合加载失败时的零值兜底，保证 renderStatsTab 不崩（不直接遍历 cachedData）
+function _emptyStatsAgg(range) {
+  return {
+    range: range || 'week',
+    groupMode: 'day',
+    dateCount: 0,
+    totalMinutes: [],
+    efficiencyRatios: [],
+    dailyPoints: [],
+    completedInSchool: [],
+    ratingCounts: { '优': 0, '良': 0, '可': 0, '差': 0 },
+    ratingTotal: 0,
+    ratingsList: [],
+    streak: 0,
+    avgTotalMin: 0,
+    avgEffVal: 0,
+    totalPoints: 0,
+  };
 }
 
 // ========== Tab 6: Settings ==========

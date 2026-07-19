@@ -1111,7 +1111,7 @@ async function redeemFromRewardBox(itemId) {
     redemptions.push(newRedemption);
     await API.putRedemption(newRedemption.id, newRedemption);
 
-    cachedData = await API.getData();
+    await Data.loadConfig();
     showMyRewards();
     showToast('已提交，等待确认');
     Voice.speak('已提交申请，等待确认');
@@ -1146,7 +1146,7 @@ async function cancelRedemption(redemptionId) {
       await API.updatePoints('earn', r.points, '撤回兑换：' + r.itemName);
     }
 
-    cachedData = await API.getData();
+    await Data.loadConfig();
     showMyRewards();
     showToast('已撤回');
   } finally {
@@ -1257,7 +1257,7 @@ async function redeemItem(itemId) {
 
     await API.updatePoints('spend', item.points, '兑换：' + item.name);
 
-    cachedData = await API.getData();
+    await Data.loadConfig();
     updateShopPage();
     showToast('兑换成功！');
     Voice.speak('兑换成功！');

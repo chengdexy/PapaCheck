@@ -217,7 +217,7 @@ async function requestDeferHomework(hwId) {
   try {
     const dateKey = Util.dateKey(currentDate);
     await API.deferHomework(dateKey, hwId, 'request', new Date().toISOString());
-    cachedData = await API.getData();
+    await Data.loadChildDay(dateKey);
     homeworks = cachedData.homeworks?.[dateKey] || [];
     Voice.speak('已申请延后，等待审核');
     needsFullRender = true;
@@ -833,8 +833,8 @@ async function submitForRating() {
 /** 拉取最新数据并刷新大屏（由 RealtimeManager 回调触发） */
 async function refreshFromServer() {
   try {
-    cachedData = await API.getData();
-    API.migrateBountyCompletionsToTotal(cachedData);
+    await Data.refreshCurrentView();
+    await Data.loadBountyCompletionsTotal();
     const key = Util.dateKey(currentDate);
     homeworks = cachedData.homeworks?.[key] || [];
     freeTimeTasks = cachedData.freeTimeTasks?.[key] || [];
@@ -879,8 +879,8 @@ async function init() {
   showTransitionMask('正在加载数据…');
 
   try {
-    cachedData = await API.getData();
-    isServerMode = true;
+    await Data.bootstrap('child');
+    await Data.loadBountyCompletionsTotal();
   } catch (e) {
     hideTransitionMask();
     showToast('加载数据失败，请检查网络');
@@ -889,7 +889,6 @@ async function init() {
   }
   hideTransitionMask();
 
-  API.migrateBountyCompletionsToTotal(cachedData);
   const key = Util.dateKey(currentDate);
 
   homeworks = cachedData.homeworks?.[key] || [];

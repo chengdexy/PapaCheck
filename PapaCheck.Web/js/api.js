@@ -152,6 +152,11 @@ async function getActiveBuffs() {
   return await _fetch(API_BASE + '/active-buffs');
 }
 
+// 按需端点：积分余额（配置类，与历史天数无关）
+async function getPointsBalance() {
+  return await _fetch(API_BASE + '/points/balance');
+}
+
 async function saveActiveBuffs(buffs) {
   await _fetch(API_BASE + '/active-buffs', {
     method: 'PUT',
@@ -466,6 +471,7 @@ const API = {
   saveSettings,
   getActiveBuffs,
   saveActiveBuffs,
+  getPointsBalance,
   getShopItems,
   saveShopItems,
   getEfficiency,
