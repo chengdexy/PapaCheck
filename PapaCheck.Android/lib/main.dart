@@ -488,7 +488,10 @@ class _PapaCheckAppState extends State<PapaCheckApp> {
 
   void _applyOrientation(DeviceRole role) {
     if (role == DeviceRole.child) {
+      // 孩子端允许竖屏+横屏，手机竖屏走紧凑布局
       SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
       ]);

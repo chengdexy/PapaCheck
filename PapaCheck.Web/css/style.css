@@ -985,12 +985,21 @@ body {
 /* ========== Responsive ========== */
 @media (max-width: 900px) {
   .big-screen-mode.active {
+    position: static;
+    min-height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     padding: 16px 20px;
+    padding-top: calc(16px + env(safe-area-inset-top));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
     gap: 14px;
   }
 
   .big-content {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    align-content: flex-start;
     gap: 14px;
   }
 
@@ -998,7 +1007,15 @@ body {
     gap: 14px;
   }
 
+  .big-card {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
   .big-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
     padding: 12px 20px;
   }
 
@@ -1090,6 +1107,84 @@ body {
   .btn-shop-nav {
     font-size: 14px;
     padding: 8px 14px;
+  }
+}
+
+/* Phone layout: tighter, touch-friendly */
+@media (max-width: 480px) {
+  .big-screen-mode.active {
+    padding: 12px 14px;
+    padding-top: calc(12px + env(safe-area-inset-top));
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .big-time {
+    font-size: 30px;
+  }
+
+  .current-task-name {
+    font-size: 24px;
+  }
+
+  .current-task-icon {
+    font-size: 48px;
+  }
+
+  .current-task-time {
+    font-size: 16px;
+  }
+
+  .big-stats {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .stat-value {
+    font-size: 24px;
+  }
+
+  .stat-label {
+    font-size: 12px;
+  }
+
+  .homework-card {
+    padding: 10px 12px;
+  }
+
+  .homework-subject {
+    font-size: 16px;
+  }
+
+  .homework-timer {
+    font-size: 16px;
+  }
+
+  .shop-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settlement-card,
+  .shop-card {
+    max-height: 90dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  button,
+  .btn,
+  .btn-shop-nav {
+    min-height: 44px;
+  }
+}
+
+/* Touch devices: drop hover transforms */
+@media (hover: none) {
+  .big-card:hover,
+  .homework-card:hover,
+  .shop-card:hover,
+  .btn:hover {
+    transform: none;
   }
 }
 
