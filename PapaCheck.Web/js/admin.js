@@ -858,11 +858,22 @@ async function adjustShopQty(itemId, delta) {
 }
 
 async function deleteShopItem(id) {
-  adminShopItems = adminShopItems.filter(i => i.id !== id);
-  await API.deleteShopItem(id);
+  if (!id) {
+    showToast('该商品缺少标识，无法删除，请用清理脚本处理');
+    return;
+  }
+  try {
+    await API.deleteShopItem(id);
+  } catch (e) {
+    console.error('删除商品失败', e);
+    showToast('删除失败：商品不存在或已被删除');
+    await refreshAllData();
+    renderShopTab();
+    return;
+  }
+  showToast('商品已删除');
   await refreshAllData();
   renderShopTab();
-  showToast('商品已删除');
 }
 
 // ========== Tab 3: Reward Box ==========
