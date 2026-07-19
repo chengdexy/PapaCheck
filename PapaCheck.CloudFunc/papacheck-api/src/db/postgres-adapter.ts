@@ -1036,11 +1036,19 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   async getShopItems(tenantId?: string): Promise<any[]> {
     await this._resetDailyShopQuantity(tenantId);
-    return (await this._getJson('shop_items', tenantId)) ?? [];
+    const items = (await this._getJson('shop_items', tenantId)) ?? [];
+    // 过滤软删除项；同时丢弃无有效 id 的损坏数据（这类记录按 id 永远删不掉，先不渲染）
+    return items.filter(
+      (item: any) => item && !item.isDeleted && typeof item.id === 'string' && item.id.length > 0
+    );
   }
 
   async saveShopItems(items: ShopItemDTO[], tenantId?: string): Promise<void> {
-    await this._setJson('shop_items', items, tenantId);
+    // 防御：为缺失 id 的商品补生成，避免任何写入路径再存出按 id 无法命中的脏数据
+    const normalized = (items ?? []).map((it: any) =>
+      it && it.id ? it : { ...(it ?? {}), id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8) }
+    );
+    await this._setJson('shop_items', normalized, tenantId);
     await this.recordModification('shop_items', '1', new Date().toISOString(), tenantId);
   }
 
@@ -1054,6 +1062,8 @@ export class PostgresAdapter extends DatabaseAdapter {
     const items = (await this._getJson('shop_items', tenantId)) ?? [];
     const { index, item: existingItem } = this._findInArray(items, id);
     const now = new Date().toISOString();
+    // B3: 以 URL 路径 id 为准兜底，杜绝存出无 id 的商品（导致按 id 删除永远命中不到）
+    data.id = data.id ?? id;
     data.lastModified = data.lastModified ?? now;
 
     if (index !== -1) {
@@ -1070,16 +1080,17 @@ export class PostgresAdapter extends DatabaseAdapter {
     await this.recordModification('shop_items', '1', now, tenantId);
   }
 
-  async deleteShopItem(id: string, tenantId?: string): Promise<void> {
+  async deleteShopItem(id: string, tenantId?: string): Promise<boolean> {
     const items = (await this._getJson('shop_items', tenantId)) ?? [];
     const { index } = this._findInArray(items, id);
-    if (index === -1) return;
+    if (index === -1) return false;
 
     const now = new Date().toISOString();
     items[index].isDeleted = true;
     items[index].lastModified = now;
     await this._setJson('shop_items', items, tenantId);
     await this.recordModification('shop_items', '1', now, tenantId);
+    return true;
   }
 
   // ==================== Redemptions ====================

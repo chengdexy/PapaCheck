@@ -17,9 +17,13 @@ export abstract class DatabaseAdapter {
   }
 
   protected _findByUuid(items: any[], uuid: string): { index: number; item: any } {
+    const target = String(uuid);
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      if (item?.uuid === uuid || item?.id === uuid || item?.taskId === uuid) {
+      if (
+        item != null &&
+        (String(item.uuid) === target || String(item.id) === target || String(item.taskId) === target)
+      ) {
         return { index: i, item };
       }
     }

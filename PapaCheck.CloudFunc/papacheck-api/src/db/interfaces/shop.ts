@@ -11,7 +11,7 @@ export interface IShopStore {
   saveShopItems(items: ShopItemDTO[], tenantId?: string): Promise<void>;
   getShopItemById(id: string, tenantId?: string): Promise<ShopItemDTO | null>;
   putShopItem(id: string, data: ShopItemDTO, tenantId?: string): Promise<void>;
-  deleteShopItem(id: string, tenantId?: string): Promise<void>;
+  deleteShopItem(id: string, tenantId?: string): Promise<boolean>;
   getRedemptions(tenantId?: string, childId?: string): Promise<RedemptionDTO[]>;
   saveRedemptions(items: RedemptionDTO[], tenantId?: string, childId?: string): Promise<void>;
   clearFulfilledRedemptions(tenantId?: string, childId?: string): Promise<void>;

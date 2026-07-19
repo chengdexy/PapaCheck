@@ -905,7 +905,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   // 52. DELETE /api/shop/:id
   app.delete<{ Params: { id: string } }>('/api/shop/:id', { schema: deleteParamSchema }, async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;
-    await db.deleteShopItem(request.params.id, tenantId);
+    const found = await db.deleteShopItem(request.params.id, tenantId);
+    if (!found) {
+      return reply.code(404).send({ ok: false, error: 'NOT_FOUND', message: '商品不存在或已被删除' });
+    }
     return sendJson(reply, { ok: true });
   });
 
