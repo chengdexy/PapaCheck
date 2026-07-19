@@ -1,5 +1,7 @@
 # 设计方案：客户端数据按需获取（按需索取）
 
+> ⚠️ **状态注记（2026-07-19）**：本文为架构设计稿。截至合并 `backup/pre-rewrite-2026-07-14` 入 `main`，**对应的前端 `Data` 层（`js/data-layer.js`、`Data.refreshActive()`、`Data.init()`、`Data.day`）尚未在 `PapaCheck.Web` 代码中实现**（`data-layer.js` 在合并前 main 也不存在）。前端三端（`app.js`/`admin.js`/`big-screen.js`）实际仍使用 `API.getData()` **全量拉取 `/api/data`**。已落地并上线的仅是**后端按需端点**（`GET /api/stats`、`/api/points/balance`、`/api/bounty-completions/total`、`/api/data-version`，见 `docs/CHANGELOG.md` 的 Added 条目）。前端切换到按需端点属于**待办重构**，不在本次合并部署范围内。
+
 - 文档版本：v1.0（架构设计稿）
 - 作者：software-architect（Bob）
 - 日期：2026-07-18

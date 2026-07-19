@@ -1,5 +1,7 @@
 # 实时刷新最小化回归验证清单（FR-6 / AC-4）
 
+> ⚠️ **状态注记（2026-07-19）**：本清单断言的 `Data.refreshActive()` / `Data.init()` / `Data.day` 等 API 在 `PapaCheck.Web` 代码中**尚未实现**（`js/data-layer.js` 未落地），前端实际仍全量 `API.getData()` 拉取 `/api/data`。**本清单待前端 `Data` 层实现后适用**，当前仅作设计目标留存。
+
 > 由 QA（T05）产出。验证目标：**版本戳变化后只重拉「当前视图」资源，不触发全量 `/api/data` 重拉**。
 > 代码级已通过 `PapaCheck.Web/js/__tests__/data-layer.test.js`（4 用例，全过）覆盖 `Data.refreshActive()`；
 > 本清单用于浏览器 / 真机手动回归，确认各端接线符合预期。

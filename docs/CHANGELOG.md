@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### Added
+- **合并 CloudBase 迁移分支（代码级下线离线模式）**：将 `backup/pre-rewrite-2026-07-14`（2026-07-07~14 的 ECS→云函数迁移 + 全面下线离线任务线）经受控合并合入 `main`。Web 端 `connection.js`/`db.js`/`crdt-sync.js`/`sync.js`/`sw.js` 全部移除，`ConnectionManager` 引用降为 0，`RealtimeManager` 就位；Android 移除离线快照/写队列；Site/Release 改用 `tcb hosting deploy`/`tcb fn deploy`/CDN 302 绕过 ECS。后端 4 个冲突文件（`app.ts`/`admin/routes.ts`/`postgres-adapter.ts`/`types.ts`）保留 `main` 的数据按需后端。回退点：`git tag pre-merge-backup-20260719`。详见 `docs/merge-cloudbase-migration-2026-07-19.md`
+- **版本全链路对齐 1.6.7**：Android `pubspec.yaml`、CloudFunc `package.json`（`/api/version` 来源）、`cloudbaserc.json`（`/api/download` CDN）统一为 1.6.7
+
 ### Changed
 - **文档大范围修正与清理**：落地页 5 处"离线可用"改为"云端实时同步"，"AI 评优"改为"家长评优"，"拍照录入作业"改为"添加作业"。ECS 链接全部切换到 CloudBase 路径。Footer 版本号 v3.0→v1.6.6。HANDOVER 标记 CloudBase 迁移完成、ECS 已下线，删除 ECS 配置/切换流程/回滚预案 3 节。PROGRESS/PRD/README 同步更新。清理 10 份已完成功能的过期 spec/plan 文档
 - **Release 控制台 Windows 兼容性修复**：`executor.ts` `executeSteps()` 在 Windows 上默认 `shell: true` 以正确解析 `.cmd` 包装脚本。`site-publish.ts`/`fn-deploy.ts` 改为 `exec()` 避免 `execFile + shell: true` 的 DEP0190 废弃警告。`console-server.ts` 将 site/web/fn 部署改为使用共享 `executor` 实例，SSE 进度正常展示。新增 `PapaCheck.Web/deploy.bat` 实现仅上传必要文件（跳过 node_modules/tts_cache/apk/__tests__），避免 7800+ 垃圾文件上传。`.gitignore` 添加 `_web_deploy/`
