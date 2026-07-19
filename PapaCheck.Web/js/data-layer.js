@@ -255,18 +255,22 @@
     });
   }
 
-  /** 家长端单日（作业/赏金 tab）：bountySubmissions + homeworks */
+  /** 家长端单日（作业/赏金 tab）：bountySubmissions + homeworks + settlement(待评级) */
   async function loadAdminDay(dateKey) {
     await _withFallback(async function () {
       /* eslint-disable no-undef */
-      const [bs, hw] = await Promise.all([
+      const [bs, hw, st] = await Promise.all([
         API.getBountySubmissions(dateKey),
         API.getHomeworks(dateKey),
+        API.getSettlement(dateKey),
       ]);
       /* eslint-enable no-undef */
       const snap = _ensureSnapshot();
       if (bs !== undefined && bs !== null) snap.bountySubmissions[dateKey] = bs;
       if (hw !== undefined && hw !== null) snap.homeworks[dateKey] = hw;
+      // 关键：admin.js 的「待评级」提醒依赖 cachedData.dailySettlement[date]，
+      // 若此处不加载，家长端永远看不到孩子的评级申请（on-demand 重构遗漏点）。
+      if (st !== undefined && st !== null) snap.dailySettlement[dateKey] = st;
     });
   }
 
