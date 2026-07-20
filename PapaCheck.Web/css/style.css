@@ -306,6 +306,61 @@ body {
   color: var(--text);
 }
 
+/* Scalable homework card text (replaces inline px so it honours phone scaling) */
+.hw-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.hw-subject-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hw-subject {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hw-mode {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.hw-content {
+  font-size: 15px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.hw-sub {
+  font-size: 13px;
+  margin-top: 2px;
+  color: var(--text-secondary);
+}
+
+.hw-count {
+  flex-shrink: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
 .homework-meta-row {
   display: flex;
   align-items: center;
@@ -998,14 +1053,16 @@ body {
 /* ========== Responsive ========== */
 @media (max-width: 900px) {
   .big-screen-mode.active {
-    position: static;
-    min-height: 100dvh;
+    position: fixed;
+    inset: 0;
+    height: 100dvh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 16px 20px;
-    padding-top: calc(16px + env(safe-area-inset-top));
-    padding-bottom: calc(16px + env(safe-area-inset-bottom));
-    gap: 14px;
+    overscroll-behavior: contain;
+    padding: 14px 16px;
+    padding-top: calc(14px + env(safe-area-inset-top));
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+    gap: 12px;
   }
 
   .big-content {
@@ -1125,65 +1182,139 @@ body {
   }
 }
 
-/* Phone layout: tighter, touch-friendly */
+/* Phone layout: scale-first, compact, touch-friendly */
 @media (max-width: 480px) {
   .big-screen-mode.active {
-    padding: 12px 14px;
-    padding-top: calc(12px + env(safe-area-inset-top));
-    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    padding: 10px 12px;
+    padding-top: calc(10px + env(safe-area-inset-top));
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    gap: 10px;
+  }
+
+  .big-header {
+    padding: 10px 14px;
+    gap: 8px;
+    border-radius: 14px;
   }
 
   .big-time {
-    font-size: 30px;
-  }
-
-  .current-task-name {
     font-size: 24px;
   }
 
+  .big-date {
+    font-size: 18px;
+  }
+
+  .big-card {
+    padding: 12px 14px;
+    border-radius: 16px;
+  }
+
+  .big-card-title {
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
+
   .current-task-icon {
-    font-size: 48px;
+    font-size: 40px;
+    margin-bottom: 6px;
+  }
+
+  .current-task-name {
+    font-size: 20px;
+    margin-bottom: 6px;
   }
 
   .current-task-time {
-    font-size: 16px;
+    font-size: 15px;
+    margin-bottom: 8px;
+  }
+
+  .current-task-display {
+    padding: 12px;
+  }
+
+  .hw-icon {
+    font-size: 24px;
+  }
+
+  .hw-subject {
+    font-size: 15px;
+  }
+
+  .hw-content {
+    font-size: 13px;
+    -webkit-line-clamp: 2;
+  }
+
+  .hw-sub {
+    font-size: 12px;
+  }
+
+  .hw-count {
+    font-size: 14px;
+  }
+
+  .homework-card {
+    padding: 8px 10px;
+    gap: 4px;
+    border-radius: 12px;
+  }
+
+  .homework-timer {
+    font-size: 15px;
   }
 
   .big-stats {
     flex-wrap: wrap;
     overflow: visible;
-    gap: 10px;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: 16px;
   }
 
   .big-stats .stat-item,
   .big-stats .btn-shop-nav {
-    flex: 1 1 calc(50% - 5px);
+    flex: 1 1 calc(50% - 4px);
     min-width: 0;
   }
 
   .btn-shop-nav {
     white-space: normal;
     text-align: center;
+    font-size: 13px;
+    padding: 8px 12px;
   }
 
   .stat-value {
-    font-size: 24px;
+    font-size: 22px;
   }
 
   .stat-label {
-    font-size: 12px;
+    font-size: 11px;
   }
 
-  .homework-card {
-    padding: 10px 12px;
-  }
-
-  .homework-subject {
+  .btn-complete {
     font-size: 16px;
+    padding: 12px 22px;
+    max-width: 180px;
   }
 
-  .homework-timer {
+  .btn-pause,
+  .btn-resume {
     font-size: 16px;
+    padding: 12px 16px;
+  }
+
+  .btn-redeem-sm {
+    font-size: 13px;
+    padding: 8px 14px;
+  }
+
+  .reward-item-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .shop-grid {

@@ -566,17 +566,17 @@ function updateHomeworkGrid() {
     bountyCards.push(...submittedSubs.map(sub => {
       const task = bountyTasks.find(t => t.id === sub.taskId);
       if (!task) return '';
-      return '<div class="homework-card" style="border-left:3px solid var(--warning);opacity:0.8;"><div class="homework-card-row"><span style="font-size:28px;flex-shrink:0;">⏳</span><div class="homework-card-info"><div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-size:18px;font-weight:600;">' + escapeHtml(task.name) + typeLabel(task) + '</span>' + (historyCounts[task.id] ? '<span style="font-size:18px;font-weight:700;color:var(--accent);">x' + historyCounts[task.id] + '</span>' : '') + '</div><div style="font-size:13px;color:var(--warning);margin-top:2px;">等待审核中...</div></div></div></div>';
+      return '<div class="homework-card" style="border-left:3px solid var(--warning);opacity:0.8;"><div class="homework-card-row"><span class="hw-icon">⏳</span><div class="homework-card-info"><div class="hw-subject-row"><span class="hw-subject">' + escapeHtml(task.name) + typeLabel(task) + '</span>' + (historyCounts[task.id] ? '<span class="hw-count">x' + historyCounts[task.id] + '</span>' : '') + '</div><div class="hw-sub" style="color:var(--warning);">等待审核中...</div></div></div></div>';
     }));
     bountyCards.push(...doingSubs.map(sub => {
       const task = bountyTasks.find(t => t.id === sub.taskId);
       if (!task) return '';
-      return '<div class="homework-card" style="border-left:3px solid var(--accent);"><div class="homework-card-row"><span style="font-size:28px;flex-shrink:0;">' + bountyEmoji(task) + '</span><div class="homework-card-info"><div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-size:18px;font-weight:600;">' + escapeHtml(task.name) + typeLabel(task) + '</span>' + (historyCounts[task.id] ? '<span style="font-size:18px;font-weight:700;color:var(--accent);">x' + historyCounts[task.id] + '</span>' : '') + '</div><div style="font-size:13px;color:var(--text-secondary);margin-top:2px;">进行中</div></div></div></div>';
+      return '<div class="homework-card" style="border-left:3px solid var(--accent);"><div class="homework-card-row"><span class="hw-icon">' + bountyEmoji(task) + '</span><div class="homework-card-info"><div class="hw-subject-row"><span class="hw-subject">' + escapeHtml(task.name) + typeLabel(task) + '</span>' + (historyCounts[task.id] ? '<span class="hw-count">x' + historyCounts[task.id] + '</span>' : '') + '</div><div class="hw-sub">进行中</div></div></div></div>';
     }));
     bountyCards.push(...availableBounty
       .filter(t => !doingSubs.some(s => s.taskId === t.id) && !submittedSubs.some(s => s.taskId === t.id))
       .map(task => {
-        return '<div class="homework-card" onclick="confirmStartBounty(\'' + task.id + '\')" style="cursor:pointer;"><div class="homework-card-row"><span style="font-size:28px;flex-shrink:0;">' + bountyEmoji(task) + '</span><div class="homework-card-info"><div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-size:18px;font-weight:600;">' + escapeHtml(task.name) + typeLabel(task) + '</span>' + (historyCounts[task.id] ? '<span style="font-size:18px;font-weight:700;color:var(--accent);">x' + historyCounts[task.id] + '</span>' : '') + '</div></div></div></div>';
+        return '<div class="homework-card" onclick="confirmStartBounty(\'' + task.id + '\')" style="cursor:pointer;"><div class="homework-card-row"><span class="hw-icon">' + bountyEmoji(task) + '</span><div class="homework-card-info"><div class="hw-subject-row"><span class="hw-subject">' + escapeHtml(task.name) + typeLabel(task) + '</span>' + (historyCounts[task.id] ? '<span class="hw-count">x' + historyCounts[task.id] + '</span>' : '') + '</div></div></div></div>';
       }));
 
     const titleEl = document.querySelector('#homeworkCard .big-card-title');
@@ -706,13 +706,13 @@ function updateHomeworkGrid() {
     return `
       <div class="homework-card ${statusClass} ${isDone && hw._animClass ? hw._animClass : ''}" data-hw-id="${hw.id}" ${clickAction}>
         <div class="homework-card-row">
-          ${subject.icon ? `<span style="font-size:28px;flex-shrink:0;">${subject.icon}</span>` : ''}
+          ${subject.icon ? `<span class="hw-icon">${subject.icon}</span>` : ''}
           <div class="homework-card-info">
-            <div style="display:flex;align-items:center;justify-content:space-between;">
-              <span style="font-size:18px;font-weight:600;">${escapeHtml(hw.subject)}</span>
-              <span style="font-size:12px;color:var(--text-secondary);">${modeLabel}</span>
+            <div class="hw-subject-row">
+              <span class="hw-subject">${escapeHtml(hw.subject)}</span>
+              <span class="hw-mode">${modeLabel}</span>
             </div>
-            <div style="font-size:15px;color:var(--text-secondary);">${escapeHtml(hw.content)}</div>
+            <div class="hw-content">${escapeHtml(hw.content)}</div>
           </div>
           ${rightSection}
         </div>
@@ -791,11 +791,11 @@ function updateFreeTimeGrid() {
     return `
       <div class="homework-card ${statusClass}" data-ft-id="${ft.id}" ${clickAction}>
         <div class="homework-card-row">
-          <span style="font-size:28px;flex-shrink:0;">🎮</span>
+          <span class="hw-icon">🎮</span>
           <div class="homework-card-info">
-            <div style="display:flex;align-items:center;justify-content:space-between;">
-              <span style="font-size:18px;font-weight:600;">${ft.name}</span>
-              <span style="font-size:12px;color:var(--text-secondary);">⏱️ ${ft.durationMinutes}分钟</span>
+            <div class="hw-subject-row">
+              <span class="hw-subject">${ft.name}</span>
+              <span class="hw-mode">⏱️ ${ft.durationMinutes}分钟</span>
             </div>
           </div>
           ${rightSection}
