@@ -579,6 +579,43 @@ export class PostgresAdapter extends DatabaseAdapter {
     return buildStatsFromData({ settlementByDate, homeworksByDate, dateRange, allDates, range: rangeMode });
   }
 
+  // ==================== 有数据日期索引（对应 GET /api/data-dates） ====================
+  // 返回指定月份（YYYY-MM）内「存在任意数据」的日期键数组（升序）。
+  // 用于家长端月视图日历点亮，避免逐日拉取。homeworks 仅计未删除项。
+  async getDataDates(month: string, tenantId?: string, childId?: string): Promise<string[]> {
+    if (!tenantId) throw new Error('tenantId required');
+    if (!/^\d{4}-\d{2}$/.test(month || '')) throw new Error('invalid month');
+    const from = month + '-01';
+    const to = month + '-31';
+    const tables = ['homeworks', 'daily_settlement', 'free_time_tasks', 'bounty_submissions', 'bounty_completions'];
+    const set = new Set<string>();
+    for (const table of tables) {
+      let query: string;
+      let params: any[];
+      if (childId) {
+        query = `SELECT date_key, data FROM ${table} WHERE tenant_id = $1 AND child_id = $2 AND date_key >= $3 AND date_key <= $4`;
+        params = [tenantId, childId, from, to];
+      } else {
+        query = `SELECT date_key, data FROM ${table} WHERE tenant_id = $1 AND date_key >= $3 AND date_key <= $4`;
+        params = [tenantId, from, to];
+      }
+      const result = await this.pool.query(query, params);
+      for (const row of result.rows) {
+        const dk = row.date_key;
+        if (typeof dk !== 'string') continue;
+        if (table === 'homeworks') {
+          const items = this._safeJsonParse(row.data);
+          if (Array.isArray(items) && items.some((h: any) => !h.isDeleted)) {
+            set.add(dk);
+          }
+        } else {
+          set.add(dk);
+        }
+      }
+    }
+    return Array.from(set).sort();
+  }
+
   // ==================== Bounty Completions Total（对应 GET /api/bounty-completions/total） ====================
 
   async getBountyCompletionsTotal(tenantId?: string, childId?: string): Promise<Record<string, number>> {

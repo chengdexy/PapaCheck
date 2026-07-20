@@ -182,6 +182,13 @@ async function getPointsBalance() {
   return await _fetch(API_BASE + '/points/balance');
 }
 
+// 月视图有数据日期索引：GET /data-dates?month=YYYY-MM → { dates: ["2026-07-01", ...] }
+async function getDataDates(year, month) {
+  const monthKey = year + '-' + String(month + 1).padStart(2, '0');
+  const res = await _fetch(API_BASE + '/data-dates?month=' + encodeURIComponent(monthKey));
+  return (res && Array.isArray(res.dates)) ? res.dates : [];
+}
+
 async function saveActiveBuffs(buffs) {
   await _fetch(API_BASE + '/active-buffs', {
     method: 'PUT',
@@ -497,6 +504,7 @@ const API = {
   getActiveBuffs,
   saveActiveBuffs,
   getPointsBalance,
+  getDataDates,
   getShopItems,
   saveShopItems,
   getEfficiency,

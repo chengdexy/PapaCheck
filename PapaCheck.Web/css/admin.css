@@ -1397,8 +1397,9 @@ input[type="number"] {
 }
 
 .mini-cal-day.holiday {
-  background: rgba(251, 191, 36, 0.2);
-  color: var(--warning, #fbbf24);
+  /* 假日标记用边框叠加：不占布局、不与数据态背景/字色冲突，使「假日+有数据」两者同时可见 */
+  outline: 2px solid var(--warning, #fbbf24);
+  outline-offset: -2px;
 }
 
 .mini-cal-day.selected {

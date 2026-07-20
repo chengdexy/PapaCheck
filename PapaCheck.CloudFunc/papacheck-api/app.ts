@@ -273,6 +273,19 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return sendJson(reply, { version });
   });
 
+  // 3.5 GET /api/data-dates?month=YYYY-MM —— 月视图有数据日期索引
+  app.get<{ Querystring: { month?: string } }>('/api/data-dates', async (request: any, reply) => {
+    const tenantId = request.jwtPayload?.tenant_id;
+    const childId = await requireChild(request, reply);
+    if (childId === null) return;
+    const month = request.query?.month;
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+      return reply.code(400).send({ error: 'invalid month, expected YYYY-MM' });
+    }
+    const dates = await db.getDataDates(month, tenantId, childId);
+    return sendJson(reply, { dates });
+  });
+
   // 4. GET /api/homeworks/:date
   app.get<{ Params: { date: string } }>('/api/homeworks/:date', async (request: any, reply) => {
     const tenantId = request.jwtPayload?.tenant_id;

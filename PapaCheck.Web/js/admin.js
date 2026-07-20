@@ -24,6 +24,29 @@ let _ratingShowCount = 5;
 let _selectedCalendarDate = null;
 let _calendarYear = null;
 let _calendarMonth = null;
+// 月视图「有数据日期索引」缓存：key `YYYY-MM` → 日期键数组（升序）
+let _monthDataDates = {};
+function _monthKeyOf(year, month) {
+  return year + '-' + String(month + 1).padStart(2, '0');
+}
+// 拉取（按需缓存）指定月的有数据日期索引；仅当显示月仍为该月时局部重渲染日历
+async function ensureMonthDataDates(year, month) {
+  const mk = _monthKeyOf(year, month);
+  if (_monthDataDates[mk] !== undefined) return;
+  try {
+    const dates = await API.getDataDates(year, month);
+    _monthDataDates[mk] = Array.isArray(dates) ? dates : [];
+  } catch (e) {
+    console.warn('[calendar] 月度数据索引加载失败', e);
+    _monthDataDates[mk] = []; // 缓存空，避免同会话反复失败请求
+  }
+  if (_calendarYear === year && _calendarMonth === month) renderMiniCalendar();
+}
+// 仅重渲染日历网格（不重渲染整个 settings tab，避免输入焦点丢失）
+function renderMiniCalendar() {
+  const el = document.getElementById('miniCalendarWrap');
+  if (el) el.innerHTML = buildMiniCalendar();
+}
 
 
 const SETTINGS_DEFAULTS = {
@@ -1988,7 +2011,7 @@ function renderSettingsTab() {
       <div class="admin-card-title">📅 日期管理</div>
       <div class="date-mgmt-row" style="display:flex;flex-direction:column;gap:12px;align-items:center;">
         <div style="flex:0 0 auto;">
-          ${calHtml}
+          <div id="miniCalendarWrap">${calHtml}</div>
         </div>
         <div class="date-mgmt-btns" style="display:flex;flex-direction:column;gap:10px;">
           <div style="font-size:20px;color:var(--accent);" id="selectedDateLabel">当前操作数据为：${AdminUtil.formatDate(adminDate)}</div>
@@ -2097,6 +2120,8 @@ function renderSettingsTab() {
   `;
 
   updateHolidayButtonLabel();
+  // 首次渲染（或切回 settings tab）时按需拉取当前月「有数据日期索引」，加载完仅重渲染日历网格
+  ensureMonthDataDates(_calendarYear, _calendarMonth);
 }
 
 function updateHolidayButtonLabel() {
@@ -2320,6 +2345,8 @@ function buildMiniCalendar() {
     html += '<div></div>';
   }
 
+  const mk = _monthKeyOf(year, month);
+  const idxSet = new Set(_monthDataDates[mk] || []);
   for (let day = 1; day <= daysInMonth; day++) {
     const d = new Date(year, month, day);
     const key = AdminUtil.dateKey(d);
@@ -2327,14 +2354,20 @@ function buildMiniCalendar() {
     const hasSettlement = cachedData?.dailySettlement?.[key];
     const hasRating = hasSettlement?.rating;
     const hasHomeworks = (cachedData?.homeworks?.[key] || []).length > 0;
+    const idxHasData = idxSet.has(key);
     const holidays = adminSettings.customHolidays || [];
 
     let className = 'mini-cal-day';
+    // 主数据状态（互斥）：已加载精确状态 > 弱数据索引
     if (hasRating) {
       className += ' has-rating';
     } else if (hasHomeworks) {
       className += ' has-homeworks';
-    } else if (holidays.includes(key)) {
+    } else if (idxHasData) {
+      className += ' has-data';
+    }
+    // 假日标记：独立叠加，始终显示，与数据状态共存（CSS 用 outline，不冲突）
+    if (holidays.includes(key)) {
       className += ' holiday';
     }
     if (isSelected) {
@@ -2342,7 +2375,7 @@ function buildMiniCalendar() {
     } else if (key === todayStr) {
       className += ' today';
     }
-    if (!hasRating && !hasHomeworks && !holidays.includes(key) && !isSelected && key !== todayStr) {
+    if (!hasRating && !hasHomeworks && !idxHasData && !holidays.includes(key) && !isSelected && key !== todayStr) {
       className += ' no-data';
     }
 
@@ -2353,7 +2386,7 @@ function buildMiniCalendar() {
   return html;
 }
 
-function navigateCalendarMonth(delta) {
+async function navigateCalendarMonth(delta) {
   _calendarMonth += delta;
   if (_calendarMonth < 0) {
     _calendarMonth = 11;
@@ -2362,7 +2395,8 @@ function navigateCalendarMonth(delta) {
     _calendarMonth = 0;
     _calendarYear += 1;
   }
-  renderSettingsTab();
+  await ensureMonthDataDates(_calendarYear, _calendarMonth);
+  renderMiniCalendar();
 }
 
 function startEditBalance() {
@@ -2395,7 +2429,10 @@ async function confirmAdjustPoints() {
     const diff = newBalance - oldBalance;
     if (diff !== 0) {
       const action = diff > 0 ? 'earn' : 'spend';
-      await API.updatePoints(action, Math.abs(diff), `积分已被调整为${newBalance}`);
+      const returnedBal = await API.updatePoints(action, Math.abs(diff), `积分已被调整为${newBalance}`);
+      // 本地乐观更新余额快照：data-layer 的 refreshCurrentView 此前在 settings tab 会跳过刷新，
+      // 若在此不写回，设置页将一直显示旧余额直到下次整页重载（bug：修改积分后不立即刷新）。
+      cachedData.points = { balance: (typeof returnedBal === 'number' ? returnedBal : newBalance) };
       const note = diff > 0
         ? '获得奖励积分：' + diff + '分'
         : '被惩罚，扣除积分：' + Math.abs(diff) + '分';

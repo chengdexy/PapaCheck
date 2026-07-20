@@ -361,6 +361,22 @@
     }));
   }
 
+  /** 重拉积分余额并写入快照（设置页改积分后立即反映；失败保留既有值） */
+  async function _reloadPoints() {
+    try {
+      /* eslint-disable no-undef */
+      const data = await API.getPointsBalance();
+      /* eslint-enable no-undef */
+      const snap = _ensureSnapshot();
+      const bal = (data && typeof data.balance === 'number')
+        ? data.balance
+        : (typeof data === 'number' ? data : 0);
+      snap.points = { balance: bal };
+    } catch (e) {
+      console.warn('[Data] 积分余额刷新失败（保留既有值）', e);
+    }
+  }
+
   // ========== 实时刷新：最小集 ==========
   /** 依据 _entry + 当前视图重拉最小集（替代全量重拉，达成 AC-1/AC-4） */
   async function refreshCurrentView() {
@@ -374,8 +390,13 @@
         await Promise.all([loadAdminStats(_statsRangeForAdmin()), loadBountyCompletionsTotal()]);
       } else if (tab === 'bounty' || tab === 'homework') {
         await loadAdminDay(_adminDateKey());
+      } else if (tab === 'settings') {
+        // 设置页承载「日历切日」与「改积分」两类写后刷新：
+        // 必须重拉当日数据（否则从设置页切到过往日期时 homework/settlement 永远空白），
+        // 并刷新积分余额（改积分后立即反映）。原实现在此直接 return 跳过，正是这两个 bug 的根因。
+        await Promise.all([loadAdminDay(_adminDateKey()), _reloadPoints()]);
       } else {
-        // 设置/商店/奖励箱/兑换 tab：配置已在 bootstrap 加载，写操作已本地乐观更新 → 跳过
+        // shop/redeem/rewardBox：纯配置视图，bootstrap 已加载，写操作本地乐观更新 → 跳过
         return;
       }
       return;

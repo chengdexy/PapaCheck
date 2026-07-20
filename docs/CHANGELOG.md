@@ -40,6 +40,15 @@
 ### Changed
 - **`/api/data` 瘦身并标 deprecated**：不再返回 `points.history` / `efficiencyHistory` / `badges` / `history` / `tasks` 5 个字段，保留 `bountyCompletions`。客户端后续应按新端点按需拉取，`/api/data` 暂时保留作回退
 
+### Fixed
+- **修复数据按需重构后家长端设置页积分不刷新、日历切过往日期空白**：根因为 `Data.refreshCurrentView()` 的 admin 分支对 settings 等 tab 直接 `return` 跳过刷新，作者假设写操作都做了本地乐观更新，但 `confirmAdjustPoints` 调 `API.updatePoints` 后未写回 `cachedData.points`，且从 settings tab 切到过往日期时 `loadAdminDay()` 永不执行。修复：`refreshCurrentView` 的 settings 分支改为重拉当日 + 积分余额（`_reloadPoints`）；`confirmAdjustPoints` 捕获返回余额做乐观写回。已部署 `papacheck/app/`
+
+### Added
+- **家长端日历月视图「有数据日期索引」端点**：新增 `GET /api/data-dates?month=YYYY-MM`，对该租户/孩子 5 张业务表（homeworks / daily_settlement / free_time_tasks / bounty_submissions / bounty_completions）按 `date_key` 区间查询，去重返回该月「有数据日期」升序键数组（homeworks 仅计未删除项）。前端 `API.getDataDates(year, month)` 按显示月拉取、切月再拉，日历网格用索引点亮 `has-data`，不再整片空白。按月按需，避免全量拉取日期索引
+
+### Changed
+- **日历假日状态改为独立叠加显示**：`buildMiniCalendar` 中 `holiday` 脱离互斥 `else if` 链、改为独立挂类；CSS `.mini-cal-day.holiday` 由「橙黄底 + 橙字」改为 `outline: 2px solid` 橙黄边框（`outline-offset: -2px` 内收、不占布局），使「假日 + 有数据」两者同时可见（假日橙框 + 数据态着色），不再互相吞没。已部署 `papacheck/app/`
+
 ## [1.4.2] - 2026-06-25
 
 ### Changed
