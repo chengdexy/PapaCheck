@@ -52,6 +52,12 @@
 ### Changed
 - **简化积分道具兑换流程（去掉申请与家长同意）**：孩子端奖励箱物品按钮由「兑换（提交申请）」改为「使用」，点击后直接进入待使用框——time 类生成 `freeTimeTask`、buff 类生成 `activeBuff`，不再创建 `pending` 兑换记录、不再等待家长端「确认兑现」；time 类使用后立即主动弹出开始计时确认界面（`confirmStartFreeTime`）。家长端「兑换管理」移除「待兑现」列表与「确认兑现」按钮，仅保留已兑现历史。后端无需改动（`/freetime/:id`、`/active-buffs/:id`、`/reward-box` 均 `requireChild`，孩子端 JWT 可直接调用）。已部署 `papacheck/app/`
 
+### Changed
+- **孩子端移动端显示增强（响应式缩放 + 屏保竖屏适配）**：
+  - **积分道具「开始」确认框响应式**：`confirmStartFreeTime` 标题/正文改用 `clamp()` 随屏缩放（不再固定 32px/20px），两个按钮改为 `flex:1 1 0; min-width:0` 平分宽度，窄屏不再溢出/挤压。
+  - **屏保竖屏适配**：`.saver-time/.saver-date/.saver-message` 字号由固定 200px/48px/32px 改为 `clamp()`（时间 `clamp(80px,22vw,200px)`），屏保容器加 `padding/box-sizing/overflow:hidden`，巨字不再越过右边界被切，竖屏手机完整显示。
+  - **主界面溢出/错换行防御**：`.task-actions`、`.big-header-right` 按钮组加 `flex-wrap: wrap` 防窄屏越过右边界；`.current-task-name` 的 `word-break: break-all`（中文逐字断行）改为 `overflow-wrap: anywhere` 修「文字错误换行」；`.big-card-title`/`.homework-card-row`/`.homework-meta-row` 加 `min-width: 0` 防 flex 子项撑破容器。已部署 `papacheck/app/`
+
 ## [1.4.2] - 2026-06-25
 
 ### Changed
