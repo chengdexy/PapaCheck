@@ -80,12 +80,12 @@ body {
 }
 
 .big-date {
-  font-size: 34px;
+  font-size: clamp(20px, 5.5vw, 34px);
   font-weight: 700;
 }
 
 .big-time {
-  font-size: 56px;
+  font-size: clamp(34px, 9vw, 56px);
   font-weight: 800;
   background: linear-gradient(135deg, var(--accent), #818cf8);
   -webkit-background-clip: text;
@@ -155,7 +155,7 @@ body {
 }
 
 .current-task-name {
-  font-size: 36px;
+  font-size: clamp(20px, 6vw, 36px);
   font-weight: 700;
   margin-bottom: 10px;
   overflow: hidden;
@@ -469,7 +469,7 @@ body {
 }
 
 .stat-value {
-  font-size: 38px;
+  font-size: clamp(22px, 7vw, 38px);
   font-weight: 800;
   color: var(--accent);
 }
@@ -1030,6 +1030,8 @@ body {
     top: 0;
     z-index: 10;
     padding: 12px 20px;
+    flex-wrap: wrap;
+    row-gap: 8px;
   }
 
   .big-time {
@@ -1148,9 +1150,20 @@ body {
   }
 
   .big-stats {
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    -webkit-overflow-scrolling: touch;
+    flex-wrap: wrap;
+    overflow: visible;
+    gap: 10px;
+  }
+
+  .big-stats .stat-item,
+  .big-stats .btn-shop-nav {
+    flex: 1 1 calc(50% - 5px);
+    min-width: 0;
+  }
+
+  .btn-shop-nav {
+    white-space: normal;
+    text-align: center;
   }
 
   .stat-value {
