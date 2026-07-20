@@ -1042,7 +1042,6 @@ function showMyRewards() {
     } else {
       content.innerHTML = available.map(r => {
         const qty = r.quantity || 0;
-        const pendingR = redemptions.find(rd => rd.rewardBoxItemId === r.id && rd.status === 'pending');
         const metaStr = r.type === 'time'
           ? (r.durationMinutes || 0) + '分钟'
           : r.type === 'buff'
@@ -1056,11 +1055,7 @@ function showMyRewards() {
             <div class="reward-item-meta">${metaStr}</div>
           </div>
           <span class="reward-qty">× ${qty}</span>
-          ${pendingR
-            ? `<span style="font-size:12px;color:var(--warning);font-weight:600;">已提交</span>
-               <button onclick="cancelRedemption('${pendingR.id}')" style="padding:8px 16px;font-size:14px;border-radius:8px;border:1px solid var(--text-secondary);background:transparent;color:var(--text-secondary);cursor:pointer;">撤回</button>`
-            : `<button class="btn-redeem-sm" onclick="redeemFromRewardBox('${r.id}')">兑换</button>`
-          }
+          <button class="btn-redeem-sm" onclick="redeemFromRewardBox('${r.id}')">使用</button>
         </div >
     `;
       }).join('');
@@ -1090,73 +1085,70 @@ async function redeemFromRewardBox(itemId) {
     return;
   }
 
-  const redemptions = cachedData?.redemptions || [];
-  const alreadyPending = redemptions.find(rd => rd.rewardBoxItemId === itemId && rd.status === 'pending');
-  if (alreadyPending) {
-    showToast('已提交过，等待确认');
-    return;
-  }
-
   _redeemingRewardBox = true;
   try {
-    const newRedemption = {
-      id: Util.genId(),
-      itemName: item.name,
-      itemType: item.type || 'item',
-      durationMinutes: item.durationMinutes || 0,
-      buffDuration: item.buffDuration ?? 0,
-      buffUnit: item.buffUnit || '',
-      points: 0,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      fromRewardBox: true,
-      rewardBoxItemId: item.id,
-    };
-    redemptions.push(newRedemption);
-    await API.putRedemption(newRedemption.id, newRedemption);
+    // 1. 消耗奖励箱物品数量（不再提交申请、不再等家长同意）
+    item.quantity = (item.quantity || 0) - 1;
+    if (item.quantity <= 0) {
+      await API.deleteRewardBoxItem(item.id);
+      const idx = rewardBox.indexOf(item);
+      if (idx !== -1) rewardBox.splice(idx, 1);
+    } else {
+      await API.putRewardBoxItem(item.id, item);
+    }
+
+    // 2. 直接生成待使用记录
+    let newFtId = null;
+    if (item.type === 'time' && (item.durationMinutes || 0) > 0) {
+      const dateKey = Util.dateKey(currentDate);
+      const ft = {
+        id: Util.genId(),
+        dateKey,
+        name: item.name,
+        durationMinutes: item.durationMinutes,
+        status: 'pending',
+        startedAt: null,
+        completedAt: null,
+        remainingSeconds: item.durationMinutes * 60,
+        fromRewardBox: true,
+      };
+      freeTimeTasks.push(ft);
+      await API.putFreeTimeTask(ft.id, ft);
+      newFtId = ft.id;
+      showToast('已加入待使用，点击开始');
+      Voice.speak(item.name + '已加入待使用');
+    } else if (item.type === 'buff') {
+      const buffs = await API.getActiveBuffs();
+      const newBuff = {
+        id: Util.genId(),
+        name: item.name,
+        duration: item.buffDuration ?? 30,
+        unit: item.buffUnit || 'days',
+        startDate: (item.buffUnit === 'minutes') ? new Date().toISOString() : Util.dateKey(currentDate),
+        fromRewardBox: true,
+      };
+      buffs.push(newBuff);
+      await API.putBuff(newBuff.id, newBuff);
+      showToast('已生效');
+      Voice.speak(item.name + '已生效');
+    } else {
+      showToast('已使用');
+    }
 
     await Data.loadConfig();
     showMyRewards();
-    showToast('已提交，等待确认');
-    Voice.speak('已提交申请，等待确认');
+    updateFreeTimeGrid();   // 待使用框立即出现新卡片
+
+    // 3. time 类主动弹出开始界面
+    if (newFtId) {
+      confirmStartFreeTime(newFtId);
+    }
   } finally {
     _redeemingRewardBox = false;
   }
 }
 
-async function cancelRedemption(redemptionId) {
-  if (_redeemingRewardBox) return;
-  if (!guardOnline()) return;
-  _redeemingRewardBox = true;
-  try {
-    const redemptions = cachedData?.redemptions || [];
-    const r = redemptions.find(r => r.id === redemptionId);
-    if (!r || r.status !== 'pending') {
-      showToast('无法撤回');
-      return;
-    }
-
-    r.status = 'cancelled';
-    await API.putRedemption(r.id, r);
-
-    if (!r.fromRewardBox) {
-      const shopItems = cachedData?.shopItems || [];
-      const shopItem = shopItems.find(si => si.name === r.itemName);
-      if (shopItem) {
-        shopItem.remainingQuantity = (shopItem.remainingQuantity ?? 0) + 1;
-        await API.putShopItem(shopItem.id, shopItem);
-      }
-
-      await API.updatePoints('earn', r.points, '撤回兑换：' + r.itemName);
-    }
-
-    await Data.loadConfig();
-    showMyRewards();
-    showToast('已撤回');
-  } finally {
-    _redeemingRewardBox = false;
-  }
-}
+// 奖励箱撤回逻辑已随「直接使用」流程移除：孩子点使用后直接进入待使用框，不再有提交申请/撤回
 
 // ========== Shop Page ==========
 function showShopPage() {

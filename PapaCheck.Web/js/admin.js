@@ -1322,7 +1322,6 @@ async function rejectBountySubmission(dateKey, taskId) {
 
 // ========== Tab 4: Redemptions ==========
 function renderRedeemTab() {
-  const pending = adminRedemptions.filter(r => r.status === 'pending');
   const fulfilled = adminRedemptions
     .filter(r => r.status === 'fulfilled')
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -1332,21 +1331,7 @@ function renderRedeemTab() {
   const container = document.getElementById('adminContent');
   container.innerHTML = `
     <div class="admin-card">
-      <div class="admin-card-title">📋 兑换管理</div>
-
-      <div class="redeem-section-title">待兑现 (${pending.length})</div>
-      ${pending.length === 0
-      ? '<div style="text-align:center;color:var(--text-secondary);padding:12px;font-size:14px;">暂无待兑现</div>'
-      : pending.map(r => `
-          <div class="redeem-item">
-            <div class="redeem-info">
-              <div class="redeem-name">${escapeHtml(r.itemName)}${r.fromRewardBox ? ' <span style="font-size:12px;color:var(--accent);">🎁 奖励箱</span>' : ''}<span style="font-size:13px;color:var(--text-secondary);margin-left:6px;">${r.points > 0 ? r.points + '积分' : ''}${r.itemType === 'time' && r.durationMinutes ? (r.points > 0 ? ' · ' : '') + r.durationMinutes + '分钟' : ''}</span></div>
-              <div class="redeem-time">${new Date(r.createdAt).toLocaleString('zh-CN')}</div>
-            </div>
-            <span class="redeem-status pending">待兑现</span>
-            <button class="btn-fulfill" onclick="fulfillRedemption('${r.id}')">确认兑现</button>
-          </div>
-        `).join('')}
+      <div class="admin-card-title">📋 兑换记录</div>
 
       <div class="redeem-section-title">已兑现</div>
       ${fulfilled.length === 0

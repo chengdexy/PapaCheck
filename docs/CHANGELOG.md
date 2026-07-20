@@ -49,6 +49,9 @@
 ### Changed
 - **日历假日状态改为独立叠加显示**：`buildMiniCalendar` 中 `holiday` 脱离互斥 `else if` 链、改为独立挂类；CSS `.mini-cal-day.holiday` 由「橙黄底 + 橙字」改为 `outline: 2px solid` 橙黄边框（`outline-offset: -2px` 内收、不占布局），使「假日 + 有数据」两者同时可见（假日橙框 + 数据态着色），不再互相吞没。已部署 `papacheck/app/`
 
+### Changed
+- **简化积分道具兑换流程（去掉申请与家长同意）**：孩子端奖励箱物品按钮由「兑换（提交申请）」改为「使用」，点击后直接进入待使用框——time 类生成 `freeTimeTask`、buff 类生成 `activeBuff`，不再创建 `pending` 兑换记录、不再等待家长端「确认兑现」；time 类使用后立即主动弹出开始计时确认界面（`confirmStartFreeTime`）。家长端「兑换管理」移除「待兑现」列表与「确认兑现」按钮，仅保留已兑现历史。后端无需改动（`/freetime/:id`、`/active-buffs/:id`、`/reward-box` 均 `requireChild`，孩子端 JWT 可直接调用）。已部署 `papacheck/app/`
+
 ## [1.4.2] - 2026-06-25
 
 ### Changed
