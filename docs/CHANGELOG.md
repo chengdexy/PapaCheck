@@ -21,6 +21,7 @@
 - **修复 RealtimeManager 启动失败：`@cloudbase/js-sdk` 裸模块标识符无法解析**：在 `admin.html`/`index.html` 中添加 `importmap`，将 `@cloudbase/js-sdk` 映射到 esm.sh CDN
 - **修复 papacheck-api 云函数持续 `FUNCTION_INVOCATION_FAILED`**：根因为 `src/auth/jwt.ts` 在**模块加载期**向只读的 `/data/.jwt_secret` 写文件触发 `EROFS`，导致入口 `exports.main` 从未赋值；叠加部署入口漏写 `--dir dist`、CLI 环境变量推送不落盘。修复：JWT 密钥改为随包 `dist/jwt.secret` 文件（只读可读）、入口拆双文件（`index.js` wrapper 懒加载 `handler-body.js` 真实逻辑，异常以 500 JSON 返回真实栈）、构建改为自包含 bundle。方案A 轻量版本戳端点 `GET /papacheck/api/data-version` 已正式上线
 - **修复孩子端 buff 道具严重超时仍显示在 buff 栏**：原逻辑 `renderBuffBar` 直接渲染全部 `cachedData.activeBuffs` 且不判断过期。新增 `buffExpiryTs`/`isBuffActive`（按 `unit` 区分分钟/天，含本地日期与时区容错），加载配置时 `loadConfig` 剔除已过期 buff 并回写清理后的列表（避免存储无限堆积），`renderBuffBar` 同时做防御性过滤。连带更新 `data-layer.test.js`（用含有效 startDate 的 buff 替代裸 mock，新增过期 buff 过滤专项测试）
+- **修复孩子端积分不及时更新**：孩子端 `refreshCurrentView()`（child 分支）原实现只 `loadChildDay` 不重载积分，导致家长端审批赏金/改分（服务端积分变化经 RealtimeManager 版本戳触发本刷新）后孩子端积分余额长期不刷新。改为 `Promise.all([loadChildDay(_todayKey()), _reloadPoints()])` 同步重载积分。注：孩子端自行兑换道具 (`redeemItem`) 已通过 `Data.loadConfig()` 刷新积分，不在本 bug 范围。新增「child 端 refreshCurrentView 重载积分」单测
 
 ### Removed
 - **移除 Flutter WebView 加载遮罩（15 秒转圈）**：`_waitForPageReady()` 定期检查已移除的离线模块 `connStatus` className，永远不满足条件，必须等 15 秒超时。移除 `_isPageReady`/`_readyCheckTimer`/`_waitForPageReady`/遮罩 Container，改为 WebView 加载完毕直接启动电池监控

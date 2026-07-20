@@ -559,6 +559,35 @@ describe('降级 fallback', () => {
     assert.deepStrictEqual(snap.activeBuffs.map(b => b.id), ['active'], '过期 buff 应从快照移除');
     assert.ok(Array.isArray(saved) && saved.length === 1 && saved[0].id === 'active', '清理后的列表应回写（saveActiveBuffs）');
   });
+
+  test('refreshCurrentView(child) 同步重载积分余额（家长审批后孩子端积分刷新）', async () => {
+    let pointsCall = 0;
+    const ctx = loadDataLayer({
+      cachedData: null,
+      API: {
+        getShopItems: async () => [],
+        getRedemptions: async () => [],
+        getRewardBox: async () => [],
+        getBountyTasks: async () => [],
+        getActiveBuffs: async () => [],
+        getSettings: async () => ({}),
+        // 首次（bootstrap）返回 100；家长审批赏金后第二次（refreshCurrentView）返回 250
+        getPointsBalance: async () => { pointsCall++; return { balance: pointsCall === 1 ? 100 : 250 }; },
+        getHomeworks: async () => [],
+        getSettlement: async () => null,
+        getFreeTime: async () => null,
+        getBountySubmissions: async () => null,
+        getData: async () => ({}),
+      },
+    });
+    await ctx.Data.bootstrap('child');
+    const afterBootstrap = ctx.Data.getSnapshot().points.balance;
+    assert.strictEqual(afterBootstrap, 100, 'bootstrap 初始积分应为 100');
+    await ctx.Data.refreshCurrentView();
+    const afterRefresh = ctx.Data.getSnapshot().points.balance;
+    assert.strictEqual(afterRefresh, 250, 'child 刷新后应重载到最新积分余额（原 bug：只 loadChildDay 不碰 points）');
+    assert.ok(pointsCall >= 2, '应至少两次调用 getPointsBalance');
+  });
 });
 
 describe('静态校验：消费者迁移 & 降级通道约束', () => {

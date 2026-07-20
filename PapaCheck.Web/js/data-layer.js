@@ -423,7 +423,10 @@
   /** 依据 _entry + 当前视图重拉最小集（替代全量重拉，达成 AC-1/AC-4） */
   async function refreshCurrentView() {
     if (_entry === 'child') {
-      await loadChildDay(_todayKey());
+      // 孩子端单日刷新必须同步重载积分余额：积分变化主要来自家长端审批/改分（服务端），
+      // 由 RealtimeManager 版本戳变化触发本刷新；原实现只 loadChildDay 不碰 points，
+      // 导致家长审批赏金后孩子端积分余额长期不刷新（与家长端 settings tab 同源 bug）。
+      await Promise.all([loadChildDay(_todayKey()), _reloadPoints()]);
       return;
     }
     if (_entry === 'admin') {
