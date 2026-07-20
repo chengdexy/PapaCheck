@@ -77,6 +77,32 @@
     return snap;
   }
 
+  /**
+   * 计算 buff 过期时间戳（ms）。数据结构：
+   *   - unit === 'minutes'：startDate 为 ISO 时间串，过期 = 起始 + duration 分钟
+   *   - unit === 'days'（默认）：startDate 为本地日期 yyyy-mm-dd，过期 = 起始日 + duration 天（含起始日当天，到该日结束）
+   * 无法判定（缺字段/格式错）一律返回 0（视为已过期，交由调用方剔除）。
+   */
+  function buffExpiryTs(buff) {
+    if (!buff || !buff.startDate) return 0;
+    const duration = Number(buff.duration) || 0;
+    const isMinutes = buff.unit === 'minutes' || /T/.test(String(buff.startDate));
+    if (isMinutes) {
+      const start = new Date(buff.startDate).getTime();
+      if (isNaN(start)) return 0;
+      return start + duration * 60 * 1000;
+    }
+    const parts = String(buff.startDate).split('-').map(Number);
+    if (parts.length < 3 || parts.some(isNaN)) return 0;
+    const start = new Date(parts[0], parts[1] - 1, parts[2]).getTime();
+    return start + duration * 24 * 60 * 60 * 1000;
+  }
+
+  /** buff 是否仍在有效期内 */
+  function isBuffActive(buff) {
+    return buffExpiryTs(buff) > Date.now();
+  }
+
   function _emptySnapshot() {
     return {
       homeworks: {},
@@ -359,6 +385,22 @@
         console.warn('[Data] 配置端点失败（已跳过，保留既有值）: ' + key, e);
       }
     }));
+
+    // 加载后剔除已过期 buff，并回写清理后的列表，避免存储无限堆积（fix: 严重超时仍显示在 buff 栏）
+    const buffs = snap.activeBuffs;
+    if (Array.isArray(buffs) && buffs.length) {
+      const remaining = buffs.filter(isBuffActive);
+      if (remaining.length !== buffs.length) {
+        snap.activeBuffs = remaining;
+        try {
+          /* eslint-disable no-undef */
+          await API.saveActiveBuffs(remaining);
+          /* eslint-enable no-undef */
+        } catch (e) {
+          console.warn('[Data] 清理过期 buff 回写失败（仅本次不展示，下次加载仍会再过滤）', e);
+        }
+      }
+    }
   }
 
   /** 重拉积分余额并写入快照（设置页改积分后立即反映；失败保留既有值） */
@@ -714,6 +756,8 @@
     refreshCurrentView: refreshCurrentView,
     fallbackToFullCachedData: fallbackToFullCachedData,
     getSnapshot: _getSnapshot,
+    isBuffActive: isBuffActive,
+    buffExpiryTs: buffExpiryTs,
     getStats: function (range) { return _statsCache[range] || null; },
     getBountyTotal: function () { return _bountyTotal; },
     // 暴露给 QA 回归（T9）：legacy 聚合基线，与 /api/stats 归一化结果逐项比对

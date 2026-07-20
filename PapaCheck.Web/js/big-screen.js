@@ -321,7 +321,11 @@ function updateMainPage() {
 function renderBuffBar() {
   const buffBar = document.getElementById('buffBar');
   if (!buffBar) return;
-  const buffs = cachedData?.activeBuffs || [];
+  let buffs = cachedData?.activeBuffs || [];
+  // 防御性过滤：仅展示仍有效的 buff（严重超时的不应出现在 buff 栏）
+  if (typeof Data !== 'undefined' && Data.isBuffActive) {
+    buffs = buffs.filter(b => Data.isBuffActive(b));
+  }
   if (buffs.length === 0) {
     buffBar.style.display = 'none';
     return;

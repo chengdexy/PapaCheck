@@ -512,7 +512,7 @@ describe('降级 fallback', () => {
         getRedemptions: async () => [{ id: 'r1' }],
         getRewardBox: async () => [{ id: 'b1' }],
         getBountyTasks: async () => [{ id: 't1' }],
-        getActiveBuffs: async () => [{ id: 'a1' }],
+        getActiveBuffs: async () => [{ id: 'a1', startDate: '2099-01-01T00:00:00.000Z', duration: 60, unit: 'minutes' }],
         getSettings: async () => ({ theme: 'dark' }),
         getPointsBalance: async () => ({ balance: 42 }),
       },
@@ -528,10 +528,36 @@ describe('降级 fallback', () => {
     assert.deepStrictEqual(snap.redemptions, [{ id: 'r1' }], '其余端点应正常填充');
     assert.deepStrictEqual(snap.rewardBox, [{ id: 'b1' }]);
     assert.deepStrictEqual(snap.bountyTasks, [{ id: 't1' }]);
-    assert.deepStrictEqual(snap.activeBuffs, [{ id: 'a1' }]);
+    assert.deepStrictEqual(snap.activeBuffs, [{ id: 'a1', startDate: '2099-01-01T00:00:00.000Z', duration: 60, unit: 'minutes' }]);
     assert.deepStrictEqual(snap.settings, { theme: 'dark' });
     assert.deepStrictEqual(snap.points, { balance: 42 });
     assert.deepStrictEqual(snap.shopItems, [], '失败端点应保留既有（空）值，不污染');
+  });
+
+  test('loadConfig 剔除已过期 buff 并回写清理后的列表', async () => {
+    const pastIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const futureIso = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    let saved = null;
+    const ctx = loadDataLayer({
+      cachedData: null,
+      API: {
+        getShopItems: async () => [],
+        getRedemptions: async () => [],
+        getRewardBox: async () => [],
+        getBountyTasks: async () => [],
+        getActiveBuffs: async () => ([
+          { id: 'expired', name: '旧buff', startDate: pastIso, duration: 1, unit: 'minutes' },
+          { id: 'active', name: '新buff', startDate: futureIso, duration: 60, unit: 'minutes' },
+        ]),
+        getSettings: async () => ({}),
+        getPointsBalance: async () => ({ balance: 0 }),
+        saveActiveBuffs: async (b) => { saved = b; return true; },
+      },
+    });
+    await ctx.Data.loadConfig();
+    const snap = ctx.Data.getSnapshot();
+    assert.deepStrictEqual(snap.activeBuffs.map(b => b.id), ['active'], '过期 buff 应从快照移除');
+    assert.ok(Array.isArray(saved) && saved.length === 1 && saved[0].id === 'active', '清理后的列表应回写（saveActiveBuffs）');
   });
 });
 
